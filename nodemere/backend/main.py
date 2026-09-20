@@ -5842,6 +5842,14 @@ def first_present(data, *paths):
     return None
 
 
+def first_present_with_path(data, *paths):
+    for path in paths:
+        value = deep_get(data, path)
+        if value is not None and value != "":
+            return path, value
+    return None, None
+
+
 def blank_to_none(value):
     if isinstance(value, str):
         stripped = value.strip()
@@ -9110,16 +9118,20 @@ async def legacy_server_tool(
         )
 
     if normalized_tool in {"identify-caller", "lookup-customer"}:
-        search_phone = normalize_phone_number(first_present(
+        phone_source, raw_search_phone = first_present_with_path(
             payload,
             "phone",
+            "customer_phone",
+            "to_phone",
+            "person_phone",
             "caller_number",
             "from_number",
             "caller_phone",
             "system__caller_id",
             "system_caller_id",
             "From",
-        ))
+        )
+        search_phone = normalize_phone_number(raw_search_phone)
         search_email = first_present(payload, "email", "caller_email")
         search_name = str(first_present(payload, "name", "full_name", "customer_name") or "").strip().lower()
 
@@ -9140,22 +9152,34 @@ async def legacy_server_tool(
             query = query.eq("user_id", user_id)
         rows = query.limit(200).execute().data or []
 
-        filtered = rows
-        if search_phone:
-            phone_values = set(build_phone_match_values(search_phone))
-            filtered = [
-                row for row in filtered
-                if set(build_phone_match_values(row.get("phone"))) & phone_values
-            ]
-        if search_email:
-            filtered = [row for row in filtered if (row.get("email") or "").strip().lower() == str(search_email).strip().lower()]
-        if search_name:
-            filtered = [
-                row for row in filtered
-                if search_name in " ".join(filter(None, [row.get("first_name"), row.get("last_name")])).strip().lower()
-            ]
+        phone_values = set(build_phone_match_values(search_phone)) if search_phone else set()
+        email_value = str(search_email or "").strip().lower()
+        weak_phone_source = phone_source in {
+            "caller_number",
+            "from_number",
+            "caller_phone",
+            "system__caller_id",
+            "system_caller_id",
+            "From",
+        }
+        phone_score = 25 if weak_phone_source and search_name else 100
+        ranked = []
+        for index, row in enumerate(rows):
+            score = 0
+            full_name = " ".join(filter(None, [row.get("first_name"), row.get("last_name")])).strip().lower()
+            if phone_values and set(build_phone_match_values(row.get("phone"))) & phone_values:
+                score += phone_score
+            if email_value and (row.get("email") or "").strip().lower() == email_value:
+                score += 90
+            if search_name and search_name in full_name:
+                score += 60
+                if full_name == search_name:
+                    score += 15
+            if score:
+                ranked.append((score, -index, row))
 
-        matches = filtered[:10]
+        ranked.sort(key=lambda item: (item[0], item[1]), reverse=True)
+        matches = [row for _score, _order, row in ranked[:10]]
         return {
             "ok": True,
             "found": bool(matches),
@@ -9599,7 +9623,16 @@ async def legacy_server_tool(
 
         business_id = business.get("id")
         person_id = int_or_none(first_present(payload, "person_id", "record_id", "customer_id"))
-        search_phone = normalize_phone_number(first_present(payload, "phone", "caller_number", "from_number", "customer_phone"))
+        phone_source, raw_search_phone = first_present_with_path(
+            payload,
+            "phone",
+            "customer_phone",
+            "to_phone",
+            "person_phone",
+            "caller_number",
+            "from_number",
+        )
+        search_phone = normalize_phone_number(raw_search_phone)
         search_email = str(first_present(payload, "email", "customer_email") or "").strip().lower()
         search_name = str(first_present(payload, "name", "full_name", "customer_name") or "").strip().lower()
 
@@ -9607,24 +9640,25 @@ async def legacy_server_tool(
         if not person_id and (search_phone or search_email or search_name):
             people_query = supabase.table("people").select("*").eq("business_id", business_id).limit(500)
             people_rows = people_query.execute().data or []
-            filtered_people = people_rows
-            if search_phone:
-                phone_values = set(build_phone_match_values(search_phone))
-                filtered_people = [
-                    row for row in filtered_people
-                    if set(build_phone_match_values(row.get("phone"))) & phone_values
-                ]
-            if search_email:
-                filtered_people = [
-                    row for row in filtered_people
-                    if str(row.get("email") or "").strip().lower() == search_email
-                ]
-            if search_name:
-                filtered_people = [
-                    row for row in filtered_people
-                    if search_name in " ".join(filter(None, [row.get("first_name"), row.get("last_name")])).strip().lower()
-                ]
-            matched_people = filtered_people[:10]
+            phone_values = set(build_phone_match_values(search_phone)) if search_phone else set()
+            weak_phone_source = phone_source in {"caller_number", "from_number"}
+            phone_score = 25 if weak_phone_source and search_name else 100
+            ranked_people = []
+            for index, row in enumerate(people_rows):
+                score = 0
+                full_name = " ".join(filter(None, [row.get("first_name"), row.get("last_name")])).strip().lower()
+                if phone_values and set(build_phone_match_values(row.get("phone"))) & phone_values:
+                    score += phone_score
+                if search_email and str(row.get("email") or "").strip().lower() == search_email:
+                    score += 90
+                if search_name and search_name in full_name:
+                    score += 60
+                    if full_name == search_name:
+                        score += 15
+                if score:
+                    ranked_people.append((score, -index, row))
+            ranked_people.sort(key=lambda item: (item[0], item[1]), reverse=True)
+            matched_people = [row for _score, _order, row in ranked_people[:10]]
             if matched_people:
                 person_id = int_or_none(matched_people[0].get("id"))
 
