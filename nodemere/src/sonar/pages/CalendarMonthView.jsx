@@ -213,15 +213,14 @@ function getCurrentMonthInitialDate(appointmentsByDate, fallbackDate) {
   return monthDates[0] || fallbackDate;
 }
 
-export default function CalendarMonthView({ data = null, className = '', selectedDate: selectedDateProp = null, onSelectedDateChange }) {
-  const appointmentsData = useAppointments();
+function CalendarMonthViewBody({ data, className = '', selectedDate: selectedDateProp = null, onSelectedDateChange }) {
   const {
     allAppointments,
     services,
     lookups,
     createAppointment,
     loading,
-  } = data || appointmentsData;
+  } = data;
 
   const today = new Date();
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
@@ -229,8 +228,8 @@ export default function CalendarMonthView({ data = null, className = '', selecte
   const [hasAnimatedDots, setHasAnimatedDots] = useState(false);
   const [expandedAppointmentId, setExpandedAppointmentId] = useState(null);
   const [activeAppointmentActionsId, setActiveAppointmentActionsId] = useState(null);
-  const dropIns = useDropIns();
   const [dropInsOpen, setDropInsOpen] = useState(false);
+  const dropIns = useDropIns(dropInsOpen);
   const [callingAppointment, setCallingAppointment] = useState(null);
   const callLock = useRef(false);
   const [callFeedback, setCallFeedback] = useState({});
@@ -1010,4 +1009,13 @@ export default function CalendarMonthView({ data = null, className = '', selecte
       `}</style>
     </div>
   );
+}
+
+function StandaloneCalendarMonthView(props) {
+  const appointmentsData = useAppointments();
+  return <CalendarMonthViewBody {...props} data={appointmentsData} />;
+}
+
+export default function CalendarMonthView({ data = null, ...props }) {
+  return data ? <CalendarMonthViewBody {...props} data={data} /> : <StandaloneCalendarMonthView {...props} />;
 }

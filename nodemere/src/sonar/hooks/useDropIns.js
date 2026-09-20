@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../lib/api';
 
-export function useDropIns() {
+export function useDropIns(enabled = true) {
   const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(Boolean(enabled));
   const [error, setError] = useState('');
   const [canManage, setCanManage] = useState(false);
   const refresh = useCallback(async () => {
+    if (!enabled) return;
     setLoading(true);
     try {
       const result = await api.getDropIns();
@@ -15,13 +16,20 @@ export function useDropIns() {
       setError('');
     } catch (e) { setError(e.message); }
     finally { setLoading(false); }
-  }, []);
-  useEffect(() => { refresh(); }, [refresh]);
+  }, [enabled]);
   useEffect(() => {
+    if (!enabled) {
+      setLoading(false);
+      return;
+    }
+    refresh();
+  }, [enabled, refresh]);
+  useEffect(() => {
+    if (!enabled) return undefined;
     const focus = () => { refresh(); };
     window.addEventListener('focus', focus);
     return () => window.removeEventListener('focus', focus);
-  }, [refresh]);
+  }, [enabled, refresh]);
   const save = async (draft) => {
     const payload = { name: draft.name, purpose: draft.purpose, prompt: draft.prompt, is_active: draft.is_active, available_on_status: draft.available_on_status };
     const result = draft.id ? await api.updateDropIn(draft.id, payload) : await api.createDropIn(payload);

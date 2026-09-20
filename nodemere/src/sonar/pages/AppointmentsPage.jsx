@@ -2,8 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useAppointments } from '../hooks/useAppointments';
 import AppointmentsTable from './AppointmentsTable';
 
-const AppointmentsPage = ({ data = null, className = '', defaultAppointmentDate = null, hideTitle = false, onToolbarMetaChange = null }) => {
-  const appointmentsData = useAppointments();
+const AppointmentsPageBody = ({ data, className = '', defaultAppointmentDate = null, hideTitle = false, onToolbarMetaChange = null }) => {
   const {
     appointments, allAppointments, people, services, receptionists, lookups, loading, error,
     justAddedAppointmentIds,
@@ -12,7 +11,7 @@ const AppointmentsPage = ({ data = null, className = '', defaultAppointmentDate 
     sourceFilter, setSourceFilter,
     sortBy, sortDir, handleSort,
     createAppointment, updateAppointment, deleteAppointment, refresh,
-  } = data || appointmentsData;
+  } = data;
 
   const [tableSchema, setTableSchema] = useState(null);
   const [creating, setCreating] = useState(false);
@@ -90,5 +89,14 @@ const AppointmentsPage = ({ data = null, className = '', defaultAppointmentDate 
     </div>
   );
 };
+
+const StandaloneAppointmentsPage = (props) => {
+  const appointmentsData = useAppointments();
+  return <AppointmentsPageBody {...props} data={appointmentsData} />;
+};
+
+const AppointmentsPage = ({ data = null, ...props }) => (
+  data ? <AppointmentsPageBody {...props} data={data} /> : <StandaloneAppointmentsPage {...props} />
+);
 
 export default AppointmentsPage;
