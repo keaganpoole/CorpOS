@@ -2061,8 +2061,13 @@ class ScenarioActionExecutor:
                     response.status_code,
                     response.text,
                 )
-                return {"success": False, "error": 'The calling provider could not start the call.',
-                        'dispatch_unknown': bool(context.get('_drop_in') and response.status_code >= 500)}
+                return {
+                    "success": False,
+                    "error": 'The calling provider could not start the call.',
+                    "provider_status": response.status_code,
+                    "provider_response": response.text,
+                    'dispatch_unknown': bool(context.get('_drop_in') and response.status_code >= 500),
+                }
             result = response.json()
             if context.get('_drop_in'):
                 if not result.get('conversation_id'):

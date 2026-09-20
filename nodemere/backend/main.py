@@ -8754,7 +8754,16 @@ async def legacy_server_tool(
         }
         result = await scenario_engine.action_executor._call_customer(node, call_context)
         if not result.get("success"):
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=result.get("error") or "The call could not be started.")
+            return {
+                "ok": False,
+                "success": False,
+                "call_dispatched": False,
+                "error": result.get("error") or "The call could not be started.",
+                "provider_status": result.get("provider_status"),
+                "provider_response": result.get("provider_response"),
+                "to_phone": to_phone,
+                "person_id": str((person or {}).get("id") or person_id or ""),
+            }
         record_intercom_write_action(request, normalized_tool, result)
         return result.get("data") or result
 
