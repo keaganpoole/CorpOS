@@ -6,6 +6,17 @@ import { needsMfa } from '../lib/workforceSecurity';
 import { resetVisitorIdentity, updateVisitorAuth } from '../lib/visitorTracking.js';
 
 const AuthContext = createContext(null);
+const REQUEST_TIMEOUT_MS = 12000;
+
+const withTimeout = (promise, label, timeoutMs = REQUEST_TIMEOUT_MS) => {
+    let timer = null;
+    const timeout = new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs);
+    });
+    return Promise.race([promise, timeout]).finally(() => {
+        if (timer) clearTimeout(timer);
+    });
+};
 
 export const AuthProvider = ({ children }) => {
     const [session, setSession] = useState(null);
@@ -16,13 +27,18 @@ export const AuthProvider = ({ children }) => {
     const currentUserIdRef = useRef(null);
     const [workforce, setWorkforce] = useState(null);
     const refreshWorkforce = useCallback(async () => {
-        const { data } = await supabase.auth.getSession();
+        const { data } = await withTimeout(supabase.auth.getSession(), 'Supabase session');
         const active = data.session;
         if (!active) { setWorkforce(null); setWorkforceContext(null); return null; }
         try {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
             const [response, assurance] = await Promise.all([
-                fetch(`${import.meta.env.VITE_API_URL || window.sonar?.apiUrl || ''}/api/workforce/session`, { headers: { Authorization: `Bearer ${active.access_token}` } }),
-                supabase.auth.mfa.getAuthenticatorAssuranceLevel(),
+                fetch(`${import.meta.env.VITE_API_URL || window.sonar?.apiUrl || ''}/api/workforce/session`, {
+                    headers: { Authorization: `Bearer ${active.access_token}` },
+                    signal: controller.signal,
+                }).finally(() => clearTimeout(timeout)),
+                withTimeout(supabase.auth.mfa.getAuthenticatorAssuranceLevel(), 'MFA assurance'),
             ]);
             if (!response.ok) throw new Error('Workforce access is unavailable. Check that the backend and security migrations are ready.');
             const body = await response.json();
@@ -136,13 +152,21 @@ export const AuthProvider = ({ children }) => {
         let isCancelled = false;
         setIsProfileLoaded(false);
 
-        ensureProfile(session.user)
+        withTimeout(ensureProfile(session.user), 'Profile load')
             .then((data) => {
                 if (!isCancelled) setProfile(data || null);
             })
             .catch((error) => {
                 console.error("AuthContext.jsx:event_136");
-                if (!isCancelled) setProfile(null);
+                if (!isCancelled) {
+                    setProfile({
+                        id: session.user.id,
+                        email: session.user.email,
+                        full_name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || null,
+                        phone: session.user.user_metadata?.phone || null,
+                        onboarded: true,
+                    });
+                }
             })
             .finally(() => {
                 if (!isCancelled) setIsProfileLoaded(true);

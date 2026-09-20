@@ -6,7 +6,7 @@ const API_BASE_URL = window.sonar?.apiUrl || import.meta.env.VITE_API_URL || 'ht
 const CallLogsContext = createContext(null);
 const CALL_LOGS_PAGE_SIZE = 20;
 
-export const CallLogsProvider = ({ children, normalizeCall }) => {
+export const CallLogsProvider = ({ children, normalizeCall, enabled = true }) => {
   const { session, workforce } = useAuth();
   const [calls, setCalls] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -20,6 +20,14 @@ export const CallLogsProvider = ({ children, normalizeCall }) => {
   const activeQueryRef = useRef('');
 
   const loadCallLogs = async ({ initial = false, force = false, append = false, searchQuery = activeQueryRef.current } = {}) => {
+    if (!enabled) {
+      setCalls([]);
+      setLoading(false);
+      setLoadingMore(false);
+      setHasMore(false);
+      hasLoadedRef.current = false;
+      return;
+    }
     if (!session?.access_token || workforce?.tenant?.role === 'STAFF') {
       setCalls([]);
       setLoading(false);
@@ -75,6 +83,14 @@ export const CallLogsProvider = ({ children, normalizeCall }) => {
   };
 
   useEffect(() => {
+    if (!enabled) {
+      setCalls([]);
+      setLoading(false);
+      setLoadingMore(false);
+      setHasMore(false);
+      hasLoadedRef.current = false;
+      return undefined;
+    }
     if (!session?.access_token || workforce?.tenant?.role === 'STAFF') {
       setCalls([]);
       setLoading(false);
@@ -123,7 +139,7 @@ export const CallLogsProvider = ({ children, normalizeCall }) => {
       if (pollingTimer) window.clearTimeout(pollingTimer);
       supabase.removeChannel(channel);
     };
-  }, [session?.access_token, workforce?.tenant?.business_id, workforce?.tenant?.role]);
+  }, [enabled, session?.access_token, workforce?.tenant?.business_id, workforce?.tenant?.role]);
 
   const value = useMemo(() => ({
     calls,

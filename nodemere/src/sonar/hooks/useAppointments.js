@@ -141,41 +141,45 @@ export function useAppointments() {
     setLoading(true);
     setError(null);
     try {
-      const [appointmentRows, peopleRows, serviceRows, apiAgents] = await Promise.all([
-        api.getAppointments(500),
+      const appointmentRows = await api.getAppointments(500);
+      if (!abortRef.current) {
+        setAppointments(appointmentRows || []);
+        setLoading(false);
+      }
+
+      const [peopleResult, servicesResult, agentsResult] = await Promise.allSettled([
         api.getPeople(500),
         api.getServices(),
         api.getAgents(),
       ]);
+      if (abortRef.current) return;
 
-      let receptionistRows = [];
-      if (Array.isArray(apiAgents) && apiAgents.length > 0) {
-        receptionistRows = apiAgents.map((agent) => ({
-          id: agent.id,
-          full_name: agent.full_name || agent.name || '',
-          first_name: agent.first_name || agent.name || '',
-          status: agent.status || null,
-          is_active: agent.is_active !== false,
-          direction: agent.direction || 'all',
-          avatar: agent.avatar || null,
-          banner_id: agent.banner_id ?? null,
-          catalog_id: agent.catalog_id ?? null,
-          user_id: agent.user_id ?? null,
-          business_id: agent.business_id ?? null,
-        }));
-      }
-
-      receptionistRows = Array.from(
-        new Map((receptionistRows || []).filter((row) => row?.id != null).map((row) => [String(row.id), row])).values(),
+      const peopleRows = peopleResult.status === 'fulfilled' ? peopleResult.value : [];
+      const serviceRows = servicesResult.status === 'fulfilled' ? servicesResult.value : [];
+      const apiAgents = agentsResult.status === 'fulfilled' ? agentsResult.value : [];
+      const receptionistRows = Array.from(
+        new Map((Array.isArray(apiAgents) ? apiAgents : [])
+          .map((agent) => ({
+            id: agent.id,
+            full_name: agent.full_name || agent.name || '',
+            first_name: agent.first_name || agent.name || '',
+            status: agent.status || null,
+            is_active: agent.is_active !== false,
+            direction: agent.direction || 'all',
+            avatar: agent.avatar || null,
+            banner_id: agent.banner_id ?? null,
+            catalog_id: agent.catalog_id ?? null,
+            user_id: agent.user_id ?? null,
+            business_id: agent.business_id ?? null,
+          }))
+          .filter((row) => row?.id != null)
+          .map((row) => [String(row.id), row])).values(),
       );
 
-      if (!abortRef.current) {
-        setAppointments(appointmentRows || []);
-        setPeople(peopleRows || []);
-        setServices(serviceRows || []);
-        setReceptionists(receptionistRows || []);
-        setReceptionistCatalog([]);
-      }
+      setPeople(Array.isArray(peopleRows) ? peopleRows : []);
+      setServices(Array.isArray(serviceRows) ? serviceRows : []);
+      setReceptionists(receptionistRows);
+      setReceptionistCatalog([]);
     } catch (err) {
       if (!abortRef.current) setError(err.message);
     } finally {

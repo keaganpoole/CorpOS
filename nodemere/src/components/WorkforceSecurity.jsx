@@ -7,11 +7,24 @@ import SplashScreen from './SplashScreen';
 const NODEMERE_LOGO_SRC = 'https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/assets/nodemere_logo2.png';
 
 const base = window.sonar?.apiUrl || import.meta.env.VITE_API_URL || '';
+const WORKFORCE_TIMEOUT_MS = 12000;
 export async function workforceRequest(path, method = 'GET', body) {
   const { data } = await supabase.auth.getSession();
-  const response = await fetch(`${base}/api/workforce${path}`, { method,
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), WORKFORCE_TIMEOUT_MS);
+  let response;
+  try {
+    response = await fetch(`${base}/api/workforce${path}`, { method,
     headers: { Authorization: `Bearer ${data.session?.access_token || ''}`, 'Content-Type': 'application/json' },
-    ...(body !== undefined ? { body: JSON.stringify(body) } : {}) });
+    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+    signal: controller.signal,
+  });
+  } catch (error) {
+    if (error?.name === 'AbortError') throw new Error(`Workforce request timed out after ${WORKFORCE_TIMEOUT_MS}ms`);
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
   const value = await response.json();
   if (!response.ok) throw new Error(value.detail?.message || value.detail || 'Request failed');
   return value;

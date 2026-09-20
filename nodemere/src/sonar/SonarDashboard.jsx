@@ -2571,7 +2571,7 @@ const SonarDashboard = () => {
 
   return (
     <AudioPlayerProvider>
-    <CallLogsProvider normalizeCall={normalizeCall}>
+    <CallLogsProvider normalizeCall={normalizeCall} enabled={currentRoute === 'call-logs'}>
     <NestProvider
       businessId={staffBusinessId || businessUsage?.business_id || profile?.business_id}
       tasklistState={backendTasklistState}

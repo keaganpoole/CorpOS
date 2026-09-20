@@ -5,6 +5,7 @@
 
 const API_BASE = window.sonar?.apiUrl || import.meta.env.VITE_API_URL || '';
 const WS_URL = window.sonar?.wsUrl || import.meta.env.VITE_WS_URL || null;
+const API_TIMEOUT_MS = 15000;
 
 let authSessionRequest = null;
 
@@ -13,9 +14,18 @@ let authSessionRequest = null;
 // burst of redundant auth work. Share the in-flight lookup across callers.
 async function getAuthSession() {
   if (!authSessionRequest) {
+    let timeout = null;
     authSessionRequest = import('./supabase')
-      .then(({ supabase }) => supabase.auth.getSession())
-      .finally(() => { authSessionRequest = null; });
+      .then(({ supabase }) => Promise.race([
+        supabase.auth.getSession(),
+        new Promise((_, reject) => {
+          timeout = setTimeout(() => reject(new Error(`Auth session timed out after ${API_TIMEOUT_MS}ms`)), API_TIMEOUT_MS);
+        }),
+      ]))
+      .finally(() => {
+        if (timeout) clearTimeout(timeout);
+        authSessionRequest = null;
+      });
   }
   return authSessionRequest;
 }
@@ -58,13 +68,31 @@ function logSlowApiCall(method, endpoint, startedAt, status = null) {
   }
 }
 
+async function fetchWithTimeout(url, options = {}, timeoutMs = API_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, {
+      ...options,
+      signal: options.signal || controller.signal,
+    });
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      throw new Error(`Request timed out after ${timeoutMs}ms`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 // ─── REST Helpers ───────────────────────────────────────────
 async function fetchJSON(endpoint) {
   const startedAt = performance.now();
   let statusCode = null;
   try {
     const headers = await buildAuthHeaders();
-    const res = await fetch(`${API_BASE}${endpoint}`, { headers });
+    const res = await fetchWithTimeout(`${API_BASE}${endpoint}`, { headers });
     statusCode = res.status;
     if (!res.ok) throw await parseApiError(res);
     return await res.json();
@@ -79,7 +107,7 @@ async function fetchJSON(endpoint) {
 async function strictGetJSON(endpoint) {
   const startedAt = performance.now();
   let statusCode = null;
-  const res = await fetch(`${API_BASE}${endpoint}`, { headers: await buildAuthHeaders() });
+  const res = await fetchWithTimeout(`${API_BASE}${endpoint}`, { headers: await buildAuthHeaders() });
   statusCode = res.status;
   logSlowApiCall('GET', endpoint, startedAt, statusCode);
   if (!res.ok) throw await parseApiError(res);
@@ -127,7 +155,7 @@ export const api = {
   deleteAppointment: (id) => deleteJSON(`/api/sonar/appointments/${encodeURIComponent(id)}`),
   getPeopleDocuments: () => fetchJSON('/api/sonar/people/documents'),
   getPersonDocumentUrl: async (personId, documentId) => {
-    const res = await fetch(`${API_BASE}/api/sonar/people/${encodeURIComponent(personId)}/documents/${encodeURIComponent(documentId)}/download`, {headers:await buildAuthHeaders()});
+    const res = await fetchWithTimeout(`${API_BASE}/api/sonar/people/${encodeURIComponent(personId)}/documents/${encodeURIComponent(documentId)}/download`, {headers:await buildAuthHeaders()});
     if (!res.ok) throw await parseApiError(res);
     return {url:URL.createObjectURL(await res.blob())};
   },
@@ -204,7 +232,7 @@ async function postJSON(endpoint, body) {
   let statusCode = null;
   try {
     const headers = await buildAuthHeaders({ 'Content-Type': 'application/json' });
-    const res = await fetch(`${API_BASE}${endpoint}`, {
+    const res = await fetchWithTimeout(`${API_BASE}${endpoint}`, {
       method: 'POST',
       headers,
       body: JSON.stringify(body),
@@ -225,7 +253,7 @@ async function putJSON(endpoint, body) {
   let statusCode = null;
   try {
     const headers = await buildAuthHeaders({ 'Content-Type': 'application/json' });
-    const res = await fetch(`${API_BASE}${endpoint}`, {
+    const res = await fetchWithTimeout(`${API_BASE}${endpoint}`, {
       method: 'PUT',
       headers,
       body: JSON.stringify(body),
@@ -246,7 +274,7 @@ async function patchJSON(endpoint, body) {
   let statusCode = null;
   try {
     const headers = await buildAuthHeaders({ 'Content-Type': 'application/json' });
-    const res = await fetch(`${API_BASE}${endpoint}`, {
+    const res = await fetchWithTimeout(`${API_BASE}${endpoint}`, {
       method: 'PATCH',
       headers,
       body: JSON.stringify(body),
@@ -267,7 +295,7 @@ async function deleteJSON(endpoint) {
   let statusCode = null;
   try {
     const headers = await buildAuthHeaders();
-    const res = await fetch(`${API_BASE}${endpoint}`, {
+    const res = await fetchWithTimeout(`${API_BASE}${endpoint}`, {
       method: 'DELETE',
       headers,
     });
