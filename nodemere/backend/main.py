@@ -8737,6 +8737,63 @@ async def legacy_server_tool(
             business_id=context.get("business_id"),
         )
 
+    if normalized_tool in {"get-call-logs", "search-call-logs", "call-logs"}:
+        safe_limit = max(1, min(int_or_none(first_present(payload, "limit")) or 20, 50))
+        safe_offset = max(0, int_or_none(first_present(payload, "offset")) or 0)
+        search_query = str(first_present(payload, "q", "query", "search") or "").strip()[:200]
+        status_filter = str(first_present(payload, "status", "call_status") or "").strip()
+        direction_filter = str(first_present(payload, "direction") or "").strip().lower()
+        if direction_filter == "outbound":
+            direction_filter = "outgoing"
+        person_id_filter = first_present(payload, "person_id", "customer_id")
+        phone_filter = normalize_phone_number(first_present(payload, "phone", "caller_phone", "customer_phone"))
+        date_from = str(first_present(payload, "date_from", "started_from") or "").strip()
+        date_to = str(first_present(payload, "date_to", "started_to") or "").strip()
+        select_fields = (
+            "id,conversation_id,provider_call_sid,business_id,user_id,person_id,caller_name,caller_phone,"
+            "from_number,to_number,started_at,ended_at,event_timestamp,created_at,duration_seconds,status,"
+            "outcome,summary,call_successful,failure_reason,direction,receptionist_name,agent_name,"
+            "hired_receptionist_id,is_favorited,has_audio"
+        )
+        query = supabase.table("call_logs").select(select_fields)
+        if business and business.get("id"):
+            query = query.eq("business_id", business["id"])
+        elif user_id:
+            query = query.eq("user_id", user_id)
+        if status_filter:
+            query = query.eq("status", status_filter)
+        if direction_filter:
+            query = query.eq("direction", direction_filter)
+        if person_id_filter:
+            query = query.eq("person_id", str(person_id_filter))
+        if date_from:
+            query = query.gte("started_at", date_from)
+        if date_to:
+            query = query.lte("started_at", date_to)
+        query = query.order("created_at", desc=True)
+        if search_query or phone_filter:
+            candidates = query.limit(500).execute().data or []
+            needle = search_query.casefold()
+            phone_values = set(build_phone_match_values(phone_filter)) if phone_filter else set()
+            search_fields = ("caller_name", "caller_phone", "from_number", "to_number", "summary", "outcome", "status", "call_successful", "agent_name", "receptionist_name")
+            rows = []
+            for row in candidates:
+                phone_match = not phone_values or bool(
+                    set(build_phone_match_values(row.get("caller_phone"))) & phone_values
+                    or set(build_phone_match_values(row.get("from_number"))) & phone_values
+                    or set(build_phone_match_values(row.get("to_number"))) & phone_values
+                )
+                text_match = not needle or any(needle in str(row.get(field) or "").casefold() for field in search_fields)
+                if phone_match and text_match:
+                    rows.append(row)
+            rows = rows[safe_offset:safe_offset + safe_limit]
+        else:
+            rows = query.range(safe_offset, safe_offset + safe_limit - 1).execute().data or []
+        for row in rows:
+            row.pop("business_id", None)
+            row.pop("user_id", None)
+        return {"ok": True, "call_logs": rows, "count": len(rows), "limit": safe_limit, "offset": safe_offset}
+
     if normalized_tool in {"dispatch-call", "start-outbound-call", "call-customer", "outbound-call"}:
         ensure_no_unresolved_templates(
             payload.get("person_id"),
