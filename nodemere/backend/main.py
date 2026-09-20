@@ -8832,6 +8832,39 @@ async def legacy_server_tool(
     if normalized_tool in {"get-reports", "get-report", "reports", "business-reports", "business-intelligence-report"}:
         report = await asyncio.to_thread(get_business_intelligence, supabase, user_id=str(user_id))
         section = str(first_present(payload, "section", "report_section") or "").strip().lower().replace("-", "_")
+        section_aliases = {
+            "staff": "operations",
+            "staffing": "operations",
+            "team": "operations",
+            "teams": "operations",
+            "services": "operations",
+            "service": "operations",
+            "receptionist": "operations",
+            "receptionists": "operations",
+            "configuration": "operations",
+            "settings": "operations",
+            "setup": "operations",
+            "workflow": "automation",
+            "workflows": "automation",
+            "scenario": "automation",
+            "scenarios": "automation",
+            "documents": "documents",
+            "docs": "documents",
+            "document_requests": "documents",
+            "customers": "people",
+            "customer": "people",
+            "contacts": "people",
+            "contact": "people",
+            "call": "calls",
+            "phone": "calls",
+            "phones": "calls",
+            "appointment": "appointments",
+            "booking": "appointments",
+            "bookings": "appointments",
+            "payment": "payments",
+            "revenue": "payments",
+        }
+        section = section_aliases.get(section, section)
         if section and section not in {"all", "full"}:
             metrics = report.get("metrics") if isinstance(report.get("metrics"), dict) else {}
             if section not in metrics:
