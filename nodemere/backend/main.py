@@ -1045,6 +1045,99 @@ def merge_call_log_raw_payload(existing_row: Optional[dict], next_payload: Optio
     return merged
 
 
+DISPATCH_STATUS_ALIASES = {
+    "answered": "connected",
+    "human": "human_answered",
+    "human_answered": "human_answered",
+    "person_answered": "human_answered",
+    "customer_answered": "human_answered",
+    "voicemail": "voicemail",
+    "machine": "voicemail",
+    "answering_machine": "voicemail",
+    "no_answer": "no_answer",
+    "no-answer": "no_answer",
+    "busy": "busy",
+    "failed": "failed",
+    "declined": "declined",
+    "dispatched": "dispatched",
+    "ringing": "ringing",
+    "connected": "connected",
+}
+
+
+def normalize_dispatch_status(value: Optional[str]) -> str:
+    normalized = str(value or "").strip().lower().replace(" ", "_")
+    return DISPATCH_STATUS_ALIASES.get(normalized, normalized or "unknown")
+
+
+def public_dispatch_status(status_value: str, *, message: Optional[str] = None, call_log: Optional[dict] = None) -> dict:
+    status_value = normalize_dispatch_status(status_value)
+    terminal = status_value in {"human_answered", "voicemail", "no_answer", "busy", "failed", "declined", "completed"}
+    return {
+        "ok": True,
+        "dispatch_status": status_value,
+        "terminal": terminal,
+        "message": message or {
+            "human_answered": "The outbound call was answered by a person.",
+            "voicemail": "The outbound call reached voicemail.",
+            "no_answer": "The outbound call was not answered.",
+            "busy": "The outbound call reached a busy line.",
+            "failed": "The outbound call failed.",
+            "declined": "The outbound call was declined.",
+            "connected": "The outbound call connected.",
+            "ringing": "The outbound call is ringing.",
+            "dispatched": "The outbound call has been dispatched.",
+        }.get(status_value, "The outbound call status is not available yet."),
+        "call_id": (call_log or {}).get("conversation_id"),
+        "call_log_id": (call_log or {}).get("id"),
+        "provider_call_sid": (call_log or {}).get("provider_call_sid"),
+    }
+
+
+def find_dispatch_call_log(*, business_id: Optional[str], call_id: Optional[str] = None, call_log_id: Optional[str] = None, provider_call_sid: Optional[str] = None) -> Optional[dict]:
+    query_fields = []
+    if call_log_id:
+        query_fields.append(("id", str(call_log_id)))
+    if call_id:
+        query_fields.append(("conversation_id", str(call_id)))
+    if provider_call_sid:
+        query_fields.append(("provider_call_sid", str(provider_call_sid)))
+    for field, value in query_fields:
+        query = supabase.table("call_logs").select("*").eq(field, value).limit(1)
+        if business_id:
+            query = query.eq("business_id", business_id)
+        rows = query.execute().data or []
+        if rows:
+            return rows[0]
+    return None
+
+
+def get_twilio_dispatch_status(provider_call_sid: Optional[str]) -> Optional[str]:
+    auth = get_twilio_auth_tuple()
+    if not twilio_account_sid or not auth or not provider_call_sid:
+        return None
+    try:
+        response = requests.get(
+            f"https://api.twilio.com/2010-04-01/Accounts/{twilio_account_sid}/Calls/{provider_call_sid}.json",
+            auth=auth,
+            timeout=8,
+        )
+        response.raise_for_status()
+        call = response.json() or {}
+    except Exception:
+        return None
+    status_value = str(call.get("status") or "").strip().lower()
+    if status_value == "in-progress":
+        return "connected"
+    if status_value in {"queued", "initiated", "ringing"}:
+        return "ringing"
+    if status_value in {"no-answer", "busy", "failed", "canceled"}:
+        return "no_answer" if status_value == "no-answer" else status_value
+    if status_value == "completed":
+        return "completed"
+    return status_value or None
+
+
 def build_inbound_ai_disclosure(business_name: Optional[str], receptionist_name: Optional[str]) -> str:
     business_label = str(business_name or "the business").strip() or "the business"
     assistant_label = str(receptionist_name or "Nodemere assistant").strip() or "Nodemere assistant"
@@ -8780,6 +8873,71 @@ async def legacy_server_tool(
             }
         record_intercom_write_action(request, normalized_tool, result)
         return result.get("data") or result
+
+    if normalized_tool in {"report-dispatch-status", "report-call-dispatch-status", "dispatch-status-report"}:
+        call_id = first_present(payload, "call_id", "conversation_id")
+        call_log_id = first_present(payload, "call_log_id", "dispatch_id")
+        provider_call_sid = first_present(payload, "provider_call_sid", "call_sid", "CallSid")
+        call_log = find_dispatch_call_log(
+            business_id=(business or {}).get("id"),
+            call_id=call_id,
+            call_log_id=call_log_id,
+            provider_call_sid=provider_call_sid,
+        )
+        if not call_log:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dispatch call not found")
+        status_value = normalize_dispatch_status(first_present(payload, "dispatch_status", "outcome", "status", "answer_type"))
+        message = str(first_present(payload, "message", "summary", "details") or "").strip()
+        raw_payload = dict(call_log.get("raw_payload") if isinstance(call_log.get("raw_payload"), dict) else {})
+        raw_payload["dispatch_status"] = {
+            "status": status_value,
+            "message": message,
+            "answer_type": first_present(payload, "answer_type", "answered_by"),
+            "reported_by": "outbound_agent",
+            "origin": first_present(payload, "origin") or "intercom",
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+        updates = {
+            "raw_payload": raw_payload,
+            "outcome": status_value if status_value in {"human_answered", "voicemail", "no_answer", "busy", "failed", "declined"} else call_log.get("outcome"),
+        }
+        if status_value in {"no_answer", "busy", "failed", "declined"}:
+            updates["status"] = "failed" if status_value == "failed" else status_value
+            updates["ended_at"] = datetime.now(timezone.utc).isoformat()
+            updates["failure_reason"] = message or public_dispatch_status(status_value).get("message")
+        updates = {key: value for key, value in updates.items() if value is not None}
+        response = supabase.table("call_logs").update(updates).eq("id", call_log["id"]).execute()
+        saved = response.data[0] if getattr(response, "data", None) else {**call_log, **updates}
+        return public_dispatch_status(status_value, message=message, call_log=saved)
+
+    if normalized_tool in {"get-dispatch-status", "dispatch-status", "check-dispatch-status"}:
+        call_id = first_present(payload, "call_id", "conversation_id")
+        call_log_id = first_present(payload, "call_log_id", "dispatch_id")
+        provider_call_sid = first_present(payload, "provider_call_sid", "call_sid", "CallSid")
+        wait_seconds = max(0, min(18, int_or_none(first_present(payload, "wait_seconds", "timeout_seconds")) or 0))
+        started_wait = time.monotonic()
+        while True:
+            call_log = find_dispatch_call_log(
+                business_id=(business or {}).get("id"),
+                call_id=call_id,
+                call_log_id=call_log_id,
+                provider_call_sid=provider_call_sid,
+            )
+            if not call_log:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dispatch call not found")
+            raw_payload = call_log.get("raw_payload") if isinstance(call_log.get("raw_payload"), dict) else {}
+            dispatch_status = raw_payload.get("dispatch_status") if isinstance(raw_payload.get("dispatch_status"), dict) else {}
+            status_value = normalize_dispatch_status(dispatch_status.get("status") or call_log.get("outcome") or "")
+            if status_value and status_value != "unknown" and public_dispatch_status(status_value).get("terminal"):
+                return public_dispatch_status(status_value, message=dispatch_status.get("message"), call_log=call_log)
+            twilio_status = get_twilio_dispatch_status(call_log.get("provider_call_sid") or provider_call_sid)
+            if twilio_status:
+                twilio_public = public_dispatch_status(twilio_status, call_log=call_log)
+                if twilio_public.get("terminal") or twilio_status in {"connected", "ringing"}:
+                    return twilio_public
+            if time.monotonic() - started_wait >= wait_seconds:
+                return public_dispatch_status(status_value if status_value != "unknown" else "dispatched", message=dispatch_status.get("message"), call_log=call_log)
+            await asyncio.sleep(1.25)
 
     if normalized_tool in {"request-docs", "document-request", "document-upload-request"}:
         context_payload = {**payload, "business": business, "user_id": user_id}
