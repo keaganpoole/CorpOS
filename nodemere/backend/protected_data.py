@@ -128,6 +128,18 @@ class ProtectedClient:
         if existing is None and table in RECORD_ID_FIELDS:
             # Never accept this server-managed binding identifier from a caller.
             row[record_field] = context[record_field] = str(uuid4())
+            if table == 'people':
+                if row.get('tags') in (None, [], ''):
+                    row.pop('tags', None)
+                    context.pop('tags', None)
+                for field in FIELDS['people']:
+                    if field == 'tags':
+                        continue
+                    if field == 'custom_fields':
+                        row.setdefault(field, {})
+                    else:
+                        row.setdefault(field, '')
+                    context.setdefault(field, row[field])
         elif context.get(record_field) is None:
             row[record_field] = context[record_field] = str(uuid4())
         for field, json_column in FIELDS[table].items():
