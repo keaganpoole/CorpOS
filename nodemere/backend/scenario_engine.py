@@ -1955,6 +1955,8 @@ class ScenarioActionExecutor:
                 "receptionist_id": str((context.get("receptionist") or {}).get("id") or ""),
                 "elevenlabs_voice_id": (context.get("receptionist") or {}).get("elevenlabs_voice_id") or "",
                 "customer_name": (context.get("customer") or {}).get("first_name") or (context.get("person") or {}).get("first_name") or "",
+                "person_id": str(customer_record.get("id") or context.get("person_id") or ""),
+                "twilio_call_sid": "",
                 "direction": "outgoing",
                 "flow_execution_id": context.get("_executionId") or "",
                 "scenario_id": (context.get("_scenario") or {}).get("id") or "",
