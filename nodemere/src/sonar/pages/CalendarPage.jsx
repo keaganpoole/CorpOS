@@ -3,7 +3,9 @@ import CalendarMonthView from './CalendarMonthView';
 import AppointmentsPage from './AppointmentsPage';
 import { useAppointments } from '../hooks/useAppointments';
 
-const CALENDAR_MIN_WIDTH = 34 * 16;
+const CALENDAR_BASE_MIN_WIDTH = 34 * 16;
+const CALENDAR_MIN_WIDTH = Math.round(CALENDAR_BASE_MIN_WIDTH * 1.15);
+const CALENDAR_DEFAULT_WIDTH = CALENDAR_MIN_WIDTH;
 const APPOINTMENTS_MIN_WIDTH = 32 * 16;
 const SPLIT_HANDLE_WIDTH = 12;
 const DESKTOP_SPLIT_QUERY = '(min-width: 1536px)';
@@ -18,9 +20,10 @@ export default function CalendarPage({ onToolbarMetaChange = null }) {
 
   const getCalendarWidthBounds = useCallback(() => {
     const containerWidth = splitContainerRef.current?.clientWidth || 0;
+    const widestAvailable = Math.max(CALENDAR_MIN_WIDTH, containerWidth - APPOINTMENTS_MIN_WIDTH - SPLIT_HANDLE_WIDTH);
     return {
       min: CALENDAR_MIN_WIDTH,
-      max: Math.max(CALENDAR_MIN_WIDTH, containerWidth - APPOINTMENTS_MIN_WIDTH - SPLIT_HANDLE_WIDTH),
+      max: Math.round(CALENDAR_MIN_WIDTH + ((widestAvailable - CALENDAR_MIN_WIDTH) * 0.5)),
     };
   }, []);
 
@@ -35,7 +38,7 @@ export default function CalendarPage({ onToolbarMetaChange = null }) {
     event.preventDefault();
     setIsDraggingSplit(true);
     const startX = event.clientX;
-    const startCalendarWidth = calendarWidth ?? CALENDAR_MIN_WIDTH;
+    const startCalendarWidth = calendarWidth ?? CALENDAR_DEFAULT_WIDTH;
 
     const handlePointerMove = (moveEvent) => {
       setCalendarWidth(clampCalendarWidth(startCalendarWidth - (moveEvent.clientX - startX)));
@@ -54,7 +57,7 @@ export default function CalendarPage({ onToolbarMetaChange = null }) {
 
   const handleSplitKeyDown = useCallback((event) => {
     const { min, max } = getCalendarWidthBounds();
-    const currentWidth = calendarWidth ?? CALENDAR_MIN_WIDTH;
+    const currentWidth = calendarWidth ?? CALENDAR_DEFAULT_WIDTH;
     let nextWidth = null;
 
     if (event.key === 'ArrowLeft') nextWidth = currentWidth + 32;
@@ -102,7 +105,7 @@ export default function CalendarPage({ onToolbarMetaChange = null }) {
       <div
         ref={splitContainerRef}
         className="flex h-full min-h-0 flex-col overflow-hidden rounded-[28px] border border-white/[0.06] bg-[#020202] shadow-[0_32px_100px_-36px_rgba(0,0,0,0.92)] 2xl:flex-row"
-        style={{ '--calendar-panel-width': `${calendarWidth ?? CALENDAR_MIN_WIDTH}px` }}
+        style={{ '--calendar-panel-width': `${calendarWidth ?? CALENDAR_DEFAULT_WIDTH}px` }}
       >
         <div className="relative flex shrink-0 items-center gap-1 border-b border-white/[0.06] bg-[#050505] px-1.5 pb-2 pt-1.5 2xl:hidden">
           <div className="absolute bottom-0 left-1.5 right-1.5 h-px bg-white/[0.04]" />
@@ -149,7 +152,7 @@ export default function CalendarPage({ onToolbarMetaChange = null }) {
           aria-orientation="vertical"
           aria-valuemin={CALENDAR_MIN_WIDTH}
           aria-valuemax={getCalendarWidthBounds().max}
-          aria-valuenow={calendarWidth ?? CALENDAR_MIN_WIDTH}
+          aria-valuenow={calendarWidth ?? CALENDAR_DEFAULT_WIDTH}
           tabIndex={0}
           onPointerDown={handleSplitPointerDown}
           onKeyDown={handleSplitKeyDown}

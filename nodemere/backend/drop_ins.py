@@ -91,6 +91,10 @@ def clean_draft(draft):
     return values
 
 
+def persisted_draft_values(values):
+    return {key: value for key, value in values.items() if key != 'button_label'}
+
+
 def run_identity(business_id, appointment_id, drop_in_id, request_id):
     return str(uuid5(NAMESPACE_URL, f'nodemere:drop-in:{business_id}:{appointment_id}:{drop_in_id}:{request_id}'))
 
@@ -151,7 +155,7 @@ def build_router(db, get_user, load_business, executor):
         last = rows(db.table('drop_ins').select('sort_order').eq('available_on_status', values['available_on_status'])
                     .is_('deleted_at', 'null').order('sort_order', desc=True).limit(1))
         values.update(business_id=auth.business_id, sort_order=(last[0]['sort_order'] + 1 if last else 0))
-        return rows(db.table('drop_ins').insert(values))[0]
+        return rows(db.table('drop_ins').insert(persisted_draft_values(values)))[0]
 
     @router.put('/api/sonar/drop-ins/order')
     def reorder(order: DropInOrder, user=Depends(get_user)):
@@ -176,7 +180,7 @@ def build_router(db, get_user, load_business, executor):
         # This is an explicitly tenant-authorized RPC. Prompts pass through the
         # same envelope encryption as individual saves; never send plaintext to SQL.
         protected = db.raw
-        encoded = [protected.encode('drop_ins', {**value, 'business_id': auth.business_id}) for value in values]
+        encoded = [protected.encode('drop_ins', persisted_draft_values({**value, 'business_id': auth.business_id})) for value in values]
         try:
             # RPCs bypass the table wrapper; retain its per-request audit identity.
             result = StampedQuery(protected.rpc('save_drop_in_builder', {
@@ -199,7 +203,7 @@ def build_router(db, get_user, load_business, executor):
         values = clean_draft(draft)
         if values['available_on_status'] != previous['available_on_status']:
             raise HTTPException(422, 'Create a separate drop-in for another status.')
-        result = rows(db.table('drop_ins').update(values).eq('id', str(drop_in_id)).is_('deleted_at', 'null'))
+        result = rows(db.table('drop_ins').update(persisted_draft_values(values)).eq('id', str(drop_in_id)).is_('deleted_at', 'null'))
         if not result:
             raise HTTPException(409, 'This drop-in changed. Reload before saving.')
         return result[0]

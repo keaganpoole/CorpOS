@@ -75,7 +75,7 @@ const decorateAppointment = (appointment, lookups) => {
     ...appointment,
     _personName: person?.display_name || '',
     _serviceName: service?.name || '',
-    _receptionistName: receptionist?.full_name || '',
+    _receptionistName: receptionist?.first_name || receptionist?.full_name?.split(/\s+/)[0] || '',
     _receptionistAvatar: receptionist?.avatar || receptionistCatalog?.avatar || bannerUrl || '',
     _receptionistBannerUrl: bannerUrl || receptionist?.avatar || receptionistCatalog?.avatar || '',
     _receptionistCatalogId: receptionist?.catalog_id || null,
@@ -184,7 +184,16 @@ export function useAppointments() {
       if (peopleRows) setPeople(peopleRows);
       if (serviceRows) setServices(serviceRows);
       if (apiAgents) setReceptionists(receptionistRows);
-      setReceptionistCatalog([]);
+      if (receptionistRows.length) {
+        const catalogResult = await api.getReceptionistCatalog();
+        if (abortRef.current) return;
+        const catalogIds = new Set(receptionistRows.map((row) => row.catalog_id).filter((value) => value != null).map(String));
+        setReceptionistCatalog(Array.isArray(catalogResult)
+          ? catalogResult.filter((row) => row?.id != null && catalogIds.has(String(row.id)))
+          : []);
+      } else {
+        setReceptionistCatalog([]);
+      }
     } catch (err) {
       if (!abortRef.current) setError(err.message);
     } finally {

@@ -85,6 +85,7 @@ const AppointmentsPageBody = ({ data, className = '', defaultAppointmentDate = n
         receptionists={receptionists}
         lookups={lookups}
         hideTitle={hideTitle}
+        onRefresh={refresh}
       />
     </div>
   );

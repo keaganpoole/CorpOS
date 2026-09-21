@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Search, Plus, ChevronUp, ChevronDown, X, Building2, Check, GripVertical, Settings2, Wand2,
+  Search, Plus, ChevronUp, ChevronDown, X, Building2, Check, GripVertical, Settings2, Wand2, RefreshCw,
   User, Phone, Mail, Flag, Compass, Clock, Tag, Search as SearchIcon, FileText, Activity,
   Users, MapPin, Map as MapIcon, Shield, DollarSign, Target, Navigation, Type, Hash, CalendarDays, Trash2,
   ToggleLeft, Repeat, Wrench, Briefcase, Factory, TrendingUp, Globe, Calendar, MessageSquare, Gauge,
@@ -1116,6 +1116,7 @@ const LeadsTable = ({
   hideTitle = false,
   searchPlaceholder = 'Search people...',
   searchFieldClassName = '',
+  onRefresh,
 }) => {
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [viewSettings, setViewSettings] = useState(() => ({
@@ -2249,10 +2250,23 @@ const LeadsTable = ({
           </TableControlButton>
         </div>
         <div className="flex-1" />
-        <div className={`relative w-[260px] ${searchFieldClassName}`}>
-          <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-700" />
-          <input value={searchQuery} onChange={(e) => onSearchChange(e.target.value)} placeholder={searchPlaceholder} className="w-full bg-white/[0.02] border border-white/[0.06] rounded-xl py-2 pl-9 pr-8 text-[12px] text-zinc-300 placeholder:text-zinc-700 focus:!outline-none transition-colors" />
-          {searchQuery && <button onClick={() => onSearchChange('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-700 hover:text-white transition-colors"><X size={11} /></button>}
+        <div className="flex items-center gap-2">
+          {onRefresh && (
+            <button
+              type="button"
+              onClick={onRefresh}
+              className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-md border border-white/[0.06] bg-white/[0.02] text-zinc-500 transition-colors hover:border-white/[0.10] hover:bg-white/[0.035] hover:text-white active:scale-95"
+              aria-label="Refresh people"
+              title="Refresh people"
+            >
+              <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
+            </button>
+          )}
+          <div className={`relative w-[260px] ${searchFieldClassName}`}>
+            <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-700" />
+            <input value={searchQuery} onChange={(e) => onSearchChange(e.target.value)} placeholder={searchPlaceholder} className="w-full bg-white/[0.02] border border-white/[0.06] rounded-xl py-2 pl-9 pr-8 text-[12px] text-zinc-300 placeholder:text-zinc-700 focus:!outline-none transition-colors" />
+            {searchQuery && <button onClick={() => onSearchChange('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-700 hover:text-white transition-colors"><X size={11} /></button>}
+          </div>
         </div>
       </div>
 

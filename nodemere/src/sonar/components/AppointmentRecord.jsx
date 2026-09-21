@@ -32,10 +32,10 @@ export default function AppointmentRecord({
         </span>
         <span className={`flex min-w-0 items-center gap-2 transition-opacity duration-200 ${actionsOpen ? 'pointer-events-none opacity-0' : 'opacity-100'}`}>{details}</span>
       </motion.div>
-      <div className="flex shrink-0 items-center space-x-1.5">
-        <span className="font-bold uppercase tracking-wider text-[9px] text-zinc-500">{category}</span>
+      <div className="flex h-4 shrink-0 items-center space-x-1.5">
+        <span className="inline-flex h-4 items-center font-bold uppercase leading-none tracking-wider text-[9px] text-zinc-500">{category}</span>
         <span className="h-4 w-px bg-white/[0.12]" aria-hidden="true" />
-        <span className="font-mono text-[10px] text-zinc-400">{time}</span>
+        <span className="inline-flex h-4 items-center font-mono text-[10px] leading-none text-zinc-400">{time}</span>
       </div>
     </div>
     {overlay}

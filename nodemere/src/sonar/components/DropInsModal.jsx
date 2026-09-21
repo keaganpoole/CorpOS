@@ -48,7 +48,7 @@ export default function DropInsModal({ model, onClose }) {
   const activeItems = statusItems.filter(x => x.is_active);
   const previewItems = useMemo(() => {
     const saved = model.items.filter(x => x.available_on_status === status && x.is_active && x.id !== draft?.id).sort(manual);
-    if (view === 'editor' && draft?.is_active) {
+    if (view === 'editor' && draft?.id && draft?.is_active) {
       saved.push({ ...draft, id: draft.id || 'draft', name: draft.name.trim() || 'New drop-in', purpose: draft.purpose.trim() || draft.name.trim() || 'follow up', sort_order: draft.sort_order ?? 2147483647 });
     }
     return saved.sort(manual);

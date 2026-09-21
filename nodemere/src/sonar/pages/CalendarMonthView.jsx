@@ -618,11 +618,12 @@ function CalendarMonthViewBody({ data, className = '', selectedDate: selectedDat
           </span>
 
           {loading ? (
-            <div className="space-y-2 overflow-y-auto custom-scrollbar">
-              {Array.from({ length: 2 }).map((_, index) => (
+            <div className="space-y-2 overflow-visible">
+              {Array.from({ length: 3 }).map((_, index) => (
                 <div
                   key={index}
                   className="agenda-item h-[52px] rounded-lg border border-white/[0.08] bg-[#070707]/92 animate-pulse"
+                  style={{ animationDelay: `${index * 160}ms`, animationDuration: '1.9s' }}
                 />
               ))}
             </div>
@@ -684,11 +685,11 @@ function CalendarMonthViewBody({ data, className = '', selectedDate: selectedDat
                       }}
                       overlay={activePromptAction ? <CallLayerBorderOverlay /> : null}
                       details={<>
-                        <span className="truncate text-xs font-semibold text-zinc-200">{title}</span>
-                        <span className="text-[10px] font-medium italic text-zinc-500">with</span>
-                        <span className="truncate text-[10px] font-medium text-zinc-400">{getCustomerName(appointment)}</span>
-                        <span className="text-[10px] font-medium italic text-zinc-500">via</span>
-                        <span className="truncate text-[10px] font-medium text-zinc-400">{appointment._receptionistName || 'Receptionist'}</span>
+                        <span className="inline-flex h-4 items-center truncate text-xs font-semibold leading-none text-zinc-200">{title}</span>
+                        <span className="inline-flex h-4 items-center text-[10px] font-medium italic leading-none text-zinc-500">with</span>
+                        <span className="inline-flex h-4 items-center truncate text-[10px] font-medium leading-none text-zinc-400">{getCustomerName(appointment)}</span>
+                        <span className="inline-flex h-4 items-center text-[10px] font-medium italic leading-none text-zinc-500">via</span>
+                        <span className="inline-flex h-4 items-center truncate text-[10px] font-medium leading-none text-zinc-400">{appointment._receptionistName || 'Receptionist'}</span>
                       </>}
                       actions={<AnimatePresence mode="wait" initial={false}>
                         {activePromptAction ? <motion.div key="action-prompt" initial={{ opacity: 0, x: -14, scale: .96 }} animate={{ opacity: 1, x: 0, scale: 1 }} exit={{ opacity: 0, x: -12, scale: .97 }} transition={{ type: 'spring', stiffness: 440, damping: 28, mass: .7 }} className="flex min-w-0 flex-1">

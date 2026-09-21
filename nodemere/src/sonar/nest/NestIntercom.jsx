@@ -25,8 +25,7 @@ const createLine = (message) => {
   };
 };
 
-const hideTranscriptTags = (value) => String(value || '')
-  .replace(/\[[^\]]*\]/g, ' ')
+const normalizeTranscriptText = (value) => String(value || '')
   .replace(/\s+/g, ' ')
   .trim();
 
@@ -82,10 +81,10 @@ function PrivacyNotice({ open, busy, onCancel, onAccept }) {
   );
 }
 
-function NestIntercomInner({ open, onClose, initialBootstrap = null }) {
+function NestIntercomInner({ open, onClose }) {
   const { start: startMicrophone, stop: stopMicrophone, sample: sampleMicrophone, setMuted: setMicrophoneMuted } = useIntercomMicrophone();
   const { queueLength, setVoiceActive, nestSoundsMuted } = useNest();
-  const [bootstrap, setBootstrap] = useState(initialBootstrap);
+  const [bootstrap, setBootstrap] = useState(null);
   const [selectedId, setSelectedId] = useState('');
   const [phase, setPhase] = useState('selecting');
   const [line, setLine] = useState(null);
@@ -154,13 +153,6 @@ function NestIntercomInner({ open, onClose, initialBootstrap = null }) {
     [bootstrap, selectedId],
   );
 
-  useEffect(() => {
-    if (!initialBootstrap) return;
-    setBootstrap(initialBootstrap);
-    const remembered = initialBootstrap?.settings?.last_receptionist_eligible ? initialBootstrap.settings.last_receptionist_id : '';
-    setSelectedId(remembered || initialBootstrap?.receptionists?.[0]?.id || '');
-  }, [initialBootstrap]);
-
   const refreshBootstrap = useCallback(async () => {
     const data = await api.getIntercomBootstrap();
     setBootstrap(data);
@@ -170,10 +162,9 @@ function NestIntercomInner({ open, onClose, initialBootstrap = null }) {
 
   useEffect(() => {
     if (!open) return undefined;
-    if (bootstrap) return undefined;
     refreshBootstrap().catch(() => setError('Voice is unavailable right now.'));
     return undefined;
-  }, [bootstrap, open, refreshBootstrap]);
+  }, [open, refreshBootstrap]);
 
   useEffect(() => {
     setVoiceActive(open);
@@ -601,7 +592,7 @@ function NestIntercomInner({ open, onClose, initialBootstrap = null }) {
                         exit={{ opacity: 0, y: -6, filter: 'blur(3px)' }}
                         transition={{ duration: line?.draft ? 0.16 : 0.34, ease: [0.16, 1, 0.3, 1] }}
                       >
-                        {hideTranscriptTags(line?.text) || sessionFallback}
+                        {normalizeTranscriptText(line?.text) || sessionFallback}
                       </motion.p>
                     </AnimatePresence>
                   </div>

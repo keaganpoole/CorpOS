@@ -73,6 +73,7 @@ const PeoplePage = ({ hideTitle = false, onToolbarMetaChange = null }) => {
         onUpdateLead={handleInlineUpdate}
         onSchemaChange={setTableSchema}
         hideTitle={hideTitle}
+        onRefresh={refresh}
       />
     </div>
   );

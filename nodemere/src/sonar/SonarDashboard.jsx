@@ -111,13 +111,6 @@ const DEFAULT_DASHBOARD_ROUTE = 'receptionists';
 const DASHBOARD_ROUTES = ['live-monitoring', 'receptionists', 'scenarios', 'calendar', 'drop-ins', 'call-logs', 'pipeline', 'stats', 'settings'];
 const POPUP_DISMISS_PERSISTS_SHOWN = false;
 
-const NestReadySignal = ({ onReady }) => {
-  useEffect(() => {
-    onReady?.();
-  }, [onReady]);
-  return null;
-};
-
 const formatPlanName = (plan) => {
   const rawPlanName = String(plan || 'Free').trim() || 'Free';
   return rawPlanName
@@ -1787,13 +1780,9 @@ const SonarDashboard = () => {
   const [planLimitDetail, setPlanLimitDetail] = useState(null);
   const [showPlanChangePopup, setShowPlanChangePopup] = useState(false);
   const [nestStageExpanded, setNestStageExpanded] = useState(false);
-  const [nestReady, setNestReady] = useState(false);
-  const [intercomReady, setIntercomReady] = useState(false);
-  const [intercomBootstrap, setIntercomBootstrap] = useState(null);
   const tasklistPersistRef = useRef('');
   const archivedAgentsLoadedRef = useRef(false);
   const userId = authSession?.user?.id || profile?.id || null;
-  const dashboardStartupReady = nestReady && intercomReady;
 
   useEffect(() => {
     const handleScenarioIntroClicked = () => setScenariosIntroClicked(true);
@@ -1879,36 +1868,8 @@ const SonarDashboard = () => {
     setManualPopupId(null);
     setBackendTasklistState(null);
     setShowSetupGuide(true);
-    setNestReady(false);
-    setIntercomReady(false);
-    setIntercomBootstrap(null);
     tasklistPersistRef.current = '';
   }, [userId]);
-
-  useEffect(() => {
-    if (!authSession?.access_token) {
-      setIntercomReady(true);
-      setIntercomBootstrap(null);
-      return undefined;
-    }
-    let cancelled = false;
-    setIntercomReady(false);
-    api.getIntercomBootstrap()
-      .then((data) => {
-        if (cancelled) return;
-        setIntercomBootstrap(data || null);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setIntercomBootstrap(null);
-      })
-      .finally(() => {
-        if (!cancelled) setIntercomReady(true);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [authSession?.access_token, userId]);
 
   const saveShowSetupGuidePreference = useCallback(async (value) => {
     setShowSetupGuide(value);
@@ -2615,7 +2576,6 @@ const SonarDashboard = () => {
       businessId={staffBusinessId || businessUsage?.business_id || profile?.business_id}
       tasklistState={backendTasklistState}
     >
-    <NestReadySignal onReady={() => setNestReady(true)} />
     <div className="sonar-dashboard-shell flex flex-col h-screen bg-[#020202] text-zinc-100 font-sans selection:bg-cyan-500/30 overflow-hidden">
       <style>{`
         .snap-x { scroll-snap-type: x proximity; }
@@ -2683,11 +2643,7 @@ const SonarDashboard = () => {
           description="Source-aware project report"
         />
 
-        <NestDock
-          businessAvatar={businessUsage?.avatar || ''}
-          initialIntercomBootstrap={intercomBootstrap}
-          onStageChange={setNestStageExpanded}
-        />
+        <NestDock businessAvatar={businessUsage?.avatar || ''} onStageChange={setNestStageExpanded} />
         <div className="ml-auto flex items-center">
           <button
             type="button"
@@ -2783,11 +2739,7 @@ const SonarDashboard = () => {
         <main className="flex-1 flex flex-col min-w-0 bg-[#020202] relative">
           <div className="flex-1 overflow-hidden">
             <div className="relative h-full">
-              {!dashboardStartupReady ? (
-                <div className="absolute inset-0 z-20 flex items-center justify-center pb-20">
-                  <CubePreloader />
-                </div>
-              ) : (mountedRoutes.includes(currentRoute)
+              {(mountedRoutes.includes(currentRoute)
                 ? mountedRoutes
                 : [...mountedRoutes, currentRoute]
               ).map((route) => {

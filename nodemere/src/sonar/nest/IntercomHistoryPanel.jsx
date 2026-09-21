@@ -15,12 +15,11 @@ const formatTime = (value) => {
   }).format(date);
 };
 
-const hideTags = (value) => String(value || '')
-  .replace(/\[[^\]]*\]/g, ' ')
+const normalizeText = (value) => String(value || '')
   .replace(/\s+/g, ' ')
   .trim();
 
-const displayText = (value, fallback = '') => hideTags(value) || fallback;
+const displayText = (value, fallback = '') => normalizeText(value) || fallback;
 
 export default function IntercomHistoryPanel({ open, onClose, businessAvatar = '' }) {
   const [query, setQuery] = useState('');
@@ -132,7 +131,7 @@ export default function IntercomHistoryPanel({ open, onClose, businessAvatar = '
             <div className="intercom-history-body custom-scrollbar">
               {selected ? (
                 <div className="intercom-history-detail">
-                  {selected.summary && hideTags(selected.summary) && <p className="intercom-history-summary">{hideTags(selected.summary)}</p>}
+                  {selected.summary && normalizeText(selected.summary) && <p className="intercom-history-summary">{normalizeText(selected.summary)}</p>}
                   <div className="intercom-history-transcript">
                     <time className="intercom-history-timestamp">{formatTime(selected.started_at || selected.created_at)}</time>
                     {(selected.transcript || []).map((item, index) => (
@@ -148,7 +147,7 @@ export default function IntercomHistoryPanel({ open, onClose, businessAvatar = '
                               ? <img className="intercom-history-message-avatar" src={businessAvatar || selected.business_avatar} alt="" />
                               : !isReceptionist && <span className="intercom-history-message-avatar">{initial}</span>}
                             <div className="intercom-history-message-content">
-                              <div className="intercom-history-message-bubble">{hideTags(item.text || item.message)}</div>
+                              <div className="intercom-history-message-bubble">{normalizeText(item.text || item.message)}</div>
                               <div className="intercom-history-message-meta">
                                 <span>{speakerName}</span>
                                 {item.offset && <><b>•</b><span>{item.offset}</span></>}

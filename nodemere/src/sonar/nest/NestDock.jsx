@@ -69,7 +69,7 @@ const HistoryPanel = () => {
   );
 };
 
-export default function NestDock({ onStageChange, businessAvatar = '', initialIntercomBootstrap = null }) {
+export default function NestDock({ onStageChange, businessAvatar = '' }) {
   const [intercomOpen, setIntercomOpen] = useState(false);
   const [conversationsOpen, setConversationsOpen] = useState(false);
   const {
@@ -118,7 +118,7 @@ export default function NestDock({ onStageChange, businessAvatar = '', initialIn
           onIdleClick={!displayEvent && !intercomOpen ? openIntercom : undefined}
           intercomOpening={intercomOpen}
         />
-        <NestIntercom open={intercomOpen} onClose={closeIntercom} initialBootstrap={initialIntercomBootstrap} />
+        <NestIntercom open={intercomOpen} onClose={closeIntercom} />
         {!intercomOpen && (
           <div className="nest-dock-tools no-drag">
             {queueLength > 0 && <span className="nest-queue-count" title={`${queueLength} queued Nest events`}>{queueLength}</span>}

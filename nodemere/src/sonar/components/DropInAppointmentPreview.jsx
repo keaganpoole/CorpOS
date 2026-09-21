@@ -9,6 +9,7 @@ import { ancestry } from '../lib/dropInGraph';
 import './dropInPreview.css';
 
 const COLORS = { pending: '#fbbf24', confirmed: '#34d399', completed: '#22c55e', missed: '#fb7185', cancelled: '#f43f5e' };
+const ADD_DROP_IN_ITEM = { id: '__add_drop_in__', name: 'Add drop-in', isAdd: true };
 
 export default function DropInAppointmentPreview({ items, status, draft, showCallLayer = false, receptionist, onAdd, onDelete, canManage, studioNavigation = false }) {
   const stage = useRef(null);
@@ -23,7 +24,7 @@ export default function DropInAppointmentPreview({ items, status, draft, showCal
   const rotateX = useSpring(pointerX, { stiffness: 100, damping: 24 });
   const rotateY = useSpring(pointerY, { stiffness: 100, damping: 24 });
   const highlight = draft?.is_active ? draft.id || 'draft' : undefined;
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (studioNavigation) return;
     if (showCallLayer && draft?.is_active) {
       setOpen(true);
@@ -34,16 +35,16 @@ export default function DropInAppointmentPreview({ items, status, draft, showCal
     setSelectedAction(null);
     if (!studioNavigation) setPath([]);
   }, [showCallLayer, draft?.id, draft?.name, draft?.purpose, draft?.is_active, status, studioNavigation]);
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!studioNavigation) return;
     setOpen(true);
     setSelectedAction(showCallLayer && draft?.is_active ? draft : null);
   }, [showCallLayer, draft?.id, status, studioNavigation]);
-  useEffect(() => { if (studioNavigation) setPath([]); }, [status, studioNavigation]);
-  useEffect(() => {
+  useLayoutEffect(() => { if (studioNavigation) setPath([]); }, [status, studioNavigation]);
+  useLayoutEffect(() => {
     if (studioNavigation && draft?.id) { setReelDirection(1); setPath(ancestry(items, draft.id)); }
   }, [draft?.id, studioNavigation]);
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!studioNavigation) return;
     // Keep navigation stable while typing, but recover from deleting, moving,
     // or disabling the currently open branch.
@@ -88,9 +89,10 @@ export default function DropInAppointmentPreview({ items, status, draft, showCal
   const currentParentId = path.at(-1) || null;
   const currentParent = items.find(item => item.id === currentParentId);
   const visibleItems = items.filter(item => String(item.parent_id || '') === String(currentParentId || ''));
-  const stripItems = currentParent ? [{ id: `back:${currentParent.id}`, name: `‹ ${currentParent.name}`, isBack: true }, ...visibleItems] : visibleItems;
+  const stripItems = currentParent ? [{ id: `back:${currentParent.id}`, name: `‹ ${currentParent.name}`, isBack: true }, ...visibleItems] : [...visibleItems, ...(canManage ? [ADD_DROP_IN_ITEM] : [])];
   const selectAction = action => {
     setOpen(true);
+    if (action.isAdd) { onAdd?.(); return; }
     if (action.isBack) { setReelDirection(-1); setPath(value => value.slice(0, -1)); return; }
     const children = items.filter(item => String(item.parent_id || '') === String(action.id));
     if (children.length || (studioNavigation && action.has_children)) { setReelDirection(1); setPath(value => [...value, action.id]); return; }
@@ -124,6 +126,9 @@ export default function DropInAppointmentPreview({ items, status, draft, showCal
                   </motion.div> : <motion.div key="action-list" initial={{ opacity: 0, x: -14, scale: .96 }} animate={{ opacity: 1, x: 0, scale: 1 }} exit={{ opacity: 0, x: -12, scale: .97 }} transition={{ type: 'spring', stiffness: 440, damping: 28, mass: .7 }} className="flex min-w-0 flex-1">
                     {studioNavigation ? <DropInHierarchyStrip items={visibleItems} parent={currentParent} direction={reelDirection} pathKey={path.join('/') || 'root'} onBack={() => { setReelDirection(-1); setPath(value => value.slice(0, -1)); }} onSelect={selectAction} onDelete={onDelete} highlightedId={highlight} childIds={new Set(items.flatMap(item => [item.parent_id, item.has_children ? item.id : null]).filter(Boolean))}
                       emptyLabel={currentParent ? 'No active children' : <button type="button" className="drop-in-preview-add" disabled={!canManage} onClick={() => onAdd?.()}>Add drop-in</button>} /> : <DropInStrip items={stripItems} highlightedId={highlight} onSelect={selectAction} onDelete={onDelete} reelKey={path.join('/') || 'root'} reelDirection={reelDirection}
+                      chipGap={2}
+                      getChipClassName={item => item.isAdd ? 'drop-in-preview-add is-inline-add' : ''}
+                      getTitle={item => item.isAdd ? 'Add drop-in' : item.name}
                       emptyLabel={<button type="button" className="drop-in-preview-add" aria-label="Add a drop-in to the preview" title="Add drop-in" disabled={!canManage}
                         onPointerDown={event => { event.preventDefault(); event.stopPropagation(); onAdd?.(); }}
                         onClick={event => { if (event.detail === 0) onAdd?.(); }}>Add drop-in</button>} />}
