@@ -699,12 +699,13 @@ function FlowCard({ children, stage, onBack, canContinue, onContinue, submitting
   );
 }
 
-export default function VoiceCloneExperience() {
-  const { token } = useParams();
+export default function VoiceCloneExperience({ sessionToken, skipSplash = false, embedded = false, active = true, onDirty, onComplete, onFinish } = {}) {
+  const { token: routeToken } = useParams();
+  const token = sessionToken || routeToken;
   const location = useLocation();
   const navigate = useNavigate();
   const reduceMotion = useReducedMotion();
-  const [showAlternateSplash, setShowAlternateSplash] = useState(true);
+  const [showAlternateSplash, setShowAlternateSplash] = useState(!skipSplash);
   const [stage, setStage] = useState(() => getInitialStage(location.state));
   const [cloneState, setCloneState] = useState({ loading: true, status: null, message: '' });
   const [form, setForm] = useState({ signer_name: '', signer_email: '' });
@@ -745,6 +746,10 @@ export default function VoiceCloneExperience() {
   const unavailable = ['not_found', 'expired', 'revoked'].includes(cloneState.status);
   const needsSignature = !isSigned;
   const activeError = cloneState.message;
+
+  useEffect(() => {
+    if (skipSplash && !cloneState.loading) setStage(cloneState.receptionist_profile?.completed_at ? 6 : cloneState.status === 'cloned' && cloneState.custom_voice_id ? 4 : isSigned ? 2 : 1);
+  }, [skipSplash, cloneState.loading]);
 
   const finishAlternateSplash = useCallback(() => {
     setShowAlternateSplash(false);
@@ -882,12 +887,13 @@ export default function VoiceCloneExperience() {
       setMediaError('Each audio sample must be 25 MB or smaller.');
       return;
     }
+    onDirty?.();
     const url = URL.createObjectURL(file);
     const sample = { id: `${Date.now()}-${Math.random().toString(16).slice(2)}`, file, name: file.name || `Voice sample ${samplesRef.current.length + 1}`, url, size: file.size, duration: null };
     samplesRef.current = [...samplesRef.current, sample];
     setSamples(samplesRef.current);
     setMediaError('');
-  }, []);
+  }, [onDirty]);
 
   const startRecording = async () => {
     setMediaError('');
@@ -932,13 +938,14 @@ export default function VoiceCloneExperience() {
       chunksRef.current = [];
     };
     recorder.start();
+    onDirty?.();
     setRecordingSeconds(0);
     setIsRecording(true);
     timerRef.current = window.setInterval(() => setRecordingSeconds((seconds) => seconds + 1), 1000);
   };
 
   const stopRecording = () => {
-    mediaRecorderRef.current?.stop();
+    if (mediaRecorderRef.current?.state === 'recording') mediaRecorderRef.current.stop();
     setIsRecording(false);
     if (timerRef.current) window.clearInterval(timerRef.current);
     timerRef.current = null;
@@ -947,7 +954,15 @@ export default function VoiceCloneExperience() {
     audioContextRef.current = null;
   };
 
+  useEffect(() => {
+    if (active) return;
+    stopRecording();
+    document.querySelectorAll('.voice-sample-review audio, #voice-preview-audio').forEach(audio => audio.pause());
+    setPlayingSampleId(null);
+  }, [active]);
+
   const removeSample = (sampleId) => {
+    onDirty?.();
     setSamples((current) => {
       const target = current.find((sample) => sample.id === sampleId);
       if (target) URL.revokeObjectURL(target.url);
@@ -1112,6 +1127,7 @@ export default function VoiceCloneExperience() {
   const addTrait = (value) => {
     const trait = normalizeTrait(value);
     if (!trait) return;
+    onDirty?.();
     setProfile((current) => {
       const exists = current.traits.some((item) => item.toLowerCase() === trait.toLowerCase());
       if (exists || current.traits.length >= 6) return { ...current, customTrait: '' };
@@ -1120,6 +1136,7 @@ export default function VoiceCloneExperience() {
   };
 
   const removeTrait = (trait) => {
+    onDirty?.();
     setProfile((current) => ({ ...current, traits: current.traits.filter((item) => item !== trait) }));
   };
 
@@ -1187,6 +1204,7 @@ export default function VoiceCloneExperience() {
       setCloneState((current) => ({ ...current, ...data, status: data.status || current.status, message: data.message || 'Cloned receptionist saved.' }));
       if (data.receptionist_profile?.avatar) setImagePreview(data.receptionist_profile.avatar);
       setStage(6);
+      onComplete?.();
     } catch (error) {
       setImageError(error.message || 'The receptionist could not be saved.');
     } finally {
@@ -1215,7 +1233,7 @@ export default function VoiceCloneExperience() {
           ? continueFromProfile
           : stage === 5
             ? saveReceptionistProfile
-            : () => navigate('/dashboard');
+            : () => onFinish ? onFinish() : navigate('/dashboard');
   const continueLabel = stage === 1
     ? (isSigned ? 'Continue to sample' : 'Sign and continue')
     : stage === 2
@@ -1254,7 +1272,7 @@ export default function VoiceCloneExperience() {
   }
 
   return (
-    <main className={`voice-flow-page ${stage === 0 ? 'is-intro' : ''}`}>
+    <main className={`voice-flow-page ${stage === 0 ? 'is-intro' : ''} ${embedded ? 'is-embedded' : ''}`} onChangeCapture={onDirty} onPointerDownCapture={event => { if (event.target.tagName === 'CANVAS') onDirty?.(); }}>
       <AnimatePresence mode="wait" initial={false}>
         {stage === 0 ? (
           <IntroNode key="intro" onBegin={() => setStage(1)} />

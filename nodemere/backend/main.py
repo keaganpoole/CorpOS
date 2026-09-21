@@ -3494,7 +3494,14 @@ async def require_authenticated_api_request(request: Request, call_next):
         if request.method in {"POST", "PUT", "PATCH", "DELETE"} and "application/json" in request.headers.get("content-type", ""):
             try:
                 body = await request.json()
-                if tenant: validate_references(raw_db, tenant, body)
+                is_drop_in_run = (
+                    request.method == "POST"
+                    and path.startswith("/api/sonar/appointments/")
+                    and "/drop-ins/" in path
+                    and path.endswith("/run")
+                )
+                if tenant and not is_drop_in_run:
+                    validate_references(raw_db, tenant, body)
                 from .permissions import contains_privileged_scenario_action
                 if "/scenarios" in path and contains_privileged_scenario_action(body):
                     require_permission(tenant, "billing.change")
@@ -7195,6 +7202,27 @@ async def check_document_upload_status_tool(request: Request):
     )
 
 
+from .voice_design import VoiceDesignRequest, VoiceSaveRequest, design_voice, save_voice
+
+
+@app.post('/api/sonar/studio/design', tags=['Nodemere Studio'])
+def studio_design_voice(payload: VoiceDesignRequest, current_user: dict = Depends(get_current_user)):
+    owner_id = business_owner_id(current_user)
+    require_plan_access(owner_id, 'receptionists')
+    return design_voice(payload, api_key=elevenlabs_api_key, owner_id=owner_id)
+
+
+@app.post('/api/sonar/studio/save', tags=['Nodemere Studio'])
+def studio_save_voice(payload: VoiceSaveRequest, current_user: dict = Depends(get_current_user)):
+    owner_id = business_owner_id(current_user)
+    require_plan_access(owner_id, 'receptionists')
+    business = load_business_by_user_id(owner_id)
+    if not business:
+        raise HTTPException(404, 'Business not found')
+    return save_voice(payload, db=supabase, api_key=elevenlabs_api_key,
+                      owner_id=owner_id, business_id=business['id'])
+
+
 class ContractCreateRequest(BaseModel):
     signer_name: Optional[str] = None
     signer_email: Optional[EmailStr] = None
@@ -10314,6 +10342,22 @@ async def persist_elevenlabs_event(payload):
         ) from exc
 
     saved = response.data[0] if getattr(response, "data", None) else {**(existing[0] if existing else {}), **call_log}
+    if saved.get("drop_in_id") and saved.get("appointment_id") and saved.get("hired_receptionist_id"):
+        saved_status = str(saved.get("status") or call_log.get("status") or "").strip().lower()
+        saved_outcome = str(saved.get("outcome") or call_log.get("outcome") or "").strip().lower()
+        is_terminal_drop_in = (
+            saved_status in CALL_COMPLETED_STATUSES
+            or saved_outcome in CALL_COMPLETED_STATUSES
+            or bool(saved.get("ended_at") or call_log.get("ended_at"))
+        )
+        if is_terminal_drop_in:
+            try:
+                supabase.table("appointments").update({
+                    "receptionist_id": int_or_none(saved.get("hired_receptionist_id")),
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                }).eq("id", str(saved["appointment_id"])).eq("business_id", saved.get("business_id")).execute()
+            except Exception:
+                logging.warning("main.elevenlabs_post_call_webhook.drop_in_appointment_receptionist_update_failed", exc_info=True)
     claim_call_milestones(supabase, saved)
     record_call_nest_event(supabase, saved)
     previous_duration_seconds = parse_usage_seconds(existing[0].get("duration_seconds")) if existing else 0
@@ -12595,6 +12639,7 @@ async def list_hired_receptionists(current_user: dict = Depends(get_current_user
 
 def normalize_custom_voice_receptionist(row: dict) -> dict:
     metadata = row.get("metadata") if isinstance(row.get("metadata"), dict) else {}
+    designed = metadata.get("source") == "voice_design"
     profile = metadata.get("receptionist_profile") if isinstance(metadata.get("receptionist_profile"), dict) else {}
     voice_name = profile.get("full_name") or row.get("voice_name") or row.get("speaker_name") or "Cloned Voice"
     first_name = profile.get("first_name") or (str(voice_name).strip().split(" ")[0] if str(voice_name).strip() else "Voice")
@@ -12603,16 +12648,16 @@ def normalize_custom_voice_receptionist(row: dict) -> dict:
         last_name = " ".join(str(voice_name).strip().split(" ")[1:])
     traits = profile.get("traits") if isinstance(profile.get("traits"), list) else ["Voice Clone", "Custom"]
     return {
-        "id": f"voice-clone:{row.get('id')}",
-        "source": "voice_clone",
+        "id": f"{'voice-design' if designed else 'voice-clone'}:{row.get('id')}",
+        "source": "custom_voice" if designed else "voice_clone",
         "custom_voice_id": row.get("id"),
         "provider_voice_id": row.get("provider_voice_id"),
         "elevenlabs_voice_id": row.get("provider_voice_id"),
         "full_name": voice_name,
         "first_name": first_name,
         "last_name": last_name,
-        "description": profile.get("description") or "Custom cloned voice.",
-        "stereotype": profile.get("stereotype") or "Custom Voice Clone",
+        "description": profile.get("description") or ("Custom designed voice." if designed else "Custom cloned voice."),
+        "stereotype": profile.get("stereotype") or ("Studio Voice Design" if designed else "Custom Voice Clone"),
         "avatar": profile.get("avatar") or profile.get("profile_image"),
         "traits": traits,
         "voice": profile.get("voice"),
@@ -14452,7 +14497,8 @@ scenario_engine = ScenarioEngine(
 
 from .drop_ins import build_router as build_drop_ins_router
 app.include_router(build_drop_ins_router(supabase, get_current_user, load_business_by_user_id,
-                                        scenario_engine.action_executor))
+                                        scenario_engine.action_executor,
+                                        find_outbound_receptionist_for_business))
 
 @app.post("/api/sonar/update-payment", tags=["Sonar Payments"])
 async def update_payment(request: PaymentUpdateRequest, current_user: dict = Depends(get_current_user)):

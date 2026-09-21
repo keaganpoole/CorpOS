@@ -67,7 +67,10 @@ class Database:
             'drop_ins': [{'id': DROP, 'business_id': 1, 'name': 'Thank You', 'purpose': 'thank them', 'prompt': 'Thank the customer.', 'available_on_status': 'completed', 'is_active': True, 'sort_order': 0, 'deleted_at': None}],
             'appointments': [{'id': APPT, 'business_id': 1, 'user_id': OWNER, 'status': 'completed', 'person_id': 7, 'receptionist_id': 9, 'date': '2026-09-06', 'time': '13:00'}],
             'people': [{'id': 7, 'business_id': 1, 'phone': '+15555550123', 'consent_call': True, 'consent_call_source': 'synthetic', 'consent_call_recorded_at': '2026-09-01', 'consent_call_scope': 'test'}],
-            'hired_receptionists': [{'id': 9, 'business_id': 1, 'first_name': 'Assigned', 'elevenlabs_voice_id': 'assigned-voice', 'is_active': True, 'direction': 'outbound'}],
+            'hired_receptionists': [
+                {'id': 9, 'business_id': 1, 'first_name': 'Assigned', 'elevenlabs_voice_id': 'assigned-voice', 'is_active': True, 'direction': 'inbound'},
+                {'id': 10, 'business_id': 1, 'first_name': 'Outbound', 'elevenlabs_voice_id': 'outbound-voice', 'is_active': True, 'direction': 'outbound'},
+            ],
             'call_logs': [],
         }
     def table(self, name): return Query(self, name)
@@ -101,8 +104,13 @@ class DropInTests(unittest.TestCase):
         async def user():
             with tenant_scope(Tenant(OWNER, 1, OWNER, role=self.role)):
                 yield SimpleNamespace(id=OWNER)
+        def outbound_receptionist(business_id, user_id=None):
+            return next((row for row in self.db.data['hired_receptionists']
+                         if str(row.get('business_id')) == str(business_id)
+                         and row.get('is_active') is not False
+                         and row.get('direction') in {'outbound', 'all'}), None)
         app = FastAPI()
-        app.include_router(build_router(self.scoped, user, lambda _: self.db.data['businesses'][0], self.executor))
+        app.include_router(build_router(self.scoped, user, lambda _: self.db.data['businesses'][0], self.executor, outbound_receptionist))
         self.client = TestClient(app)
         self.url = f'/api/sonar/appointments/{APPT}/drop-ins/{DROP}/run'
     async def dispatch(self, node, context):
@@ -165,20 +173,22 @@ class DropInTests(unittest.TestCase):
         self.assertEqual(self.run_call().status_code, 409)
         self.db.data['drop_ins'][0]['deleted_at'] = 'now'
         self.assertEqual(self.run_call().status_code, 404)
-    def test_cross_tenant_receptionist_rejected(self):
-        self.db.data['hired_receptionists'][0]['business_id'] = 2
-        self.assertEqual(self.run_call().status_code, 404)
-    def test_customer_consent_and_assignment_required(self):
+    def test_cross_tenant_outbound_receptionist_rejected(self):
+        self.db.data['hired_receptionists'][1]['business_id'] = 2
+        self.assertEqual(self.run_call().status_code, 422)
+    def test_customer_consent_and_outbound_receptionist_required(self):
         self.db.data['people'][0]['do_not_call'] = True
         self.assertEqual(self.run_call().status_code, 422)
-        self.db.data['appointments'][0]['receptionist_id'] = None
+        self.db.data['people'][0]['do_not_call'] = False
+        self.db.data['hired_receptionists'][1]['direction'] = 'none'
         self.assertEqual(self.run_call().status_code, 422)
         self.executor._call_customer.assert_not_awaited()
-    def test_exact_assigned_receptionist_and_prompt_snapshot(self):
+    def test_selected_outbound_receptionist_and_prompt_snapshot(self):
         self.assertEqual(self.run_call().status_code, 200)
-        self.assertEqual(self.context['receptionist']['id'], 9)
+        self.assertEqual(self.context['receptionist']['id'], 10)
+        self.assertEqual(self.context['appointment_receptionist']['id'], 9)
         log = self.db.data['call_logs'][0]
-        self.assertEqual(log['hired_receptionist_id'], 9)
+        self.assertEqual(log['hired_receptionist_id'], 10)
         self.assertEqual(log['appointment_id'], APPT)
         self.assertEqual(log['conversation_initiation_data']['drop_in']['purpose'], 'thank them')
         self.assertEqual(log['conversation_initiation_data']['drop_in']['prompt'], 'Thank the customer.')
@@ -213,7 +223,7 @@ class ProviderDispatchTests(unittest.TestCase):
         self.executor = ScenarioActionExecutor(self.db, {}, 'http://offline.invalid')
         self.context = {'business': {'id': 1, 'user_id': OWNER, 'name': 'Synthetic business'},
                         'person': self.db.data['people'][0], 'customer': self.db.data['people'][0],
-                        'receptionist': self.db.data['hired_receptionists'][0],
+                        'receptionist': self.db.data['hired_receptionists'][1],
                         'appointment': self.db.data['appointments'][0], '_scenario': {},
                         '_drop_in': {'id': DROP, 'name': 'Thank You', 'purpose': 'thank them', 'call_log_id': self.log_id}}
         self.stack = ExitStack()
@@ -229,13 +239,14 @@ class ProviderDispatchTests(unittest.TestCase):
             result = self.execute()
         self.assertTrue(result['success'], result)
         payload = provider.call_args.kwargs['json']['conversation_initiation_client_data']
-        self.assertEqual(payload['conversation_config_override']['tts']['voice_id'], 'assigned-voice')
-        self.assertEqual(payload['dynamic_variables']['receptionist_id'], '9')
+        self.assertEqual(payload['conversation_config_override']['tts']['voice_id'], 'outbound-voice')
+        self.assertEqual(payload['dynamic_variables']['receptionist_id'], '10')
         self.assertEqual(payload['dynamic_variables']['call_log_id'], self.log_id)
         self.assertEqual(payload['dynamic_variables']['drop_in_id'], DROP)
         self.assertEqual(payload['dynamic_variables']['drop_in_name'], 'Thank You')
         self.assertEqual(payload['dynamic_variables']['drop_in_purpose'], 'thank them')
-        self.assertIn(APPT, payload['dynamic_variables']['mission'])
+        self.assertEqual(payload['dynamic_variables']['mission'], 'Thank them for visiting.')
+        self.assertIn(APPT, payload['dynamic_variables']['appointment_context'])
         self.assertIn('secret__nodemere_context', payload['dynamic_variables'])
         self.assertEqual(len(self.db.data['call_logs']), 1)
         self.assertEqual(self.db.data['call_logs'][0]['conversation_id'], 'synthetic-conversation')
@@ -245,7 +256,7 @@ class ProviderDispatchTests(unittest.TestCase):
         self.assertFalse(result['success'])
         self.assertTrue(result['dispatch_unknown'])
     def test_provider_rejection_is_definitive(self):
-        with patch('backend.scenario_engine.requests.post', return_value=SimpleNamespace(ok=False, status_code=422)):
+        with patch('backend.scenario_engine.requests.post', return_value=SimpleNamespace(ok=False, status_code=422, text='bad request')):
             result = self.execute()
         self.assertFalse(result['success'])
         self.assertFalse(result['dispatch_unknown'])

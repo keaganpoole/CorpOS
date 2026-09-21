@@ -74,7 +74,8 @@ def clean_builder(builder):
 
 
 class DropInRun(BaseModel):
-    request_id: UUID
+    run_id: UUID | None = None
+    request_id: UUID | None = None
 
 
 def clean_draft(draft):
@@ -104,7 +105,7 @@ def public_run(row):
             'failure_reason': row.get('failure_reason')}
 
 
-def build_router(db, get_user, load_business, executor):
+def build_router(db, get_user, load_business, executor, find_outbound_receptionist=None):
     router = APIRouter(tags=['Drop-ins'])
 
     def tenant(permission='operations.read'):
@@ -115,14 +116,23 @@ def build_router(db, get_user, load_business, executor):
     def rows(query):
         return query.execute().data or []
 
-    def get(table, record_id, *, active=False):
+    def get(table, record_id, *, active=False, label='record'):
         query = db.table(table).select('*').eq('id', str(record_id)).limit(1)
         if active:
             query = query.is_('deleted_at', 'null')
         found = rows(query)
         if not found:
-            raise HTTPException(404, 'This record is no longer available.')
+            raise HTTPException(404, f'This {label} is no longer available.')
         return found[0]
+
+    def maybe_get(table, record_id, *, active=False):
+        if not record_id:
+            return {}
+        query = db.table(table).select('*').eq('id', str(record_id)).limit(1)
+        if active:
+            query = query.is_('deleted_at', 'null')
+        found = rows(query)
+        return found[0] if found else {}
 
     @router.get('/api/sonar/drop-ins')
     def list_drop_ins(user=Depends(get_user)):
@@ -199,7 +209,7 @@ def build_router(db, get_user, load_business, executor):
     @router.put('/api/sonar/drop-ins/{drop_in_id}')
     def update(drop_in_id: UUID, draft: DropInDraft, user=Depends(get_user)):
         tenant('operations.manage')
-        previous = get('drop_ins', drop_in_id, active=True)
+        previous = get('drop_ins', drop_in_id, active=True, label='drop-in')
         values = clean_draft(draft)
         if values['available_on_status'] != previous['available_on_status']:
             raise HTTPException(422, 'Create a separate drop-in for another status.')
@@ -211,13 +221,13 @@ def build_router(db, get_user, load_business, executor):
     @router.put('/api/sonar/drop-ins/{drop_in_id}/move')
     def move(drop_in_id: UUID, move: DropInMove, user=Depends(get_user)):
         tenant('operations.manage')
-        get('drop_ins', drop_in_id, active=True)
+        get('drop_ins', drop_in_id, active=True, label='drop-in')
         raise HTTPException(410, 'Nested drop-ins are no longer supported.')
 
     @router.delete('/api/sonar/drop-ins/{drop_in_id}')
     def delete(drop_in_id: UUID, user=Depends(get_user)):
         tenant('operations.manage')
-        get('drop_ins', drop_in_id, active=True)
+        get('drop_ins', drop_in_id, active=True, label='drop-in')
         rows(db.table('drop_ins').update({'deleted_at': datetime.now(timezone.utc).isoformat(), 'is_active': False})
              .eq('id', str(drop_in_id)))
         return {'ok': True}
@@ -225,39 +235,45 @@ def build_router(db, get_user, load_business, executor):
     @router.post('/api/sonar/appointments/{appointment_id}/drop-ins/{drop_in_id}/run')
     async def run(appointment_id: UUID, drop_in_id: UUID, payload: DropInRun, user=Depends(get_user)):
         auth = tenant('operations.write')
-        log_id = run_identity(auth.business_id, appointment_id, drop_in_id, payload.request_id)
+        run_id = payload.run_id or payload.request_id
+        if not run_id:
+            raise HTTPException(422, 'A drop-in run id is required.')
+        log_id = run_identity(auth.business_id, appointment_id, drop_in_id, run_id)
         previous = rows(db.table('call_logs').select('id,status,failure_reason').eq('id', log_id).limit(1))
         if previous:
             return public_run(previous[0])
-        drop_in = get('drop_ins', drop_in_id, active=True)
-        appointment = get('appointments', appointment_id)
+        drop_in = get('drop_ins', drop_in_id, active=True, label='drop-in')
+        appointment = get('appointments', appointment_id, label='appointment')
         if not drop_in['is_active'] or appointment.get('status', '').lower() != drop_in['available_on_status']:
             raise HTTPException(409, 'This drop-in is no longer available for the appointment’s current status.')
         if not appointment.get('person_id'):
             raise HTTPException(422, 'Link a customer to this appointment before calling.')
-        if not appointment.get('receptionist_id'):
-            raise HTTPException(422, 'Assign a receptionist to this appointment before calling.')
-        person = get('people', appointment['person_id'])
-        receptionist = get('hired_receptionists', appointment['receptionist_id'])
+        person = get('people', appointment['person_id'], label='customer')
+        assigned_receptionist = maybe_get('hired_receptionists', appointment.get('receptionist_id'))
+        receptionist = find_outbound_receptionist(auth.business_id, auth.owner_id) if find_outbound_receptionist else None
+        if not receptionist:
+            raise HTTPException(422, 'No outbound receptionist is selected. Set a receptionist to Outbound or All, then try again.')
         if not person.get('phone'):
             raise HTTPException(422, 'Add a phone number to this customer before calling.')
         if receptionist.get('is_active') is False or not receptionist.get('elevenlabs_voice_id'):
-            raise HTTPException(422, 'The assigned receptionist needs an active voice before calling.')
+            raise HTTPException(422, 'The outbound receptionist needs an active voice before calling.')
         from .scenario_engine import has_documented_call_consent, receptionist_direction_allows
         if not has_documented_call_consent(person):
             raise HTTPException(422, 'Outbound AI calls are disabled for this person because Do Not Call is set.')
         if not receptionist_direction_allows('outbound', receptionist.get('direction')):
-            raise HTTPException(422, 'Outbound calling is disabled for the assigned receptionist.')
+            raise HTTPException(422, 'The selected outbound receptionist is not enabled for outbound calls.')
         business = load_business(auth.owner_id) or {}
         if executor.plan_access_checker:
             executor.plan_access_checker(auth.owner_id, business, direction='outbound')
-        service = get('services', appointment['service_id']) if appointment.get('service_id') else {}
+        service = maybe_get('services', appointment.get('service_id'))
         context = {'business': business, 'business_id': auth.business_id, 'user_id': auth.owner_id,
                    'person': person, 'customer': person, 'receptionist': receptionist,
-                   'appointment': appointment, 'service': service, '_scenario': {},
+                   'appointment': appointment, 'appointment_receptionist': assigned_receptionist,
+                   'service': service, '_scenario': {},
                    '_drop_in': {'id': str(drop_in_id), 'name': drop_in['name'], 'purpose': drop_in['purpose'], 'call_log_id': log_id}}
         snapshot = {'drop_in': {'id': str(drop_in_id), 'name': drop_in['name'], 'purpose': drop_in['purpose'], 'prompt': drop_in['prompt'],
-                                'triggered_by': auth.actor_id}}
+                                'triggered_by': auth.actor_id},
+                    'appointment_receptionist_id': str(assigned_receptionist.get('id') or '')}
         try:
             rows(db.table('call_logs').insert({
                 'id': log_id, 'business_id': auth.business_id, 'user_id': auth.owner_id,
@@ -282,6 +298,6 @@ def build_router(db, get_user, load_business, executor):
             state = 'dispatch-unknown' if result.get('dispatch_unknown') else 'failed'
             rows(db.table('call_logs').update({'status': state, 'failure_reason': result.get('error') or 'The call could not be started.'})
                  .eq('id', log_id).eq('status', 'dispatching'))
-        return public_run(get('call_logs', log_id))
+        return public_run(get('call_logs', log_id, label='call request'))
 
     return router

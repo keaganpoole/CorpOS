@@ -109,6 +109,9 @@ async function strictGetJSON(endpoint) {
 }
 
 export const api = {
+  designVoice: (definition) => postJSON('/api/sonar/studio/design', definition, 150000),
+  saveDesignedVoice: (voice) => postJSON('/api/sonar/studio/save', voice, 150000),
+  createStudioCloneSession: () => postJSON('/api/contracts', { metadata: { source: 'nodemere_studio' } }),
   getDropIns: () => strictGetJSON('/api/sonar/drop-ins'),
   getDashboardBootstrap: () => fetchJSON('/api/sonar/dashboard/bootstrap'),
   getDropInTemplates: () => strictGetJSON('/api/sonar/drop-ins/templates'),
@@ -118,7 +121,7 @@ export const api = {
   deleteDropIn: (id) => deleteJSON(`/api/sonar/drop-ins/${encodeURIComponent(id)}`),
   reorderDropIns: (order) => putJSON('/api/sonar/drop-ins/order', order),
   moveDropIn: (id, move) => putJSON(`/api/sonar/drop-ins/${encodeURIComponent(id)}/move`, move),
-  runDropIn: (appointmentId, id, requestId) => postJSON(`/api/sonar/appointments/${encodeURIComponent(appointmentId)}/drop-ins/${encodeURIComponent(id)}/run`, { request_id: requestId }),
+  runDropIn: (appointmentId, id, requestId) => postJSON(`/api/sonar/appointments/${encodeURIComponent(appointmentId)}/drop-ins/${encodeURIComponent(id)}/run`, { run_id: requestId }),
   getAgents: (options = {}) => fetchJSON(`/api/agents${options.includeArchived ? '?include_archived=true' : ''}`),
   getSystemSummary: () => fetchJSON('/api/system/summary'),
   getLivePulse: (limit = 30) => fetchJSON(`/api/events/live-pulse?limit=${limit}`),
@@ -221,14 +224,14 @@ export const api = {
   pingMax: () => postJSON('/api/control/ping-max', {}),
 };
 
-async function postJSON(endpoint, body) {
+async function postJSON(endpoint, body, timeoutMs = API_TIMEOUT_MS) {
   try {
     const headers = await buildAuthHeaders({ 'Content-Type': 'application/json' });
     const res = await fetchWithTimeout(`${API_BASE}${endpoint}`, {
       method: 'POST',
       headers,
       body: JSON.stringify(body),
-    });
+    }, timeoutMs);
     if (!res.ok) throw await parseApiError(res);
     return await res.json();
   } catch (err) {

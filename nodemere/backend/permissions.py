@@ -33,6 +33,8 @@ def require_permission(tenant, permission):
 
 def route_permission(path, method):
     read = method in {"GET", "HEAD"}
+    if path.startswith('/api/sonar/studio/'):
+        return 'operations.read' if read else 'operations.manage'
     if path.startswith('/api/voice-catalog'):
         return 'operations.read' if read else 'operations.manage'
     if path.startswith('/api/sonar/nest/intercom'):

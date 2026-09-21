@@ -2,7 +2,7 @@
  * SonarDashboard — Wraps the Sonar App component for use inside Nodemere routing.
  * Renders the full Sonar dashboard UI at /dashboard.
  */
-import React, { useState, useEffect, useRef, useCallback, Component } from 'react';
+import React, { useState, useEffect, useRef, useCallback, Component, lazy, Suspense } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from './lib/supabase';
 import {
@@ -22,7 +22,6 @@ import {
   Play,
   Maximize2,
   RefreshCw,
-  Layers,
   Eye,
   Heart,
   AlertTriangle,
@@ -61,13 +60,15 @@ import { api } from './lib/api';
 import LeadsPage from './pages/LeadsPage';
 import ScenariosModal from './pages/ScenariosModal';
 import HireReceptionistModal from './pages/HireReceptionistModal';
+const ReceptionistEntry = lazy(() => import('./studio/ReceptionistEntry'));
+const NodemereStudio = lazy(() => import('./studio/NodemereStudio'));
+const StudioExitDialog = lazy(() => import('./studio/StudioExitDialog'));
 import { CommanderModal, SubtaskStatusIcon } from './pages/CommanderModal';
 import ScenariosPage from './pages/Scenarios/Scenarios';
 import SettingsPage from './pages/SettingsPage';
 import { StaffManager } from './pages/SettingsPage';
 import ReportProblemModal from './components/ReportProblemModal';
 import CalendarPage from './pages/CalendarPage';
-import DropInsPage from './pages/DropInsPage';
 import CallLogsPage, { normalizeCall } from './pages/CallLogsPage';
 import BusinessIntelligenceReport from './pages/BusinessIntelligenceReport';
 import CubePreloader from './components/CubePreloader';
@@ -108,7 +109,7 @@ const teamCardVariants = {
   visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.26, ease: [0.22, 1, 0.36, 1] } },
 };
 const DEFAULT_DASHBOARD_ROUTE = 'receptionists';
-const DASHBOARD_ROUTES = ['live-monitoring', 'receptionists', 'scenarios', 'calendar', 'drop-ins', 'call-logs', 'pipeline', 'stats', 'settings'];
+const DASHBOARD_ROUTES = ['live-monitoring', 'receptionists', 'scenarios', 'calendar', 'call-logs', 'pipeline', 'stats', 'settings'];
 const POPUP_DISMISS_PERSISTS_SHOWN = false;
 
 const formatPlanName = (plan) => {
@@ -1755,6 +1756,47 @@ const SonarDashboard = () => {
   const [pendingModel, setPendingModel] = useState(null);
   const [receptionistsAgent, setReceptionistsAgent] = useState(null);
   const [showHireModal, setShowHireModal] = useState(false);
+  const [teamExperience, setTeamExperience] = useState('team');
+  const studioDirty = useRef(false);
+  const pendingStudioExit = useRef(null);
+  const [showStudioExit, setShowStudioExit] = useState(false);
+  const cancelStudioExit = useCallback(() => { pendingStudioExit.current = null; setShowStudioExit(false); }, []);
+  const updateStudioDirty = useCallback(value => { studioDirty.current = value; }, []);
+  const requestStudioExit = useCallback(action => {
+    if (studioDirty.current) { pendingStudioExit.current = action; setShowStudioExit(true); return false; }
+    action();
+    return true;
+  }, []);
+  const leaveStudio = useCallback(() => requestStudioExit(() => { studioDirty.current = false; setTeamExperience('team'); }), [requestStudioExit]);
+  const navigateDashboard = route => {
+    requestStudioExit(() => { studioDirty.current = false; setTeamExperience('team'); setCurrentRoute(route); });
+  };
+  useEffect(() => {
+    if (teamExperience !== 'studio') return;
+    const warn = event => { if (studioDirty.current) { event.preventDefault(); event.returnValue = ''; } };
+    const link = event => {
+      const anchor = event.target.closest?.('a[href]');
+      if (!anchor || anchor.target === '_blank' || anchor.getAttribute('href')?.startsWith('#')) return;
+      if (studioDirty.current) {
+        event.preventDefault(); event.stopPropagation();
+        requestStudioExit(() => { studioDirty.current = false; window.location.assign(anchor.href); });
+      }
+    };
+    // A same-URL history entry makes browser Back return to Team first.
+    if (!window.history.state?.nodemereStudio) window.history.pushState({ ...window.history.state, nodemereStudio: true }, '', window.location.href);
+    const back = event => {
+      event.stopImmediatePropagation();
+      if (!leaveStudio()) window.history.pushState({ ...window.history.state, nodemereStudio: true }, '', window.location.href);
+    };
+    window.addEventListener('beforeunload', warn);
+    window.addEventListener('popstate', back, true);
+    document.addEventListener('click', link, true);
+    return () => {
+      window.removeEventListener('beforeunload', warn);
+      window.removeEventListener('popstate', back, true);
+      document.removeEventListener('click', link, true);
+    };
+  }, [teamExperience, leaveStudio, requestStudioExit]);
   const [showCommander, setShowCommander] = useState(false);
   const [logoHover, setLogoHover] = useState(false);
   const [terminateAgent, setTerminateAgent] = useState(null);
@@ -2257,7 +2299,6 @@ const SonarDashboard = () => {
   const navItems = [
     { id: 'receptionists', icon: <IdCardLanyard size={18} />, label: 'Team' },
     { id: 'calendar', icon: <CalendarFold size={18} />, label: 'Calendar' },
-    { id: 'drop-ins', icon: <Layers size={18} />, label: 'Drop-Ins' },
     { id: 'pipeline', icon: <BookUser size={18} />, label: 'People' },
     { id: 'scenarios', icon: <Webhook size={18} />, label: 'Scenarios', beta: true },
     { id: 'live-monitoring', icon: <Activity size={18} />, label: 'Reports' },
@@ -2270,6 +2311,8 @@ const SonarDashboard = () => {
     }
     switch (route) {
       case 'receptionists':
+        if (teamExperience === 'studio') return <Suspense fallback={<div className="h-full grid place-items-center"><CubePreloader /></div>}><NodemereStudio onReturn={leaveStudio} onDirtyChange={updateStudioDirty} onSaved={async () => { await refresh(); await loadAgentScenarios(); }} /></Suspense>;
+        if (teamExperience === 'entry') return <Suspense fallback={null}><ReceptionistEntry onReturn={() => setTeamExperience('team')} onCreate={() => setTeamExperience('studio')} onHire={() => { setTeamExperience('team'); setShowHireModal(true); }} /></Suspense>;
         return (
           <div className={`receptionists-page-scope h-full ${marketplaceAgent ? 'overflow-hidden' : 'overflow-auto'} custom-scrollbar bg-[#020202] flex flex-col`}>
             <div className="shrink-0 px-10 pb-3 pt-8 flex items-center justify-between">
@@ -2297,7 +2340,7 @@ const SonarDashboard = () => {
               </div>
               <div className="flex items-center gap-3">
                 {teamView === 'receptionists' ? (
-                  <button onClick={() => setShowHireModal(true)} className="dashboard-neutral-button flex items-center gap-2 px-5 py-2.5 rounded-xl text-[11px] font-bold tracking-wider transition-all active:scale-95">New Receptionist</button>
+                  <button onClick={() => setTeamExperience('entry')} className="dashboard-neutral-button flex items-center gap-2 px-5 py-2.5 rounded-xl text-[11px] font-bold tracking-wider transition-all active:scale-95">New Receptionist</button>
                 ) : teamView === 'staff' ? (
                   <button onClick={() => window.dispatchEvent(new CustomEvent('team:open-staff-modal'))} className="dashboard-neutral-button flex items-center gap-2 px-5 py-2.5 rounded-xl text-[11px] font-bold tracking-wider transition-all active:scale-95">New Staff Member</button>
                 ) : null}
@@ -2556,8 +2599,6 @@ const SonarDashboard = () => {
         return <SettingsPage />;
       case 'calendar':
         return <CalendarPage onToolbarMetaChange={setCalendarToolbarMeta} />;
-      case 'drop-ins':
-        return <DropInsPage receptionists={agents} storageKey={`drop-ins-camera:${staffBusinessId || businessUsage?.business_id || profile?.business_id || profile?.id || 'local'}`} />;
       case 'call-logs':
         return <CallLogsPage onToolbarMetaChange={setCallLogsToolbarMeta} />;
       case 'pipeline':
@@ -2628,11 +2669,6 @@ const SonarDashboard = () => {
           description="Automate workflows with conditional logic"
         />
         <StaticToolbarTitle
-          active={currentRoute === 'drop-ins'}
-          title="Drop-Ins"
-          description="Build appointment conversations"
-        />
-        <StaticToolbarTitle
           active={currentRoute === 'settings'}
           title="Settings"
           description="Account & business configuration"
@@ -2664,11 +2700,11 @@ const SonarDashboard = () => {
             onClose={() => setAccountMenuOpen(false)}
             onOpenSettings={() => {
               setAccountMenuOpen(false);
-              setCurrentRoute('settings');
+              navigateDashboard('settings');
             }}
             onUpgrade={() => {
               setAccountMenuOpen(false);
-              window.location.href = '/pricing';
+              requestStudioExit(() => { studioDirty.current = false; window.location.href = '/pricing'; });
             }}
           />
         </div>
@@ -2686,7 +2722,7 @@ const SonarDashboard = () => {
         <aside
           onMouseEnter={() => setSidebarCollapsed(false)}
           onMouseLeave={() => setSidebarCollapsed(true)}
-          className={`sonar-dashboard-chrome group/sidebar flex flex-col border-r border-white/5 bg-[#020202] transition-[width] duration-200 ease-out ${sidebarCollapsed ? 'w-[76px]' : 'w-[240px]'}`}
+          className={`sonar-dashboard-chrome ${teamExperience === 'studio' ? 'nodemere-studio-sidebar' : ''} group/sidebar flex flex-col border-r border-white/5 bg-[#020202] transition-[width] duration-200 ease-out ${sidebarCollapsed ? 'w-[76px]' : 'w-[240px]'}`}
         >
           <div className="px-3 pt-10">
             <nav className="space-y-1">
@@ -2697,7 +2733,7 @@ const SonarDashboard = () => {
                   isActive={currentRoute === item.id}
                   onClick={() => {
                     setSidebarCollapsed(true);
-                    setCurrentRoute(item.id);
+                    navigateDashboard(item.id);
                   }}
                   collapsed={sidebarCollapsed}
                 />
@@ -2723,7 +2759,7 @@ const SonarDashboard = () => {
               type="button"
               onClick={() => {
                 setSidebarCollapsed(true);
-                setCurrentRoute('settings');
+                navigateDashboard('settings');
               }}
               title={sidebarCollapsed ? 'Settings' : undefined}
               className="no-drag group flex w-full items-center gap-3.5 rounded-xl px-3 py-2.5 text-[13px] text-zinc-500 transition-colors hover:bg-white/5 hover:text-white"
@@ -2767,8 +2803,15 @@ const SonarDashboard = () => {
           </div>
         </main>
       </div>
+      {showStudioExit && <Suspense fallback={null}><StudioExitDialog onCancel={cancelStudioExit} onDiscard={() => {
+        const action = pendingStudioExit.current;
+        pendingStudioExit.current = null;
+        studioDirty.current = false;
+        setShowStudioExit(false);
+        action?.();
+      }} /></Suspense>}
       <PopupModal
-        popup={activePopup}
+        popup={currentRoute === 'receptionists' && teamExperience !== 'team' ? null : activePopup}
         profile={profile}
         onClose={() => dismissPopup(activePopup)}
       />

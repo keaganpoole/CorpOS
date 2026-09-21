@@ -28,6 +28,10 @@ const SplashScreenAlternate = ({ onAnimationEnd, label = 'Studio' }) => {
 
   useEffect(() => {
     if (!logoReady) return undefined;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      const timer = window.setTimeout(() => onAnimationEnd?.(), 100);
+      return () => window.clearTimeout(timer);
+    }
 
     const enterFrame = window.requestAnimationFrame(() => setPhase('logo-enter'));
     const timers = [

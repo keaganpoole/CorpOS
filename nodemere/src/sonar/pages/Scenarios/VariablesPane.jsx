@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { getOutputVariables, isStripeResponseNode } from '../../../sonar/lib/fieldContexts';
 import { api } from '../../lib/api';
+import useInstrumentTilt from '../../hooks/useInstrumentTilt';
 import { fetchCustomFields, getCurrentBusinessId, getCustomValue, isCustomFieldKey } from '../../lib/customFields';
 import { getSmartActionByKey } from './smartActions';
 import { renderSafeTemplateHTML } from '../../lib/safeTemplateHTML';
@@ -1550,51 +1551,7 @@ const VariablesPane = ({ visible, fieldLabel, onInsertVariable, onTableHover, on
     scenarioLog('log', '[VariablesPane] activeReceptionist:state', activeReceptionist);
   }, [visible, activeReceptionist]);
 
-  useEffect(() => {
-    const panel = paneRef.current;
-    if (!visible || !panel || typeof window === 'undefined' || window.innerWidth < 1024) return undefined;
-    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return undefined;
-
-    const defaultRot = { x: 0, y: 6 };
-    let currentRot = { ...defaultRot };
-    let targetRot = { ...defaultRot };
-    let frameId = null;
-
-    const animate = () => {
-      currentRot.x += (targetRot.x - currentRot.x) * 0.1;
-      currentRot.y += (targetRot.y - currentRot.y) * 0.1;
-
-      panel.style.setProperty('--sb-pane-rotate-x', `${currentRot.x.toFixed(3)}deg`);
-      panel.style.setProperty('--sb-pane-rotate-y', `${currentRot.y.toFixed(3)}deg`);
-
-      frameId = window.requestAnimationFrame(animate);
-    };
-
-    const handleMouseMove = (event) => {
-      const rect = panel.getBoundingClientRect();
-      const xPercent = ((event.clientX - rect.left) / rect.width - 0.5) * 2;
-      const yPercent = ((event.clientY - rect.top) / rect.height - 0.5) * -2;
-
-      targetRot.y = 6 - (xPercent * 3.6);
-      targetRot.x = yPercent * -2.8;
-    };
-
-    const handleMouseLeave = () => {
-      targetRot = { ...defaultRot };
-    };
-
-    frameId = window.requestAnimationFrame(animate);
-    panel.addEventListener('mousemove', handleMouseMove);
-    panel.addEventListener('mouseleave', handleMouseLeave);
-
-    return () => {
-      if (frameId) window.cancelAnimationFrame(frameId);
-      panel.removeEventListener('mousemove', handleMouseMove);
-      panel.removeEventListener('mouseleave', handleMouseLeave);
-      panel.style.removeProperty('--sb-pane-rotate-x');
-      panel.style.removeProperty('--sb-pane-rotate-y');
-    };
-  }, [visible]);
+  useInstrumentTilt(paneRef, visible);
 
   const hasCallNodeBefore = (() => {
     if (!currentNodeId || !nodes.length) return false;
