@@ -87,7 +87,17 @@ async function fetchJSON(endpoint) {
     if (!res.ok) throw await parseApiError(res);
     return await res.json();
   } catch (err) {
-    console.error("api.js:event_62");
+    const errorDetails = {
+      endpoint,
+      status: err?.status || null,
+      message: err?.message || String(err),
+      detail: err?.detail || null,
+    };
+    if (String(errorDetails.message || '').includes('Request timed out')) {
+      console.debug("api.js:event_62", errorDetails);
+    } else {
+      console.error("api.js:event_62", errorDetails);
+    }
     return null;
   }
 }

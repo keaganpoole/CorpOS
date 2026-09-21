@@ -10378,7 +10378,7 @@ async def persist_elevenlabs_event(payload):
     return {"ok": True, "call_log_id": saved.get("id")}
 
 @app.get("/api/agents", tags=["Sonar Controller Compat"])
-async def get_sonar_agents(include_archived: bool = False, current_user: dict = Depends(get_current_user)):
+def get_sonar_agents(include_archived: bool = False, current_user: dict = Depends(get_current_user)):
     try:
         current_user_id = business_owner_id(current_user)
         response = (
@@ -10504,13 +10504,12 @@ async def get_sonar_business_intelligence(current_user: dict = Depends(get_curre
 
 
 @app.get("/api/sonar/nest/history", tags=["Sonar Nest"])
-async def get_sonar_nest_history(limit: int = 40, current_user: dict = Depends(get_current_user)):
+def get_sonar_nest_history(limit: int = 40, current_user: dict = Depends(get_current_user)):
     """Return a small tenant-scoped history normalized from existing business activity."""
     business = load_business_by_user_id(business_owner_id(current_user))
     if not business:
         return {"events": []}
-    events = await asyncio.to_thread(
-        get_nest_history,
+    events = get_nest_history(
         supabase,
         business_id=business.get("id"),
         user_id=business_owner_id(current_user),
@@ -11244,7 +11243,7 @@ async def get_session_state(current_user: dict = Depends(get_current_user)):
     return get_tenant_session_state(business_owner_id(current_user))
 
 @app.get("/api/pipeline", tags=["Sonar Controller Compat"])
-async def get_pipeline_state(current_user: dict = Depends(get_current_user)):
+def get_pipeline_state(current_user: dict = Depends(get_current_user)):
     user_id = business_owner_id(current_user)
     business = load_business_by_user_id(user_id)
     if not business:
@@ -11269,7 +11268,7 @@ async def get_pipeline_state(current_user: dict = Depends(get_current_user)):
 
 
 @app.get("/api/sonar/dashboard/bootstrap", tags=["Sonar Dashboard"])
-async def get_sonar_dashboard_bootstrap(current_user: dict = Depends(get_current_user)):
+def get_sonar_dashboard_bootstrap(current_user: dict = Depends(get_current_user)):
     user_id = business_owner_id(current_user)
     control = get_tenant_control_state(user_id)
     session = get_tenant_session_state(user_id)
@@ -11304,7 +11303,7 @@ async def get_sonar_dashboard_bootstrap(current_user: dict = Depends(get_current
         "session": session,
         "live_pulse": pulse,
         "logs": logs,
-        "pipeline": await get_pipeline_state(current_user),
+        "pipeline": get_pipeline_state(current_user),
         "cron": cron,
         "reactions": reactions,
         "account_settings": account_settings,
@@ -11583,7 +11582,7 @@ async def people_webhook(payload: dict, current_user: dict = Depends(get_current
     return {"ok": True}
 
 @app.get("/api/sonar/business/profile", tags=["Sonar Business"])
-async def get_sonar_business_profile(current_user: dict = Depends(get_current_user)):
+def get_sonar_business_profile(current_user: dict = Depends(get_current_user)):
     business = load_business_by_user_id(business_owner_id(current_user))
     if not business:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Business not found")
@@ -12319,7 +12318,7 @@ async def delete_sonar_service(service_id: UUID, current_user: dict = Depends(ge
     return {"ok": True}
 
 @app.get("/api/sonar/appointments", tags=["Sonar Appointments"])
-async def list_sonar_appointments(limit: int = 100, current_user: dict = Depends(get_current_user)):
+def list_sonar_appointments(limit: int = 100, current_user: dict = Depends(get_current_user)):
     business = load_business_by_user_id(business_owner_id(current_user))
     if not business:
         return []
@@ -13531,7 +13530,7 @@ async def create_billing_portal_session(current_user: dict = Depends(get_current
 
 
 @app.get("/api/sonar/billing/usage", tags=["Billing"])
-async def get_billing_usage(current_user: dict = Depends(get_current_user)):
+def get_billing_usage(current_user: dict = Depends(get_current_user)):
     usage = get_usage_snapshot(business_owner_id(current_user))
     recent_events = []
     try:
