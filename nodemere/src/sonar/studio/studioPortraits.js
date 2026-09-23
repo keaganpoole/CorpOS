@@ -45,7 +45,6 @@ export const STUDIO_PORTRAITS = Object.freeze({
     'Hispanic / Latina': paired('ethnicity', 'hispanic_man.png', 'latina_woman'),
   },
   tone: {
-    Balanced: paired('temperament', 'balanced_man.png', 'balanced_woman.png'),
     Calm: paired('temperament', 'calm_man.png', 'calm_woman.png'),
     Caring: paired('temperament', 'caring_man.png', 'caring_woman.png'),
     Charming: paired('temperament', 'charming_man.png', 'charming_woman.png'),
