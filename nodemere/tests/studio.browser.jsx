@@ -2,18 +2,24 @@
 import React, { useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
-import NodemereStudio from '../src/sonar/studio/NodemereStudio';
+import OfficeExperience from '../src/sonar/studio/OfficeExperience';
+import { STUDIO_PORTRAITS } from '../src/sonar/studio/studioPortraits';
 import { api } from '../src/sonar/lib/api';
 import '../src/index.css';
 
 const fixtureOptions=new URLSearchParams(window.location.search);
-if(fixtureOptions.has('fallback')){
-  const getContext=HTMLCanvasElement.prototype.getContext;
-  HTMLCanvasElement.prototype.getContext=function(type,...args){return type.startsWith('webgl')?null:getContext.call(this,type,...args);};
-}
+const fixturePortrait='/tests/assets/portrait-reference.jpg';
+const fixturePortraitAssets={
+  age:{
+    'Young adult':{src:`${fixturePortrait}?age=young`,position:'57% 49%',scale:1.01},
+    'Middle-aged':{src:`${fixturePortrait}?age=middle`,position:'56% 49%',scale:1.025},
+    Mature:{src:`${fixturePortrait}?age=mature`,position:'55% 49%',scale:1.04},
+  },
+};
+const portraitAssets=fixtureOptions.get('fixturePortraits')==='1'?fixturePortraitAssets:STUDIO_PORTRAITS;
 if(fixtureOptions.get('motion')==='reduce'){
   const matchMedia=window.matchMedia.bind(window);
-  window.matchMedia=query=>query.includes('prefers-reduced-motion')?{matches:true,media:query,onchange:null,addListener(){},removeListener(){},addEventListener(){},removeEventListener(){},dispatchEvent(){return true;}}:matchMedia(query);
+  window.matchMedia=query=>query.includes('prefers-reduced-motion')?{matches:!query.includes('no-preference'),media:query,onchange:null,addListener(){},removeListener(){},addEventListener(){},removeEventListener(){},dispatchEvent(){return true;}}:matchMedia(query);
 }
 
 function wave(index) {
@@ -34,6 +40,8 @@ api.saveDesignedVoice=async payload=>({id:'test-saved',voice_name:payload.voice_
 api.hireReceptionist=async()=>({id:'test-hired'});
 function Fixture(){
   const [dirty,setDirty]=useState(false),[open,setOpen]=useState(true);
-  return <><div style={{height:32,background:'#242424',color:'#ccc',fontSize:11,padding:'6px 18px',display:'flex',gap:24}}><span>TEST FIXTURE · SYNTHETIC AUDIO · NO REMOTE WRITES</span><span data-testid="dirty-state">{dirty?'Unsaved changes':'Clean session'}</span><label><input type="checkbox" onChange={e=>{fail=e.target.checked;}}/> Simulate provider failure</label></div><div style={{height:'calc(100dvh - 32px)'}}>{open?<NodemereStudio onDirtyChange={setDirty} onReturn={()=>setOpen(false)}/>:<button onClick={()=>{setDirty(false);setOpen(true);}}>Open test Studio</button>}</div></>;
+  return <><div style={{height:32,background:'#242424',color:'#ccc',fontSize:11,padding:'6px 18px',display:'flex',gap:24}}><span>TEST FIXTURE · SYNTHETIC AUDIO · NO REMOTE WRITES</span><span data-testid="dirty-state">{dirty?'Unsaved changes':'Clean session'}</span><label><input type="checkbox" onChange={e=>{fail=e.target.checked;}}/> Simulate provider failure</label></div><div style={{height:'calc(100dvh - 32px)'}}>{open?<OfficeExperience portraitAssets={portraitAssets} onDirtyChange={setDirty} onReturn={()=>setOpen(false)} onHire={()=>setOpen(false)}/>:<button onClick={()=>{setDirty(false);setOpen(true);}}>Open test Studio</button>}</div></>;
 }
-createRoot(document.getElementById('root')).render(<React.StrictMode><BrowserRouter><Fixture/></BrowserRouter></React.StrictMode>);
+const fixtureRoot=import.meta.hot?.data.root||createRoot(document.getElementById('root'));
+if(import.meta.hot)import.meta.hot.data.root=fixtureRoot;
+fixtureRoot.render(<React.StrictMode><BrowserRouter><Fixture/></BrowserRouter></React.StrictMode>);

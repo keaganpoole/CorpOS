@@ -3,11 +3,12 @@ import './SplashScreenAlternate.css';
 
 const LOGO_SRC = 'https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/assets/nodemere_logo2.png';
 
-const SplashScreenAlternate = ({ onAnimationEnd, label = 'Studio' }) => {
+const SplashScreenAlternate = ({ onAnimationEnd, label = 'Studio', cinematic = false }) => {
   const [phase, setPhase] = useState('logo-prep');
   const [logoReady, setLogoReady] = useState(false);
 
   useEffect(() => {
+    if (cinematic) { setLogoReady(true); return; }
     let cancelled = false;
     const image = new Image();
     const markReady = () => {
@@ -24,7 +25,7 @@ const SplashScreenAlternate = ({ onAnimationEnd, label = 'Studio' }) => {
       image.onload = null;
       image.onerror = null;
     };
-  }, []);
+  }, [cinematic]);
 
   useEffect(() => {
     if (!logoReady) return undefined;
@@ -33,6 +34,11 @@ const SplashScreenAlternate = ({ onAnimationEnd, label = 'Studio' }) => {
       return () => window.clearTimeout(timer);
     }
 
+    if (cinematic) {
+      setPhase('studio-enter');
+      const timer = setTimeout(()=>setPhase('studio-exit'),2100);
+      return ()=>clearTimeout(timer);
+    }
     const enterFrame = window.requestAnimationFrame(() => setPhase('logo-enter'));
     const timers = [
       window.setTimeout(() => setPhase('logo-hold'), 560),
@@ -47,18 +53,18 @@ const SplashScreenAlternate = ({ onAnimationEnd, label = 'Studio' }) => {
       window.cancelAnimationFrame(enterFrame);
       timers.forEach((timer) => window.clearTimeout(timer));
     };
-  }, [logoReady, onAnimationEnd]);
+  }, [logoReady, onAnimationEnd, cinematic]);
 
   return (
-    <div className={`splash-alternate splash-alternate--${phase}`} role="status" aria-label={'Loading Nodemere ' + label}>
-      <div className={`splash-alternate-mark splash-alternate-mark--${phase}`}>
+    <div className={`splash-alternate splash-alternate--${phase} ${cinematic ? 'splash-alternate--cinematic' : ''}`} role="status" aria-label={'Loading Nodemere ' + label}>
+      {!cinematic && <div className={`splash-alternate-mark splash-alternate-mark--${phase}`}>
         <img
           src={LOGO_SRC}
           alt="Nodemere"
           onLoad={() => setLogoReady(true)}
           onError={() => setLogoReady(true)}
         />
-      </div>
+      </div>}
       <div className={`splash-alternate-studio splash-alternate-studio--${phase}`} aria-hidden="true">
         Nodemere <span>{label}</span>
       </div>

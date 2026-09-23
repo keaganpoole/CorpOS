@@ -10,6 +10,7 @@ export default defineConfig({
   },
   server: {
     host: true,
+    watch: { ignored: ['**/.studio-tools/**'] },
     port: 5173,
     proxy: {
       '/api': {

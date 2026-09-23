@@ -60,8 +60,7 @@ import { api } from './lib/api';
 import LeadsPage from './pages/LeadsPage';
 import ScenariosModal from './pages/ScenariosModal';
 import HireReceptionistModal from './pages/HireReceptionistModal';
-const ReceptionistEntry = lazy(() => import('./studio/ReceptionistEntry'));
-const NodemereStudio = lazy(() => import('./studio/NodemereStudio'));
+const OfficeExperience = lazy(() => import('./studio/OfficeExperience'));
 const StudioExitDialog = lazy(() => import('./studio/StudioExitDialog'));
 import { CommanderModal, SubtaskStatusIcon } from './pages/CommanderModal';
 import ScenariosPage from './pages/Scenarios/Scenarios';
@@ -2311,8 +2310,7 @@ const SonarDashboard = () => {
     }
     switch (route) {
       case 'receptionists':
-        if (teamExperience === 'studio') return <Suspense fallback={<div className="h-full grid place-items-center"><CubePreloader /></div>}><NodemereStudio onReturn={leaveStudio} onDirtyChange={updateStudioDirty} onSaved={async () => { await refresh(); await loadAgentScenarios(); }} /></Suspense>;
-        if (teamExperience === 'entry') return <Suspense fallback={null}><ReceptionistEntry onReturn={() => setTeamExperience('team')} onCreate={() => setTeamExperience('studio')} onHire={() => { setTeamExperience('team'); setShowHireModal(true); }} /></Suspense>;
+        if (teamExperience !== 'team') return <Suspense fallback={<div className="h-full grid place-items-center"><CubePreloader /></div>}><OfficeExperience onReturn={leaveStudio} onCreateStarted={() => setTeamExperience('studio')} onHire={() => { setTeamExperience('team'); setShowHireModal(true); }} onDirtyChange={updateStudioDirty} onSaved={async () => { await refresh(); await loadAgentScenarios(); }} /></Suspense>;
         return (
           <div className={`receptionists-page-scope h-full ${marketplaceAgent ? 'overflow-hidden' : 'overflow-auto'} custom-scrollbar bg-[#020202] flex flex-col`}>
             <div className="shrink-0 px-10 pb-3 pt-8 flex items-center justify-between">
@@ -2722,7 +2720,7 @@ const SonarDashboard = () => {
         <aside
           onMouseEnter={() => setSidebarCollapsed(false)}
           onMouseLeave={() => setSidebarCollapsed(true)}
-          className={`sonar-dashboard-chrome ${teamExperience === 'studio' ? 'nodemere-studio-sidebar' : ''} group/sidebar flex flex-col border-r border-white/5 bg-[#020202] transition-[width] duration-200 ease-out ${sidebarCollapsed ? 'w-[76px]' : 'w-[240px]'}`}
+          className={`sonar-dashboard-chrome ${teamExperience !== 'team' ? 'nodemere-studio-sidebar' : ''} group/sidebar flex flex-col border-r border-white/5 bg-[#020202] transition-[width] duration-200 ease-out ${sidebarCollapsed ? 'w-[76px]' : 'w-[240px]'}`}
         >
           <div className="px-3 pt-10">
             <nav className="space-y-1">

@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 export default function useAudition(previews) {
-  const audio = useRef(null), context = useRef(null), analyser = useRef(null), frame = useRef(0);
-  const level = useRef(0);
+  const audio = useRef(null), context = useRef(null), frame = useRef(0);
   const playRequest = useRef(0);
   const [playing, setPlaying] = useState(null), [progress, setProgress] = useState(0), [error, setError] = useState('');
   const [tracks, setTracks] = useState([]);
@@ -30,25 +29,18 @@ export default function useAudition(previews) {
       }));
       if (!cancelled) setTracks(next);
     };
-    audio.current?.pause(); setPlaying(null); setProgress(0); level.current=0;
+    audio.current?.pause(); setPlaying(null); setProgress(0);
     decode().catch(() => { if (!cancelled) setError('This preview could not be decoded. Generate another audition.'); });
-    return () => { playRequest.current++; cancelled = true; audio.current?.pause(); cancelAnimationFrame(frame.current); level.current=0; urls.forEach(URL.revokeObjectURL); };
+    return () => { playRequest.current++; cancelled = true; audio.current?.pause(); cancelAnimationFrame(frame.current); urls.forEach(URL.revokeObjectURL); };
   }, [previews]);
-  useEffect(() => () => { audio.current?.pause(); context.current?.close(); context.current=null; audio.current=null; analyser.current=null; cancelAnimationFrame(frame.current); }, []);
-  const stop = () => { playRequest.current++; audio.current?.pause(); setPlaying(null); level.current=0; cancelAnimationFrame(frame.current); };
+  useEffect(() => () => { audio.current?.pause(); context.current?.close(); context.current=null; audio.current=null; cancelAnimationFrame(frame.current); }, []);
+  const stop = () => { playRequest.current++; audio.current?.pause(); setPlaying(null); cancelAnimationFrame(frame.current); };
   const play = async track => {
     if (playing === track.generated_voice_id) { stop(); return; }
     stop(); setError(''); setProgress(0);
     const request = playRequest.current;
     try {
-      if (!audio.current) {
-        audio.current = new Audio();
-        if (context.current) {
-          analyser.current = context.current.createAnalyser(); analyser.current.fftSize=256;
-          context.current.createMediaElementSource(audio.current).connect(analyser.current);
-          analyser.current.connect(context.current.destination);
-        }
-      }
+      audio.current ||= new Audio();
       audio.current.src = track.url;
       audio.current.onended = stop;
       audio.current.onerror = () => { stop(); setError('Playback failed. Try this audition again.'); };
@@ -57,15 +49,13 @@ export default function useAudition(previews) {
       await audio.current.play();
       if(request!==playRequest.current)return;
       setPlaying(track.generated_voice_id);
-      const data = new Uint8Array(128);
       let lastProgress=0;
       const tick = now => {
         if(request!==playRequest.current)return;
-        if (analyser.current) { analyser.current.getByteFrequencyData(data); level.current=data.reduce((a,b)=>a+b,0)/data.length/255; }
         if(now-lastProgress>40){lastProgress=now;setProgress(audio.current.duration ? audio.current.currentTime/audio.current.duration : 0);}
         frame.current=requestAnimationFrame(tick);
       }; frame.current=requestAnimationFrame(tick);
     } catch { if(request===playRequest.current){stop(); setError('Playback could not start. Please try again.');} }
   };
-  return { tracks, play, stop, playing, progress, error, level };
+  return { tracks, play, stop, playing, progress, error };
 }

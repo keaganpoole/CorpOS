@@ -1,51 +1,67 @@
-# Nest Intercom Session Design QA
+**Evidence**
 
-- Source visual truth path: `C:\Users\Keagan\.codex\generated_images\01a0960e-9463-7e72-b547-d44a9727ddaf\call_W7nU3POtVVGaQPu6Y0hmRX0u.png`
-- Source pixels: 2079 x 756. The source depicts a 1920 x 200 conceptual strip; implementation is normalized to the product's real 1669 x 55 Nest surface.
-- Implementation: `src/sonar/nest/NestIntercom.jsx` and `src/sonar/nest/nest.css`.
-- Implementation screenshot path: connected-browser inline capture of `http://localhost:5173/dashboard`; the browser API does not expose a persistent local screenshot path.
-- Browser viewport: 1834 x 1210 CSS px, device scale factor 1.
-- State: authenticated dashboard, intercom listening state with Maggie selected and no live microphone session.
+- Source visual truth path: `C:\Users\Keagan\Desktop\0ab740182e7189927e5763799d95ed55.jpg`
+- Source pixels: 1199 × 1379.
+- Browser comparison path: `C:\Users\Keagan\.openclaw\workspace\nodemere\tests\studio-comparison.html`
+- Browser-rendered implementation URL: `http://127.0.0.1:5174/tests/studio.browser.html`
+- Combined comparison URL: `http://127.0.0.1:5174/tests/studio-comparison.html`
+- Comparison viewport: 1280 × 720 CSS pixels at device scale 1. The implementation iframe measured 960 CSS pixels wide; responsive checks separately used 390 × 844, 1024 × 768, 1440 × 900, and 1920 × 900 viewports.
+- State: Age stage with a focused portrait preview, plus the completed Control Room state.
+- Density normalization: the source remained at native density and used `object-fit: cover` only in the labeled source-reference column. The Studio used the same unmodified test-only raster through the real `object-fit: contain`, per-asset position/scale, mask, and transition code. The production manifest remained empty.
 
-## Full-view comparison evidence
+**Full-view comparison evidence**
 
-The source mockup and the browser-rendered implementation were both opened and visually compared at their native aspect ratios. The implementation preserves the selected design's horizontal order and hierarchy: an enlarged atmospheric receptionist banner anchored on the left, portrait focal point with layered morphing contours, compact activity mark and status, vertical divider, live caption, and quiet controls on the far right. The source's blue-black cast was intentionally replaced with Nodemere's neutral charcoal surface and restrained pink-purple session accent.
+The source and browser-rendered implementation were inspected together in the same comparison page. The Studio preserves the portrait's sharp facial detail while creating a broad fade before the left selector. The right edge intentionally leaves the viewport and the office remains subordinate. The selector remains the first readable interaction and the portrait does not form a freestanding card or full-screen wallpaper.
 
-## Focused-region comparison evidence
+The Control Room was inspected at 1920px, 1024px, and a 960px-wide embedded application surface. The shared workspace remained centered. Measured panel gaps were 88px at 1920px, 44px at 1024px/960px, with 430px/390px left-panel widths and 520px/466px right-panel widths. No horizontal overflow occurred at 390px.
 
-- Real Nest surface: left 82, right 1751, width 1669, height 55.
-- Session stage: left 749.23, right 1083.75, width 334.52, height 55. Its midpoint is 916.49, matching the Nest midpoint of 916.5.
-- Controls: left 1685, right 1743, height 27; all controls remain inside the Nest bounds.
-- The live portrait is 38 x 38 inside a 50 x 50 animated presence field with layered SVG contour motion, preserving visible breathing room within the 55px Nest.
-- Focused comparison was required because the component is only 55px tall in the production dashboard.
+**Focused region comparison evidence**
 
-## Fidelity surfaces
+The combined comparison specifically exposed the face, left fade, top fade, selector overlap, and option focus state at readable size. The face stayed sharp through the eye, skin, nose, and lips; masking affected the outer composition rather than softening the subject. A separate mobile capture verified a 310px portrait header with the selector below it. A focused Control Room pass verified that the portrait at 8.5% desktop opacity did not reduce definition-text readability.
 
-- Fonts and typography: the session inherits the same system UI stack as the Nest notifications. Status is 10px/520 and transcript is 12px/460 with 1.35 line height, zero letter spacing, single-line truncation, and a restrained text shadow.
-- Spacing and layout rhythm: the content-sized grid keeps the visible cluster centered rather than centering an empty flexible column. The 15px gaps and 26px divider maintain the mockup's pacing without vertical stacking.
-- Colors and visual tokens: the core background is neutral black/charcoal. Pink-purple appears only in the live halo and activity icon; there is no blue background.
-- Image quality and asset fidelity: the real Maggie banner URL is used for the enlarged low-opacity background and the 1696 x 2320 avatar asset is used in the focal portrait. Both loaded at full source resolution.
-- Copy and content: the state reads `Listening` with `I'm here. What do you need?` until a real transcript line arrives. Live transcript text retains the existing animated replacement behavior.
+**Findings**
 
-## Interaction and regression checks
+- No actionable P0, P1, or P2 findings remain.
+- [P3] Final per-option facial alignment depends on the production portrait set. Each manifest entry supports independent `position` and `scale` values so the art can be calibrated without changing the component.
 
-- Listening motion uses multiple blurred and crisp contour paths with animated shape interpolation; speaking accelerates and brightens the contours while reduced-motion preferences collapse animations.
-- Existing mute, end, privacy, error, idle warning, queue, close, picker, Nest history, and notification/reel selectors remain intact.
-- Browser console errors: none during the active-state render.
-- `npm run build`: passed. Existing unrelated warnings remain for a late CSS `@import`, stale Browserslist data, and large bundle chunks.
+**Required fidelity surfaces**
 
-## Comparison history
+- Fonts and typography: existing Nodemere Inter/system stack, weights, letter spacing, heading scale, small labels, and wrapping are preserved. The Control Room restores the selector's visual weight without changing type language.
+- Spacing and layout rhythm: the guided selector proportions remain intact. The Control Room now uses one centered 1050px workspace, fixed responsive gap bands, and larger instrument padding. Mobile stacks definition before controls and has no horizontal overflow.
+- Colors and visual tokens: neutral black and gray surfaces use the existing Nodemere hairlines and white action treatment. The former blue cast was removed. Portrait tone control uses darkness and masking instead of colored effects.
+- Image quality and asset fidelity: production does not include, generate, or derive a portrait from the supplied example. The reusable layer preloads and decodes assets, keeps the outgoing portrait until the next is ready, uses `object-fit: contain`, and preserves the sharp facial region. The reference is copied only under `tests/assets` for local visual QA.
+- Copy and content: guided labels, characteristic descriptions, Voice Definition, ElevenLabs controls, audition language, Return to Team, and cloning access remain unchanged.
 
-1. Initial render: the stage occupied the correct 55px height, but its flexible transcript track made the visible elements read left-heavy and the banner footprint was too narrow.
-2. Fix: changed the session grid to content-sized tracks and widened the active banner crop while retaining low opacity.
-3. Final render: the visible stage is centered to within 0.01px of the Nest midpoint, the background has the intended breadth, and all content and controls remain inside the Nest.
+**Comparison history**
 
-## Findings
+1. Earlier implementation: the Control Room used three grid tracks, which allowed a large empty center, and the left panel was small with a blue cast. Fix: replaced it with a centered two-track workspace, enlarged the instrument surface, applied neutral black surfaces, and linked the guided/control surfaces with a shared Framer Motion layout ID. Post-fix evidence: 88px maximum desktop gap and 44px laptop gap with centered panels.
+2. First mobile pass: the scene caption had both top and bottom anchors, stretching it through the definition area. Fix: explicitly released the bottom anchor for compact Room/Audition layouts. Post-fix evidence: caption measured 10.5px high at y=404, followed by the writing surface at y=445.
+3. First Control Room portrait pass: 16% opacity left facial features too present behind definition copy. Fix: reduced desktop opacity to 8.5% and added restrained desaturation/darkening. Post-fix evidence: copy remained dominant while identity continuity was still visible.
 
-No actionable P0, P1, or P2 findings remain.
+**Primary interactions tested**
 
-## Follow-up polish
+- Focus-preview Young Adult, Middle-aged, and Mature.
+- Rapid preview changes with one final rendered portrait and no blank frame.
+- Preview leave returning to the selected portrait.
+- Selection persistence after advancing and revisiting Age.
+- Guided completion and shared-surface transition into Control Room.
+- Desktop, ultrawide, laptop, mobile, and reduced-motion paths.
+- Production build, frontend voice-definition tests, backend voice-design tests, Python compilation, and browser console checks.
 
-- P3: tune the banner focal position per receptionist only if future banner assets place faces unusually far from center.
+Console errors checked: none in the standard fixture. The reduced-motion fixture emitted only Framer Motion's expected informational warning that reduced motion was enabled.
+
+**Implementation Checklist**
+
+- [x] Asset-driven portrait manifest and per-option alignment.
+- [x] Stage preloading and decode-before-swap behavior.
+- [x] Hover/focus preview, selected persistence, and graceful restore.
+- [x] Editorial masking and mobile portrait composition.
+- [x] Shared guided-to-Control-Room panel motion.
+- [x] Centered responsive Control Room and neutral panel treatment.
+- [x] Reduced-motion handling and no-overflow mobile layout.
+
+**Follow-up Polish**
+
+- Calibrate the `position` and `scale` values in `studioPortraits.js` when the production age/accent portrait pack is supplied.
 
 final result: passed
