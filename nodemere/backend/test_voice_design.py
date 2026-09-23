@@ -56,6 +56,7 @@ class VoiceDesignTests(unittest.TestCase):
         self.assertEqual(len(result['previews']),2)
         self.assertEqual(result['text'],'provider text')
         self.assertNotIn('text',post.call_args.args[1])
+        self.assertEqual(post.call_args.kwargs.get('params'), {'output_format': 'mp3_44100_128'})
         self.assertEqual(verify_ticket(result['previews'][1]['ticket'],'owner',SECRET)['id'],'1')
 
     @patch('backend.voice_design.provider_post')

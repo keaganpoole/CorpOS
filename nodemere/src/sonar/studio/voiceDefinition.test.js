@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { buildToneDirection, composeDescription, describeToneWeights, inferLoudnessFromToneWeights } from './voiceDefinition.js';
 
 test('guided choices become natural voice direction, never invented provider parameters', () => {
-  const description=composeDescription({gender:'Feminine',age:'Mature',accent:'Irish',toneWeights:{Calm:70,Caring:35}},'');
-  for (const part of ['mature feminine','irish','led by a steady and reassuring calm','care come through as']) assert.ok(description.toLowerCase().includes(part));
+  const description=composeDescription({gender:'Feminine',age:'Mature',accent:'Irish',subAccent:'Dublin',toneWeights:{Calm:70,Caring:35}},'');
+  for (const part of ['mature feminine','natural irish accent with a light dublin influence','led by a steady and reassuring calm','care come through as']) assert.ok(description.toLowerCase().includes(part));
   assert.ok(!description.toLowerCase().includes('calm strongly'));
   assert.ok(description.length >= 20 && description.length <= 1000);
 });

@@ -120,7 +120,8 @@ export default function NodemereStudio({ onReturn, onDirtyChange, onSaved, skipI
   const generate=async()=>{
     if(busy||saving)return; touch();setBusy(true);setError('');audition.stop();
     try {
-      const payload={...settings, voice_description:description, auto_generate_text:false, text:previewText, seed:settings.seed===''?null:Number(settings.seed)};
+      const script=previewText.trim();
+      const payload={...settings, voice_description:description, auto_generate_text:!script, ...(script?{text:script}:{}), seed:settings.seed===''?null:Number(settings.seed)};
       if(settings.model_id==='eleven_ttv_v3')delete payload.quality;
       const result=await api.designVoice(payload);
       if(!result?.previews?.length)throw new Error('No auditions were returned. Please try again.');
@@ -155,7 +156,9 @@ export default function NodemereStudio({ onReturn, onDirtyChange, onSaved, skipI
     catch{setError('Use a Nodemere clone link from this workspace.');}
   };
   const switchMode=next=>{clearTimeout(advance.current);audition.stop();setMode(next);setError('');};
-  const valid=description.trim().length>=20&&description.length<=1000&&previewText.trim().length>=100&&previewText.length<=1000&&(settings.seed===''||(Number.isInteger(Number(settings.seed))&&Number(settings.seed)>=0&&Number(settings.seed)<=2147483647));
+  const scriptLength=previewText.trim().length;
+  const scriptValid=!scriptLength||(scriptLength>=100&&previewText.length<=1000);
+  const valid=description.trim().length>=20&&description.length<=1000&&scriptValid&&(settings.seed===''||(Number.isInteger(Number(settings.seed))&&Number(settings.seed)>=0&&Number(settings.seed)<=2147483647));
   return <section onScroll={event=>event.currentTarget.closest('.ns-office')?.style.setProperty('--office-scroll',`${-event.currentTarget.scrollTop}px`)} className={`ns-studio ${room?'is-room':''} ${auditioning?'is-audition':''} ${mode==='clone'?'is-clone':''} ${busy?'is-processing':''}`}>
     {intro?<div className="ns-intro"><SplashScreenAlternate onAnimationEnd={finishIntro}/><button className="ns-skip" onClick={finishIntro}>Enter Studio <ArrowRight size={14}/></button></div>:null}
     <div className="ns-content" inert={intro?'':undefined}>
@@ -196,7 +199,7 @@ export default function NodemereStudio({ onReturn, onDirtyChange, onSaved, skipI
             <label className="ns-description-label" htmlFor="studio-description">Voice description <span>{description.length} / 1000</span></label>
             <textarea id="studio-description" className="ns-description" readOnly={busy} maxLength={1000} value={description} onChange={e=>{touch();setManual(e.target.value);}} spellCheck/>
             {manual!==null?<div className="ns-manual-note">Your writing is in control. Character choices won’t overwrite it.<button disabled={busy} onClick={()=>{touch();setManual(null);}}>Rebuild from choices</button></div>:null}
-            <details className="ns-script" inert={busy?'':undefined}><summary>Audition script <ChevronDown size={14}/></summary><textarea aria-label="Audition script" value={previewText} maxLength={1000} placeholder={DEFAULT_PREVIEW} onChange={e=>{touch();setPreviewText(e.target.value);}}/><small>{previewText.length} / 1000 characters · minimum 100</small></details>
+            <details className="ns-script" inert={busy?'':undefined}><summary>Audition script <ChevronDown size={14}/></summary><textarea aria-label="Audition script" value={previewText} maxLength={1000} placeholder={DEFAULT_PREVIEW} onChange={e=>{touch();setPreviewText(e.target.value);}}/><small>{previewText.length} / 1000 characters · leave blank to auto-generate</small></details>
             {error?<p className="ns-error" role="alert">{error}</p>:null}
           </div>
           <button className="ns-primary" disabled={!valid||busy} onClick={generate}>{busy?'Preparing the audition…':'Give them a voice'} {busy?<span className="ns-busy-dot"/>:<ArrowRight size={17}/>}</button>
@@ -223,4 +226,5 @@ export default function NodemereStudio({ onReturn, onDirtyChange, onSaved, skipI
     </div>
   </section>;
 }
+
 

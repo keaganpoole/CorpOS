@@ -65,12 +65,14 @@ def verify_ticket(ticket, owner_id, secret, now=None):
         raise HTTPException(400, "This audition has expired or is unavailable. Generate a new audition.") from None
 
 
-def provider_post(path, payload, api_key):
+PREVIEW_OUTPUT_FORMAT = 'mp3_44100_128'
+
+def provider_post(path, payload, api_key, params=None):
     if not api_key:
         raise HTTPException(503, "Voice Design is not configured on this server.")
     try:
         response = requests.post("https://api.elevenlabs.io/v1/text-to-voice" + path,
-                                 headers={"xi-api-key": api_key}, json=payload, timeout=(10, 120))
+                                 headers={"xi-api-key": api_key}, json=payload, params=params, timeout=(10, 120))
     except requests.RequestException:
         raise HTTPException(504, "ElevenLabs did not confirm the request. Please try again shortly.") from None
     if response.status_code >= 400:
@@ -104,7 +106,7 @@ def design_voice(payload, *, api_key, owner_id):
     body = payload.model_dump(exclude_none=True)
     if payload.auto_generate_text:
         body.pop("text", None)
-    result = provider_post("/design", body, api_key)
+    result = provider_post("/design", body, api_key, params={"output_format": PREVIEW_OUTPUT_FORMAT})
     previews = result.get("previews") or []
     if not previews or any(not p.get("generated_voice_id") or not p.get("audio_base_64") for p in previews):
         raise HTTPException(502, "ElevenLabs did not return playable auditions. Please try again.")

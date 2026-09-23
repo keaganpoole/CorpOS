@@ -107,7 +107,7 @@ export function buildVoiceDescription(values) {
   const gender = { Feminine: 'feminine', Masculine: 'masculine' }[values.gender] || 'natural';
   const age = values.age?.toLowerCase();
   return [`${age ? `A ${age}` : 'An adult'} ${gender} receptionist voice.`,
-    values.accent ? values.subAccent ? `The accent direction is ${values.accent.toLowerCase()}, with a subtle ${values.subAccent.toLowerCase()} regional character.` : `The accent direction is ${values.accent.toLowerCase()}.` : '',
+    values.accent ? values.subAccent ? `The voice should carry a natural ${values.accent.toLowerCase()} accent with a light ${values.subAccent.toLowerCase()} influence.` : `The voice should carry a natural ${values.accent.toLowerCase()} accent.` : '',
     buildToneDirection(values.toneWeights, values.tone),
     'Clear articulation, a comfortable conversational pace, and natural pauses. Studio-quality audio.'].filter(Boolean).join(' ');
 }
