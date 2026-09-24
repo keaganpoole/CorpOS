@@ -4,8 +4,8 @@ import { CHARACTERISTICS } from './voiceDefinition';
 
 const loaded = new Set();
 const failed = new Set();
-const EASE = [.16, 1, .3, 1];
-const CROSSFADE_MS = 1150;
+const EASE = [.22, 1, .36, 1];
+const CROSSFADE_MS = 520;
 
 function asPortrait(asset, values = {}) {
   if (!asset) return null;
@@ -111,20 +111,17 @@ export default function PortraitPreview({ stage, values = {}, previewOption, ass
   const currentScale = Number(visible.scale || 1);
   const previousScale = Number(previousVisible?.scale || 1);
   return <div className={`ns-portrait-preview ${subdued ? 'is-subdued' : ''}`}>
-    <motion.span
+    <span
       className="ns-portrait-image ns-portrait-image--current"
       key={`${visible.src}-${visible.position || ''}-${visible.scale || 1}-${visible.origin || ''}`}
-      initial={{ opacity: previousVisible && !reducedMotion ? .12 : 1, filter: previousVisible && !reducedMotion ? 'blur(2.5px)' : 'blur(0px)' }}
-      animate={{ opacity: 1, filter: 'blur(0px)' }}
-      transition={{ duration: reducedMotion ? 0 : CROSSFADE_MS / 1000, ease: EASE }}
     >
       <img src={visible.src} alt="" style={{ objectPosition: visible.position || '56% 50%', transformOrigin: visible.origin || undefined, transform: `scale(${currentScale})` }} />
-    </motion.span>
+    </span>
     {previousVisible ? <motion.span
       className="ns-portrait-image ns-portrait-image--previous"
       key={`${previousVisible.src}-${previousVisible.position || ''}-${previousVisible.scale || 1}-${previousVisible.origin || ''}`}
-      initial={{ opacity: reducedMotion ? 0 : 1, filter: 'blur(0px)' }}
-      animate={{ opacity: 0, filter: reducedMotion ? 'blur(0px)' : 'blur(2px)' }}
+      initial={{ opacity: reducedMotion ? 0 : 1 }}
+      animate={{ opacity: 0 }}
       transition={{ duration: reducedMotion ? 0 : CROSSFADE_MS / 1000, ease: EASE }}
       aria-hidden="true"
     >
