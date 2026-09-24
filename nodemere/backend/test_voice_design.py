@@ -43,6 +43,12 @@ class VoiceDesignTests(unittest.TestCase):
                      {'voice_description':DESCRIPTION,'auto_generate_text':True,'invented_pitch':5}):
             with self.assertRaises(ValidationError): VoiceDesignRequest(**body)
 
+    def test_save_accepts_catalog_sized_trait_set(self):
+        payload = VoiceSaveRequest(ticket=candidate_ticket('candidate',DESCRIPTION,'owner',SECRET), voice_name='Avery', traits=['one','two','three','four','five','six'])
+        self.assertEqual(len(payload.traits), 6)
+        with self.assertRaises(ValidationError):
+            VoiceSaveRequest(ticket=candidate_ticket('candidate',DESCRIPTION,'owner',SECRET), voice_name='Avery', traits=['one','two','three','four','five','six','seven'])
+
     def test_ticket_is_owned_signed_and_expiring(self):
         ticket=candidate_ticket('candidate',DESCRIPTION,'owner',SECRET,now=100)
         self.assertEqual(verify_ticket(ticket,'owner',SECRET,now=200)['id'],'candidate')

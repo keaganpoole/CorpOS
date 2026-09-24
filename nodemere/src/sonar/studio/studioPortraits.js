@@ -39,9 +39,17 @@ export const STUDIO_PORTRAITS = Object.freeze({
     Australian: paired('ethnicity', 'australian_man.png', 'australian.png'),
     British: paired('ethnicity', 'british_man.png', 'british.png'),
     Canadian: paired('ethnicity', 'canadian_man.png', 'canadian.png'),
+    Chinese: paired('ethnicity', 'chinese_man.png', 'chinese.png', {
+      Masculine: { position: '60% 46.5%', scale: 1.09, origin: '18% 50%' },
+      Feminine: { position: '54% 48%', scale: 1.035 },
+    }),
     Indian: paired('ethnicity', 'indian_man.png', 'indian.png'),
     Irish: paired('ethnicity', 'irish_man.png', 'irish.png'),
     Italian: paired('ethnicity', 'italian_man.png', 'italian.png'),
+    Japanese: paired('ethnicity', 'japanese_man.png', 'japanese.png', {
+      Masculine: { position: '56.5% 48%', scale: 1.02 },
+      Feminine: { position: '51% 48%', scale: 1.01 },
+    }),
     'Hispanic / Latina': paired('ethnicity', 'hispanic_man.png', 'latina_woman'),
   },
   tone: {

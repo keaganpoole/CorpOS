@@ -37,7 +37,7 @@ class VoiceSaveRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
     ticket: str = Field(min_length=20, max_length=10000)
     voice_name: str = Field(min_length=1, max_length=80)
-    traits: list[str] = Field(default_factory=list, max_length=3)
+    traits: list[str] = Field(default_factory=list, max_length=6)
     gender: Optional[Literal["Feminine", "Masculine", "Androgynous"]] = None
     age: Optional[Literal["Young adult", "Middle-aged", "Mature"]] = None
 

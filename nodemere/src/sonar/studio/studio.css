@@ -80,6 +80,8 @@
 /* Portraits are optional, data-driven studio layers. The image itself stays sharp;
    wide masks dissolve only its outer edges into the office and selector space. */
 .ns-portrait-preview{position:absolute;z-index:1;top:72px;right:max(-7vw,-120px);bottom:0;width:min(64vw,960px);overflow:hidden;opacity:.94;isolation:isolate;-webkit-mask-image:linear-gradient(90deg,transparent 0%,rgba(0,0,0,.06) 9%,rgba(0,0,0,.7) 28%,#000 48%,#000 87%,transparent 100%),linear-gradient(0deg,transparent 0%,#000 15%,#000 91%,transparent 100%);-webkit-mask-composite:source-in;mask-image:linear-gradient(90deg,transparent 0%,rgba(0,0,0,.06) 9%,rgba(0,0,0,.7) 28%,#000 48%,#000 87%,transparent 100%),linear-gradient(0deg,transparent 0%,#000 15%,#000 91%,transparent 100%);mask-composite:intersect}
+.ns-portrait-image{position:absolute;inset:0;width:100%;height:100%;display:block}
+.ns-portrait-image--current{z-index:1}.ns-portrait-image--previous{z-index:2}
 .ns-portrait-preview img{position:absolute;inset:0;width:100%;height:100%;max-width:none;object-fit:contain;object-position:var(--portrait-position,56% 50%);transform-origin:68% 50%;will-change:opacity,transform,filter}
 .ns-portrait-tone{position:absolute;inset:0;background:linear-gradient(90deg,#050505 0%,rgba(5,5,5,.55) 12%,transparent 30%),linear-gradient(0deg,#060606aa 0%,transparent 26%,transparent 78%,#06060655 100%);mix-blend-mode:multiply;pointer-events:none}
 .ns-portrait-preview.is-subdued{opacity:.085;right:1vw;filter:saturate(.5) brightness(.58) contrast(.94)}
@@ -114,3 +116,89 @@
 .ns-inline-subaccents i:hover{color:#c9c9d1;transform:translateY(-1px)}.ns-inline-subaccents i.is-selected{color:#fff;transform:translateY(-1px);text-shadow:0 0 14px rgba(255,255,255,.18)}
 @keyframes ns-subaccent-in{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
 @container nodemere-studio (max-width:600px){.ns-inline-subaccents{grid-template-columns:repeat(2,minmax(0,1fr));max-width:none}.ns-inline-subaccents i{font-size:9px}}
+
+/* Multi-accent selection and the animated accent DNA ribbon. */
+.ns-accent-decisions{align-items:start}
+.ns-accent-decisions,.ns-accent-dna{width:100%;max-width:none}
+.ns-accent-choice{min-width:0;border-bottom:1px solid var(--ns-hairline);color:#b7b7bf;transition:border-color .3s,color .3s}
+.ns-accent-choice:hover,.ns-accent-choice.is-selected{color:#fff;border-color:rgba(230,225,215,.62)}
+.ns-accent-main{position:relative;display:block;width:100%;min-height:74px;text-align:left;padding:17px 30px 15px 0;transition:padding .3s,color .3s}
+.ns-accent-main>span{display:block;font-size:18px;letter-spacing:-.035em;font-weight:500}
+.ns-accent-main small{display:block;font-size:9px;font-weight:400;color:#777780;margin-top:3px}
+.ns-accent-main>b{position:absolute;right:8px;top:25px;opacity:0;transform:translateX(-7px);transition:.3s}
+.ns-accent-main:hover,.ns-accent-choice.is-selected .ns-accent-main{padding-left:9px}
+.ns-accent-main:hover>b,.ns-accent-choice.is-selected .ns-accent-main>b{opacity:1;transform:translateX(0)}
+.ns-accent-choice.is-selected .ns-accent-main>span{font-size:16px}
+.ns-accent-choice.is-selected .ns-accent-main small{display:none}
+.ns-accent-choice.is-selected .ns-accent-main{min-height:43px;padding-top:12px;padding-bottom:9px}
+.ns-accent-choice.is-selected .ns-accent-main>b{top:15px}
+.ns-accent-choice:not(.is-selected):has(.ns-accent-main[aria-disabled="true"]){opacity:.42}
+.ns-inline-subaccents{grid-template-columns:repeat(3,minmax(0,1fr));gap:3px 10px;margin:0 0 10px 9px;max-width:340px}
+.ns-inline-subaccents button{display:block;min-width:0;text-align:left;font:inherit;font-size:8px;line-height:1.15;color:#8f8f98;padding:3px 0;cursor:pointer;transition:color .2s,transform .2s,text-shadow .2s}
+.ns-inline-subaccents button:hover{color:#d3c9b8;transform:translateY(-1px)}
+.ns-inline-subaccents button.is-selected{color:#fff;transform:translateY(-1px);text-shadow:0 0 14px rgba(226,211,184,.3)}
+.ns-accent-dna{width:100%;max-width:430px;margin:18px 0 16px;position:relative;color:#dad8d2}
+.ns-accent-dna>header,.ns-dna-meta{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.ns-accent-dna>header>span{font-size:8px;letter-spacing:.19em;font-weight:600;color:#9d9991}
+.ns-accent-dna>header>small,.ns-dna-meta{font-size:8px;letter-spacing:.06em;color:#77746f}
+.ns-dna-ribbon{display:flex;align-items:stretch;position:relative;isolation:isolate;overflow:hidden;width:100%;height:34px;margin-top:8px;border-radius:17px;background:linear-gradient(180deg,#0b0b0d,#020203 72%,#09090b);box-shadow:inset 0 1px 0 rgba(255,255,255,.16),inset 0 -1px 0 rgba(255,255,255,.09),0 11px 30px rgba(0,0,0,.2);perspective:600px}
+.ns-dna-ribbon::before{content:"";position:absolute;z-index:4;inset:0;background:radial-gradient(circle at 18% 0,rgba(255,255,255,.22),transparent 32%),linear-gradient(90deg,rgba(255,255,255,.14),transparent 14%,transparent 86%,rgba(255,255,255,.1)),linear-gradient(180deg,rgba(255,255,255,.12),transparent 34%,transparent 66%,rgba(255,255,255,.07));opacity:.36;pointer-events:none;mix-blend-mode:screen}
+.ns-dna-ribbon::after{content:var(--preview-name);position:absolute;z-index:5;right:9px;top:50%;transform:translateY(-50%);max-width:45%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#c7beb0;font-size:7px;letter-spacing:.16em;text-transform:uppercase;opacity:0;transition:opacity .24s ease,transform .24s ease;pointer-events:none;text-shadow:0 0 12px rgba(0,0,0,.9)}
+.ns-accent-dna.is-previewing .ns-dna-ribbon::after{opacity:.5;transform:translateY(-50%) translateX(-2px)}
+.ns-dna-strand{position:relative;display:block;flex:1 1 0;min-width:0;overflow:hidden;transform-origin:center center;background:linear-gradient(180deg,#08080a,#020203 72%,#09090b);filter:saturate(1.05) brightness(.76);box-shadow:inset 0 0 18px rgba(0,0,0,.75);transition:filter .32s,transform .32s,box-shadow .32s,opacity .32s}
+.ns-dna-strand+.ns-dna-strand{border-left:1px solid rgba(238,231,218,.14)}
+.ns-dna-strand::before{content:"";position:absolute;inset:-70% -18%;background:radial-gradient(ellipse at 18% 48%,var(--dna-primary),transparent 19%),radial-gradient(ellipse at 78% 22%,var(--dna-secondary),transparent 16%),radial-gradient(ellipse at 55% 88%,var(--dna-primary),transparent 14%);opacity:.2;filter:blur(12px);mix-blend-mode:screen;animation:ns-dna-drift 16s ease-in-out infinite alternate;pointer-events:none}
+.ns-dna-strand::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent 0 7%,color-mix(in srgb,var(--dna-primary) 74%,transparent) 8%,transparent 9% 27%,rgba(250,236,209,.18) 28%,transparent 29% 52%,color-mix(in srgb,var(--dna-secondary) 65%,transparent) 53%,transparent 54% 77%,color-mix(in srgb,var(--dna-primary) 48%,transparent) 78%,transparent 79% 100%),repeating-linear-gradient(0deg,transparent 0 5px,rgba(255,255,255,.035) 6px,transparent 7px 12px);opacity:.54;filter:blur(.18px);pointer-events:none}
+.ns-dna-wave{position:absolute;z-index:1;inset:0;background:linear-gradient(90deg,transparent 12%,rgba(255,231,195,.16) 49%,transparent 86%);opacity:0;transform:translateX(-65%);transition:opacity .25s,transform .5s}
+.ns-dna-label{position:absolute;z-index:2;inset:auto 7px 4px;display:block;color:#eee4d4;text-shadow:0 1px 8px #000,0 0 13px rgba(0,0,0,.75);font-size:7px;letter-spacing:.1em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.64}
+.ns-dna-strand:hover,.ns-dna-strand.is-preview{filter:saturate(1.35) brightness(.86);transform:translateY(-1px);box-shadow:inset 0 0 18px rgba(0,0,0,.62),inset 0 0 0 1px rgba(255,238,205,.16)}
+.ns-dna-strand:hover .ns-dna-wave,.ns-dna-strand.is-preview .ns-dna-wave{opacity:.35;transform:translateX(65%)}
+.ns-dna-strand.is-preview{animation-duration:22s}
+.ns-accent-dna.is-previewing .ns-dna-ribbon{box-shadow:inset 0 1px 0 rgba(255,255,255,.13),inset 0 -1px 0 rgba(245,231,204,.1),0 12px 32px rgba(0,0,0,.22)}
+.ns-dna-meta{margin-top:7px;letter-spacing:.02em}
+.ns-dna-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:space-around;pointer-events:none}
+.ns-dna-empty span{height:1px;width:15%;background:rgba(238,231,218,.12);box-shadow:0 0 8px rgba(238,231,218,.05);animation:ns-dna-pulse 4.2s ease-in-out infinite alternate}
+.ns-dna-empty span:nth-child(2){animation-delay:.4s}.ns-dna-empty span:nth-child(3){animation-delay:.8s}.ns-dna-empty span:nth-child(4){animation-delay:1.2s}
+@keyframes ns-dna-flow{from{background-position:0% 50%}to{background-position:180% 50%}}
+@keyframes ns-dna-scan{from{transform:translateX(-3%);opacity:.12}to{transform:translateX(3%);opacity:.32}}
+@keyframes ns-dna-drift{from{transform:translateX(-4%) scale(1)}to{transform:translateX(4%) scale(1.08)}}
+@keyframes ns-dna-pulse{from{opacity:.28;transform:scaleX(.78)}to{opacity:.72;transform:scaleX(1.08)}}
+@container nodemere-studio (max-width:600px){.ns-accent-dna{max-width:none;margin-top:16px}.ns-dna-ribbon{height:30px}.ns-inline-subaccents{grid-template-columns:repeat(2,minmax(0,1fr));max-width:none}.ns-inline-subaccents button{font-size:9px}.ns-accent-main{min-height:68px}}
+@media(prefers-reduced-motion:reduce){.ns-dna-strand,.ns-dna-strand::before,.ns-dna-empty span{animation:none!important}}
+
+/* Accent DNA — scenic black glass capsule. The landscape is the material of the
+   element; the UI treatment only edits contrast, edge light, and the seams. */
+.ns-accent-dna{max-width:520px;margin:25px 0 18px;color:#e8e3dc}
+.ns-accent-dna>header{height:13px}
+.ns-accent-dna>header>span{font-size:8px;letter-spacing:.24em;color:#aaa49b}
+.ns-accent-dna>header>small,.ns-dna-meta{font-size:8px;letter-spacing:.08em;color:#716e6a}
+.ns-dna-ribbon{height:94px;margin-top:10px;border-radius:19px;background:#050609;box-shadow:inset 0 1px 0 rgba(255,255,255,.18),inset 0 -1px 0 rgba(255,255,255,.12),0 18px 42px rgba(0,0,0,.34);overflow:hidden;perspective:none}
+.ns-dna-ribbon::before{z-index:8;opacity:.34;background:linear-gradient(104deg,transparent 0 38%,rgba(255,255,255,.13) 47%,rgba(255,255,255,.025) 52%,transparent 63%),linear-gradient(180deg,rgba(255,255,255,.1),transparent 25%,transparent 72%,rgba(0,0,0,.34));mix-blend-mode:screen;animation:ns-dna-sheen 13s ease-in-out infinite}
+.ns-dna-ribbon::after{display:none}
+.ns-dna-strand{height:100%;min-width:0;filter:saturate(.94) brightness(.74);background:var(--dna-base);box-shadow:none;isolation:isolate;transition:filter .4s ease,transform .4s ease}
+.ns-dna-strand+.ns-dna-strand{margin-left:-14px;border-left:0}
+.ns-dna-strand:first-child{border-radius:19px 0 0 19px}
+.ns-dna-strand:last-child{border-radius:0 19px 19px 0}
+.ns-dna-strand:only-child{border-radius:19px}
+.ns-dna-strand::before{inset:-18%;z-index:1;background:var(--dna-image) center/cover no-repeat;opacity:.98;filter:saturate(.98) contrast(1.03);mix-blend-mode:normal;animation:ns-dna-pan 22s ease-in-out infinite alternate}
+.ns-dna-strand::after{inset:0;z-index:2;background:linear-gradient(90deg,rgba(0,0,0,.42),transparent 26%,transparent 70%,rgba(0,0,0,.38)),linear-gradient(0deg,rgba(0,0,0,.52),transparent 44%,rgba(0,0,0,.17));opacity:1;filter:none}
+.ns-dna-strand:not(:first-child)::before{mask-image:linear-gradient(90deg,transparent 0,#000 24%,#000 100%);-webkit-mask-image:linear-gradient(90deg,transparent 0,#000 24%,#000 100%)}
+.ns-dna-strand:not(:last-child)::before{mask-image:linear-gradient(90deg,#000 0,#000 76%,transparent 100%);-webkit-mask-image:linear-gradient(90deg,#000 0,#000 76%,transparent 100%)}
+.ns-dna-strand:not(:first-child)::after{background:linear-gradient(90deg,rgba(0,0,0,.7),rgba(0,0,0,.12) 25%,transparent 48%),linear-gradient(0deg,rgba(0,0,0,.52),transparent 44%,rgba(0,0,0,.17))}
+.ns-dna-strand.is-fallback::before{background:radial-gradient(circle at 30% 30%,var(--dna-primary),transparent 50%),radial-gradient(circle at 80% 80%,var(--dna-secondary),transparent 58%),var(--dna-base);opacity:.8}
+.ns-dna-scrub{position:absolute;z-index:3;left:12%;right:12%;top:32%;height:36%;border-radius:999px;background:linear-gradient(90deg,transparent,rgba(4,5,7,.68) 17%,rgba(4,5,7,.79) 50%,rgba(4,5,7,.68) 83%,transparent);filter:blur(5px);opacity:.92}
+.ns-dna-label{z-index:4;inset:50% 8px auto;transform:translateY(-50%);text-align:center;color:#f3ede4;text-shadow:0 1px 12px rgba(0,0,0,.95);font-size:9px;letter-spacing:.2em;font-weight:600;opacity:.95}
+.ns-dna-rim{position:absolute;z-index:5;inset:0;border:1px solid color-mix(in srgb,var(--dna-primary) 46%,rgba(255,255,255,.22));border-radius:inherit;box-shadow:inset 0 0 18px color-mix(in srgb,var(--dna-primary) 20%,transparent);pointer-events:none;opacity:.78}
+.ns-dna-strand+.ns-dna-strand .ns-dna-rim{border-left-color:color-mix(in srgb,var(--dna-secondary) 35%,transparent)}
+.ns-dna-strand:hover,.ns-dna-strand.is-preview{filter:saturate(1.02) brightness(.8);transform:none;box-shadow:none}
+.ns-dna-strand:hover .ns-dna-scrub,.ns-dna-strand.is-preview .ns-dna-scrub{opacity:1}
+.ns-accent-dna.is-previewing .ns-dna-ribbon{box-shadow:inset 0 1px 0 rgba(255,255,255,.14),inset 0 -1px 0 rgba(255,255,255,.1),0 18px 42px rgba(0,0,0,.34)}
+.ns-dna-meta{margin-top:9px}
+.ns-dna-empty{inset:1px;border-radius:inherit;background:linear-gradient(105deg,#050609,#0a0b10,#050609);overflow:hidden}
+.ns-dna-empty::after{content:"";position:absolute;inset:0;background:linear-gradient(100deg,transparent 25%,rgba(255,255,255,.09),transparent 75%);animation:ns-dna-sheen 14s ease-in-out infinite}
+.ns-dna-empty span{width:13%;background:rgba(237,229,217,.2);box-shadow:0 0 12px rgba(237,229,217,.12)}
+@keyframes ns-dna-pan{from{transform:scale(1.04) translateX(-1.5%)}to{transform:scale(1.09) translateX(1.5%)}}
+@keyframes ns-dna-sheen{0%,55%{transform:translateX(-75%);opacity:0}70%{opacity:.3}100%{transform:translateX(75%);opacity:0}}
+@container nodemere-studio (max-width:600px){.ns-accent-dna{max-width:none}.ns-dna-ribbon{height:76px;border-radius:16px}.ns-dna-strand:first-child{border-radius:16px 0 0 16px}.ns-dna-strand:last-child{border-radius:0 16px 16px 0}.ns-dna-strand:only-child{border-radius:16px}.ns-dna-label{font-size:8px;letter-spacing:.14em}}
+@media(prefers-reduced-motion:reduce){.ns-dna-ribbon::before,.ns-dna-strand::before,.ns-dna-empty::after{animation:none!important}}
+

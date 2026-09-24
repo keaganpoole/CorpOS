@@ -4,8 +4,8 @@ import { CHARACTERISTICS } from './voiceDefinition';
 
 const loaded = new Set();
 const failed = new Set();
-const EASE = [.22, 1, .36, 1];
-const CROSSFADE_MS = 520;
+const EASE = [.16, 1, .3, 1];
+const CROSSFADE_MS = 1150;
 
 function asPortrait(asset, values = {}) {
   if (!asset) return null;
@@ -47,8 +47,8 @@ export default function PortraitPreview({ stage, values = {}, previewOption, ass
     ? portraitFor(stageAssets, previewOption.option, values)
     : selectedPortrait(stage, values, assets);
   const [visible, setVisible] = useState(() => requested && loaded.has(requested.src) ? requested : null);
-  const [previous, setPrevious] = useState(null);
-  const visibleRef = React.useRef(visible);
+  const [previousVisible, setPreviousVisible] = useState(null);
+  const previousTimer = React.useRef(null);
   const sources = useMemo(() => Object.values(stageAssets).map(asset => asPortrait(asset, values)).filter(Boolean), [stageAssets, values.gender]);
 
   useEffect(() => {
@@ -64,7 +64,23 @@ export default function PortraitPreview({ stage, values = {}, previewOption, ass
     });
   }, [sources]);
 
-  useEffect(() => { visibleRef.current = visible; }, [visible]);
+  useEffect(() => () => {
+    if (previousTimer.current) window.clearTimeout(previousTimer.current);
+  }, []);
+
+  const revealPortrait = React.useCallback((next) => {
+    setVisible(current => {
+      if (current?.src && current.src !== next.src) {
+        setPreviousVisible(current);
+        if (previousTimer.current) window.clearTimeout(previousTimer.current);
+        previousTimer.current = window.setTimeout(() => {
+          setPreviousVisible(null);
+          previousTimer.current = null;
+        }, CROSSFADE_MS);
+      }
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     if (!requested?.src || failed.has(requested.src)) {
@@ -72,8 +88,7 @@ export default function PortraitPreview({ stage, values = {}, previewOption, ass
       return undefined;
     }
     if (loaded.has(requested.src)) {
-      setPrevious(visibleRef.current?.src && visibleRef.current.src !== requested.src ? visibleRef.current : null);
-      setVisible(requested);
+      revealPortrait(requested);
       return undefined;
     }
     let cancelled = false;
@@ -83,37 +98,38 @@ export default function PortraitPreview({ stage, values = {}, previewOption, ass
     const reveal = () => {
       if (cancelled) return;
       loaded.add(requested.src);
-      setPrevious(visibleRef.current?.src && visibleRef.current.src !== requested.src ? visibleRef.current : null);
-      setVisible(requested);
+      revealPortrait(requested);
     };
     image.decode?.().then(reveal).catch(() => {
       if (image.complete && image.naturalWidth) reveal();
       else failed.add(requested.src);
     });
     return () => { cancelled = true; };
-  }, [requested?.src, requested?.position, requested?.scale]);
-
-  useEffect(() => {
-    if (!previous || reducedMotion) return undefined;
-    const timer = setTimeout(() => setPrevious(null), CROSSFADE_MS);
-    return () => clearTimeout(timer);
-  }, [previous, reducedMotion]);
+  }, [requested?.src, requested?.position, requested?.scale, requested?.origin, revealPortrait]);
 
   if (!visible) return null;
   const currentScale = Number(visible.scale || 1);
-  const previousScale = Number(previous?.scale || 1);
+  const previousScale = Number(previousVisible?.scale || 1);
   return <div className={`ns-portrait-preview ${subdued ? 'is-subdued' : ''}`}>
-    {previous && !reducedMotion ? <img className="ns-portrait-image ns-portrait-image--previous" src={previous.src} alt="" style={{ objectPosition: previous.position || '56% 50%', transform: `scale(${previousScale})` }} /> : null}
-    <motion.img
-      className="ns-portrait-image"
-      key={visible.src}
-      src={visible.src}
-      alt=""
-      style={{ objectPosition: visible.position || '56% 50%' }}
-      initial={{ opacity: previous && !reducedMotion ? 0 : 1, scale: currentScale }}
-      animate={{ opacity: 1, scale: currentScale }}
+    <motion.span
+      className="ns-portrait-image ns-portrait-image--current"
+      key={`${visible.src}-${visible.position || ''}-${visible.scale || 1}-${visible.origin || ''}`}
+      initial={{ opacity: previousVisible && !reducedMotion ? .12 : 1, filter: previousVisible && !reducedMotion ? 'blur(2.5px)' : 'blur(0px)' }}
+      animate={{ opacity: 1, filter: 'blur(0px)' }}
       transition={{ duration: reducedMotion ? 0 : CROSSFADE_MS / 1000, ease: EASE }}
-    />
+    >
+      <img src={visible.src} alt="" style={{ objectPosition: visible.position || '56% 50%', transformOrigin: visible.origin || undefined, transform: `scale(${currentScale})` }} />
+    </motion.span>
+    {previousVisible ? <motion.span
+      className="ns-portrait-image ns-portrait-image--previous"
+      key={`${previousVisible.src}-${previousVisible.position || ''}-${previousVisible.scale || 1}-${previousVisible.origin || ''}`}
+      initial={{ opacity: reducedMotion ? 0 : 1, filter: 'blur(0px)' }}
+      animate={{ opacity: 0, filter: reducedMotion ? 'blur(0px)' : 'blur(2px)' }}
+      transition={{ duration: reducedMotion ? 0 : CROSSFADE_MS / 1000, ease: EASE }}
+      aria-hidden="true"
+    >
+      <img src={previousVisible.src} alt="" style={{ objectPosition: previousVisible.position || '56% 50%', transformOrigin: previousVisible.origin || undefined, transform: `scale(${previousScale})` }} />
+    </motion.span> : null}
     <div className="ns-portrait-tone" />
   </div>;
 }
