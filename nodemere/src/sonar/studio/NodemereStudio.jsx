@@ -1,4 +1,4 @@
-import React, { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from 'framer-motion';
 import { ArrowLeft, ArrowRight, Check, ChevronDown, Headphones, Pause, Play, RotateCcw, SlidersHorizontal } from 'lucide-react';
 import SplashScreenAlternate from '../../components/SplashScreenAlternate';
@@ -18,19 +18,134 @@ const COMPLETE_STAGE = ROOM_STAGE + 2;
 const TONE_STAGE = CHARACTERISTICS.findIndex(item => item.key === 'tone');
 const DEFAULT_TONE_WEIGHTS = Object.fromEntries((CHARACTERISTICS[TONE_STAGE]?.options || []).map(option => [option, 50]));
 const accentSelections = values => values.accents?.length ? values.accents : values.accent ? [{accent:values.accent,subAccent:values.subAccent||''}] : [];
+const accentDnaSelections = values => {
+  const seen = new Set();
+  return accentSelections(values).filter(item => {
+    if (seen.has(item.accent)) return false;
+    seen.add(item.accent);
+    return true;
+  });
+};
 const accentName = item => item.subAccent || item.accent;
 const accentColors = item => SUB_ACCENT_PALETTES[item.subAccent] || ACCENT_PALETTES[item.accent] || ACCENT_PALETTES.American;
 const accentLandscape = item => ACCENT_LANDSCAPES[item.accent] || '';
 const accentVisualName = item => item.accent === 'Hispanic / Latina' ? 'Latina' : item.accent;
+const accentLandscapePosition = item => ({
+  American: 'center 28%',
+  Chinese: 'center 20%',
+  Japanese: 'center 20%',
+}[item.accent] || 'center center');
+const sampledImageColors = new Map();
+
+function rgbToHex(r, g, b) {
+  return `#${[r, g, b].map(value => Math.max(0, Math.min(255, Math.round(value))).toString(16).padStart(2, '0')).join('')}`;
+}
+
+function hexToRgb(hex) {
+  const value = hex.replace('#', '');
+  return [0, 2, 4].map(index => parseInt(value.slice(index, index + 2), 16));
+}
+
+function mixHex(a, b, amount = .5) {
+  const left = hexToRgb(a);
+  const right = hexToRgb(b);
+  return rgbToHex(...left.map((channel, index) => channel * (1 - amount) + right[index] * amount));
+}
+
+function colorDistance(a, b) {
+  return Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2]);
+}
+
+function colorStats([r, g, b]) {
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const brightness = (r + g + b) / 3;
+  const saturation = max ? (max - min) / max : 0;
+  return { brightness, saturation };
+}
+
+function representativeColor(data, width, height, startX, endX, fallback) {
+  const clusters = [];
+  for (let y = 0; y < height; y += 2) {
+    for (let x = startX; x < endX; x += 2) {
+      const index = (y * width + x) * 4;
+      const alpha = data[index + 3];
+      if (alpha < 180) continue;
+      const color = [data[index], data[index + 1], data[index + 2]];
+      const { brightness, saturation } = colorStats(color);
+      if (brightness < 34 || brightness > 238 || saturation < .08) continue;
+      const existing = clusters.find(cluster => colorDistance(cluster.color, color) < 48);
+      if (existing) {
+        existing.count += 1;
+        existing.saturation += saturation;
+        existing.brightness += brightness;
+        existing.color = existing.color.map((channel, channelIndex) => (channel * .76) + (color[channelIndex] * .24));
+      } else {
+        clusters.push({ color, count: 1, saturation, brightness });
+      }
+    }
+  }
+  const best = clusters.sort((a, b) => {
+    const score = cluster => {
+      const saturation = cluster.saturation / cluster.count;
+      const brightness = cluster.brightness / cluster.count;
+      const brightnessScore = brightness > 205 ? .86 : brightness < 65 ? .78 : 1;
+      return cluster.count * (1 + saturation * 2.4) * brightnessScore;
+    };
+    return score(b) - score(a);
+  })[0]?.color;
+  return best ? rgbToHex(...best) : fallback;
+}
+
+async function sampleImageGlow(src, fallback) {
+  const fallbackStops = { left: fallback, center: fallback, right: fallback };
+  if (!src) return fallbackStops;
+  if (sampledImageColors.has(src)) return sampledImageColors.get(src);
+  const sampled = new Promise(resolve => {
+    const image = new Image();
+    image.crossOrigin = 'anonymous';
+    image.decoding = 'async';
+    image.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        const width = 96;
+        const height = 28;
+        canvas.width = width;
+        canvas.height = height;
+        const context = canvas.getContext('2d', { willReadFrequently: true });
+        if (!context) throw new Error('Canvas unavailable');
+        const cropRatio = width / height;
+        const imageRatio = image.naturalWidth / image.naturalHeight;
+        const sourceWidth = imageRatio > cropRatio ? image.naturalHeight * cropRatio : image.naturalWidth;
+        const sourceHeight = imageRatio > cropRatio ? image.naturalHeight : image.naturalWidth / cropRatio;
+        const sourceX = (image.naturalWidth - sourceWidth) / 2;
+        const sourceY = (image.naturalHeight - sourceHeight) / 2;
+        context.drawImage(image, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, width, height);
+        const { data } = context.getImageData(0, 0, width, height);
+        resolve({
+          left: representativeColor(data, width, height, 0, Math.floor(width * .34), fallback),
+          center: representativeColor(data, width, height, Math.floor(width * .25), Math.floor(width * .75), fallback),
+          right: representativeColor(data, width, height, Math.floor(width * .66), width, fallback),
+        });
+      } catch {
+        resolve(fallbackStops);
+      }
+    };
+    image.onerror = () => resolve(fallbackStops);
+    image.src = src;
+  });
+  sampledImageColors.set(src, sampled);
+  return sampled;
+}
 
 function Range({ label, value, onChange, min, max, step = .1, hint }) {
   return <label className="ns-range"><span>{label}<output>{value}</output></span><input type="range" aria-label={label} min={min} max={max} step={step} value={value} onChange={e=>onChange(Number(e.target.value))}/><small>{hint}</small></label>;
 }
 
-function BlendChoice({ option, note, value = 0, active, onChange, onPreview }) {
+function BlendChoice({ option, note, value = 0, active, onChange, onPreview, index = 0 }) {
   const amount = Math.round(value);
   const descriptor = amount >= 85 ? 'defining' : amount >= 60 ? 'strong' : amount >= 30 ? 'present' : amount > 0 ? 'subtle' : 'none';
-  return <div className={`ns-blend-row ${active ? 'is-selected' : ''}`} style={{ '--weight': `${amount}%` }} onPointerEnter={onPreview} onFocus={onPreview}>
+  return <div className={`ns-blend-row ${active ? 'is-selected' : ''}`} style={{ '--weight': `${amount}%`, '--option-index': index }} onPointerEnter={onPreview} onFocus={onPreview}>
     <button type="button" className="ns-blend-name" aria-pressed={amount > 0} onClick={() => onChange(amount ? 0 : 55)}>
       <span>{option}</span><small>{note}</small>
     </button>
@@ -40,26 +155,75 @@ function BlendChoice({ option, note, value = 0, active, onChange, onPreview }) {
 }
 
 function AccentDna({ values, previewOption }) {
-  const chosen=accentSelections(values);
+  const chosen=accentDnaSelections(values);
+  const reducedMotion=useReducedMotion();
+  const [imageGlows,setImageGlows]=useState({});
   let strands=chosen.map(item=>({...item,preview:false}));
+  const glowRequestKey=strands.map(item=>`${item.accent}:${item.subAccent||''}:${accentLandscape(item)}:${accentColors(item)[1]}`).join('|');
+  const glowRequests=useMemo(()=>strands.map(item=>{
+    const [,primary]=accentColors(item);
+    return {accent:item.accent,image:accentLandscape(item),fallback:primary};
+  }),[glowRequestKey]);
+  useEffect(()=>{
+    let cancelled=false;
+    Promise.all(glowRequests.map(async item=>[item.accent,await sampleImageGlow(item.image,item.fallback)])).then(entries=>{
+      if(cancelled)return;
+      setImageGlows(Object.fromEntries(entries));
+    });
+    return()=>{cancelled=true;};
+  },[glowRequests]);
   if(previewOption?.key==='accent'){
     const index=strands.findIndex(item=>item.accent===previewOption.option);
     if(index>=0)strands[index]={...strands[index],preview:true};
   }
   const previewName=previewOption?.key==='accent' ? previewOption.option : '';
+  const strandGlows=strands.map(item=>{
+    const [,primary]=accentColors(item);
+    return imageGlows[item.accent]||{left:primary,center:primary,right:primary};
+  });
+  const glowStops=strandGlows.flatMap((glow,index)=>{
+    const segment=100/Math.max(strandGlows.length,1);
+    const start=index*segment;
+    const end=start+segment;
+    const inner=Math.min(7, segment*.22);
+    const previous=strandGlows[index-1];
+    const next=strandGlows[index+1];
+    const startColor=previous?mixHex(previous.right,glow.left,.5):glow.left;
+    const endColor=next?mixHex(glow.right,next.left,.5):glow.right;
+    return [
+      `${startColor} ${start.toFixed(2)}%`,
+      `${glow.left} ${(start+inner).toFixed(2)}%`,
+      `${glow.center} ${(start+segment*.5).toFixed(2)}%`,
+      `${glow.right} ${(end-inner).toFixed(2)}%`,
+      `${endColor} ${end.toFixed(2)}%`,
+    ];
+  });
+  const ribbonGlow=glowStops.length?`linear-gradient(90deg,${glowStops.join(',')})`:'linear-gradient(90deg,#ffffff,#ffffff)';
+  const glowStrength=strands.length<=1?1:strands.length===2?.78:.64;
+  if(!chosen.length)return null;
   return <section className={`ns-accent-dna ${strands.length?'has-strands':''} ${previewOption?.key==='accent'?'is-previewing':''}`} aria-label="Accent DNA preview">
     <header><span>ACCENT DNA</span><small>{chosen.length} / 3 influences</small></header>
-    <div className="ns-dna-ribbon" style={{'--preview-name':`"${previewName}"`}} role="img" aria-label={chosen.length?`${chosen.length} selected accent${chosen.length===1?'':'s'}: ${chosen.map(accentName).join(', ')}`:'Select an accent to begin the blend'}>
+    <div className="ns-dna-ribbon" style={{'--preview-name':`"${previewName}"`,'--dna-ribbon-glow':ribbonGlow,'--dna-glow-strength':glowStrength}} role="img" aria-label={chosen.length?`${chosen.length} selected accent${chosen.length===1?'':'s'}: ${chosen.map(accentName).join(', ')}`:'Select an accent to begin the blend'}>
+      <AnimatePresence initial={false}>
       {strands.map(item=>{
         const colors=accentColors(item);
         const [base,primary,secondary]=colors;
         const image=accentLandscape(item);
-        return <motion.div key={item.accent} layout className={`ns-dna-strand ${item.preview?'is-preview':''} ${image?'has-image':'is-fallback'}`} style={{'--dna-base':base,'--dna-primary':primary,'--dna-secondary':secondary,'--dna-image':image?`url("${image}")`:'none'}} initial={{opacity:0,scaleX:.6}} animate={{opacity:1,scaleX:1}} exit={{opacity:0,scaleX:.75}} transition={{duration:.55,ease:EASE}}>
-        <span className="ns-dna-image"/><span className="ns-dna-grade"/><span className="ns-dna-scrub"/><span className="ns-dna-label">{accentVisualName(item)}</span><span className="ns-dna-rim"/>
+        const glow=imageGlows[item.accent]||{left:primary,center:primary,right:primary};
+        return <motion.div
+          key={item.accent}
+          layout
+          className={`ns-dna-strand ${item.preview?'is-preview':''} ${image?'has-image':'is-fallback'}`}
+          style={{'--dna-base':base,'--dna-primary':primary,'--dna-secondary':secondary,'--dna-glow-left':glow.left,'--dna-glow-center':glow.center,'--dna-glow-right':glow.right,'--dna-image':image?`url("${image}")`:'none','--dna-image-position':accentLandscapePosition(item)}}
+          initial={{opacity:0,scaleX:reducedMotion?1:.96}}
+          animate={{opacity:1,scaleX:1}}
+          exit={{opacity:0,scaleX:reducedMotion?1:.98}}
+          transition={{opacity:{duration:reducedMotion?0:.2,ease:EASE},scaleX:{duration:reducedMotion?0:.26,ease:EASE},layout:{duration:reducedMotion?0:.28,ease:EASE}}}
+        >
+        <span className="ns-dna-image"/>
       </motion.div>})}
-      {!strands.length?<div className="ns-dna-empty"><span/><span/><span/><span/></div>:null}
+      </AnimatePresence>
     </div>
-    <div id="studio-accent-dna-description" className="ns-dna-meta"><span>{chosen.length?'Accent blend':'Choose up to three accent influences'}</span>{previewName&&chosen.length<3?<span>Previewing {previewName}</span>:chosen.length<3?<span>{3-chosen.length} {3-chosen.length===1?'slot':'slots'} open</span>:<span>Full blend</span>}</div>
   </section>;
 }
 
@@ -123,13 +287,11 @@ export default function NodemereStudio({ onReturn, onDirtyChange, onSaved, skipI
   const chooseSubAccent=value=>{
     const current=accentSelections(values), parent=Object.keys(SUB_ACCENTS).find(accent=>SUB_ACCENTS[accent].includes(value));
     const selectedIndex=current.findIndex(item=>item.accent===parent&&item.subAccent===value);
-    const baseIndex=current.findIndex(item=>item.accent===parent&&!item.subAccent);
-    if(selectedIndex<0&&baseIndex<0&&current.length>=3)return;
+    if(selectedIndex<0&&current.length>=3)return;
     touch();
     setValues(s=>{
       const selected=current.findIndex(item=>item.accent===parent&&item.subAccent===value);
-      const base=current.findIndex(item=>item.accent===parent&&!item.subAccent);
-      const accents=selected>=0?current.filter((_,index)=>index!==selected):base>=0?current.map((item,index)=>index===base?{...item,subAccent:value}:item):[...current,{accent:parent,subAccent:value}];
+      const accents=selected>=0?current.filter((_,index)=>index!==selected):[...current,{accent:parent,subAccent:value}];
       const primary=accents[0];
       return {...s,accents,accent:primary?.accent||'',subAccent:primary?.subAccent||''};
     });
@@ -211,12 +373,12 @@ export default function NodemereStudio({ onReturn, onDirtyChange, onSaved, skipI
   const scriptValid=!scriptLength||(scriptLength>=100&&previewText.length<=1000);
   const valid=description.trim().length>=20&&description.length<=1000&&scriptValid&&(settings.seed===''||(Number.isInteger(Number(settings.seed))&&Number(settings.seed)>=0&&Number(settings.seed)<=2147483647));
   return <section onScroll={event=>event.currentTarget.closest('.ns-office')?.style.setProperty('--office-scroll',`${-event.currentTarget.scrollTop}px`)} className={`ns-studio ${room?'is-room':''} ${auditioning?'is-audition':''} ${mode==='clone'?'is-clone':''} ${busy?'is-processing':''}`}>
-    {intro?<div className="ns-intro"><SplashScreenAlternate onAnimationEnd={finishIntro}/><button className="ns-skip" onClick={finishIntro}>Enter Studio <ArrowRight size={14}/></button></div>:null}
+    {intro?<div className="ns-intro"><SplashScreenAlternate label="Audition" onAnimationEnd={finishIntro}/><button className="ns-skip" onClick={finishIntro}>Enter Audition <ArrowRight size={14}/></button></div>:null}
     <div className="ns-content" inert={intro?'':undefined}>
     <header className="ns-topbar">
       <button className="ns-return" onClick={onReturn}><ArrowLeft size={15}/> Return to Team</button>
-      <div className="ns-wordmark">Nodemere <span>Studio</span></div>
-      <nav aria-label="Studio mode"><button disabled={busy||saving} aria-pressed={mode==='design'} onClick={()=>switchMode('design')}>Design a Voice</button><button disabled={busy||saving} aria-pressed={mode==='clone'} onClick={()=>switchMode('clone')}>Clone a Voice</button></nav>
+      <div className="ns-wordmark">Nodemere <span>Audition</span></div>
+      <nav aria-label="Audition mode"><button disabled={busy||saving} aria-pressed={mode==='design'} onClick={()=>switchMode('design')}>Design a Voice</button><button disabled={busy||saving} aria-pressed={mode==='clone'} onClick={()=>switchMode('clone')}>Clone a Voice</button></nav>
     </header>
     {mode==='design'?<>
       {audition.playing||complete?<div className="ns-scene-caption"><span className={audition.playing?'is-speaking':''}/>{audition.playing?'YOUR VOICE, IN THE ROOM':name}</div>:null}
@@ -228,20 +390,20 @@ export default function NodemereStudio({ onReturn, onDirtyChange, onSaved, skipI
           {stage===2?<AccentDna values={values} previewOption={previewOption}/>:null}
           {CHARACTERISTICS[stage].control==='blend'?<div className="ns-blend">{CHARACTERISTICS[stage].options.map((option,i)=>{
             const weight=values.toneWeights?.[option]??50;
-            return <BlendChoice key={option} option={option} note={CHARACTERISTICS[stage].notes[i]} value={weight} active={values.tone===option} onPreview={()=>setPreviewOption({key:'tone',option})} onChange={amount=>blendTone(option,amount)}/>;
+            return <BlendChoice key={option} index={i} option={option} note={CHARACTERISTICS[stage].notes[i]} value={weight} active={values.tone===option} onPreview={()=>setPreviewOption({key:'tone',option})} onChange={amount=>blendTone(option,amount)}/>;
           })}</div>:<div className={`ns-decisions ${CHARACTERISTICS[stage].options.length>3?'ns-decisions--grid':''} ${CHARACTERISTICS[stage].key==='accent'?'ns-accent-decisions':''}`}>{CHARACTERISTICS[stage].options.map((option,i)=>{
             const key=CHARACTERISTICS[stage].key;
             if(key==='accent'){
               const selected=accentSelections(values).filter(item=>item.accent===option), active=Boolean(selected.length), subAccents=active?(SUB_ACCENTS[option]||[]):[];
-              return <div key={option} className={`ns-accent-choice ${active?'is-selected':''}`}>
-                <button type="button" className="ns-accent-main" aria-pressed={active} aria-disabled={!active&&accentSelections(values).length>=3} aria-describedby="studio-accent-dna-description" onPointerEnter={()=>setPreviewOption({key,option})} onPointerLeave={()=>setPreviewOption(current=>current?.key===key&&current.option===option?null:current)} onFocus={()=>setPreviewOption({key,option})} onBlur={()=>setPreviewOption(current=>current?.key===key&&current.option===option?null:current)} onClick={()=>toggleAccent(option)}>
+              return <div key={option} className={`ns-accent-choice ${active?'is-selected':''}`} style={{ '--option-index': i }} onPointerEnter={()=>setPreviewOption({key,option})} onPointerLeave={()=>setPreviewOption(current=>current?.key===key&&current.option===option?null:current)}>
+                <button type="button" className="ns-accent-main" aria-pressed={active} aria-disabled={!active&&accentSelections(values).length>=3} onFocus={()=>setPreviewOption({key,option})} onBlur={()=>setPreviewOption(current=>current?.key===key&&current.option===option?null:current)} onClick={()=>toggleAccent(option)}>
                   <span>{option}</span><small>{CHARACTERISTICS[stage].notes[i]}</small><b>{active?<Check size={17}/>:<ArrowRight size={16}/>}</b>
                 </button>
-                {subAccents.length?<div className="ns-inline-subaccents" aria-label={`${option} regional accents`}>{subAccents.map(sub=>{const isSelected=selected.some(item=>item.subAccent===sub);return <button type="button" key={sub} className={isSelected?'is-selected':''} aria-pressed={isSelected} onPointerEnter={()=>setPreviewOption({key,option,subAccent:sub})} onPointerLeave={()=>setPreviewOption(current=>current?.subAccent===sub?null:current)} onFocus={()=>setPreviewOption({key,option,subAccent:sub})} onBlur={()=>setPreviewOption(current=>current?.subAccent===sub?null:current)} onClick={()=>chooseSubAccent(sub)}>{sub}</button>;})}</div>:null}
+                {subAccents.length?<div className="ns-inline-subaccents" aria-label={`${option} regional accents`}>{subAccents.map(sub=>{const isSelected=selected.some(item=>item.subAccent===sub);return <button type="button" key={sub} className={isSelected?'is-selected':''} aria-pressed={isSelected} onFocus={()=>setPreviewOption({key,option,subAccent:sub})} onBlur={()=>setPreviewOption(current=>current?.subAccent===sub?null:current)} onClick={()=>chooseSubAccent(sub)}>{sub}</button>;})}</div>:null}
               </div>;
             }
             const active=values[key]===option;
-            return <button key={option} className={active?'is-selected':''} aria-pressed={active} onPointerEnter={()=>setPreviewOption({key,option})} onPointerLeave={()=>setPreviewOption(current=>current?.key===key&&current.option===option?null:current)} onFocus={()=>setPreviewOption({key,option})} onBlur={()=>setPreviewOption(current=>current?.key===key&&current.option===option?null:current)} onClick={()=>choose(key,option)}><span>{option}</span><small>{CHARACTERISTICS[stage].notes[i]}</small><b>{active?<Check size={17}/>:<ArrowRight size={16}/>}</b></button>;
+            return <button key={option} className={active?'is-selected':''} style={{ '--option-index': i }} aria-pressed={active} onPointerEnter={()=>setPreviewOption({key,option})} onPointerLeave={()=>setPreviewOption(current=>current?.key===key&&current.option===option?null:current)} onFocus={()=>setPreviewOption({key,option})} onBlur={()=>setPreviewOption(current=>current?.key===key&&current.option===option?null:current)} onClick={()=>choose(key,option)}><span>{option}</span><small>{CHARACTERISTICS[stage].notes[i]}</small><b>{active?<Check size={17}/>:<ArrowRight size={16}/>}</b></button>;
           })}</div>}
           {CHARACTERISTICS[stage].control==='blend'?<button className="ns-primary" onClick={()=>setStage(ROOM_STAGE)}>Enter the control room <ArrowRight size={16}/></button>:values[CHARACTERISTICS[stage].key]&&(!canHoverFine||CHARACTERISTICS[stage].key==='accent')?<button className={`ns-primary ${CHARACTERISTICS[stage].key==='accent'?'':'ns-touch-continue'}`} onClick={continueGuided}>Continue <ArrowRight size={16}/></button>:null}
         </motion.div></AnimatePresence></div></motion.div>
@@ -283,9 +445,7 @@ export default function NodemereStudio({ onReturn, onDirtyChange, onSaved, skipI
       </div>:null}
       {complete?<div className="ns-complete"><span className="ns-eyebrow"><Check size={14}/> VOICE SAVED</span><h1 ref={focusHeading} tabIndex={-1}>Hello,<br/><span>{name}.</span></h1><p>A voice of their own. Ready for your front desk.<br/>Your receptionist is saved in the catalog.</p><button className="ns-primary" disabled={hiring} onClick={hire}>{hiring?'Adding to Team…':saved?.hired?'Return to Team':'Add to Team'}<ArrowRight size={16}/></button><button className="ns-text-button" onClick={onReturn}>Return to Team</button>{error?<p role="alert" className="ns-error">{error}</p>:null}</div>:null}
     </>:null}
-    <div hidden={mode!=='clone'}>{cloneToken?<Suspense fallback={<CubePreloader/>}><Clone embedded active={mode==='clone'} sessionToken={cloneToken} skipSplash onDirty={()=>markDirty('clone',true)} onComplete={()=>markDirty('clone',false)} onFinish={onReturn}/></Suspense>:mode==='clone'?<div className="ns-clone-entry"><span className="ns-eyebrow">YOUR VOICE. A NEW POSSIBILITY.</span><h1 ref={focusHeading} tabIndex={-1}>Already one<br/><span>of a kind.</span></h1><p>Bring your own voice into the Studio. Review your consent, record or upload a sample, then shape your receptionist.</p><button className="ns-primary" disabled={busy} onClick={beginClone}>{busy?'Preparing your session…':'Begin voice cloning'}<ArrowRight size={16}/></button><details className="ns-script"><summary>Continue an existing clone session <ChevronDown size={14}/></summary><label>Clone session link<input value={cloneLink} placeholder="Paste your Nodemere clone link" onChange={e=>{touch();setCloneLink(e.target.value);}}/></label><button className="ns-text-button" onClick={useCloneLink}>Continue session <ArrowRight size={13}/></button></details>{error?<p className="ns-error" role="alert">{error}</p>:null}</div>:null}</div>
+    <div hidden={mode!=='clone'}>{cloneToken?<Suspense fallback={<CubePreloader/>}><Clone embedded active={mode==='clone'} sessionToken={cloneToken} skipSplash onDirty={()=>markDirty('clone',true)} onComplete={()=>markDirty('clone',false)} onFinish={onReturn}/></Suspense>:mode==='clone'?<div className="ns-clone-entry"><span className="ns-eyebrow">YOUR VOICE. A NEW POSSIBILITY.</span><h1 ref={focusHeading} tabIndex={-1}>Already one<br/><span>of a kind.</span></h1><p>Bring your own voice into Audition. Review your consent, record or upload a sample, then shape your receptionist.</p><button className="ns-primary" disabled={busy} onClick={beginClone}>{busy?'Preparing your session…':'Begin voice cloning'}<ArrowRight size={16}/></button><details className="ns-script"><summary>Continue an existing clone session <ChevronDown size={14}/></summary><label>Clone session link<input value={cloneLink} placeholder="Paste your Nodemere clone link" onChange={e=>{touch();setCloneLink(e.target.value);}}/></label><button className="ns-text-button" onClick={useCloneLink}>Continue session <ArrowRight size={13}/></button></details>{error?<p className="ns-error" role="alert">{error}</p>:null}</div>:null}</div>
     </div>
   </section>;
 }
-
-

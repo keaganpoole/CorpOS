@@ -48,6 +48,7 @@ export default function PortraitPreview({ stage, values = {}, previewOption, ass
     : selectedPortrait(stage, values, assets);
   const [visible, setVisible] = useState(() => requested && loaded.has(requested.src) ? requested : null);
   const [previousVisible, setPreviousVisible] = useState(null);
+  const [fadeFromEmpty, setFadeFromEmpty] = useState(false);
   const previousTimer = React.useRef(null);
   const sources = useMemo(() => Object.values(stageAssets).map(asset => asPortrait(asset, values)).filter(Boolean), [stageAssets, values.gender]);
 
@@ -71,12 +72,15 @@ export default function PortraitPreview({ stage, values = {}, previewOption, ass
   const revealPortrait = React.useCallback((next) => {
     setVisible(current => {
       if (current?.src && current.src !== next.src) {
+        setFadeFromEmpty(false);
         setPreviousVisible(current);
         if (previousTimer.current) window.clearTimeout(previousTimer.current);
         previousTimer.current = window.setTimeout(() => {
           setPreviousVisible(null);
           previousTimer.current = null;
         }, CROSSFADE_MS);
+      } else if (!current?.src) {
+        setFadeFromEmpty(true);
       }
       return next;
     });
@@ -84,7 +88,10 @@ export default function PortraitPreview({ stage, values = {}, previewOption, ass
 
   useEffect(() => {
     if (!requested?.src || failed.has(requested.src)) {
-      if (!requested) setVisible(null);
+      if (!requested) {
+        setFadeFromEmpty(false);
+        setVisible(null);
+      }
       return undefined;
     }
     if (loaded.has(requested.src)) {
@@ -111,12 +118,15 @@ export default function PortraitPreview({ stage, values = {}, previewOption, ass
   const currentScale = Number(visible.scale || 1);
   const previousScale = Number(previousVisible?.scale || 1);
   return <div className={`ns-portrait-preview ${subdued ? 'is-subdued' : ''}`}>
-    <span
+    <motion.span
       className="ns-portrait-image ns-portrait-image--current"
       key={`${visible.src}-${visible.position || ''}-${visible.scale || 1}-${visible.origin || ''}`}
+      initial={fadeFromEmpty && !reducedMotion ? { opacity: 0, filter: 'blur(8px)' } : false}
+      animate={{ opacity: 1, filter: 'blur(0px)' }}
+      transition={{ duration: fadeFromEmpty && !reducedMotion ? .48 : 0, ease: EASE }}
     >
       <img src={visible.src} alt="" style={{ objectPosition: visible.position || '56% 50%', transformOrigin: visible.origin || undefined, transform: `scale(${currentScale})` }} />
-    </span>
+    </motion.span>
     {previousVisible ? <motion.span
       className="ns-portrait-image ns-portrait-image--previous"
       key={`${previousVisible.src}-${previousVisible.position || ''}-${previousVisible.scale || 1}-${previousVisible.origin || ''}`}

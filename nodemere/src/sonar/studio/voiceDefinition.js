@@ -1,7 +1,7 @@
 export const CHARACTERISTICS = [
   { key: 'gender', label: 'Gender', title: 'Every voice starts\nwith a presence.', hint: 'Choose the foundation. Make it unmistakably yours.', options: ['Feminine', 'Masculine'], notes: ['Clear. Expressive. Distinct.', 'Grounded. Resonant. Present.'] },
   { key: 'age', label: 'Age', title: 'A little life\nin every word.', hint: 'Shape the perceived age of the voice.', options: ['Young adult', 'Middle-aged', 'Mature'], notes: ['A fresh, youthful character', 'An experienced, assured presence', 'Depth and lived-in character'] },
-  { key: 'accent', label: 'Ethnicity', title: 'Who is taking\nshape?', hint: 'Define the receptionist’s visual identity and presence.', options: ['African', 'American', 'Australian', 'British', 'Canadian', 'Chinese', 'Indian', 'Irish', 'Italian', 'Japanese', 'Hispanic / Latina'], notes: ['Distinct and composed', 'Polished and familiar', 'Bright and natural', 'Refined and poised', 'Open and approachable', 'Precise and graceful', 'Warm and expressive', 'Characterful and clear', 'Elegant and assured', 'Polished and melodic', 'Vivid and welcoming'] },
+  { key: 'accent', label: 'Ethnicity', title: 'Who is taking\nshape?', hint: 'Define the receptionist’s visual identity and presence.', options: ['African', 'American', 'Australian', 'British', 'Canadian', 'Chinese', 'Indian', 'Irish', 'Italian', 'Japanese', 'Hispanic / Latina'], notes: ['African visual direction', 'American visual direction', 'Australian visual direction', 'British visual direction', 'Canadian visual direction', 'Chinese visual direction', 'Indian visual direction', 'Irish visual direction', 'Italian visual direction', 'Japanese visual direction', 'Latina visual direction'] },
   { key: 'tone', label: 'Tone', title: 'Blend the feeling\nof the first hello.', hint: 'Choose the ingredients of the delivery, then decide how much of each belongs in the voice.', control: 'blend', options: ['Calm', 'Caring', 'Charming', 'Friendly', 'Motivational', 'Playful', 'Serious'], notes: ['Steady and reassuring', 'Attentive and warm', 'Polished with ease', 'Open and welcoming', 'Bright and encouraging', 'Light and expressive', 'Focused and composed'] },
 ];
 
@@ -22,16 +22,17 @@ export const SUB_ACCENTS = {
 const COUNTRY_LANDSCAPE_BASE = 'https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/audition_faces/countries';
 
 export const ACCENT_LANDSCAPES = {
-  African: `${COUNTRY_LANDSCAPE_BASE}/african_landscape.png`,
-  American: `${COUNTRY_LANDSCAPE_BASE}/american_landscape.png`,
-  Australian: `${COUNTRY_LANDSCAPE_BASE}/australian_landscape.png`,
-  British: `${COUNTRY_LANDSCAPE_BASE}/british_landscape.png`,
-  Canadian: `${COUNTRY_LANDSCAPE_BASE}/canadian_landscape.png`,
-  Chinese: `${COUNTRY_LANDSCAPE_BASE}/chinese_landscape.png`,
-  Indian: `${COUNTRY_LANDSCAPE_BASE}/indian_landscape.png`,
-  Irish: `${COUNTRY_LANDSCAPE_BASE}/irish_landscape.png`,
-  Japanese: `${COUNTRY_LANDSCAPE_BASE}/japanese_landscape.png`,
-  'Hispanic / Latina': `${COUNTRY_LANDSCAPE_BASE}/latino_landscape.png`,
+  African: `${COUNTRY_LANDSCAPE_BASE}/african_landscape2.png`,
+  American: `${COUNTRY_LANDSCAPE_BASE}/american_landscape2.png`,
+  Australian: `${COUNTRY_LANDSCAPE_BASE}/australian_landscape2.png`,
+  British: `${COUNTRY_LANDSCAPE_BASE}/british_landscape2.png`,
+  Canadian: `${COUNTRY_LANDSCAPE_BASE}/canadian_landscape2.png`,
+  Chinese: `${COUNTRY_LANDSCAPE_BASE}/chinese_landscape2.png`,
+  Indian: `${COUNTRY_LANDSCAPE_BASE}/indian_landscape2.png`,
+  Irish: `${COUNTRY_LANDSCAPE_BASE}/irish_landscape2.png`,
+  Italian: `${COUNTRY_LANDSCAPE_BASE}/italian_landscape2.png`,
+  Japanese: `${COUNTRY_LANDSCAPE_BASE}/japanese_landscape2.png`,
+  'Hispanic / Latina': `${COUNTRY_LANDSCAPE_BASE}/latino_landscape2.png`,
 };
 
 // Studio DNA colors use cinematic light families rather than literal flags.

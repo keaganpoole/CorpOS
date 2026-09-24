@@ -669,7 +669,7 @@ function FlowCard({ children, stage, onBack, canContinue, onContinue, submitting
       aria-live="polite"
     >
       <div className="voice-flow-studio-mark" aria-hidden="true">
-        Nodemere <span>Studio</span>
+        Nodemere <span>Audition</span>
       </div>
       <FlowProgress stage={stage} />
       <AnimatePresence mode="wait">

@@ -1,11 +1,16 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import './SplashScreenAlternate.css';
 
 const LOGO_SRC = 'https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/assets/nodemere_logo2.png';
 
-const SplashScreenAlternate = ({ onAnimationEnd, label = 'Studio', cinematic = false }) => {
+const SplashScreenAlternate = ({ onAnimationEnd, label = 'Audition', cinematic = false }) => {
   const [phase, setPhase] = useState('logo-prep');
   const [logoReady, setLogoReady] = useState(false);
+  const onAnimationEndRef = useRef(onAnimationEnd);
+
+  useEffect(() => {
+    onAnimationEndRef.current = onAnimationEnd;
+  }, [onAnimationEnd]);
 
   useEffect(() => {
     if (cinematic) { setLogoReady(true); return; }
@@ -30,7 +35,7 @@ const SplashScreenAlternate = ({ onAnimationEnd, label = 'Studio', cinematic = f
   useEffect(() => {
     if (!logoReady) return undefined;
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      const timer = window.setTimeout(() => onAnimationEnd?.(), 100);
+      const timer = window.setTimeout(() => onAnimationEndRef.current?.(), 100);
       return () => window.clearTimeout(timer);
     }
 
@@ -46,14 +51,14 @@ const SplashScreenAlternate = ({ onAnimationEnd, label = 'Studio', cinematic = f
       window.setTimeout(() => setPhase('studio-enter'), 2390),
       window.setTimeout(() => setPhase('studio-hold'), 2950),
       window.setTimeout(() => setPhase('studio-exit'), 4400),
-      window.setTimeout(() => onAnimationEnd?.(), 4880),
+      window.setTimeout(() => onAnimationEndRef.current?.(), 4880),
     ];
 
     return () => {
       window.cancelAnimationFrame(enterFrame);
       timers.forEach((timer) => window.clearTimeout(timer));
     };
-  }, [logoReady, onAnimationEnd, cinematic]);
+  }, [logoReady, cinematic]);
 
   return (
     <div className={`splash-alternate splash-alternate--${phase} ${cinematic ? 'splash-alternate--cinematic' : ''}`} role="status" aria-label={'Loading Nodemere ' + label}>

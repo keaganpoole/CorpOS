@@ -1756,6 +1756,7 @@ const SonarDashboard = () => {
   const [receptionistsAgent, setReceptionistsAgent] = useState(null);
   const [showHireModal, setShowHireModal] = useState(false);
   const [teamExperience, setTeamExperience] = useState('team');
+  const [studioLaunchDestination, setStudioLaunchDestination] = useState('create');
   const studioDirty = useRef(false);
   const pendingStudioExit = useRef(null);
   const [showStudioExit, setShowStudioExit] = useState(false);
@@ -2310,7 +2311,7 @@ const SonarDashboard = () => {
     }
     switch (route) {
       case 'receptionists':
-        if (teamExperience !== 'team') return <Suspense fallback={<div className="h-full grid place-items-center"><CubePreloader /></div>}><OfficeExperience onReturn={leaveStudio} onCreateStarted={() => setTeamExperience('studio')} onHire={() => { setTeamExperience('team'); setShowHireModal(true); }} onDirtyChange={updateStudioDirty} onSaved={async () => { await refresh(); await loadAgentScenarios(); }} /></Suspense>;
+        if (teamExperience !== 'team') return <Suspense fallback={<div className="h-full grid place-items-center"><CubePreloader /></div>}><OfficeExperience initialDestination={studioLaunchDestination} onReturn={leaveStudio} onCreateStarted={() => setTeamExperience('studio')} onHire={() => { setTeamExperience('team'); setShowHireModal(true); }} onDirtyChange={updateStudioDirty} onSaved={async () => { await refresh(); await loadAgentScenarios(); }} /></Suspense>;
         return (
           <div className={`receptionists-page-scope h-full ${marketplaceAgent ? 'overflow-hidden' : 'overflow-auto'} custom-scrollbar bg-[#020202] flex flex-col`}>
             <div className="shrink-0 px-10 pb-3 pt-8 flex items-center justify-between">
@@ -2338,7 +2339,10 @@ const SonarDashboard = () => {
               </div>
               <div className="flex items-center gap-3">
                 {teamView === 'receptionists' ? (
-                  <button onClick={() => setTeamExperience('entry')} className="dashboard-neutral-button flex items-center gap-2 px-5 py-2.5 rounded-xl text-[11px] font-bold tracking-wider transition-all active:scale-95">New Receptionist</button>
+                  <>
+                    <button onClick={() => { setStudioLaunchDestination('create'); setTeamExperience('studio'); }} className="dashboard-neutral-button flex items-center gap-2 px-5 py-2.5 rounded-xl text-[11px] font-bold tracking-wider transition-all active:scale-95">Create Receptionist</button>
+                    <button onClick={() => setShowHireModal(true)} className="dashboard-neutral-button flex items-center gap-2 px-5 py-2.5 rounded-xl text-[11px] font-bold tracking-wider transition-all active:scale-95">New Receptionist</button>
+                  </>
                 ) : teamView === 'staff' ? (
                   <button onClick={() => window.dispatchEvent(new CustomEvent('team:open-staff-modal'))} className="dashboard-neutral-button flex items-center gap-2 px-5 py-2.5 rounded-xl text-[11px] font-bold tracking-wider transition-all active:scale-95">New Staff Member</button>
                 ) : null}
