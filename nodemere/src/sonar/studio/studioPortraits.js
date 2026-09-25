@@ -40,7 +40,7 @@ export const STUDIO_PORTRAITS = Object.freeze({
     British: paired('ethnicity', 'british_man.png', 'british.png'),
     Canadian: paired('ethnicity', 'canadian_man.png', 'canadian.png'),
     Chinese: {
-      Male: portrait('man', 'ethnicity', 'chinese_man.png', { position: '50% 48%' }),
+      Male: portrait('man', 'ethnicity', 'chinese_man.png', { position: '47% 51%' }),
       Female: portrait('woman', 'age', 'chinese_woman_2.png'),
     },
     Indian: paired('ethnicity', 'indian_man.png', 'indian.png'),
