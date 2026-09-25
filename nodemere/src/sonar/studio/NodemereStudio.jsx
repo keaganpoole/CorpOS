@@ -429,15 +429,15 @@ export default function NodemereStudio({ onReturn, onDirtyChange, onSaved, skipI
             const key=CHARACTERISTICS[stage].key;
             if(key==='accent'){
               const selected=accentSelections(values).filter(item=>item.accent===option), active=Boolean(selected.length), subAccents=active?(SUB_ACCENTS[option]||[]):[];
-              return <div key={option} className={`ns-accent-choice ${active?'is-selected':''}`} style={{ '--option-index': i }} onPointerEnter={()=>setPreviewOption({key,option})} onPointerLeave={()=>setPreviewOption(current=>current?.key===key&&current.option===option?null:current)}>
-                <button type="button" className="ns-accent-main" aria-pressed={active} aria-disabled={!active&&accentSelections(values).length>=3} onFocus={()=>setPreviewOption({key,option})} onBlur={()=>setPreviewOption(current=>current?.key===key&&current.option===option?null:current)} onClick={()=>toggleAccent(option)}>
+              return <div key={option} className={`ns-accent-choice ${active?'is-selected':''}`} style={{ '--option-index': i }} onPointerEnter={()=>setPreviewOption({key,option})}>
+                <button type="button" className="ns-accent-main" aria-pressed={active} aria-disabled={!active&&accentSelections(values).length>=3} onFocus={()=>setPreviewOption({key,option})} onClick={()=>toggleAccent(option)}>
                   <span>{option}</span><small>{CHARACTERISTICS[stage].notes[i]}</small><b>{active?<Check size={17}/>:<ArrowRight size={16}/>}</b>
                 </button>
                 {subAccents.length?<div className="ns-inline-subaccents" aria-label={`${option} regional accents`}>{subAccents.map(sub=>{const isSelected=selected.some(item=>item.subAccent===sub);return <button type="button" key={sub} className={isSelected?'is-selected':''} aria-pressed={isSelected} onFocus={()=>setPreviewOption({key,option,subAccent:sub})} onBlur={()=>setPreviewOption(current=>current?.subAccent===sub?null:current)} onClick={()=>chooseSubAccent(sub)}>{sub}</button>;})}</div>:null}
               </div>;
             }
             const active=values[key]===option;
-            return <button key={option} className={active?'is-selected':''} style={{ '--option-index': i }} aria-pressed={active} onPointerEnter={()=>setPreviewOption({key,option})} onPointerLeave={()=>setPreviewOption(current=>current?.key===key&&current.option===option?null:current)} onFocus={()=>setPreviewOption({key,option})} onBlur={()=>setPreviewOption(current=>current?.key===key&&current.option===option?null:current)} onClick={()=>choose(key,option)}><span>{option}</span><small>{CHARACTERISTICS[stage].notes[i]}</small><b>{active?<Check size={17}/>:<ArrowRight size={16}/>}</b></button>;
+            return <button key={option} className={active?'is-selected':''} style={{ '--option-index': i }} aria-pressed={active} onPointerEnter={()=>setPreviewOption({key,option})} onFocus={()=>setPreviewOption({key,option})} onClick={()=>choose(key,option)}><span>{option}</span><small>{CHARACTERISTICS[stage].notes[i]}</small><b>{active?<Check size={17}/>:<ArrowRight size={16}/>}</b></button>;
           })}</div>}
           {CHARACTERISTICS[stage].control==='blend'?<button className="ns-primary" onClick={()=>setStage(ROOM_STAGE)}>Continue <ArrowRight size={16}/></button>:values[CHARACTERISTICS[stage].key]&&(!canHoverFine||CHARACTERISTICS[stage].key==='accent')?<button className={`ns-primary ${CHARACTERISTICS[stage].key==='accent'?'':'ns-touch-continue'}`} onClick={continueGuided}>Continue <ArrowRight size={16}/></button>:null}
         </motion.div></AnimatePresence></div></motion.div>

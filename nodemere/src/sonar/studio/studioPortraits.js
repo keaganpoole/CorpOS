@@ -39,18 +39,21 @@ export const STUDIO_PORTRAITS = Object.freeze({
     Australian: paired('ethnicity', 'australian_man.png', 'australian.png'),
     British: paired('ethnicity', 'british_man.png', 'british.png'),
     Canadian: paired('ethnicity', 'canadian_man.png', 'canadian.png'),
-    Chinese: paired('ethnicity', 'chinese_man.png', 'chinese.png', {
-      Male: { position: '60% 46.5%', scale: 1.09, origin: '18% 50%' },
-      Female: { position: '54% 48%', scale: 1.035 },
-    }),
+    Chinese: {
+      Male: portrait('man', 'ethnicity', 'chinese_man.png', { position: '60% 46.5%', scale: 1.09, origin: '18% 50%' }),
+      Female: portrait('woman', 'age', 'chinese_woman_2.png', { scale: 0.94 }),
+    },
     Indian: paired('ethnicity', 'indian_man.png', 'indian.png'),
     Irish: paired('ethnicity', 'irish_man.png', 'irish.png'),
     Italian: paired('ethnicity', 'italian_man.png', 'italian.png'),
-    Japanese: paired('ethnicity', 'japanese_man.png', 'japanese.png', {
-      Male: { position: '56.5% 48%', scale: 1.02 },
-      Female: { position: '51% 48%', scale: 1.01 },
-    }),
-    'Hispanic / Latina': paired('ethnicity', 'hispanic_man.png', 'latina_woman'),
+    Japanese: {
+      Male: portrait('man', 'ethnicity', 'japanese_man.png', { position: '56.5% 48%', scale: 1.02 }),
+      Female: portrait('woman', 'age', 'japanese_woman_2.png', { scale: 0.96 }),
+    },
+    'Hispanic / Latina': {
+      Male: portrait('man', 'ethnicity', 'hispanic_man.png'),
+      Female: portrait('woman', 'age', 'hispanic_woman_2.png'),
+    },
   },
   tone: {
     Calm: paired('temperament', 'calm_man.png', 'calm_woman.png'),
