@@ -110,6 +110,7 @@ async function strictGetJSON(endpoint) {
 
 export const api = {
   designVoice: (definition) => postJSON('/api/sonar/studio/design', definition, 150000),
+  generateReceptionistPortraits: (profile) => postJSON('/api/sonar/studio/portraits', profile, 180000),
   saveDesignedVoice: (voice) => postJSON('/api/sonar/studio/save', voice, 150000),
   createStudioCloneSession: () => postJSON('/api/contracts', { metadata: { source: 'nodemere_studio' } }),
   getDropIns: () => strictGetJSON('/api/sonar/drop-ins'),
@@ -213,6 +214,7 @@ export const api = {
         id: catalogId,
         source: receptionist.source,
         custom_voice_id: receptionist.custom_voice_id,
+        created_receptionist_id: receptionist.created_receptionist_id,
       });
     }
     return postJSON('/api/sonar/receptionists/hire', { catalog_id: receptionist });

@@ -23,6 +23,7 @@ function selectedPortrait(stage, values, assets) {
   const current = CHARACTERISTICS[Math.min(stage, CHARACTERISTICS.length - 1)];
   const selected = current && portraitFor(assets[current.key], values[current.key], values);
   if (selected) return selected;
+  if (current?.key === 'gender') return portraitFor(assets.gender, 'Feminine', values);
 
   for (let index = Math.min(stage, CHARACTERISTICS.length - 1); index >= 0; index -= 1) {
     const characteristic = CHARACTERISTICS[index];
@@ -40,7 +41,7 @@ function selectedPortrait(stage, values, assets) {
   return null;
 }
 
-export default function PortraitPreview({ stage, values = {}, previewOption, assets = {}, reducedMotion, subdued = false }) {
+export default function PortraitPreview({ stage, values = {}, previewOption, assets = {}, reducedMotion, subdued = false, onVisibleChange }) {
   const characteristic = CHARACTERISTICS[Math.min(stage, CHARACTERISTICS.length - 1)];
   const stageAssets = assets[characteristic?.key] || {};
   const requested = previewOption?.key === characteristic?.key
@@ -68,6 +69,11 @@ export default function PortraitPreview({ stage, values = {}, previewOption, ass
   useEffect(() => () => {
     if (previousTimer.current) window.clearTimeout(previousTimer.current);
   }, []);
+
+  useEffect(() => {
+    onVisibleChange?.(Boolean(visible));
+    return () => onVisibleChange?.(false);
+  }, [visible, onVisibleChange]);
 
   const revealPortrait = React.useCallback((next) => {
     setVisible(current => {

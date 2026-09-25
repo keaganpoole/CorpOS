@@ -11,6 +11,8 @@ import requests
 from fastapi import HTTPException
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from .portrait_generation import upload_portrait
+
 
 class VoiceDesignRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
@@ -40,6 +42,7 @@ class VoiceSaveRequest(BaseModel):
     traits: list[str] = Field(default_factory=list, max_length=6)
     gender: Optional[Literal["Feminine", "Masculine", "Androgynous"]] = None
     age: Optional[Literal["Young adult", "Middle-aged", "Mature"]] = None
+    portrait_image: Optional[str] = Field(default=None, max_length=12_000_000)
 
 
 def candidate_ticket(candidate_id, description, owner_id, secret, now=None):
@@ -121,57 +124,54 @@ def save_voice(payload, *, db, api_key, owner_id, business_id):
     if not api_key:
         raise HTTPException(503, "Voice Design is not configured on this server.")
     candidate = verify_ticket(payload.ticket, owner_id, api_key)
-    # A stable primary key is a database-backed lock across workers and retries.
+    business_name = "Nodemere"
+    try:
+        business_rows = db.table("businesses").select("name").eq("id", business_id).limit(1).execute().data or []
+        business_name = str((business_rows[0] or {}).get("name") or "Nodemere").strip() or "Nodemere"
+    except Exception:
+        business_name = "Nodemere"
+    voice_description = candidate["description"]
+    if business_name.lower() not in voice_description.lower():
+        voice_description = f"{voice_description.rstrip()} The receptionist represents {business_name} and should sound natural when welcoming callers to the business."
     row_id = str(uuid5(NAMESPACE_URL, f"nodemere:voice-design:{owner_id}:{candidate['id']}"))
-    def load():
-        return (db.table("custom_voices").select("id,status,provider_voice_id,metadata,voice_name")
-                .eq("id", row_id).eq("user_id", str(owner_id)).limit(1).execute().data or [None])[0]
-    existing = load()
-    if existing and existing.get("status") == "ready":
-        return {"id": row_id, "voice_name": existing["voice_name"], "voice_id": existing["provider_voice_id"]}
     profile = {"full_name": payload.voice_name, "first_name": payload.voice_name.split()[0],
-               "description": candidate["description"], "traits": [str(t)[:40] for t in payload.traits],
+               "description": voice_description, "traits": [str(t)[:40] for t in payload.traits],
                "gender": {"Feminine": "female", "Masculine": "male"}.get(payload.gender),
                "stereotype": "Studio Voice Design"}
-    metadata = {"source": "voice_design", "generated_voice_id": candidate["id"], "receptionist_profile": profile,
-                "voice_characteristics": {"age": payload.age, "gender": payload.gender, "personality": profile['traits']}}
-    reservation = {"id": row_id, "user_id": str(owner_id), "business_id": business_id,
-                   "voice_source": "voice_design", "voice_name": payload.voice_name,
-                   "status": "pending", "metadata": metadata}
-    if existing:
-        if existing.get("status") != "failed":
-            raise HTTPException(409, "This voice save is awaiting confirmation. Do not regenerate it. Contact support if it does not appear in the catalog.")
-        claimed = db.table("custom_voices").update({"status": "pending", "metadata": metadata, "voice_name": payload.voice_name}).eq("id", row_id).eq("status", "failed").execute().data
-        if not claimed:
-            raise HTTPException(409, "This voice is already being saved.")
-    else:
-        try:
-            db.table("custom_voices").insert(reservation).execute()
-        except Exception:
-            existing = load()
-            if existing and existing.get("status") == "ready":
-                return {"id": row_id, "voice_name": existing["voice_name"], "voice_id": existing["provider_voice_id"]}
-            if existing:
-                raise HTTPException(409, "This voice is already being saved.") from None
-            raise HTTPException(503, "Voice storage is not ready. Apply the Nodemere Studio database migration before saving voices.") from None
+    portrait_url = upload_portrait(db, payload.portrait_image, owner_id=str(owner_id), voice_id=row_id)
+    if portrait_url:
+        profile["avatar"] = portrait_url
     try:
-        voice = provider_post("", {"voice_name": payload.voice_name, "voice_description": candidate["description"],
+        voice = provider_post("", {"voice_name": payload.voice_name, "voice_description": voice_description,
                                    "generated_voice_id": candidate["id"]}, api_key)
     except HTTPException as error:
         # Retry only a definitive rejection. Timeouts may already have created
         # the provider voice; preserve the reservation for reconciliation.
-        if getattr(error, "provider_rejected", False):
-            db.table("custom_voices").update({"status": "failed"}).eq("id", row_id).execute()
         raise
     voice_id = voice.get("voice_id")
     if not voice_id:
         raise HTTPException(502, "The provider did not confirm a saved voice. Contact support before trying again.")
     profile["voice"] = voice.get("preview_url")
     try:
-        updated = db.table("custom_voices").update({"provider_voice_id": voice_id, "status": "ready", "metadata": metadata,
-                                                   "provider_response": {"voice_id": voice_id}}).eq("id", row_id).execute().data
-        if not updated:
-            raise RuntimeError("No saved row")
+        created = db.table("created_receptionists").insert({
+            "user_id": str(owner_id),
+            "business_id": business_id,
+            "status": "ready",
+            "full_name": payload.voice_name,
+            "first_name": payload.voice_name.split()[0],
+            "gender": payload.gender,
+            "age": payload.age,
+            "description": voice_description,
+            "traits": [str(t)[:40] for t in payload.traits],
+            "voice_id": voice_id,
+            "voice_name": payload.voice_name,
+            "voice_description": voice_description,
+            "portrait_options": ([{"id": "selected", "url": portrait_url}] if portrait_url else []),
+            "selected_portrait_id": "selected" if portrait_url else None,
+            "selected_portrait_url": portrait_url,
+        }).execute().data
     except Exception:
-        raise HTTPException(503, "The provider saved your voice, but catalog storage needs recovery. Contact support; do not create another copy.") from None
-    return {"id": row_id, "voice_name": payload.voice_name, "voice_id": voice_id}
+        raise HTTPException(503, "Voice saved, but audition storage is not ready. Apply the created_receptionists migration before continuing.") from None
+    created_row = (created or [{}])[0]
+    return {"id": row_id, "voice_name": payload.voice_name, "voice_id": voice_id,
+            "created_receptionist_id": created_row.get("id")}

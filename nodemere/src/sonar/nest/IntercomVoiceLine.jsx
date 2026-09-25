@@ -5,14 +5,14 @@ import { useAnimationFrame, useReducedMotion } from 'framer-motion';
 // envelope, pinned ends, and spring attack/release. Audio replaces hover.
 const LAYERS = [
   { color: '#ffffff', amplitude: 1, frequency: 1 },
-  { color: '#7c3aed', amplitude: 0.75, frequency: 1.12 },
+  { color: 'url(#intercom-purple-pink-gradient)', amplitude: 0.75, frequency: 1.12 },
   { color: 'url(#intercom-pink-purple-gradient)', amplitude: 0.55, frequency: 0.92 },
-  { color: '#f45fd2', amplitude: 0.4, frequency: 1.28 },
+  { color: 'url(#intercom-pink-purple-gradient-reverse)', amplitude: 0.4, frequency: 1.28 },
 ];
 const FLAT_PATH = 'M 4 22 L 92 22';
 const MAX_AMPLITUDE = 15;
-const ACTIVE_RMS_THRESHOLD = 0.035;
-const FULL_AMPLITUDE_RMS = 0.18;
+const ACTIVE_RMS_THRESHOLD = 0.005;
+const FULL_AMPLITUDE_RMS = 0.35;
 
 function wavePath(amplitude, phase, layerIndex) {
   const layer = LAYERS[layerIndex];
@@ -30,7 +30,7 @@ function wavePath(amplitude, phase, layerIndex) {
   return points.join(' ');
 }
 
-export default function IntercomVoiceLine({ sampleMicrophone, enabled }) {
+export default function IntercomVoiceLine({ sampleMicrophone, enabled, level }) {
   const reducedMotion = useReducedMotion();
   const pathsRef = useRef([]);
   const glowsRef = useRef([]);
@@ -42,16 +42,21 @@ export default function IntercomVoiceLine({ sampleMicrophone, enabled }) {
     let available = false;
     if (enabled && !reducedMotion && !document.hidden) {
       try {
-        const sample = sampleMicrophone();
-        available = sample.available;
-        volume = Number.isFinite(sample.level) ? Math.max(0, Math.min(1, sample.level)) : 0;
+        if (Number.isFinite(level)) {
+          available = true;
+          volume = Math.max(0, Math.min(1, level));
+        } else {
+          const sample = sampleMicrophone();
+          available = sample.available;
+          volume = Number.isFinite(sample.level) ? Math.max(0, Math.min(1, sample.level)) : 0;
+        }
       } catch {
         // The audio transport can disappear between a frame and disconnect.
       }
     }
     // Keep normal speech restrained; full deformation requires raised-volume input.
     const target = available
-      ? 0.04 + (MAX_AMPLITUDE - 0.04) * Math.min(1, Math.max(0, (volume - ACTIVE_RMS_THRESHOLD) / (FULL_AMPLITUDE_RMS - ACTIVE_RMS_THRESHOLD)))
+      ? 0.45 + (MAX_AMPLITUDE - 0.45) * Math.pow(Math.min(1, Math.max(0, (volume - ACTIVE_RMS_THRESHOLD) / (FULL_AMPLITUDE_RMS - ACTIVE_RMS_THRESHOLD))), 0.58)
       : 0;
     const seconds = Math.min(delta / 1000, 0.05);
     const steps = Math.max(1, Math.ceil(seconds * 120));
@@ -79,9 +84,17 @@ export default function IntercomVoiceLine({ sampleMicrophone, enabled }) {
   return (
     <svg className="intercom-voice-line" viewBox="0 0 96 44" preserveAspectRatio="none" aria-hidden="true">
       <defs>
+        <linearGradient id="intercom-purple-pink-gradient" x1="0" x2="1" y1="0" y2="0">
+          <stop offset="42%" stopColor="#7c3aed" />
+          <stop offset="58%" stopColor="#f45fd2" />
+        </linearGradient>
         <linearGradient id="intercom-pink-purple-gradient" x1="0" x2="1" y1="0" y2="0">
-          <stop offset="50%" stopColor="#f45fd2" />
-          <stop offset="50%" stopColor="#7c3aed" />
+          <stop offset="42%" stopColor="#f45fd2" />
+          <stop offset="58%" stopColor="#7c3aed" />
+        </linearGradient>
+        <linearGradient id="intercom-pink-purple-gradient-reverse" x1="0" x2="1" y1="0" y2="0">
+          <stop offset="42%" stopColor="#7c3aed" />
+          <stop offset="58%" stopColor="#f45fd2" />
         </linearGradient>
       </defs>
       {[...LAYERS].reverse().map((layer, index) => (

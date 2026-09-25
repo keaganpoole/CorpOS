@@ -8,7 +8,7 @@ import {
   Copy, Download, Layers, Plus, Trash2, Tag, DollarSign,
   ArrowRight, X, MessageSquareText, Users, Maximize2, Wand2,
   CalendarClock, Mail, PhoneCall, ListChecks, Upload, CalendarCheck, Pencil, Play, LogOut,
-  ThumbsUp, ThumbsDown,
+  ThumbsUp, ThumbsDown, Palette,
   Loader2, CreditCard, ExternalLink,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
@@ -234,6 +234,7 @@ const KNOWLEDGE_TABS = [
 
 const defaultSettings = {
   business_name: '',
+  brand_color: '',
   industry: '',
   industry_details: {},
   business_phone: '',
@@ -676,6 +677,33 @@ const TextInput = ({ value, onChange, placeholder, type = 'text' }) => (
     className="w-full bg-[#070707]/85 border border-white/[0.06] rounded-xl px-4 py-2.5 text-[13px] text-zinc-200 placeholder:text-zinc-700 outline-none outline-none focus:outline-none focus-visible:outline-none focus-visible:outline-none transition-all"
   />
 );
+
+const BrandColorInput = ({ value, onChange }) => {
+  const color = value || '#ff32ac';
+
+  return (
+    <div className="flex h-12 items-center gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.035] px-3 transition-colors focus-within:border-white/[0.16]">
+      <label className="relative h-8 w-8 shrink-0 cursor-pointer overflow-hidden rounded-xl border border-white/15 shadow-[0_0_18px_rgba(255,50,172,0.16)]" style={{ backgroundColor: color }}>
+        <input
+          type="color"
+          value={color}
+          onChange={(event) => onChange(event.target.value)}
+          className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+          aria-label="Choose brand color"
+        />
+      </label>
+      <div className="min-w-0 flex-1">
+        <div className="text-[12px] font-medium text-zinc-200">{value ? value.toUpperCase() : 'Not set'}</div>
+        <div className="text-[10px] text-zinc-600">Used for your business accent</div>
+      </div>
+      {value ? (
+        <button type="button" onClick={() => onChange('')} className="rounded-lg px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-zinc-600 transition hover:bg-white/[0.05] hover:text-zinc-300">
+          Clear
+        </button>
+      ) : null}
+    </div>
+  );
+};
 
 const SelectInput = ({ value, onChange, options }) => (
   <select
@@ -3751,6 +3779,7 @@ const SettingsPage = () => {
           },
           nest: normalizeNestPreferences((config.preferences || {}).nest),
         },
+        brand_color: config.brand_color || config.preferences?.general?.brand_color || '',
         // Knowledge base from businesses table
         knowledge_base: {
           about: biz.about_us ?? '',
@@ -3779,8 +3808,17 @@ const SettingsPage = () => {
       const normalizedBusinessId = business?.id ?? null;
 
       // Save app config to account_settings (excluding business fields and services)
-      const { business_name, industry, industry_details, business_phone, business_email, business_avatar, business_street, business_city, business_state, business_zip, business_hours, business_timezone, _business_id, services, knowledge_base, id: _id, created_at, updated_at, ...appConfig } = settings;
-      const normalizedAppConfig = normalizeNullishStrings(appConfig);
+      const { business_name, industry, industry_details, business_phone, business_email, business_avatar, business_street, business_city, business_state, business_zip, business_hours, business_timezone, brand_color, _business_id, services, knowledge_base, id: _id, created_at, updated_at, ...appConfig } = settings;
+      const normalizedAppConfig = normalizeNullishStrings({
+        ...appConfig,
+        preferences: {
+          ...(appConfig.preferences || {}),
+          general: {
+            ...(appConfig.preferences?.general || {}),
+            brand_color: brand_color || null,
+          },
+        },
+      });
       const scopedAppConfig = {
         ...normalizedAppConfig,
         user_id: userId,
@@ -4239,6 +4277,15 @@ const SettingsPage = () => {
               <Field label="ZIP Code">
                 <TextInput value={settings.business_zip} onChange={(v) => update('business_zip', v)} placeholder="04901" />
               </Field>
+            </div>
+            <div className="mt-8 border-t border-white/[0.05] pt-6">
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-600">Other</p>
+              <p className="mt-2 text-[12px] leading-5 text-zinc-600">Optional details that help shape your business experience.</p>
+              <div className="mt-4 rounded-2xl border border-white/[0.07] bg-black/20 px-5 py-4">
+                <Field label={<span className="flex items-center gap-2"><Palette size={12} className="settings-icon" /><span>Brand Color</span><span className="text-[9px] font-medium normal-case tracking-normal text-zinc-700">Optional</span></span>}>
+                  <BrandColorInput value={settings.brand_color} onChange={(v) => update('brand_color', v)} />
+                </Field>
+              </div>
             </div>
           </>
         );
