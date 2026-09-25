@@ -64,7 +64,7 @@ function OnboardingGate() {
     return <Navigate to="/dashboard" replace />;
   }
 
-  return <LegalAcceptanceGate><Onboarding2Page /></LegalAcceptanceGate>;
+  return <LegalAcceptanceGate><WorkforceGate><Onboarding2Page /></WorkforceGate></LegalAcceptanceGate>;
 }
 
 function VisitorGate() {

@@ -11,8 +11,8 @@ function asPortrait(asset, values = {}) {
   if (!asset) return null;
   if (typeof asset === 'string') return { src: asset };
   if (asset.src) return asset;
-  const gender = values.gender === 'Masculine' ? 'Masculine' : values.gender === 'Feminine' ? 'Feminine' : null;
-  return asset[gender] || asset.Feminine || asset.Masculine || null;
+  const gender = values.gender === 'Male' ? 'Male' : values.gender === 'Female' ? 'Female' : null;
+  return asset[gender] || asset.Female || asset.Male || null;
 }
 
 function portraitFor(stageAssets, option, values) {
@@ -23,7 +23,7 @@ function selectedPortrait(stage, values, assets) {
   const current = CHARACTERISTICS[Math.min(stage, CHARACTERISTICS.length - 1)];
   const selected = current && portraitFor(assets[current.key], values[current.key], values);
   if (selected) return selected;
-  if (current?.key === 'gender') return portraitFor(assets.gender, 'Feminine', values);
+  if (current?.key === 'gender') return portraitFor(assets.gender, 'Female', values);
 
   for (let index = Math.min(stage, CHARACTERISTICS.length - 1); index >= 0; index -= 1) {
     const characteristic = CHARACTERISTICS[index];
@@ -121,9 +121,13 @@ export default function PortraitPreview({ stage, values = {}, previewOption, ass
   }, [requested?.src, requested?.position, requested?.scale, requested?.origin, revealPortrait]);
 
   if (!visible) return null;
-  const currentScale = Number(visible.scale || 1);
-  const previousScale = Number(previousVisible?.scale || 1);
-  return <div className={`ns-portrait-preview ${subdued ? 'is-subdued' : ''}`}>
+  const isAgePreview = characteristic?.key === 'age';
+  const agePosition = values.gender === 'Male' ? '60% 35%' : '54% 35%';
+  const imageStyle = (portrait) => ({
+    objectPosition: isAgePreview ? agePosition : (portrait.position || '56% 50%'),
+    transform: isAgePreview ? 'scale(1)' : `scale(${Number(portrait.scale || 1)})`,
+  });
+  return <div className={`ns-portrait-preview ${isAgePreview ? 'is-age-preview' : ''} ${subdued ? 'is-subdued' : ''}`}>
     <motion.span
       className="ns-portrait-image ns-portrait-image--current"
       key={`${visible.src}-${visible.position || ''}-${visible.scale || 1}-${visible.origin || ''}`}
@@ -131,7 +135,7 @@ export default function PortraitPreview({ stage, values = {}, previewOption, ass
       animate={{ opacity: 1, filter: 'blur(0px)' }}
       transition={{ duration: fadeFromEmpty && !reducedMotion ? .48 : 0, ease: EASE }}
     >
-      <img src={visible.src} alt="" style={{ objectPosition: visible.position || '56% 50%', transformOrigin: visible.origin || undefined, transform: `scale(${currentScale})` }} />
+      <img src={visible.src} alt="" style={{ ...imageStyle(visible), transformOrigin: visible.origin || undefined }} />
     </motion.span>
     {previousVisible ? <motion.span
       className="ns-portrait-image ns-portrait-image--previous"
@@ -141,7 +145,7 @@ export default function PortraitPreview({ stage, values = {}, previewOption, ass
       transition={{ duration: reducedMotion ? 0 : CROSSFADE_MS / 1000, ease: EASE }}
       aria-hidden="true"
     >
-      <img src={previousVisible.src} alt="" style={{ objectPosition: previousVisible.position || '56% 50%', transformOrigin: previousVisible.origin || undefined, transform: `scale(${previousScale})` }} />
+      <img src={previousVisible.src} alt="" style={{ ...imageStyle(previousVisible), transformOrigin: previousVisible.origin || undefined }} />
     </motion.span> : null}
     <div className="ns-portrait-tone" />
   </div>;

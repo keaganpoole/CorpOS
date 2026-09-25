@@ -3068,6 +3068,7 @@ class PaymentCreateRequest(BaseModel):
 
 class OnboardingRequest(BaseModel):
     business_name: Optional[str] = None
+    brand_color: Optional[str] = None
     industry: Optional[str] = None
     sub_industry: Optional[str] = None
     business_email: Optional[EmailStr] = None
@@ -3467,12 +3468,23 @@ async def require_authenticated_api_request(request: Request, call_next):
             resolve_session_tenant, raw_db, str(user.id),
             aal=getattr(user,"nodemere_aal","aal1"), allow_missing=onboarding,
         )
+        if onboarding:
+            logging.info(
+                "onboarding.authorization.resolved user_id=%s aal=%s tenant_business_id=%s tenant_role=%s tenant_mfa_required=%s token_mfa_enrolled=%s",
+                str(user.id), getattr(user, "nodemere_aal", "aal1"),
+                getattr(tenant, "business_id", None), getattr(tenant, "role", None),
+                getattr(tenant, "mfa_required", None), getattr(user, "nodemere_mfa_enrolled", False),
+            )
         if onboarding and tenant is None:
             if raw_db.table('businesses').select('id').eq('user_id',str(user.id)).limit(1).execute().data:
+                logging.warning("onboarding.authorization.denied user_id=%s reason=active_business_membership_required", str(user.id))
                 raise HTTPException(403,'Active business membership required')
         elif onboarding:
             profile=raw_db.table('users').select('onboarded').eq('id',str(user.id)).limit(1).execute().data or [{}]
-            if tenant.role != 'OWNER': raise HTTPException(403,'Owner required for business setup')
+            logging.info("onboarding.authorization.profile user_id=%s onboarded=%s", str(user.id), profile[0].get('onboarded'))
+            if tenant.role != 'OWNER':
+                logging.warning("onboarding.authorization.denied user_id=%s reason=owner_required role=%s", str(user.id), tenant.role)
+                raise HTTPException(403,'Owner required for business setup')
             if profile[0].get('onboarded') or tenant.mfa_required or getattr(user,'nodemere_mfa_enrolled',False):
                 require_permission(tenant,'administration')
         if tenant and getattr(user,"nodemere_mfa_enrolled",False):
@@ -3480,6 +3492,8 @@ async def require_authenticated_api_request(request: Request, call_next):
         if not onboarding: require_permission(tenant, route_permission(path, request.method))
         if tenant: begin_audit_request(request, supabase_admin, tenant)
     except HTTPException as exc:
+        if onboarding:
+            logging.warning("onboarding.authorization.denied user_id=%s status=%s detail=%s", request.state.__dict__.get('authenticated_user_id'), exc.status_code, exc.detail)
         from .audit import denied_request
         try: denied_request(request, supabase_admin, exc.status_code, tenant)
         except HTTPException:
@@ -16270,6 +16284,11 @@ async def complete_onboarding(
     current_user: dict = Depends(get_current_user),
 ):
     current_user_id = business_owner_id(current_user)
+    logging.info(
+        "onboarding.save.start user_id=%s mark_onboarded=%s business_name_present=%s service_count=%s",
+        current_user_id, onboarding_data.mark_onboarded,
+        bool((onboarding_data.business_name or '').strip()), len(onboarding_data.services or []),
+    )
 
     try:
         if onboarding_data.mark_onboarded and not (onboarding_data.business_name or '').strip():
@@ -16355,6 +16374,44 @@ async def complete_onboarding(
         business = business_response.data[0] if business_response.data else None
         business_id = business.get("id") if business else (existing_business or {}).get("id")
 
+        brand_color = str(onboarding_data.brand_color or "").strip()
+        if business_id and brand_color:
+            try:
+                existing_settings_response = (
+                    supabase.table("account_settings")
+                    .select("id, preferences")
+                    .eq("user_id", current_user_id)
+                    .limit(1)
+                    .execute()
+                )
+                existing_settings = existing_settings_response.data[0] if existing_settings_response.data else None
+                preferences = existing_settings.get("preferences") if existing_settings else {}
+                if not isinstance(preferences, dict):
+                    preferences = {}
+                general_preferences = preferences.get("general")
+                if not isinstance(general_preferences, dict):
+                    general_preferences = {}
+                settings_payload = {
+                    "user_id": current_user_id,
+                    "business_id": business_id,
+                    "preferences": {
+                        **preferences,
+                        "general": {
+                            **general_preferences,
+                            "brand_color": brand_color,
+                        },
+                    },
+                }
+                if existing_settings:
+                    supabase.table("account_settings").update(settings_payload).eq("id", existing_settings["id"]).execute()
+                else:
+                    supabase.table("account_settings").insert({
+                        **settings_payload,
+                        "id": str(uuid4()),
+                    }).execute()
+            except Exception as exc:
+                logging.warning('main.complete_onboarding.brand_color_settings.event_13008')
+
         if business_id and onboarding_data.services:
             service_rows = []
             for index, service in enumerate(onboarding_data.services):
@@ -16406,7 +16463,7 @@ async def complete_onboarding(
             detail='The request could not be completed',
         )
     except Exception as e:
-        logging.error('main.complete_onboarding.event_13007')
+        logging.exception('main.complete_onboarding.event_13007 user_id=%s', current_user_id)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to save onboarding data.",

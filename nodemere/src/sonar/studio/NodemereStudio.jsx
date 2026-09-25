@@ -336,7 +336,7 @@ export default function NodemereStudio({ onReturn, onDirtyChange, onSaved, skipI
     if(busy||saving)return; touch();setBusy(true);setError('');audition.stop();
     try {
       const script=previewText.trim();
-      const payload={...settings, voice_description:description, auto_generate_text:!script, ...(script?{text:script}:{}), seed:settings.seed===''?null:Number(settings.seed)};
+      const payload={...settings, voice_description:description, gender:voiceValues.gender||null, auto_generate_text:!script, ...(script?{text:script}:{}), seed:settings.seed===''?null:Number(settings.seed)};
       if(settings.model_id==='eleven_ttv_v3')delete payload.quality;
       const result=await api.designVoice(payload);
       if(!result?.previews?.length)throw new Error('No auditions were returned. Please try again.');

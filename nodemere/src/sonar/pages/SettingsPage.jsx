@@ -20,6 +20,7 @@ import { useNest } from '../nest/NestRuntime';
 import ForwardNumberModal, { FORWARDING_API_BASE_URL } from '../components/ForwardNumberModal';
 import CubePreloader from '../components/CubePreloader';
 import AccountLifecycleSection from '../components/AccountLifecycleSection';
+import BrandColorInput from '../components/BrandColorInput';
 import ModalSpectrumLine from '../../components/ModalSpectrumLine';
 import SnapDropdown from '../../components/SnapDropdown';
 import {
@@ -677,33 +678,6 @@ const TextInput = ({ value, onChange, placeholder, type = 'text' }) => (
     className="w-full bg-[#070707]/85 border border-white/[0.06] rounded-xl px-4 py-2.5 text-[13px] text-zinc-200 placeholder:text-zinc-700 outline-none outline-none focus:outline-none focus-visible:outline-none focus-visible:outline-none transition-all"
   />
 );
-
-const BrandColorInput = ({ value, onChange }) => {
-  const color = value || '#ff32ac';
-
-  return (
-    <div className="flex h-12 items-center gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.035] px-3 transition-colors focus-within:border-white/[0.16]">
-      <label className="relative h-8 w-8 shrink-0 cursor-pointer overflow-hidden rounded-xl border border-white/15 shadow-[0_0_18px_rgba(255,50,172,0.16)]" style={{ backgroundColor: color }}>
-        <input
-          type="color"
-          value={color}
-          onChange={(event) => onChange(event.target.value)}
-          className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-          aria-label="Choose brand color"
-        />
-      </label>
-      <div className="min-w-0 flex-1">
-        <div className="text-[12px] font-medium text-zinc-200">{value ? value.toUpperCase() : 'Not set'}</div>
-        <div className="text-[10px] text-zinc-600">Used for your business accent</div>
-      </div>
-      {value ? (
-        <button type="button" onClick={() => onChange('')} className="rounded-lg px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-zinc-600 transition hover:bg-white/[0.05] hover:text-zinc-300">
-          Clear
-        </button>
-      ) : null}
-    </div>
-  );
-};
 
 const SelectInput = ({ value, onChange, options }) => (
   <select

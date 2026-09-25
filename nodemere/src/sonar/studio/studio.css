@@ -87,6 +87,7 @@
 .ns-portrait-image{position:absolute;inset:0;width:100%;height:100%;display:block}
 .ns-portrait-image--current{z-index:1}.ns-portrait-image--previous{z-index:2}
 .ns-portrait-preview img{position:absolute;inset:0;width:100%;height:100%;max-width:none;object-fit:contain;object-position:var(--portrait-position,56% 50%);transform-origin:68% 50%;will-change:opacity,transform,filter}
+.ns-portrait-preview.is-age-preview img{object-fit:cover}
 .ns-portrait-tone{position:absolute;inset:0;background:linear-gradient(90deg,#050505 0%,rgba(5,5,5,.55) 12%,transparent 30%),linear-gradient(0deg,#060606aa 0%,transparent 26%,transparent 78%,#06060655 100%);mix-blend-mode:multiply;pointer-events:none}
 .ns-portrait-preview.is-subdued{opacity:.085;right:1vw;filter:saturate(.5) brightness(.58) contrast(.94)}
 .ns-office-environment:has(.ns-portrait-preview) .ns-office-camera{filter:brightness(.38) saturate(.62);transition:filter .65s cubic-bezier(.22,1,.36,1)}

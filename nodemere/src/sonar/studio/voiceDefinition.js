@@ -1,5 +1,5 @@
 export const CHARACTERISTICS = [
-  { key: 'gender', label: 'Gender', title: 'Choose a\ngender.', hint: "Set the foundation for your receptionist's voice.", options: ['Feminine', 'Masculine'], notes: ['Clear. Expressive. Distinct.', 'Grounded. Resonant. Present.'] },
+  { key: 'gender', label: 'Gender', title: 'Choose a\ngender.', hint: "Set the foundation for your receptionist's voice.", options: ['Female', 'Male'], notes: ['A lighter vocal character with a higher typical range.', 'A fuller vocal character with a lower typical range.'] },
   { key: 'age', label: 'Age', title: 'Choose an age\nrange.', hint: 'Choose the age range that best fits your brand.', options: ['Young adult', 'Middle-aged', 'Mature'], notes: ['Fresh and youthful', 'Experienced and assured', 'Mature and established'] },
   { key: 'accent', label: 'Accent', title: 'Choose an\naccent.', hint: 'Give their voice an authentic sound rooted in place and culture.', options: ['African', 'American', 'Australian', 'British', 'Canadian', 'Chinese', 'Indian', 'Irish', 'Italian', 'Japanese', 'Hispanic / Latina'], notes: ['African accent', 'American accent', 'Australian accent', 'British accent', 'Canadian accent', 'Chinese accent', 'Indian accent', 'Irish accent', 'Italian accent', 'Japanese accent', 'Latina accent'] },
   { key: 'tone', label: 'Personality', title: 'Set the vibe.', hint: 'Give their voice a personality people can feel and remember.', control: 'blend', options: ['Calm', 'Caring', 'Charming', 'Friendly', 'Motivational', 'Playful', 'Serious'], notes: ['Steady and reassuring', 'Attentive and warm', 'Polished with ease', 'Open and welcoming', 'Bright and encouraging', 'Light and expressive', 'Focused and composed'] },
@@ -161,7 +161,7 @@ export function buildToneDirection(toneWeights = {}, fallbackTone = '') {
 }
 
 export function buildVoiceDescription(values) {
-  const gender = { Feminine: 'feminine', Masculine: 'masculine' }[values.gender] || 'natural';
+  const gender = { Female: 'female', Male: 'male' }[values.gender] || 'natural';
   const age = values.age?.toLowerCase();
   const accents = values.accents?.length ? values.accents : values.accent ? [{ accent: values.accent, subAccent: values.subAccent }] : [];
   const accentDirection = accents.map(({ accent, subAccent }) => subAccent

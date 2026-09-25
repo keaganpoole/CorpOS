@@ -3,15 +3,15 @@ import assert from 'node:assert/strict';
 import { buildToneDirection, composeDescription, describeToneWeights, inferLoudnessFromToneWeights } from './voiceDefinition.js';
 
 test('guided choices become natural voice direction, never invented provider parameters', () => {
-  const description=composeDescription({gender:'Feminine',age:'Mature',accent:'Irish',subAccent:'Dublin',toneWeights:{Calm:70,Caring:35}},'');
-  for (const part of ['mature feminine','natural irish accent with a light dublin influence','led by a steady and reassuring calm','care come through as']) assert.ok(description.toLowerCase().includes(part));
+  const description=composeDescription({gender:'Female',age:'Mature',accent:'Irish',subAccent:'Dublin',toneWeights:{Calm:70,Caring:35}},'');
+  for (const part of ['mature female','natural irish accent, lightly colored by dublin','led by a steady and reassuring calm','care come through as']) assert.ok(description.toLowerCase().includes(part));
   assert.ok(!description.toLowerCase().includes('calm strongly'));
   assert.ok(description.length >= 20 && description.length <= 1000);
 });
 test('additional direction preserves the generated definition', () => {
-  const values={gender:'Masculine',toneWeights:{}};
+  const values={gender:'Male',toneWeights:{}};
   assert.equal(composeDescription(values,'  Gentle pauses.  '),composeDescription(values,'')+'\n\nGentle pauses.');
-  assert.ok(composeDescription(values,'').startsWith('An adult masculine receptionist voice.'));
+  assert.ok(composeDescription(values,'').startsWith('An adult male receptionist voice.'));
 });
 test('tone weights keep a compact UI summary without driving prompt prose', () => {
   assert.equal(describeToneWeights({Friendly:25,Caring:90,Calm:0,Serious:60}),'caring defining, serious leading, friendly accent');

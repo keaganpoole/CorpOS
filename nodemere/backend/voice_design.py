@@ -25,6 +25,7 @@ class VoiceDesignRequest(BaseModel):
     seed: Optional[int] = Field(default=None, ge=0, le=2147483647)
     should_enhance: bool = False
     quality: Optional[float] = Field(default=None, ge=-1, le=1, allow_inf_nan=False)
+    gender: Optional[Literal["Female", "Male"]] = None
 
     @model_validator(mode="after")
     def valid_script(self):
@@ -40,7 +41,7 @@ class VoiceSaveRequest(BaseModel):
     ticket: str = Field(min_length=20, max_length=10000)
     voice_name: str = Field(min_length=1, max_length=80)
     traits: list[str] = Field(default_factory=list, max_length=6)
-    gender: Optional[Literal["Feminine", "Masculine", "Androgynous"]] = None
+    gender: Optional[Literal["Female", "Male", "Androgynous"]] = None
     age: Optional[Literal["Young adult", "Middle-aged", "Mature"]] = None
     portrait_image: Optional[str] = Field(default=None, max_length=12_000_000)
 
@@ -107,6 +108,8 @@ def provider_post(path, payload, api_key, params=None):
 
 def design_voice(payload, *, api_key, owner_id):
     body = payload.model_dump(exclude_none=True)
+    if payload.gender:
+        body["gender"] = payload.gender.lower()
     if payload.auto_generate_text:
         body.pop("text", None)
     result = provider_post("/design", body, api_key, params={"output_format": PREVIEW_OUTPUT_FORMAT})
@@ -136,14 +139,15 @@ def save_voice(payload, *, db, api_key, owner_id, business_id):
     row_id = str(uuid5(NAMESPACE_URL, f"nodemere:voice-design:{owner_id}:{candidate['id']}"))
     profile = {"full_name": payload.voice_name, "first_name": payload.voice_name.split()[0],
                "description": voice_description, "traits": [str(t)[:40] for t in payload.traits],
-               "gender": {"Feminine": "female", "Masculine": "male"}.get(payload.gender),
+               "gender": payload.gender.lower() if payload.gender else None,
                "stereotype": "Studio Voice Design"}
     portrait_url = upload_portrait(db, payload.portrait_image, owner_id=str(owner_id), voice_id=row_id)
     if portrait_url:
         profile["avatar"] = portrait_url
     try:
         voice = provider_post("", {"voice_name": payload.voice_name, "voice_description": voice_description,
-                                   "generated_voice_id": candidate["id"]}, api_key)
+                                   "generated_voice_id": candidate["id"],
+                                   "gender": payload.gender.lower() if payload.gender else None}, api_key)
     except HTTPException as error:
         # Retry only a definitive rejection. Timeouts may already have created
         # the provider voice; preserve the reservation for reconciliation.

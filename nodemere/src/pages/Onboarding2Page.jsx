@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import SplashScreenAlternate from '../components/SplashScreenAlternate';
 import ModalSpectrumLine from '../components/ModalSpectrumLine';
 import SnapDropdown from '../components/SnapDropdown';
+import BrandColorInput from '../sonar/components/BrandColorInput';
 import {
   additionalBusinessBriefContexts,
   additionalIndustries,
@@ -1871,9 +1872,9 @@ const ScheduleTimeline = ({ value, onChange, colorblindMode, onColorblindModeCha
 const InfoModal = ({ eyebrow = 'Tips', title, intro, points = [], footer, onClose, zIndexClass = 'z-[220]', dense = false, maxWidthClass = 'max-w-[620px]' }) => (
   <motion.div
     className={`fixed inset-0 ${zIndexClass} flex items-center justify-center bg-black/70 px-5 backdrop-blur-sm`}
-    initial={{ opacity: 0 }}
+    initial={{ opacity: 1 }}
     animate={{ opacity: 1 }}
-    exit={{ opacity: 0 }}
+    exit={{ opacity: 1 }}
     onMouseDown={onClose}
   >
     <motion.div
@@ -2236,6 +2237,7 @@ const Onboarding2Page = () => {
   const businessBriefEditorRef = useRef(null);
   const [form, setForm] = useState({
     businessName: '',
+    brandColor: '',
     industry: '',
     email: '',
     phone: '',
@@ -2467,6 +2469,7 @@ const Onboarding2Page = () => {
 
   const buildOnboardingPayload = (markOnboarded = false) => ({
     business_name: form.businessName.trim(),
+    brand_color: form.brandColor || null,
     industry: form.industry,
     sub_industry: null,
     business_email: form.email.trim() || null,
@@ -2809,19 +2812,24 @@ const Onboarding2Page = () => {
                       <div className="flex-1">
                         {step === 0 ? (
                           <div className="space-y-6">
-                            <Field label="Business name" hint="">
-                              <div className="relative">
-                                <Building2 className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-600" />
-                                <input
-                                  type="text"
-                                  value={form.businessName}
-                                  onChange={(e) => update('businessName', formatBusinessNameInput(e.target.value))}
-                                  placeholder="e.g., Your business name"
-                                  autoFocus
-                                  className={`${fieldClass} pl-12`}
-                                />
-                              </div>
-                            </Field>
+                            <div className="grid gap-5 md:grid-cols-2 md:items-start">
+                              <Field label="Business name" hint="">
+                                <div className="relative">
+                                  <Building2 className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-600" />
+                                  <input
+                                    type="text"
+                                    value={form.businessName}
+                                    onChange={(e) => update('businessName', formatBusinessNameInput(e.target.value))}
+                                    placeholder="e.g., Your business name"
+                                    autoFocus
+                                    className={`${fieldClass} pl-12`}
+                                  />
+                                </div>
+                              </Field>
+                              <Field label="Brand color" hint="Optional">
+                                <BrandColorInput value={form.brandColor} onChange={(value) => update('brandColor', value)} />
+                              </Field>
+                            </div>
 
                             <Field label="Industry" hint="Choose the closest fit. This helps shape smarter defaults.">
                               <div className="relative">
