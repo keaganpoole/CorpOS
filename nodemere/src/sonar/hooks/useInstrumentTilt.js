@@ -21,7 +21,11 @@ export default function useInstrumentTilt(ref, enabled = true) {
     const move = event => {
       if (!media.matches) return;
       const r = panel.getBoundingClientRect();
-      target = { x: (((event.clientY - r.top) / r.height - 0.5) * -2) * -2.8, y: 6 - (((event.clientX - r.left) / r.width - 0.5) * 2) * 3.6 };
+      const pointerX = Math.max(0, Math.min(1, (event.clientX - r.left) / r.width));
+      const pointerY = Math.max(0, Math.min(1, (event.clientY - r.top) / r.height));
+      target = { x: ((pointerY - 0.5) * -2) * -2.8, y: 6 - ((pointerX - 0.5) * 2) * 3.6 };
+      panel.style.setProperty('--ns-liquid-x', `${(pointerX * 100).toFixed(2)}%`);
+      panel.style.setProperty('--ns-liquid-y', `${(pointerY * 100).toFixed(2)}%`);
       wake();
     };
     const leave = () => { target = { x: 0, y: 6 }; wake(); };
@@ -42,6 +46,8 @@ export default function useInstrumentTilt(ref, enabled = true) {
       media.removeEventListener('change', reset);
       panel.style.removeProperty('--sb-pane-rotate-x');
       panel.style.removeProperty('--sb-pane-rotate-y');
+      panel.style.removeProperty('--ns-liquid-x');
+      panel.style.removeProperty('--ns-liquid-y');
     };
   }, [ref, enabled]);
 }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import {
   X, Play, Pause, Sparkles,
   User, ChevronLeft, ChevronRight, Loader2,
@@ -8,6 +8,7 @@ import {
 import { api } from '../lib/api';
 import CubePreloader from '../components/CubePreloader';
 import MbtiPersonalityModal from '../components/MbtiPersonalityModal';
+import ReceptionistGallery from '../studio/ReceptionistGallery';
 
 const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalogIds = [], hiredVoiceIds = [] }) => {
   const [receptionists, setReceptionists] = useState([]);
@@ -19,6 +20,10 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
   const [hireError, setHireError] = useState('');
   const [personalityPerson, setPersonalityPerson] = useState(null);
   const audioRef = useRef(null);
+  const detailRef = useRef(null);
+  const [selectedIndex, setSelectedIndex] = useState(null);
+  const [loadError, setLoadError] = useState('');
+  const reducedMotion = useReducedMotion();
   const carouselTransitionMs = 620;
   const hiredCatalogKey = (hiredCatalogIds || [])
     .filter(Boolean)
@@ -33,6 +38,8 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
 
   const loadReceptionists = async () => {
     setLoading(true);
+    setLoadError('');
+    setSelectedIndex(null);
     try {
       const catalogData = await api.getReceptionistCatalog();
 
@@ -49,6 +56,7 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
       setReceptionists(availableReceptionists);
     } catch (err) {
       console.error("HireReceptionistModal.jsx:event_46");
+      setLoadError('The catalog couldn’t load. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -57,6 +65,39 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
   useEffect(() => {
     loadReceptionists();
   }, [hiredCatalogKey, hiredVoiceKey]);
+
+  useEffect(() => () => { audioRef.current?.pause(); }, []);
+
+  const closeDetail = () => {
+    audioRef.current?.pause();
+    setPlayingVoice(null);
+    setSelectedIndex(null);
+    setHireError('');
+  };
+
+  useEffect(() => {
+    if (!embedded || selectedIndex === null) return;
+    const previousFocus = document.activeElement;
+    const panel = detailRef.current;
+    panel?.querySelector('button')?.focus();
+    return () => { previousFocus?.focus(); };
+  }, [embedded, selectedIndex]);
+
+  useEffect(() => {
+    if (!embedded || selectedIndex === null) return;
+    const panel = detailRef.current;
+    const key = event => {
+      if (personalityPerson) return;
+      if (event.key === 'Escape' && !hiringId) { event.preventDefault(); closeDetail(); }
+      if (event.key !== 'Tab') return;
+      const buttons = [...panel.querySelectorAll('button:not(:disabled),[href],[tabindex="0"]')];
+      const first = buttons[0], last = buttons[buttons.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+      if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+    };
+    document.addEventListener('keydown', key);
+    return () => { document.removeEventListener('keydown', key); };
+  }, [embedded, selectedIndex, personalityPerson, hiringId]);
 
   const nextCard = () => {
     if (isAnimating || receptionists.length === 0) return;
@@ -74,13 +115,14 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
 
   // Keyboard navigation
   useEffect(() => {
+    if (embedded) return;
     const handleKeyDown = (e) => {
       if (e.key === 'ArrowRight') nextCard();
       if (e.key === 'ArrowLeft') prevCard();
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isAnimating, receptionists.length]);
+  }, [embedded, isAnimating, receptionists.length]);
 
   const playVoice = (voiceUrl, receptionistId) => {
     if (audioRef.current) {
@@ -127,26 +169,25 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
     }
   };
 
-  const active = receptionists[currentIndex];
-
-  return (
+  const detail = (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className={
+      transition={embedded ? { duration: reducedMotion ? 0 : .8, ease: [.9, 0, .1, 1] } : undefined}
+        className={
         embedded
-          ? 'relative z-0 flex items-center justify-center py-4'
+          ? 'ns-gallery-detail'
           : 'fixed inset-0 z-[1000] flex items-center justify-center p-8 bg-black/80 backdrop-blur-md'
       }
-      onClick={embedded ? undefined : onClose}
+      onClick={embedded ? () => { if (!hiringId) closeDetail(); } : onClose}
     >
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      {!embedded && <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-zinc-700/10 blur-[120px] rounded-full animate-pulse" />
         <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-zinc-800/12 blur-[120px] rounded-full" />
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full opacity-[0.03]"
           style={{ backgroundImage: `radial-gradient(#ffffff 1px, transparent 1px)`, backgroundSize: '40px 40px' }} />
-      </div>
+      </div>}
 
       {/* Close button */}
       {!embedded && (
@@ -162,14 +203,20 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
         initial={{ scale: 0.95, opacity: 0, y: 20 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
         exit={{ scale: 0.95, opacity: 0, y: 20 }}
-        className="relative z-10 w-full max-w-[440px] flex flex-col items-center"
+        transition={embedded ? { duration: reducedMotion ? 0 : .8, ease: [.77, 0, .175, 1] } : undefined}
+        className={embedded ? 'ns-gallery-detail-inner relative z-10 flex flex-col items-center' : 'relative z-10 w-full max-w-[440px] flex flex-col items-center'}
+        ref={detailRef}
+        role={embedded ? 'dialog' : undefined}
+        aria-modal={embedded ? true : undefined}
+        aria-label={embedded ? `${receptionists[selectedIndex]?.full_name || 'Receptionist'} details` : undefined}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="text-center mb-10 space-y-2">
+        {embedded && <button type="button" className="ns-gallery-detail-close" disabled={Boolean(hiringId)} onClick={closeDetail}><X size={14}/> Back to gallery</button>}
+        {!embedded && <div className="text-center mb-10 space-y-2">
           <h1 className="text-xs uppercase tracking-[6px] font-bold text-white/20">RECEPTIONIST CATALOG</h1>
           <p className="text-2xl font-semibold tracking-tight text-white">Hire a Receptionist</p>
-        </div>
+        </div>}
 
         {loading ? (
           <div className="flex items-center justify-center py-20" aria-label="Loading receptionists">
@@ -185,10 +232,11 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
             {/* Card Carousel — 3D perspective */}
             <div className="relative w-full aspect-[2/3] mb-6" style={{ perspective: '1500px' }}>
               {receptionists.map((person, index) => {
+                if (embedded && index !== selectedIndex) return null;
                 const hasNeighbors = receptionists.length > 1;
-                const isActive = index === currentIndex;
-                const isNext = hasNeighbors && index === (currentIndex + 1) % receptionists.length;
-                const isPrev = hasNeighbors && index === (currentIndex - 1 + receptionists.length) % receptionists.length;
+                const isActive = embedded || index === currentIndex;
+                const isNext = !embedded && hasNeighbors && index === (currentIndex + 1) % receptionists.length;
+                const isPrev = !embedded && hasNeighbors && index === (currentIndex - 1 + receptionists.length) % receptionists.length;
 
                 const baseClasses = "absolute top-0 left-0 w-full h-full transition-all duration-[620ms] ease-[cubic-bezier(0.16,1,0.3,1)] transform";
                 let stateClasses = "opacity-0 scale-90 pointer-events-none";
@@ -319,7 +367,7 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
                             }}
                             className="mt-auto w-full h-11 bg-white text-black font-bold rounded-2xl tracking-wide flex items-center justify-center gap-2 hover:bg-white/90 transition-all active:scale-[0.98] shadow-lg shadow-white/5 disabled:opacity-60 disabled:cursor-not-allowed"
                           >
-                            {hiringId === person.id && <Loader2 size={16} className="animate-spin" />}
+                            {hiringId === (person.catalog_id ?? person.id) && <Loader2 size={16} className="animate-spin" />}
                             ✨ Hire {person.first_name || person.full_name || 'Receptionist'}
                           </button>
                         )}
@@ -331,7 +379,7 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
             </div>
 
             {/* Navigation arrows */}
-            {receptionists.length > 1 && (
+            {!embedded && receptionists.length > 1 && (
               <div className="flex items-center gap-4 mb-6">
                 <button
                   onClick={prevCard}
@@ -391,6 +439,17 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
       `}</style>
     </motion.div>
   );
+
+  if (!embedded) return detail;
+  if (loading || loadError || !receptionists.length) return <div className="ns-gallery-status" role="status">
+    {loading ? <><CubePreloader size={26}/><span>Opening the catalog</span></> : <>
+      <User size={32}/><span>{loadError || 'No receptionists available'}</span>
+      {loadError && <button type="button" onClick={loadReceptionists}>Try again</button>}
+    </>}
+  </div>;
+  return <ReceptionistGallery receptionists={receptionists} onSelect={setSelectedIndex} paused={selectedIndex !== null}>
+    <AnimatePresence>{selectedIndex !== null && detail}</AnimatePresence>
+  </ReceptionistGallery>;
 };
 
 export default HireReceptionistModal;

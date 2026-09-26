@@ -59,7 +59,6 @@ import { useSonarState } from './hooks/useSonarState';
 import { api } from './lib/api';
 import LeadsPage from './pages/LeadsPage';
 import ScenariosModal from './pages/ScenariosModal';
-import HireReceptionistModal from './pages/HireReceptionistModal';
 const OfficeExperience = lazy(() => import('./studio/OfficeExperience'));
 const StudioExitDialog = lazy(() => import('./studio/StudioExitDialog'));
 import { CommanderModal, SubtaskStatusIcon } from './pages/CommanderModal';
@@ -1754,7 +1753,6 @@ const SonarDashboard = () => {
   const [marketplaceAgent, setMarketplaceAgent] = useState(null);
   const [pendingModel, setPendingModel] = useState(null);
   const [receptionistsAgent, setReceptionistsAgent] = useState(null);
-  const [showHireModal, setShowHireModal] = useState(false);
   const [teamExperience, setTeamExperience] = useState('team');
   const [studioLaunchDestination, setStudioLaunchDestination] = useState('create');
   const studioDirty = useRef(false);
@@ -2256,7 +2254,6 @@ const SonarDashboard = () => {
     teamView,
     agentsLoading,
     receptionistCount: enrichedAgents.length,
-    showHireModal,
     calendarCount: calendarToolbarMeta.count,
     calendarLoading: calendarToolbarMeta.loading,
     calendarHasAppointmentWithPerson: calendarToolbarMeta.hasAppointmentWithPerson,
@@ -2311,7 +2308,14 @@ const SonarDashboard = () => {
     }
     switch (route) {
       case 'receptionists':
-        if (teamExperience !== 'team') return <Suspense fallback={<div className="h-full grid place-items-center"><CubePreloader /></div>}><OfficeExperience initialDestination={studioLaunchDestination} onReturn={leaveStudio} onCreateStarted={() => setTeamExperience('studio')} onHire={() => { setTeamExperience('team'); setShowHireModal(true); }} onDirtyChange={updateStudioDirty} onSaved={async () => { await refresh(); await loadAgentScenarios(); }} /></Suspense>;
+        if (teamExperience !== 'team') return <Suspense fallback={<div className="h-full grid place-items-center"><CubePreloader /></div>}><OfficeExperience initialDestination={studioLaunchDestination} onReturn={leaveStudio} onCreateStarted={() => setTeamExperience('studio')} hiredCatalogIds={enrichedAgents.map((agent) => agent.catalog_id).filter(Boolean)} hiredVoiceIds={enrichedAgents.map((agent) => agent.elevenlabs_voice_id).filter(Boolean)} onHire={async (receptionist) => {
+          const result = await api.hireReceptionist(receptionist);
+          if (!result) throw new Error('Failed to hire receptionist');
+          await refresh();
+          await loadAgentScenarios();
+          setTeamExperience('team');
+          return result;
+        }} onDirtyChange={updateStudioDirty} onSaved={async () => { await refresh(); await loadAgentScenarios(); }} /></Suspense>;
         return (
           <div className={`receptionists-page-scope h-full ${marketplaceAgent ? 'overflow-hidden' : 'overflow-auto'} custom-scrollbar bg-[#020202] flex flex-col`}>
             <div className="shrink-0 px-10 pb-3 pt-8 flex items-center justify-between">
@@ -2340,8 +2344,7 @@ const SonarDashboard = () => {
               <div className="flex items-center gap-3">
                 {teamView === 'receptionists' ? (
                   <>
-                    <button onClick={() => { setStudioLaunchDestination('create'); setTeamExperience('studio'); }} className="dashboard-neutral-button flex items-center gap-2 px-5 py-2.5 rounded-xl text-[11px] font-bold tracking-wider transition-all active:scale-95">Create Receptionist</button>
-                    <button onClick={() => setShowHireModal(true)} className="dashboard-neutral-button flex items-center gap-2 px-5 py-2.5 rounded-xl text-[11px] font-bold tracking-wider transition-all active:scale-95">New Receptionist</button>
+                    <button onClick={() => { setStudioLaunchDestination('create'); setTeamExperience('studio'); }} className="dashboard-neutral-button flex items-center gap-2 px-5 py-2.5 rounded-xl text-[11px] font-bold tracking-wider transition-all active:scale-95">New Receptionist</button>
                   </>
                 ) : teamView === 'staff' ? (
                   <button onClick={() => window.dispatchEvent(new CustomEvent('team:open-staff-modal'))} className="dashboard-neutral-button flex items-center gap-2 px-5 py-2.5 rounded-xl text-[11px] font-bold tracking-wider transition-all active:scale-95">New Staff Member</button>
@@ -2485,28 +2488,6 @@ const SonarDashboard = () => {
                 />
               </motion.div>
             </div>
-            <AnimatePresence>
-              {showHireModal && (
-                <HireReceptionistModal
-                  onClose={() => setShowHireModal(false)}
-                  hiredCatalogIds={enrichedAgents.map((agent) => agent.catalog_id).filter(Boolean)}
-                  hiredVoiceIds={enrichedAgents.map((agent) => agent.elevenlabs_voice_id).filter(Boolean)}
-                  onHire={async (receptionist) => {
-                    try {
-                      const result = await api.hireReceptionist(receptionist);
-                      if (!result) throw new Error('Failed to hire receptionist');
-                      await refresh();
-                      await loadAgentScenarios();
-                      return result;
-                    } catch (err) {
-                      console.error("SonarDashboard.jsx:event_2402");
-                      throw err;
-                    }
-                  }}
-                />
-              )}
-            </AnimatePresence>
-
             <AnimatePresence>
               {receptionistsAgent && (
                 <ScenariosModal
