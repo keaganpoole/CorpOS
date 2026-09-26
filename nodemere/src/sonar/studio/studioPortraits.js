@@ -24,9 +24,9 @@ export const STUDIO_PORTRAITS = Object.freeze({
       Male: { position: '60% 48%', scale: 1.02 },
       Female: { position: '54% 48%', scale: 1.02 },
     }),
-    'Middle-aged': paired('age', 'middle_aged.png', 'middle_aged.png', {
+    'Middle-aged': paired('age', 'middle_aged.png', 'middle_aged_3.png', {
       Male: { position: '60% 48%', scale: 1.01 },
-      Female: { position: '54% 48%', scale: 0.92 },
+      Female: { position: '54% 48%', scale: 1 },
     }),
     Mature: paired('age', 'mature.png', 'mature.png', {
       Male: { position: '60% 48%' },
@@ -40,22 +40,22 @@ export const STUDIO_PORTRAITS = Object.freeze({
     British: paired('ethnicity', 'british_man.png', 'british.png'),
     Canadian: paired('ethnicity', 'canadian_man.png', 'canadian.png'),
     Chinese: {
-      Male: portrait('man', 'ethnicity', 'chinese_man.png', { position: '47% 51%' }),
-      Female: portrait('woman', 'age', 'chinese_woman_2.png'),
+      Male: portrait('man', 'ethnicity', 'chinese_man.png', { position: '47% 47%' }),
+      Female: portrait('woman', 'ethnicity', 'chinese_woman_2.png', { position: '54% 70%', scale: 1.05 }),
     },
     Indian: paired('ethnicity', 'indian_man.png', 'indian.png'),
     Irish: {
       Male: portrait('man', 'ethnicity', 'irish_man.png'),
-      Female: portrait('woman', 'ethnicity', 'irish.png', { position: '54% 43%' }),
+      Female: portrait('woman', 'ethnicity', 'irish.png', { position: '54% 100%', scale: 1 }),
     },
     Italian: paired('ethnicity', 'italian_man.png', 'italian.png'),
     Japanese: {
       Male: portrait('man', 'ethnicity', 'japanese_man.png', { position: '56.5% 48%', scale: 1.02 }),
-      Female: portrait('woman', 'age', 'japanese_woman_2.png'),
+      Female: portrait('woman', 'ethnicity', 'japanese_woman_2.png'),
     },
     'Hispanic / Latina': {
       Male: portrait('man', 'ethnicity', 'hispanic_man.png'),
-      Female: portrait('woman', 'age', 'hispanic_woman_2.png'),
+      Female: portrait('woman', 'ethnicity', 'hispanic_woman_2.png'),
     },
   },
   tone: {
