@@ -1,6 +1,6 @@
 import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from 'framer-motion';
-import { ArrowLeft, ArrowRight, Check, ChevronDown, Headphones, Pause, Play, RotateCcw, SlidersHorizontal, Sparkles, UserRound } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CalendarDays, Check, ChevronDown, Globe2, Headphones, Heart, Pause, Play, RotateCcw, SlidersHorizontal, Sparkles, UserRound } from 'lucide-react';
 import SplashScreenAlternate from '../../components/SplashScreenAlternate';
 import CubePreloader from '../components/CubePreloader';
 import useInstrumentTilt from '../hooks/useInstrumentTilt';
@@ -233,7 +233,7 @@ function AccentDna({ values, previewOption }) {
 export default function NodemereStudio({ onReturn, onDirtyChange, onSaved, skipIntro = false, onSceneState }) {
   const reducedMotion = useReducedMotion();
   const [canHoverFine,setCanHoverFine]=useState(()=>typeof window !== 'undefined' ? Boolean(window.matchMedia?.('(hover: hover) and (pointer: fine)').matches) : false);
-  const [intro,setIntro]=useState(!skipIntro), [mode,setMode]=useState('design'), [stage,setStage]=useState(0);
+  const [intro,setIntro]=useState(!skipIntro), [showWelcome,setShowWelcome]=useState(true), [identityReady,setIdentityReady]=useState(false), [mode,setMode]=useState('design'), [stage,setStage]=useState(0);
   const [values,setValues]=useState({toneWeights:{},accents:[]}), [manual,setManual]=useState(null);
   const [previewOption,setPreviewOption]=useState(null);
   const [settings,setSettings]=useState({ loudness:.5,guidance_scale:5,model_id:'eleven_ttv_v3',seed:'',should_enhance:false,quality:0 });
@@ -253,7 +253,7 @@ export default function NodemereStudio({ onReturn, onDirtyChange, onSaved, skipI
   const room=stage===ROOM_STAGE, auditioning=stage===AUDITION_STAGE, portraits=stage===PORTRAIT_STAGE, previewing=stage===PREVIEW_STAGE, complete=stage===COMPLETE_STAGE;
   useInstrumentTilt(panel, room&&!intro);
   useInstrumentTilt(guidedSurface, stage<ROOM_STAGE&&!intro&&mode==='design');
-  useEffect(()=>{onSceneState?.({stage,values,previewOption,quiet:busy,mode,playing:Boolean(audition.playing)});},[stage,values,previewOption,busy,mode,audition.playing,onSceneState]);
+  useEffect(()=>{onSceneState?.({stage,values,previewOption,quiet:busy,mode,playing:Boolean(audition.playing),welcome:showWelcome});},[stage,values,previewOption,busy,mode,audition.playing,showWelcome,onSceneState]);
   useEffect(()=>{
     const media=window.matchMedia?.('(hover: hover) and (pointer: fine)');
     if(!media)return;
@@ -336,7 +336,7 @@ export default function NodemereStudio({ onReturn, onDirtyChange, onSaved, skipI
     if(busy||saving)return; touch();setBusy(true);setError('');audition.stop();
     try {
       const script=previewText.trim();
-      const payload={...settings, voice_description:description, gender:voiceValues.gender||null, auto_generate_text:!script, ...(script?{text:script}:{}), seed:settings.seed===''?null:Number(settings.seed)};
+      const payload={...settings, voice_description:description, gender:values.gender||null, auto_generate_text:!script, ...(script?{text:script}:{}), seed:settings.seed===''?null:Number(settings.seed)};
       if(settings.model_id==='eleven_ttv_v3')delete payload.quality;
       const result=await api.designVoice(payload);
       if(!result?.previews?.length)throw new Error('No auditions were returned. Please try again.');
@@ -399,6 +399,19 @@ export default function NodemereStudio({ onReturn, onDirtyChange, onSaved, skipI
   const scriptLength=previewText.trim().length;
   const scriptValid=!scriptLength||(scriptLength>=100&&previewText.length<=1000);
   const valid=description.trim().length>=20&&description.length<=1000&&scriptValid&&(settings.seed===''||(Number.isInteger(Number(settings.seed))&&Number(settings.seed)>=0&&Number(settings.seed)<=2147483647));
+  const namedReceptionist=name.trim();
+  const hasShortName=namedReceptionist.length>0&&namedReceptionist.length<=50;
+  const guidedHint=stage===0&&!identityReady
+    ? 'Give your receptionist a name people will remember.'
+    : stage===0&&identityReady
+      ? `Set the gender for ${namedReceptionist||'your receptionist'}.`
+      : stage===1
+        ? (hasShortName?`Choose the age range that best fits ${namedReceptionist}.`:CHARACTERISTICS[stage].hint)
+        : stage===2
+          ? (namedReceptionist?`Give ${namedReceptionist} an authentic sound rooted in place and culture.`:CHARACTERISTICS[stage].hint)
+          : stage===TONE_STAGE
+            ? (namedReceptionist?`Give ${namedReceptionist} a personality people can feel and remember.`:CHARACTERISTICS[stage].hint)
+            : CHARACTERISTICS[stage]?.hint;
   return <section onScroll={event=>event.currentTarget.closest('.ns-office')?.style.setProperty('--office-scroll',`${-event.currentTarget.scrollTop}px`)} className={`ns-studio ${room?'is-room':''} ${auditioning?'is-audition':''} ${mode==='clone'?'is-clone':''} ${busy?'is-processing':''}`}>
     {intro?<div className="ns-intro"><SplashScreenAlternate label="Audition" onAnimationEnd={finishIntro}/><button className="ns-skip" onClick={finishIntro}>Enter Audition <ArrowRight size={14}/></button></div>:null}
     <div className="ns-content" inert={intro?'':undefined}>
@@ -407,7 +420,7 @@ export default function NodemereStudio({ onReturn, onDirtyChange, onSaved, skipI
       <div className="ns-wordmark">Nodemere <span>Audition</span></div>
       <nav aria-label="Audition mode"><button disabled={busy||saving} aria-pressed={mode==='design'} onClick={()=>switchMode('design')}>Design a Voice</button><button disabled={busy||saving} aria-pressed={mode==='clone'} onClick={()=>switchMode('clone')}>Clone a Voice</button></nav>
     </header>
-    {mode==='design'&&stage>=ROOM_STAGE?<nav className="ns-audition-guide" aria-label="Audition progress">
+     {mode==='design'&&stage>=ROOM_STAGE&&!showWelcome?<nav className="ns-audition-guide" aria-label="Audition progress">
       <button type="button" aria-current={stage<ROOM_STAGE?'step':undefined} onClick={()=>{setStage(0);setMode('design');}}>Edit voice</button>
       <button type="button" aria-current={stage===ROOM_STAGE?'step':undefined} onClick={()=>setStage(ROOM_STAGE)}>Voice prompt</button>
       <button type="button" aria-current={stage===AUDITION_STAGE?'step':undefined} disabled={!previews.length} onClick={()=>setStage(AUDITION_STAGE)}>Voice options</button>
@@ -416,13 +429,17 @@ export default function NodemereStudio({ onReturn, onDirtyChange, onSaved, skipI
     </nav>:null}
     {mode==='design'?<>
       {audition.playing||complete?<div className="ns-scene-caption"><span className={audition.playing?'is-speaking':''}/>{audition.playing?'YOUR VOICE, IN THE ROOM':name}</div>:null}
-      <LayoutGroup id="studio-primary-surface">{stage<ROOM_STAGE?<>
+      <LayoutGroup id="studio-primary-surface">{showWelcome?<div className="ns-welcome ns-fade-in">
+        <div className="ns-welcome-copy"><span className="ns-eyebrow">NODEMERE AUDITION</span><h1>Build your dream<br/><span>receptionist.</span></h1><p>Create a receptionist that feels made for your business, from the voice customers hear to the personality they remember.</p><button className="ns-primary" onClick={()=>setShowWelcome(false)}>Create a receptionist <ArrowRight size={16}/></button></div>
+      </div>:stage<ROOM_STAGE?<>
         <nav className="ns-chapters" aria-label="Voice characteristics">{CHARACTERISTICS.map((item,i)=><button key={item.key} disabled={i>stage} aria-current={stage===i?'step':undefined} onClick={()=>{clearTimeout(advance.current);setStage(i);}}><span>{String(i+1).padStart(2,'0')}</span>{item.label}{(item.key==='tone'?Object.keys(values.toneWeights||{}).length:values[item.key]?.length)?<Check size={11}/>:null}</button>)}</nav>
         <motion.div layoutId="studio-primary-panel" className="ns-guided-space" transition={{duration:reducedMotion?0:.7,ease:EASE}}><div ref={guidedSurface} className="ns-guided-surface"><AnimatePresence mode="wait"><motion.div key={stage} className={`ns-guided ${CHARACTERISTICS[stage].control==='blend'?'is-blend':''}`} initial={{opacity:0,y:reducedMotion?0:18}} animate={{opacity:1,y:0}} exit={{opacity:0,y:reducedMotion?0:-12}} transition={{duration:reducedMotion?0:.4,ease:EASE}}>
-          <span className="ns-eyebrow">{CHARACTERISTICS[stage].label} / VOICE DIRECTION</span>
-          <h1 ref={focusHeading} tabIndex={-1}>{CHARACTERISTICS[stage].title}</h1><p>{CHARACTERISTICS[stage].hint}</p>
+           {stage===0?<nav className="ns-identity-slides" aria-label="Identity steps"><button type="button" className={!identityReady?'is-active':''} onClick={()=>setIdentityReady(false)}>Name</button><button type="button" className={identityReady?'is-active':''} disabled={!name.trim()} onClick={()=>setIdentityReady(true)}>Gender</button></nav>:null}
+           <span className="ns-eyebrow">{stage===0?'IDENTITY':CHARACTERISTICS[stage].label} / VOICE DIRECTION</span>
+           <h1 ref={focusHeading} tabIndex={-1}>{stage===0&&identityReady?'Choose a\ngender.':CHARACTERISTICS[stage].title}</h1><p>{guidedHint}</p>
+           {stage===0&&!identityReady?<label className="ns-age-name"><span>Name</span><div className="ns-identity-name-shell"><input aria-label="Name your receptionist" placeholder="Name your receptionist" value={name} disabled={busy||saving} onChange={e=>{touch();setName(e.target.value);}}/><button type="button" aria-label="Continue to gender" disabled={!name.trim()||busy||saving} onClick={()=>setIdentityReady(true)}><ArrowRight size={17}/></button></div></label>:null}
           {stage===2?<AccentDna values={values} previewOption={previewOption}/>:null}
-          {CHARACTERISTICS[stage].control==='blend'?<div className="ns-blend">{CHARACTERISTICS[stage].options.map((option,i)=>{
+           {stage===0&&!identityReady?null:CHARACTERISTICS[stage].control==='blend'?<div className="ns-blend">{CHARACTERISTICS[stage].options.map((option,i)=>{
             const weight=values.toneWeights?.[option]??50;
             return <BlendChoice key={option} index={i} option={option} note={CHARACTERISTICS[stage].notes[i]} value={weight} active={values.tone===option} onPreview={()=>setPreviewOption({key:'tone',option})} onChange={amount=>blendTone(option,amount)}/>;
           })}</div>:<div className={`ns-decisions ${CHARACTERISTICS[stage].options.length>3?'ns-decisions--grid':''} ${CHARACTERISTICS[stage].key==='accent'?'ns-accent-decisions':''}`}>{CHARACTERISTICS[stage].options.map((option,i)=>{
@@ -431,13 +448,13 @@ export default function NodemereStudio({ onReturn, onDirtyChange, onSaved, skipI
               const selected=accentSelections(values).filter(item=>item.accent===option), active=Boolean(selected.length), subAccents=active?(SUB_ACCENTS[option]||[]):[];
               return <div key={option} className={`ns-accent-choice ${active?'is-selected':''}`} style={{ '--option-index': i }} onPointerEnter={()=>setPreviewOption({key,option})}>
                 <button type="button" className="ns-accent-main" aria-pressed={active} aria-disabled={!active&&accentSelections(values).length>=3} onFocus={()=>setPreviewOption({key,option})} onClick={()=>toggleAccent(option)}>
-                  <span>{option}</span><small>{CHARACTERISTICS[stage].notes[i]}</small><b>{active?<Check size={17}/>:<ArrowRight size={16}/>}</b>
+                   <span>{option}</span><small>{CHARACTERISTICS[stage].notes[i]}</small>
                 </button>
                 {subAccents.length?<div className="ns-inline-subaccents" aria-label={`${option} regional accents`}>{subAccents.map(sub=>{const isSelected=selected.some(item=>item.subAccent===sub);return <button type="button" key={sub} className={isSelected?'is-selected':''} aria-pressed={isSelected} onFocus={()=>setPreviewOption({key,option,subAccent:sub})} onBlur={()=>setPreviewOption(current=>current?.subAccent===sub?null:current)} onClick={()=>chooseSubAccent(sub)}>{sub}</button>;})}</div>:null}
               </div>;
             }
             const active=values[key]===option;
-            return <button key={option} className={active?'is-selected':''} style={{ '--option-index': i }} aria-pressed={active} onPointerEnter={()=>setPreviewOption({key,option})} onFocus={()=>setPreviewOption({key,option})} onClick={()=>choose(key,option)}><span>{option}</span><small>{CHARACTERISTICS[stage].notes[i]}</small><b>{active?<Check size={17}/>:<ArrowRight size={16}/>}</b></button>;
+             return <button key={option} disabled={stage===0&&!name.trim()} className={active?'is-selected':''} style={{ '--option-index': i }} aria-pressed={active} onPointerEnter={()=>setPreviewOption({key,option})} onFocus={()=>setPreviewOption({key,option})} onClick={()=>choose(key,option)}><span>{option}</span><small>{CHARACTERISTICS[stage].notes[i]}</small></button>;
           })}</div>}
           {CHARACTERISTICS[stage].control==='blend'?<button className="ns-primary" onClick={()=>setStage(ROOM_STAGE)}>Continue <ArrowRight size={16}/></button>:values[CHARACTERISTICS[stage].key]&&(!canHoverFine||CHARACTERISTICS[stage].key==='accent')?<button className={`ns-primary ${CHARACTERISTICS[stage].key==='accent'?'':'ns-touch-continue'}`} onClick={continueGuided}>Continue <ArrowRight size={16}/></button>:null}
         </motion.div></AnimatePresence></div></motion.div>
@@ -471,10 +488,9 @@ export default function NodemereStudio({ onReturn, onDirtyChange, onSaved, skipI
           </div><button className="ns-select-take" disabled={busy||saving} aria-pressed={selected?.generated_voice_id===track.generated_voice_id} onClick={()=>{touch();setSelected(track);}}>{selected?.generated_voice_id===track.generated_voice_id?<><Check size={13}/> Selected voice</>:'Choose this voice'}</button>
         </div>)}</div>
           <button className="ns-text-button" disabled={busy||saving} onClick={generate}><RotateCcw size={13}/>{busy?'Preparing new auditions…':'Audition another set'}</button>
-          {selected?<div className="ns-save"><button className="ns-primary" onClick={continueToPortraits} disabled={portraitBusy||saving||busy}>{portraitBusy?'Preparing their portrait…':'Continue to their portrait'} {portraitBusy?<span className="ns-busy-dot"/>:<ArrowRight size={15}/>}</button></div>:null}
-          {error||audition.error?<p role="alert" className="ns-error">{error||audition.error}</p>:null}
-          {generation?.text?<details className="ns-script"><summary>What they’re saying <ChevronDown size={13}/></summary><p>{generation.text}</p></details>:null}
-        </div>
+           <div className="ns-save"><button className="ns-primary" onClick={continueToPortraits} disabled={!selected||portraitBusy||saving||busy}>{portraitBusy?'Preparing their portrait…':'Continue to their portrait'} {portraitBusy?<span className="ns-busy-dot"/>:<ArrowRight size={15}/>}</button></div>
+           {error||audition.error?<p role="alert" className="ns-error">{error||audition.error}</p>:null}
+         </div>
       </div>:null}
       {portraits?<div className="ns-portrait-stage ns-fade-in">
         <div className="ns-portrait-stage-heading"><h1 ref={focusHeading} tabIndex={-1}>Choose a <span>portrait.</span></h1></div>
@@ -492,7 +508,7 @@ export default function NodemereStudio({ onReturn, onDirtyChange, onSaved, skipI
         <div className="ns-review-stage-heading"><h1 ref={focusHeading} tabIndex={-1}>Review &amp; confirm</h1></div>
         <div className="ns-receptionist-preview-card">
           <div className="ns-receptionist-preview-image"><img src={selectedPortrait?.data_url} alt="Selected receptionist portrait" /><div className="ns-receptionist-preview-image-wash" /></div>
-          <div className="ns-receptionist-preview-body"><p className="ns-receptionist-preview-copy">A voice and presence designed for the first hello.</p><div className="ns-receptionist-preview-selections"><div><small>GENDER</small><strong>{generation?.values?.gender || 'Custom'}</strong></div><div><small>AGE</small><strong>{generation?.values?.age || 'Custom'}</strong></div><div><small>ACCENT</small><strong>{accentSelections(generation?.values || {}).map(accentName).join(' · ') || 'Custom'}</strong></div><div><small>PERSONALITY</small><strong>{describeToneWeights(generation?.values?.toneWeights || {}) || generation?.values?.tone || 'Custom'}</strong></div></div><label className="ns-preview-name"><span>Name your receptionist</span><input id="studio-name" disabled={saving} placeholder="Their name" value={name} maxLength={80} onChange={e=>{touch();setName(e.target.value);}} /></label><div className="ns-receptionist-preview-actions"><button className="ns-text-button" disabled={saving} onClick={()=>setStage(PORTRAIT_STAGE)}><ArrowLeft size={14}/> Change portrait</button><button className="ns-primary" onClick={save} disabled={!name.trim()||saving||portraitBusy}>{saving?'Saving your receptionist…':'Save receptionist'}<ArrowRight size={15}/></button></div>{error?<p role="alert" className="ns-error">{error}</p>:null}</div>
+           <div className="ns-receptionist-preview-body"><p className="ns-receptionist-preview-copy">A voice and presence designed for the first hello.</p><div className="ns-receptionist-preview-selections"><div><span className="ns-review-meta-icon"><UserRound size={16}/><small>GENDER</small></span><strong>{generation?.values?.gender || 'Custom'}</strong></div><div><span className="ns-review-meta-icon"><CalendarDays size={16}/><small>AGE</small></span><strong>{generation?.values?.age || 'Custom'}</strong></div><div><span className="ns-review-meta-icon"><Globe2 size={16}/><small>ACCENT</small></span><strong>{accentSelections(generation?.values || {}).map(accentName).join(' · ') || 'Custom'}</strong></div><div><span className="ns-review-meta-icon"><Heart size={16}/><small>PERSONALITY</small></span><strong>{describeToneWeights(generation?.values?.toneWeights || {}) || generation?.values?.tone || 'Custom'}</strong></div></div><div className="ns-receptionist-preview-actions"><button className="ns-text-button" disabled={saving} onClick={()=>setStage(PORTRAIT_STAGE)}><ArrowLeft size={14}/> Change portrait</button><button className="ns-primary" onClick={save} disabled={!name.trim()||saving||portraitBusy}>{saving?'Saving your receptionist…':'Save receptionist'}<ArrowRight size={15}/></button></div>{error?<p role="alert" className="ns-error">{error}</p>:null}</div>
         </div>
       </div>:null}
       {complete?<div className="ns-complete"><span className="ns-eyebrow"><Check size={14}/> VOICE SAVED</span><h1 ref={focusHeading} tabIndex={-1}>Hello,<br/><span>{name}.</span></h1><p>A voice of their own. Ready for your front desk.<br/>Your receptionist is saved in the catalog.</p><button className="ns-primary" disabled={hiring} onClick={hire}>{hiring?'Adding to Team…':saved?.hired?'Return to Team':'Add to Team'}<ArrowRight size={16}/></button><button className="ns-text-button" onClick={onReturn}>Return to Team</button>{error?<p role="alert" className="ns-error">{error}</p>:null}</div>:null}

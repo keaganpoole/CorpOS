@@ -18,6 +18,18 @@ class PortraitGenerationRequest(BaseModel):
     voice_description: str = Field(default="", max_length=1000)
 
 
+def _safe_provider_message(exc: Exception) -> str:
+    detail = " ".join(str(exc).split())
+    for secret_prefix in ("sk-", "sess-"):
+        while secret_prefix in detail:
+            start = detail.find(secret_prefix)
+            end = start + len(secret_prefix)
+            while end < len(detail) and not detail[end].isspace() and detail[end] not in "'\"},]":
+                end += 1
+            detail = detail[:start] + "[redacted]" + detail[end:]
+    return detail[:500] or exc.__class__.__name__
+
+
 def _business_context(db, owner_id: str) -> tuple[str, str, str, str]:
     business = (db.table("businesses").select("name,industry,about_us").eq("user_id", owner_id)
                 .limit(1).execute().data or [None])[0] or {}
@@ -77,7 +89,7 @@ STRICT EXCLUSIONS — HARD IMAGE CONSTRAINT: The image must contain zero text. N
 
 
 def _generate_one(client: OpenAI, prompt: str, model: str) -> dict:
-    result = client.images.generate(model=model, prompt=prompt, size="1024x1280", quality="medium", n=1)
+    result = client.images.generate(model=model, prompt=prompt, size="1024x1536", quality="medium", n=1)
     item = (result.data or [None])[0]
     encoded = getattr(item, "b64_json", None) if item else None
     if not encoded:
@@ -104,7 +116,8 @@ def generate_portraits(payload: PortraitGenerationRequest, *, db, api_key: str, 
         raise HTTPException(429, "OpenAI image generation is temporarily rate-limited. Please wait a moment and retry.") from exc
     except Exception as exc:
         logging.exception("receptionist portrait generation failed")
-        raise HTTPException(502, "The portrait studio could not finish these options. Please try again.") from exc
+        provider_detail = _safe_provider_message(exc)
+        raise HTTPException(502, f"Portrait generation failed upstream ({exc.__class__.__name__}): {provider_detail}") from exc
     return {"images": [{"id": f"portrait-{index + 1}", **image} for index, image in enumerate(images)], "model": model}
 
 
