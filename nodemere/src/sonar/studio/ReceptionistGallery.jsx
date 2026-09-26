@@ -6,8 +6,8 @@ import './receptionistGallery.css';
 
 export default function ReceptionistGallery({ receptionists, onSelect, paused, children }) {
   const DRAG_RESISTANCE = 0.86;
-  const FOLLOW_STIFFNESS = 8.5;
-  const INERTIA_DAMPING = 4.5;
+  const FOLLOW_STIFFNESS = 6.5;
+  const INERTIA_DAMPING = 3.1;
   const rootRef = useRef(null), worldRef = useRef(null), tilesRef = useRef(new Map());
   const controlsRef = useRef(null);
   const [cells, setCells] = useState([]);
@@ -62,7 +62,7 @@ export default function ReceptionistGallery({ receptionists, onSelect, paused, c
     };
     const release = event => {
       if (!drag) return;
-      if (performance.now() - drag.time > 90 || reducedMotion) velocity = { x: 0, y: 0 };
+      if (!moved || reducedMotion) velocity = { x: 0, y: 0 };
       if (root.hasPointerCapture(event.pointerId)) root.releasePointerCapture(event.pointerId);
       drag = null;
       root.classList.remove('is-dragging');
