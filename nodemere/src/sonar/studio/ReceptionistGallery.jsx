@@ -117,6 +117,7 @@ export default function ReceptionistGallery({ receptionists, onSelect, paused, c
         const lift = (lifts.get(cell.key) || 0) + (desired - (lifts.get(cell.key) || 0)) * blend;
         lifts.set(cell.key, lift);
         element.style.setProperty('--tile-lift', `${lift * 22}px`);
+        element.style.setProperty('--tile-scale', (1 + lift * .14).toFixed(4));
         element.style.setProperty('--tile-glow', (lift * .13).toFixed(4));
         element.style.setProperty('--tile-aura', (lift * .19).toFixed(4));
         element.style.setProperty('--tile-blur', `${edgeBlur.toFixed(2)}px`);
