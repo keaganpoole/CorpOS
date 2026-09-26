@@ -89,7 +89,7 @@ export default function ReceptionistGallery({ receptionists, onSelect, paused, c
       current.x += (target.x - current.x) * blend;
       current.y += (target.y - current.y) * blend;
       current.scale += (target.scale - current.scale) * blend;
-      worldRef.current.style.transform = `translate3d(${current.x}px,${current.y}px,0) scale(${current.scale})`;
+      worldRef.current.style.transform = `translate(${current.x}px,${current.y}px) scale(${current.scale})`;
       const visible = galleryCells(current, size.width, size.height, receptionists.length);
       const signature = visible.map(cell => cell.key).join('|');
       if (signature !== cellSignature) { cellSignature = signature; setCells(visible); }
@@ -140,7 +140,7 @@ export default function ReceptionistGallery({ receptionists, onSelect, paused, c
           ref={node => { if (node) tilesRef.current.set(cell.key, node); else tilesRef.current.delete(cell.key); }}
           style={{ left: cell.x, top: cell.y, width: cell.width, height: cell.height }}
           aria-label={`Meet ${person.full_name || 'receptionist'}`} onClick={() => onSelect(cell.personIndex)}>
-          {(person.hero_avatar || person.avatar) ? <img src={person.hero_avatar || person.avatar} alt="" draggable="false" /> : <span className="ns-gallery-placeholder"><User size={40}/><span>{person.full_name || 'Receptionist'}</span></span>}
+          {person.avatar ? <img src={person.avatar} alt="" draggable="false" /> : <span className="ns-gallery-placeholder"><User size={40}/><span>{person.full_name || 'Receptionist'}</span></span>}
           <span className="ns-gallery-neon" aria-hidden="true"/>
         </button>;
       })}
