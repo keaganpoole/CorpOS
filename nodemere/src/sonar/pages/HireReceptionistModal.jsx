@@ -257,9 +257,9 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
                     <div className="relative h-full w-full bg-[#0a0a0a] border border-white/10 rounded-[40px] overflow-hidden shadow-2xl flex flex-col">
                       {/* Header Image Area */}
                       <div className="relative h-[75%] w-full group overflow-hidden">
-                        {person.avatar ? (
+                        {(person.hero_avatar || person.avatar) ? (
                           <img
-                            src={person.avatar}
+                            src={person.hero_avatar || person.avatar}
                             alt={person.full_name || 'Receptionist'}
                             className="w-full h-full object-cover"
                           />

@@ -140,7 +140,7 @@ export default function ReceptionistGallery({ receptionists, onSelect, paused, c
           ref={node => { if (node) tilesRef.current.set(cell.key, node); else tilesRef.current.delete(cell.key); }}
           style={{ left: cell.x, top: cell.y, width: cell.width, height: cell.height }}
           aria-label={`Meet ${person.full_name || 'receptionist'}`} onClick={() => onSelect(cell.personIndex)}>
-          {person.avatar ? <img src={person.avatar} alt="" draggable="false" /> : <span className="ns-gallery-placeholder"><User size={40}/><span>{person.full_name || 'Receptionist'}</span></span>}
+          {(person.hero_avatar || person.avatar) ? <img src={person.hero_avatar || person.avatar} alt="" draggable="false" /> : <span className="ns-gallery-placeholder"><User size={40}/><span>{person.full_name || 'Receptionist'}</span></span>}
           <span className="ns-gallery-neon" aria-hidden="true"/>
         </button>;
       })}
