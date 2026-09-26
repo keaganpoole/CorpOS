@@ -106,14 +106,19 @@ export default function ReceptionistGallery({ receptionists, onSelect, paused, c
       for (const cell of visible) {
         const element = tilesRef.current.get(cell.key);
         if (!element) continue;
-        const distance = pointer && smoothPointer ? Math.hypot((cell.x + cell.width / 2) * current.scale + current.x - smoothPointer.x,
+        const screenX = (cell.x + cell.width / 2) * current.scale + current.x;
+        const screenY = (cell.y + cell.height / 2) * current.scale + current.y;
+        const distance = pointer && smoothPointer ? Math.hypot(screenX - smoothPointer.x,
           (cell.y + cell.height / 2) * current.scale + current.y - smoothPointer.y) : Infinity;
+        const centerDistance = Math.hypot(screenX - size.width / 2, screenY - size.height / 2);
+        const edgeBlur = Math.min(1.1, Math.max(0, (centerDistance - 180) / 420) * .9);
         const desired = pausedRef.current || reducedMotion ? 0 : hoverFalloff(distance, 360 * current.scale);
         const lift = (lifts.get(cell.key) || 0) + (desired - (lifts.get(cell.key) || 0)) * blend;
         lifts.set(cell.key, lift);
         element.style.setProperty('--tile-lift', `${lift * 22}px`);
         element.style.setProperty('--tile-glow', (lift * .13).toFixed(4));
         element.style.setProperty('--tile-aura', (lift * .19).toFixed(4));
+        element.style.setProperty('--tile-blur', `${edgeBlur.toFixed(2)}px`);
         element.style.zIndex = lift > .01 ? '2' : '1';
       }
       frame = requestAnimationFrame(tick);
