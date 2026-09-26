@@ -3,7 +3,7 @@
 .ns-office.is-catalog .ns-catalog-route{position:absolute;inset:0;padding:0;min-height:0;overflow:hidden}
 .ns-office.is-catalog .ns-catalog-back{top:25px;left:28px;z-index:12;padding:8px 12px;border-radius:20px;background:#080808b8;backdrop-filter:blur(12px)}
 .ns-office.is-catalog .ns-persistent-wordmark{z-index:12}
-.ns-office.is-catalog .ns-persistent-wordmark::before{content:"";position:absolute;z-index:-1;top:50%;left:50%;width:100vw;height:176px;transform:translate(-50%,-50%);pointer-events:none;background:linear-gradient(180deg,rgba(0,0,0,.94),rgba(0,0,0,.74) 48%,rgba(0,0,0,.3) 78%,rgba(0,0,0,.08) 96%,transparent)}
+.ns-office.is-catalog .ns-persistent-wordmark::before{content:"";position:absolute;z-index:-1;top:50%;left:50%;width:100vw;height:176px;transform:translate(-50%,-50%);pointer-events:none;background:linear-gradient(180deg,rgba(0,0,0,.94),rgba(0,0,0,.72) 52%,rgba(0,0,0,.16) 86%,transparent)}
 .ns-receptionist-gallery{position:absolute;inset:0;overflow:hidden;background:#020202;touch-action:none;overscroll-behavior:none;cursor:grab;outline:none;font-family:Inter,sans-serif}
 .ns-receptionist-gallery.is-dragging,.ns-receptionist-gallery.is-dragging button{cursor:grabbing}
 .ns-gallery-world{position:absolute;inset:0;transform-origin:0 0}
