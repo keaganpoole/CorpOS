@@ -5,9 +5,9 @@ import { galleryCells, hoverFalloff, zoomAt } from './catalogGeometry';
 import './receptionistGallery.css';
 
 export default function ReceptionistGallery({ receptionists, onSelect, paused, children }) {
-  const DRAG_RESISTANCE = 0.86;
-  const FOLLOW_STIFFNESS = 6.5;
-  const INERTIA_DAMPING = 3.1;
+  const DRAG_RESISTANCE = 0.78;
+  const FOLLOW_STIFFNESS = 5.1;
+  const INERTIA_DAMPING = 2.35;
   const rootRef = useRef(null), worldRef = useRef(null), tilesRef = useRef(new Map());
   const controlsRef = useRef(null);
   const [cells, setCells] = useState([]);
