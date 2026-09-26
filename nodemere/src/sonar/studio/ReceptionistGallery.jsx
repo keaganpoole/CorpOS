@@ -111,7 +111,7 @@ export default function ReceptionistGallery({ receptionists, onSelect, paused, c
         const distance = pointer && smoothPointer ? Math.hypot(screenX - smoothPointer.x,
           (cell.y + cell.height / 2) * current.scale + current.y - smoothPointer.y) : Infinity;
         const centerDistance = Math.hypot(screenX - size.width / 2, screenY - size.height / 2);
-        const edgeBlur = Math.min(1.1, Math.max(0, (centerDistance - 180) / 420) * .9);
+        const edgeBlur = Math.min(1.65, Math.max(0, (centerDistance - 280) / 360) * 1.2);
         const desired = pausedRef.current || reducedMotion ? 0 : hoverFalloff(distance, 360 * current.scale);
         const lift = (lifts.get(cell.key) || 0) + (desired - (lifts.get(cell.key) || 0)) * blend;
         lifts.set(cell.key, lift);
