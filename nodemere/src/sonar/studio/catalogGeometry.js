@@ -1,5 +1,6 @@
 export const TILE_WIDTH = 210;
 export const TILE_GAP = 4;
+export const MIN_GALLERY_ZOOM = 0.75;
 const HEIGHTS = [190, 286, 224, 334];
 const PERIOD = HEIGHTS.reduce((sum, height) => sum + height + TILE_GAP, 0);
 export const wrap = (value, length) => ((value % length) + length) % length;
@@ -33,7 +34,7 @@ export function galleryCells(view, width, height, count) {
 }
 
 export function zoomAt(view, scale, point) {
-  const nextScale = Math.max(.45, Math.min(1.8, scale));
+  const nextScale = Math.max(MIN_GALLERY_ZOOM, Math.min(1.8, scale));
   const ratio = nextScale / view.scale;
   return { scale: nextScale, x: point.x - (point.x - view.x) * ratio,
     y: point.y - (point.y - view.y) * ratio };

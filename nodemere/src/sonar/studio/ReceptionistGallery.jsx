@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Minus, Plus, User } from 'lucide-react';
 import { useReducedMotion } from 'framer-motion';
-import { galleryCells, hoverFalloff, zoomAt } from './catalogGeometry';
+import { galleryCells, zoomAt, MIN_GALLERY_ZOOM } from './catalogGeometry';
 import './receptionistGallery.css';
 
 export default function ReceptionistGallery({ receptionists, onSelect, paused, children }) {
@@ -20,9 +20,8 @@ export default function ReceptionistGallery({ receptionists, onSelect, paused, c
     const root = rootRef.current;
     let size = { width: root.clientWidth, height: root.clientHeight };
     let current = { x: -110, y: -120, scale: 1 }, target = { ...current };
-    let pointer = null, smoothPointer = null, drag = null, moved = false;
+    let drag = null, moved = false;
     let velocity = { x: 0, y: 0 }, lastTime = 0, frame, cellSignature = '';
-    const lifts = new Map();
     const point = event => {
       const rect = root.getBoundingClientRect();
       return { x: event.clientX - rect.left, y: event.clientY - rect.top };
@@ -50,7 +49,6 @@ export default function ReceptionistGallery({ receptionists, onSelect, paused, c
     const move = event => {
       if (pausedRef.current) return;
       const p = point(event);
-      pointer = event.pointerType === 'touch' ? null : p;
       if (!drag) return;
       const now = performance.now(), dt = Math.max(.008, (now - drag.time) / 1000);
       const dx = p.x - drag.x, dy = p.y - drag.y;
@@ -71,7 +69,6 @@ export default function ReceptionistGallery({ receptionists, onSelect, paused, c
     const click = event => {
       if (moved) { event.preventDefault(); event.stopPropagation(); moved = false; }
     };
-    const leave = () => { pointer = null; };
     const key = event => {
       if (pausedRef.current || event.target.closest('button')) return;
       const offsets = { ArrowLeft: [100, 0], ArrowRight: [-100, 0], ArrowUp: [0, 100], ArrowDown: [0, -100] };
@@ -96,33 +93,17 @@ export default function ReceptionistGallery({ receptionists, onSelect, paused, c
       const visible = galleryCells(current, size.width, size.height, receptionists.length);
       const signature = visible.map(cell => cell.key).join('|');
       if (signature !== cellSignature) { cellSignature = signature; setCells(visible); }
-      if (pointer && !pausedRef.current) {
-        if (!smoothPointer) smoothPointer = { ...pointer };
-        smoothPointer.x += (pointer.x - smoothPointer.x) * blend;
-        smoothPointer.y += (pointer.y - smoothPointer.y) * blend;
-      }
-      const visibleKeys = new Set(visible.map(cell => cell.key));
-      for (const key of lifts.keys()) if (!visibleKeys.has(key)) lifts.delete(key);
       for (const cell of visible) {
         const element = tilesRef.current.get(cell.key);
         if (!element) continue;
         const screenX = (cell.x + cell.width / 2) * current.scale + current.x;
         const screenY = (cell.y + cell.height / 2) * current.scale + current.y;
-        const distance = pointer && smoothPointer ? Math.hypot(screenX - smoothPointer.x,
-          (cell.y + cell.height / 2) * current.scale + current.y - smoothPointer.y) : Infinity;
         const centerDistance = Math.hypot(screenX - size.width / 2, screenY - size.height / 2);
-        const edgeBlur = Math.min(1.25, Math.max(0, (centerDistance - 280) / 360) * .9);
+        const edgeBlur = Math.min(1.5, Math.max(0, (centerDistance - 340) / 450) * 1.05);
         const edgeDim = Math.min(.36, Math.max(0, (centerDistance - 280) / 520) * .29);
-        const desired = pausedRef.current || reducedMotion ? 0 : hoverFalloff(distance, 360 * current.scale);
-        const lift = (lifts.get(cell.key) || 0) + (desired - (lifts.get(cell.key) || 0)) * blend;
-        lifts.set(cell.key, lift);
-        element.style.setProperty('--tile-lift', `${lift * 22}px`);
-        element.style.setProperty('--tile-scale', (1 + lift * .14).toFixed(4));
-        element.style.setProperty('--tile-glow', (lift * .13).toFixed(4));
-        element.style.setProperty('--tile-aura', (lift * .19).toFixed(4));
         element.style.setProperty('--tile-blur', `${edgeBlur.toFixed(2)}px`);
         element.style.setProperty('--tile-dim', edgeDim.toFixed(3));
-        element.style.zIndex = lift > .01 ? '2' : '1';
+        element.style.zIndex = '1';
       }
       frame = requestAnimationFrame(tick);
     };
@@ -131,14 +112,14 @@ export default function ReceptionistGallery({ receptionists, onSelect, paused, c
     root.addEventListener('wheel', wheel, { passive: false });
     root.addEventListener('pointerdown', down); root.addEventListener('pointermove', move);
     root.addEventListener('pointerup', release); root.addEventListener('pointercancel', cancel);
-    root.addEventListener('pointerleave', leave); root.addEventListener('click', click, true);
+    root.addEventListener('click', click, true);
     root.addEventListener('keydown', key);
     frame = requestAnimationFrame(tick);
     return () => {
       cancelAnimationFrame(frame); resize.disconnect(); controlsRef.current = null;
       root.removeEventListener('wheel', wheel); root.removeEventListener('pointerdown', down);
       root.removeEventListener('pointermove', move); root.removeEventListener('pointerup', release);
-      root.removeEventListener('pointercancel', cancel); root.removeEventListener('pointerleave', leave);
+      root.removeEventListener('pointercancel', cancel);
       root.removeEventListener('click', click, true); root.removeEventListener('keydown', key);
     };
   }, [receptionists.length, reducedMotion]);
@@ -157,7 +138,7 @@ export default function ReceptionistGallery({ receptionists, onSelect, paused, c
       })}
     </div>
     <div className="ns-gallery-toolbar" data-gallery-controls role="toolbar" aria-label="Gallery zoom" inert={paused ? '' : undefined}>
-      <button type="button" disabled={zoomLevel <= .45} onClick={() => controlsRef.current?.('out')}><Minus size={14}/> Zoom Out</button>
+      <button type="button" disabled={zoomLevel <= MIN_GALLERY_ZOOM} onClick={() => controlsRef.current?.('out')}><Minus size={14}/> Zoom Out</button>
       <button type="button" aria-pressed={Math.abs(zoomLevel - 1) < .001} onClick={() => controlsRef.current?.('default')}>Default</button>
       <button type="button" disabled={zoomLevel >= 1.8} onClick={() => controlsRef.current?.('in')}>Zoom In <Plus size={14}/></button>
     </div>

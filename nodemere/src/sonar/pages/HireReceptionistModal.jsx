@@ -174,7 +174,7 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      transition={embedded ? { duration: reducedMotion ? 0 : .8, ease: [.9, 0, .1, 1] } : undefined}
+      transition={embedded ? { duration: reducedMotion ? 0 : .68, ease: [.9, 0, .1, 1] } : undefined}
         className={
         embedded
           ? 'ns-gallery-detail'
@@ -203,7 +203,7 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
         initial={{ scale: 0.95, opacity: 0, y: 20 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
         exit={{ scale: 0.95, opacity: 0, y: 20 }}
-        transition={embedded ? { duration: reducedMotion ? 0 : .8, ease: [.77, 0, .175, 1] } : undefined}
+        transition={embedded ? { duration: reducedMotion ? 0 : .68, ease: [.77, 0, .175, 1] } : undefined}
         className={embedded ? 'ns-gallery-detail-inner relative z-10 flex flex-col items-center' : 'relative z-10 w-full max-w-[440px] flex flex-col items-center'}
         ref={detailRef}
         role={embedded ? 'dialog' : undefined}
@@ -242,8 +242,8 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
                 let stateClasses = "opacity-0 scale-90 pointer-events-none";
 
                 if (isActive) stateClasses = "opacity-100 scale-100 translate-x-0 z-20";
-                if (isNext) stateClasses = "opacity-40 scale-95 translate-x-full z-10 blur-[2px] cursor-pointer hover:translate-x-[95%] transition-transform";
-                if (isPrev) stateClasses = "opacity-40 scale-95 -translate-x-full z-10 blur-[2px] cursor-pointer hover:-translate-x-[95%] transition-transform";
+                if (isNext) stateClasses = "opacity-40 scale-95 translate-x-full z-10 blur-[2px] cursor-pointer";
+                if (isPrev) stateClasses = "opacity-40 scale-95 -translate-x-full z-10 blur-[2px] cursor-pointer";
 
                 return (
                   <div
