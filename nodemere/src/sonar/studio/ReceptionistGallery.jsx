@@ -89,6 +89,7 @@ export default function ReceptionistGallery({ receptionists, onSelect, paused, c
         target.x += velocity.x * dt; target.y += velocity.y * dt;
         velocity.x *= Math.exp(-INERTIA_DAMPING * dt); velocity.y *= Math.exp(-INERTIA_DAMPING * dt);
       }
+      root.classList.toggle('is-gliding', Boolean(drag) || Math.hypot(velocity.x, velocity.y) > 70);
       current.x += (target.x - current.x) * blend;
       current.y += (target.y - current.y) * blend;
       current.scale += (target.scale - current.scale) * blend;
@@ -128,6 +129,7 @@ export default function ReceptionistGallery({ receptionists, onSelect, paused, c
     frame = requestAnimationFrame(tick);
     return () => {
       cancelAnimationFrame(frame); resize.disconnect(); controlsRef.current = null;
+      root.classList.remove('is-gliding');
       root.removeEventListener('wheel', wheel); root.removeEventListener('pointerdown', down);
       root.removeEventListener('pointermove', move); root.removeEventListener('pointerup', release);
       root.removeEventListener('pointercancel', cancel); root.removeEventListener('pointerleave', leave);
