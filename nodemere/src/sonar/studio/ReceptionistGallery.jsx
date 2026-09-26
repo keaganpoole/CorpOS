@@ -89,6 +89,9 @@ export default function ReceptionistGallery({ receptionists, onSelect, paused, c
         target.x += velocity.x * dt; target.y += velocity.y * dt;
         velocity.x *= Math.exp(-INERTIA_DAMPING * dt); velocity.y *= Math.exp(-INERTIA_DAMPING * dt);
       }
+      const speed = Math.hypot(velocity.x, velocity.y);
+      const motionBlur = drag ? Math.min(1.4, speed / 900) : Math.min(2.4, speed / 650);
+      worldRef.current.style.setProperty('--gallery-motion-blur', `${motionBlur.toFixed(2)}px`);
       current.x += (target.x - current.x) * blend;
       current.y += (target.y - current.y) * blend;
       current.scale += (target.scale - current.scale) * blend;
