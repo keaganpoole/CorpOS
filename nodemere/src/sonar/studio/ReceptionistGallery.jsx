@@ -5,6 +5,9 @@ import { galleryCells, hoverFalloff, zoomAt } from './catalogGeometry';
 import './receptionistGallery.css';
 
 export default function ReceptionistGallery({ receptionists, onSelect, paused, children }) {
+  const DRAG_RESISTANCE = 0.86;
+  const FOLLOW_STIFFNESS = 8.5;
+  const INERTIA_DAMPING = 4.5;
   const rootRef = useRef(null), worldRef = useRef(null), tilesRef = useRef(new Map());
   const controlsRef = useRef(null);
   const [cells, setCells] = useState([]);
@@ -53,8 +56,8 @@ export default function ReceptionistGallery({ receptionists, onSelect, paused, c
       const dx = p.x - drag.x, dy = p.y - drag.y;
       moved ||= Math.hypot(p.x - drag.startX, p.y - drag.startY) > 7;
       if (moved && !root.hasPointerCapture(event.pointerId)) root.setPointerCapture(event.pointerId);
-      target.x += dx; target.y += dy;
-      velocity = { x: Math.max(-1400, Math.min(1400, dx / dt)), y: Math.max(-1400, Math.min(1400, dy / dt)) };
+      target.x += dx * DRAG_RESISTANCE; target.y += dy * DRAG_RESISTANCE;
+      velocity = { x: Math.max(-1400, Math.min(1400, dx * DRAG_RESISTANCE / dt)), y: Math.max(-1400, Math.min(1400, dy * DRAG_RESISTANCE / dt)) };
       drag = { ...drag, ...p, time: now };
     };
     const release = event => {
@@ -80,11 +83,11 @@ export default function ReceptionistGallery({ receptionists, onSelect, paused, c
     const tick = time => {
       const dt = Math.min(.04, (time - (lastTime || time)) / 1000);
       lastTime = time;
-      const blend = reducedMotion ? 1 : 1 - Math.exp(-12 * dt);
+      const blend = reducedMotion ? 1 : 1 - Math.exp(-FOLLOW_STIFFNESS * dt);
       if (pausedRef.current) velocity = { x: 0, y: 0 };
       if (!drag && !pausedRef.current) {
         target.x += velocity.x * dt; target.y += velocity.y * dt;
-        velocity.x *= Math.exp(-7 * dt); velocity.y *= Math.exp(-7 * dt);
+        velocity.x *= Math.exp(-INERTIA_DAMPING * dt); velocity.y *= Math.exp(-INERTIA_DAMPING * dt);
       }
       current.x += (target.x - current.x) * blend;
       current.y += (target.y - current.y) * blend;
