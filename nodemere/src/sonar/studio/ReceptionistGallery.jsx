@@ -112,6 +112,7 @@ export default function ReceptionistGallery({ receptionists, onSelect, paused, c
           (cell.y + cell.height / 2) * current.scale + current.y - smoothPointer.y) : Infinity;
         const centerDistance = Math.hypot(screenX - size.width / 2, screenY - size.height / 2);
         const edgeBlur = Math.min(1.25, Math.max(0, (centerDistance - 280) / 360) * .9);
+        const edgeDim = Math.min(.48, Math.max(0, (centerDistance - 280) / 520) * .38);
         const desired = pausedRef.current || reducedMotion ? 0 : hoverFalloff(distance, 360 * current.scale);
         const lift = (lifts.get(cell.key) || 0) + (desired - (lifts.get(cell.key) || 0)) * blend;
         lifts.set(cell.key, lift);
@@ -119,6 +120,7 @@ export default function ReceptionistGallery({ receptionists, onSelect, paused, c
         element.style.setProperty('--tile-glow', (lift * .13).toFixed(4));
         element.style.setProperty('--tile-aura', (lift * .19).toFixed(4));
         element.style.setProperty('--tile-blur', `${edgeBlur.toFixed(2)}px`);
+        element.style.setProperty('--tile-dim', edgeDim.toFixed(3));
         element.style.zIndex = lift > .01 ? '2' : '1';
       }
       frame = requestAnimationFrame(tick);
