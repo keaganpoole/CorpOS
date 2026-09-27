@@ -280,7 +280,7 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
                   <div className="ns-receptionist-preview-image-wash" />
                 </div>
                 <div className="ns-receptionist-preview-body">
-                  <span className="ns-eyebrow">YOUR NEXT FIRST HELLO</span>
+                  <span className="ns-eyebrow">AVAILABLE</span>
                   <h2>{person.full_name || 'Receptionist'}</h2>
                   {(person.description || person.bio) && <p className="ns-receptionist-preview-copy">{person.description || person.bio}</p>}
                   <dl className="ns-catalog-review-meta">

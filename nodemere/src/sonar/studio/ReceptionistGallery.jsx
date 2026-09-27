@@ -4,6 +4,8 @@ import { useReducedMotion } from 'framer-motion';
 import { galleryCells, zoomAt, MIN_GALLERY_ZOOM } from './catalogGeometry';
 import './receptionistGallery.css';
 
+const DEFAULT_GALLERY_ZOOM = 1.1;
+
 export default function ReceptionistGallery({ receptionists, onSelect, paused, children }) {
   const DRAG_RESISTANCE = 0.78;
   const FOLLOW_STIFFNESS = 5.1;
@@ -12,7 +14,7 @@ export default function ReceptionistGallery({ receptionists, onSelect, paused, c
   const tileRefCallbacks = useRef(new Map());
   const controlsRef = useRef(null);
   const [cells, setCells] = useState([]);
-  const [zoomLevel, setZoomLevel] = useState(1);
+  const [zoomLevel, setZoomLevel] = useState(DEFAULT_GALLERY_ZOOM);
   const reducedMotion = useReducedMotion();
   const pausedRef = useRef(paused);
   pausedRef.current = paused;
@@ -30,7 +32,12 @@ export default function ReceptionistGallery({ receptionists, onSelect, paused, c
   useEffect(() => {
     const root = rootRef.current;
     let size = { width: root.clientWidth, height: root.clientHeight };
-    let current = { x: -110, y: -120, scale: 1 }, target = { ...current };
+    const center = { x: size.width / 2, y: size.height / 2 };
+    let current = {
+      x: center.x - (center.x + 110) * DEFAULT_GALLERY_ZOOM,
+      y: center.y - (center.y + 120) * DEFAULT_GALLERY_ZOOM,
+      scale: DEFAULT_GALLERY_ZOOM,
+    }, target = { ...current };
     let drag = null, moved = false;
     let velocity = { x: 0, y: 0 }, lastTime = 0, frame = null, cellSignature = '';
     const styleCache = new WeakMap();
@@ -46,7 +53,7 @@ export default function ReceptionistGallery({ receptionists, onSelect, paused, c
       velocity = { x: 0, y: 0 };
       scheduleTick();
     };
-    controlsRef.current = action => setZoom(action === 'default' ? 1 : target.scale * (action === 'in' ? 1.2 : 1 / 1.2));
+    controlsRef.current = action => setZoom(action === 'default' ? DEFAULT_GALLERY_ZOOM : target.scale * (action === 'in' ? 1.2 : 1 / 1.2));
     const wheel = event => {
       if (pausedRef.current) return;
       event.preventDefault();
@@ -164,7 +171,7 @@ export default function ReceptionistGallery({ receptionists, onSelect, paused, c
     </div>
     <div className="ns-gallery-toolbar" data-gallery-controls role="toolbar" aria-label="Gallery zoom" inert={paused ? '' : undefined}>
       <button type="button" disabled={zoomLevel <= MIN_GALLERY_ZOOM} onClick={() => controlsRef.current?.('out')}><Minus size={14}/> Zoom Out</button>
-      <button type="button" aria-pressed={Math.abs(zoomLevel - 1) < .001} onClick={() => controlsRef.current?.('default')}>Default</button>
+      <button type="button" aria-pressed={Math.abs(zoomLevel - DEFAULT_GALLERY_ZOOM) < .001} onClick={() => controlsRef.current?.('default')}>Default</button>
       <button type="button" disabled={zoomLevel >= 1.8} onClick={() => controlsRef.current?.('in')}>Zoom In <Plus size={14}/></button>
     </div>
     {children}

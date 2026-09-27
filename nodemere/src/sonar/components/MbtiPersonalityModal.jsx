@@ -4,33 +4,33 @@ import { motion } from 'framer-motion';
 import { Sparkles, X } from 'lucide-react';
 
 const LETTERS = {
-  I: ['Introverted', 'Recharges through reflection and focused interaction.'],
-  E: ['Extraverted', 'Gains energy through active conversation and connection.'],
-  N: ['Intuitive', 'Notices patterns, possibilities, and the bigger picture.'],
-  S: ['Observant', 'Grounds decisions in details and practical information.'],
-  T: ['Thinking', 'Leans on logic, consistency, and objective tradeoffs.'],
-  F: ['Feeling', 'Prioritizes empathy, values, and the human impact.'],
-  J: ['Judging', 'Prefers structure, clarity, and a decided path forward.'],
-  P: ['Prospecting', 'Stays flexible, curious, and responsive as things change.'],
+  E: ['Extraverted', 'Brings an outgoing, expressive energy to conversations and readily engages with callers.'],
+  I: ['Introverted', 'Brings a quieter, more reserved presence and tends to speak with intention rather than filling the space.'],
+  S: ['Observant', 'Stays grounded in what’s happening right now, giving conversations a practical, down-to-earth feel.'],
+  N: ['Intuitive', 'Looks beyond what’s immediately said, giving conversations a more curious, open-ended feel.'],
+  T: ['Thinking', 'Approaches conversations with a more matter-of-fact tone, favoring objectivity over emotional expression.'],
+  F: ['Feeling', 'Leans into the human side of conversation, putting more emphasis on warmth, empathy, and personal connection.'],
+  J: ['Judging', 'Prefers a clear sense of direction, giving conversations a more structured and settled rhythm.'],
+  P: ['Prospecting', 'Prefers to stay flexible and follow the moment, giving conversations a more spontaneous, go-with-the-flow rhythm.'],
 };
 
 const PROFILES = {
-  INTJ: { name: 'Architect', summary: 'Strategic, composed, and quietly confident. They naturally organize complex information into a clear path forward.', strengths: ['Strategic', 'Independent', 'Decisive'], phone: 'Expect focused questions, efficient problem-solving, and calm control of complicated requests.' },
-  INTP: { name: 'Logician', summary: 'Curious, analytical, and inventive. They enjoy understanding how things work and finding elegant answers to unusual problems.', strengths: ['Analytical', 'Inventive', 'Objective'], phone: 'Expect thoughtful clarification, precise answers, and creative solutions when the usual script is not enough.' },
-  ENTJ: { name: 'Commander', summary: 'Direct, organized, and naturally decisive. They are comfortable taking ownership and moving conversations toward a result.', strengths: ['Confident', 'Efficient', 'Organized'], phone: 'Expect a crisp pace, clear next steps, and confident guidance through high-stakes or time-sensitive calls.' },
-  ENTP: { name: 'Debater', summary: 'Quick-thinking, resourceful, and energized by possibility. They adapt rapidly and enjoy finding a smarter angle.', strengths: ['Resourceful', 'Adaptable', 'Quick-witted'], phone: 'Expect lively problem-solving, flexible conversation, and an easy recovery when a caller changes direction.' },
-  INFJ: { name: 'Advocate', summary: 'Insightful, considerate, and purpose-driven. They listen for what someone means as carefully as what they say.', strengths: ['Insightful', 'Empathetic', 'Principled'], phone: 'Expect patient listening, emotionally aware responses, and thoughtful guidance that still feels structured.' },
-  INFP: { name: 'Mediator', summary: 'Gentle, imaginative, and deeply empathetic. They create space for people to feel understood before guiding them forward.', strengths: ['Compassionate', 'Creative', 'Open-minded'], phone: 'Expect a warm, unhurried tone, careful listening, and responses shaped around the caller’s individual needs.' },
-  ENFJ: { name: 'Protagonist', summary: 'Warm, persuasive, and people-focused. They naturally build trust and help others feel confident about the next step.', strengths: ['Encouraging', 'Reliable', 'Persuasive'], phone: 'Expect polished warmth, clear reassurance, and a strong instinct for keeping the caller engaged and comfortable.' },
-  ENFP: { name: 'Campaigner', summary: 'Expressive, imaginative, and infectiously optimistic. They bring energy to conversations without losing sight of the person.', strengths: ['Enthusiastic', 'Creative', 'Sociable'], phone: 'Expect an upbeat welcome, natural rapport, and energetic adaptability that makes routine calls feel personal.' },
-  ISTJ: { name: 'Logistician', summary: 'Dependable, practical, and detail-conscious. They value accuracy and make sure important steps are completed properly.', strengths: ['Reliable', 'Thorough', 'Practical'], phone: 'Expect consistent service, careful information capture, and dependable follow-through on every commitment.' },
-  ISFJ: { name: 'Defender', summary: 'Attentive, patient, and quietly devoted to helping. They remember the details that make service feel personal.', strengths: ['Supportive', 'Patient', 'Attentive'], phone: 'Expect a gentle welcome, careful note-taking, and reassuring help for callers who need extra patience.' },
-  ESTJ: { name: 'Executive', summary: 'Clear, practical, and highly organized. They are comfortable setting expectations and keeping a process on track.', strengths: ['Direct', 'Structured', 'Dependable'], phone: 'Expect decisive routing, concise explanations, and firm control of busy or operationally complex calls.' },
-  ESFJ: { name: 'Consul', summary: 'Friendly, attentive, and community-minded. They notice social cues quickly and want every caller to feel looked after.', strengths: ['Welcoming', 'Loyal', 'Considerate'], phone: 'Expect personable service, active reassurance, and a strong awareness of what makes the caller comfortable.' },
-  ISTP: { name: 'Virtuoso', summary: 'Calm, observant, and practical under pressure. They diagnose what matters quickly and prefer useful action over unnecessary fuss.', strengths: ['Calm', 'Resourceful', 'Pragmatic'], phone: 'Expect concise troubleshooting, steady composure, and fast adaptation when a call becomes unpredictable.' },
-  ISFP: { name: 'Adventurer', summary: 'Gentle, observant, and naturally personable. They respond to the moment with warmth and understated creativity.', strengths: ['Flexible', 'Charming', 'Sensitive'], phone: 'Expect a relaxed conversational style, subtle empathy, and service that adjusts naturally to each caller.' },
-  ESTP: { name: 'Entrepreneur', summary: 'Energetic, perceptive, and action-oriented. They read a situation quickly and keep momentum high.', strengths: ['Bold', 'Perceptive', 'Responsive'], phone: 'Expect confident improvisation, fast decisions, and an engaging pace that moves callers toward action.' },
-  ESFP: { name: 'Entertainer', summary: 'Playful, generous, and socially intuitive. They make people feel welcome and bring brightness to everyday interactions.', strengths: ['Energetic', 'Friendly', 'Spontaneous'], phone: 'Expect an expressive welcome, immediate rapport, and a memorable sense of warmth throughout the call.' },
+  INTJ: { name: 'Architect', summary: 'Cool, composed, and straight to the point, with an understated confidence. Keeps things purposeful without needing to be the biggest personality in the room.', strengths: ['Strategic', 'Independent', 'Decisive'], phone: 'They ask helpful questions, find clear answers, and stay calm when a caller has a complicated request.' },
+  INTP: { name: 'Logician', summary: 'Thoughtful with a slightly quirky edge, making conversations feel relaxed rather than rehearsed. More comfortable being genuine than perfectly polished.', strengths: ['Analytical', 'Inventive', 'Objective'], phone: 'They listen carefully, explain things clearly, and look for a helpful answer when a request is unusual.' },
+  ENTJ: { name: 'Commander', summary: 'Bold and self-assured, with a presence that tends to take charge of the conversation. Friendly when it fits, but rarely one to dance around the point.', strengths: ['Confident', 'Efficient', 'Organized'], phone: 'They quickly understand what the caller needs and confidently guide them to the next step.' },
+  ENTP: { name: 'Debater', summary: 'Engaging and flexible, with a curious presence that keeps conversations feeling fresh. Prefers an open exchange over a tightly controlled conversational style.', strengths: ['Resourceful', 'Adaptable', 'Quick-witted'], phone: 'They think on their feet, keep the conversation natural, and adjust easily when plans change.' },
+  INFJ: { name: 'Advocate', summary: 'Calm and genuinely caring, with a knack for picking up on the feeling behind the words. More heart to heart than quick banter.', strengths: ['Insightful', 'Empathetic', 'Principled'], phone: 'They listen with care, respond kindly, and help callers feel understood while finding a way forward.' },
+  INFP: { name: 'Mediator', summary: 'Soft-spoken and sincere, with a natural warmth that makes conversations feel personal rather than transactional. Less take-charge, more meet-you-where-you-are.', strengths: ['Compassionate', 'Creative', 'Open-minded'], phone: 'They give callers time to explain, respond warmly, and tailor their help to each person.' },
+  ENFJ: { name: 'Protagonist', summary: 'Confidently friendly, with a natural tendency to cheer people on and keep the conversation moving. More personal and expressive than reserved or strictly businesslike.', strengths: ['Encouraging', 'Reliable', 'Persuasive'], phone: 'They make callers feel welcome, offer reassurance, and explain what to expect next.' },
+  ENFP: { name: 'Campaigner', summary: 'Bubbly and personable, with an infectious energy that quickly makes conversations feel less formal. More expressive by nature, so subtle and reserved is not really the vibe.', strengths: ['Enthusiastic', 'Creative', 'Sociable'], phone: 'They bring friendly energy to every call and make routine conversations feel more personal.' },
+  ISTJ: { name: 'Logistician', summary: 'Calm and matter-of-fact, with a dependable presence that makes calls feel orderly and predictable. More reserved and traditional than expressive or spontaneous.', strengths: ['Reliable', 'Thorough', 'Practical'], phone: 'They take down details carefully, share accurate information, and make sure follow-up steps are clear.' },
+  ISFJ: { name: 'Defender', summary: 'Calm, considerate, and naturally service-minded, bringing a personal touch without becoming overly familiar. More likely to listen and accommodate than strongly steer the conversation.', strengths: ['Supportive', 'Patient', 'Attentive'], phone: 'They offer patient, thoughtful help and make sure callers feel looked after.' },
+  ESTJ: { name: 'Executive', summary: 'Straightforward and grounded, with a no-nonsense style that keeps conversations from wandering too far. Less playful by nature, but never needlessly stiff.', strengths: ['Direct', 'Structured', 'Dependable'], phone: 'They get callers to the right person, explain things clearly, and keep busy calls on track.' },
+  ESFJ: { name: 'Consul', summary: 'Treats good service as making someone feel genuinely looked after, not just answering their question. This gives calls a more personal, social flavor than a strictly professional one.', strengths: ['Welcoming', 'Loyal', 'Considerate'], phone: 'They give each caller a friendly welcome and make sure they feel cared for.' },
+  ISTP: { name: 'Virtuoso', summary: 'The low-key problem-solver vibe, relaxed, observant, and not interested in making things more complicated than they need to be. Usually keeps the conversation lean rather than filling the space.', strengths: ['Calm', 'Resourceful', 'Pragmatic'], phone: 'They stay calm, get to the point, and help solve the caller’s problem without fuss.' },
+  ISFP: { name: 'Adventurer', summary: 'Soft-spoken and easy to be around, with a natural feel for the mood of the call. Tends to follow the moment rather than force the conversation into a set rhythm.', strengths: ['Flexible', 'Charming', 'Sensitive'], phone: 'They keep calls relaxed and friendly, adapting their help to the person they’re speaking with.' },
+  ESTP: { name: 'Entrepreneur', summary: 'Has a natural “let’s get to it” energy that keeps calls from feeling sluggish. Comfortable jumping in and taking the conversation wherever it needs to go.', strengths: ['Bold', 'Perceptive', 'Responsive'], phone: 'They respond quickly, keep things moving, and help callers decide what to do next.' },
+  ESFP: { name: 'Entertainer', summary: 'Feels like the receptionist who already knows everyone’s name. Sociable, expressive, and welcoming, with more emphasis on connection than keeping every call perfectly streamlined.', strengths: ['Energetic', 'Friendly', 'Spontaneous'], phone: 'They bring a cheerful welcome and make callers feel comfortable from the start.' },
 };
 
 const SPECTRUM = {
@@ -123,24 +123,23 @@ export default function MbtiPersonalityModal({ person, onClose }) {
 
   return createPortal(
     <motion.div className="fixed inset-0 z-[1200] flex items-center justify-center bg-black/75 px-5 backdrop-blur-md" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onMouseDown={onClose} onClick={(event) => event.stopPropagation()}>
-      <motion.section role="dialog" aria-modal="true" aria-labelledby="mbti-personality-title" className="relative w-full max-w-[560px] overflow-hidden rounded-[30px] border border-white/[0.08] bg-[#070707]/[0.97] shadow-[0_28px_90px_rgba(0,0,0,.62)]" initial={{ opacity: 0, y: 16, scale: .98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 16, scale: .98 }} transition={{ duration: .2 }} onMouseDown={(event) => event.stopPropagation()}>
+      <motion.section role="dialog" aria-modal="true" aria-labelledby="mbti-personality-title" className="relative w-full max-w-[620px] overflow-hidden rounded-[30px] border border-white/[0.08] bg-[#070707]/[0.97] shadow-[0_28px_90px_rgba(0,0,0,.62)]" initial={{ opacity: 0, y: 16, scale: .98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 16, scale: .98 }} transition={{ duration: .2 }} onMouseDown={(event) => event.stopPropagation()}>
         <MbtiSpectrumLine type={type} />
         <div className="pointer-events-none absolute right-[-110px] top-[-130px] h-72 w-72 rounded-full blur-[90px]" style={{ background: `${SPECTRUM[type]?.[0] || '#c4b5fd'}18` }} />
-        <div className="relative p-6 sm:px-8 sm:py-7">
+        <div className="relative p-7 sm:px-9 sm:py-8">
           <div className="flex items-start justify-between gap-5">
             <div className="min-w-0">
               <div className="mb-3 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[.18em] text-zinc-600"><Sparkles size={14} /><span>Personality profile</span></div>
               <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <h2 id="mbti-personality-title" className="text-[32px] font-semibold tracking-[-.05em] text-white">{type || 'MBTI'}</h2>
+                <h2 id="mbti-personality-title" className="text-[36px] font-semibold tracking-[-.05em] text-white">{type || 'MBTI'}</h2>
               </div>
-              <p className="mt-3 max-w-[470px] text-[13px] leading-6 text-zinc-400">{profile.phone}</p>
             </div>
             <button type="button" onClick={onClose} className="flex h-8 w-8 shrink-0 items-center justify-center text-zinc-600 transition hover:text-white" aria-label="Close personality profile"><X size={17} /></button>
           </div>
 
           {type.length === 4 && (
-            <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
-              {type.split('').map((letter) => <div key={letter} className="rounded-xl border border-white/[.07] bg-white/[.025] p-3"><div className="flex items-baseline gap-1.5"><strong className="text-lg text-white">{letter}</strong><span className="truncate text-[10px] font-semibold text-zinc-500">{LETTERS[letter]?.[0]}</span></div><p className="mt-2 text-[10px] leading-[1.55] text-zinc-600">{LETTERS[letter]?.[1]}</p></div>)}
+            <div className="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {type.split('').map((letter) => <div key={letter} className="flex items-start gap-3 rounded-lg border border-white/[.045] bg-transparent px-3.5 py-3"><div className="flex w-[82px] shrink-0 items-baseline gap-1.5"><strong className="text-xl text-white">{letter}</strong><span className="text-[11px] font-semibold text-zinc-400">{LETTERS[letter]?.[0]}</span></div><p className="min-w-0 pt-0.5 text-[11px] leading-[1.6] text-zinc-500">{LETTERS[letter]?.[1]}</p></div>)}
             </div>
           )}
 
