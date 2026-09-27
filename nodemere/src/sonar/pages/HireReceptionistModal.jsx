@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { api } from '../lib/api';
 import CubePreloader from '../components/CubePreloader';
-import MbtiPersonalityModal from '../components/MbtiPersonalityModal';
+import MbtiPersonalityModal, { getMbtiProfileSummary } from '../components/MbtiPersonalityModal';
 import ReceptionistGallery from '../studio/ReceptionistGallery';
 import IntercomVoiceLine from '../nest/IntercomVoiceLine';
 import { avatarVideoUrl } from '../studio/catalogGeometry';
@@ -213,9 +213,6 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
     }
   };
 
-  const selectedPerson = selectedIndex !== null ? receptionists[selectedIndex] : null;
-  const isChloePortraitModal = Boolean(selectedPerson?.full_name === 'Chloe Sinclair' && selectedPerson?.avatar_video);
-
   const detail = (
     <motion.div
       initial={{ opacity: 0 }}
@@ -247,9 +244,9 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
       )}
 
       <motion.div
-        initial={isChloePortraitModal ? { scale: 1, opacity: 0, y: 0 } : { scale: 0.95, opacity: 0, y: 20 }}
+        initial={{ scale: 0.95, opacity: 0, y: 20 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
-        exit={isChloePortraitModal ? { scale: 1, opacity: 0, y: 0 } : { scale: 0.95, opacity: 0, y: 20 }}
+        exit={{ scale: 0.95, opacity: 0, y: 20 }}
         transition={embedded ? { duration: reducedMotion ? 0 : .68, ease: [.77, 0, .175, 1] } : undefined}
         className={embedded ? 'ns-gallery-detail-inner relative z-10 flex flex-col items-center' : 'relative z-10 w-full max-w-[440px] flex flex-col items-center'}
         ref={detailRef}
@@ -277,7 +274,7 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
           <>
             {/* Card Carousel — 3D perspective */}
             {embedded ? receptionists.filter((_, index) => index === selectedIndex).map(person => (
-              <section className={`ns-receptionist-preview-card ns-catalog-review ${person.avatar_video ? 'ns-catalog-video-review' : ''} ${person.full_name === 'Chloe Sinclair' && person.avatar_video ? 'ns-catalog-portrait-video-review' : ''}`} key={person.id || person.full_name}>
+              <section className={`ns-receptionist-preview-card ns-catalog-review ${person.avatar_video ? 'ns-catalog-video-review' : ''}`} key={person.id || person.full_name}>
                 <div className="ns-receptionist-preview-image">
                   {person.avatar_video ? <video src={avatarVideoUrl(person.avatar_video)} poster={person.avatar || undefined} autoPlay muted loop playsInline preload="metadata" aria-label={`${person.full_name || 'Receptionist'} video portrait`} /> : person.avatar ? <img src={person.avatar} alt={person.full_name || 'Receptionist'} /> : <div className="ns-gallery-placeholder"><User size={64}/></div>}
                   <div className="ns-receptionist-preview-image-wash" />
@@ -285,7 +282,7 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
                 <div className="ns-receptionist-preview-body">
                   <span className="ns-eyebrow">AVAILABLE</span>
                   <h2>{person.full_name || 'Receptionist'}</h2>
-                  {(person.description || person.bio) && <p className="ns-receptionist-preview-copy">{person.description || person.bio}</p>}
+                  {getMbtiProfileSummary(person.personality?.mbti || person.personality_type, person.first_name || person.full_name) && <p className="ns-receptionist-preview-copy">{getMbtiProfileSummary(person.personality?.mbti || person.personality_type, person.first_name || person.full_name)}</p>}
                   <dl className="ns-catalog-review-meta">
                     {person.age && <div><dt>Age</dt><dd>{person.age} years old</dd></div>}
                     {(person.personality?.mbti || person.personality_type) && <div><dt>Personality</dt><dd><button type="button" onClick={() => setPersonalityPerson(person)}>{person.personality?.mbti || person.personality_type}</button></dd></div>}
@@ -420,9 +417,9 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
                         </div>
 
                         {/* Description */}
-                        {(person.description || person.bio) && (
+                        {getMbtiProfileSummary(person.personality?.mbti || person.personality_type, person.first_name || person.full_name) && (
                           <p className="mt-2 text-xs leading-relaxed text-white/40">
-                            "{person.description || person.bio}"
+                            "{getMbtiProfileSummary(person.personality?.mbti || person.personality_type, person.first_name || person.full_name)}"
                           </p>
                         )}
 

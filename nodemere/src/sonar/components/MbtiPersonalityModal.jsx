@@ -14,7 +14,7 @@ const LETTERS = {
   P: ['Prospecting', 'Prefers to stay flexible and follow the moment, giving conversations a more spontaneous, go-with-the-flow rhythm.'],
 };
 
-const PROFILES = {
+export const MBTI_PROFILES = {
   INTJ: { name: 'Architect', summary: 'Cool, composed, and straight to the point, with an understated confidence. Keeps things purposeful without needing to be the biggest personality in the room.', strengths: ['Strategic', 'Independent', 'Decisive'], phone: 'They ask helpful questions, find clear answers, and stay calm when a caller has a complicated request.' },
   INTP: { name: 'Logician', summary: 'Thoughtful with a slightly quirky edge, making conversations feel relaxed rather than rehearsed. More comfortable being genuine than perfectly polished.', strengths: ['Analytical', 'Inventive', 'Objective'], phone: 'They listen carefully, explain things clearly, and look for a helpful answer when a request is unusual.' },
   ENTJ: { name: 'Commander', summary: 'Bold and self-assured, with a presence that tends to take charge of the conversation. Friendly when it fits, but rarely one to dance around the point.', strengths: ['Confident', 'Efficient', 'Organized'], phone: 'They quickly understand what the caller needs and confidently guide them to the next step.' },
@@ -31,6 +31,24 @@ const PROFILES = {
   ISFP: { name: 'Adventurer', summary: 'Soft-spoken and easy to be around, with a natural feel for the mood of the call. Tends to follow the moment rather than force the conversation into a set rhythm.', strengths: ['Flexible', 'Charming', 'Sensitive'], phone: 'They keep calls relaxed and friendly, adapting their help to the person they’re speaking with.' },
   ESTP: { name: 'Entrepreneur', summary: 'Has a natural “let’s get to it” energy that keeps calls from feeling sluggish. Comfortable jumping in and taking the conversation wherever it needs to go.', strengths: ['Bold', 'Perceptive', 'Responsive'], phone: 'They respond quickly, keep things moving, and help callers decide what to do next.' },
   ESFP: { name: 'Entertainer', summary: 'Feels like the receptionist who already knows everyone’s name. Sociable, expressive, and welcoming, with more emphasis on connection than keeping every call perfectly streamlined.', strengths: ['Energetic', 'Friendly', 'Spontaneous'], phone: 'They bring a cheerful welcome and make callers feel comfortable from the start.' },
+};
+
+const NAME_PERSONALIZED_TYPES = new Set(['INTJ', 'INTP', 'ENTJ', 'ENTP', 'INFJ', 'INFP', 'ISFJ', 'ENFJ']);
+
+export const getMbtiProfileSummary = (type, name) => {
+  const normalizedType = String(type || '').toUpperCase();
+  const summary = MBTI_PROFILES[normalizedType]?.summary || '';
+  const cleanName = String(name || '').trim();
+  if (!summary || !cleanName || !NAME_PERSONALIZED_TYPES.has(normalizedType)) return summary;
+  if (normalizedType === 'INTJ') return `${cleanName} is cool, composed, and straight to the point, with an understated confidence. Keeps things purposeful without needing to be the biggest personality in the room.`;
+  if (normalizedType === 'INTP') return `Thoughtful with a slightly quirky edge, ${cleanName} makes conversations feel relaxed rather than rehearsed. More comfortable being genuine than perfectly polished.`;
+  if (normalizedType === 'ENTJ') return `${cleanName} is bold and self-assured, with a presence that tends to take charge of the conversation. Friendly when it fits, but rarely one to dance around the point.`;
+  if (normalizedType === 'ENTP') return `Engaging and flexible, ${cleanName} brings a curious presence that keeps conversations feeling fresh. Prefers an open exchange over a tightly controlled conversational style.`;
+  if (normalizedType === 'INFJ') return `Calm and genuinely caring, ${cleanName} has a knack for picking up on the feeling behind the words. More heart to heart than quick banter.`;
+  if (normalizedType === 'INFP') return `Soft-spoken and sincere, ${cleanName} brings a natural warmth that makes conversations feel personal rather than transactional. Less take-charge, more meet-you-where-you-are.`;
+  if (normalizedType === 'ISFJ') return `Calm, considerate, and naturally service-minded, ${cleanName} brings a personal touch without becoming overly familiar. More likely to listen and accommodate than strongly steer the conversation.`;
+  if (normalizedType === 'ENFJ') return `${cleanName} is confidently friendly, with a natural tendency to cheer people on and keep the conversation moving. More personal and expressive than reserved or strictly businesslike.`;
+  return summary;
 };
 
 const SPECTRUM = {
@@ -105,7 +123,7 @@ function MbtiSpectrumLine({ type }) {
 
 export default function MbtiPersonalityModal({ person, onClose }) {
   const type = String(person?.personality?.mbti || person?.personality_type || '').toUpperCase();
-  const profile = PROFILES[type] || { name: 'Personality type', summary: person?.personality?.personality || 'This profile describes the communication style and preferences this receptionist is designed to bring to conversations.', strengths: [], phone: 'Their personality helps shape the tone, pace, and style they use with callers.' };
+  const profile = MBTI_PROFILES[type] || { name: 'Personality type', summary: person?.personality?.personality || 'This profile describes the communication style and preferences this receptionist is designed to bring to conversations.', strengths: [], phone: 'Their personality helps shape the tone, pace, and style they use with callers.' };
   const firstName = person?.first_name || person?.full_name || 'This receptionist';
 
   useEffect(() => {
