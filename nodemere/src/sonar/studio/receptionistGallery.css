@@ -9,6 +9,7 @@
 .ns-gallery-world{position:absolute;inset:0;transform-origin:0 0}
 .ns-gallery-tile{--tile-blur:0px;--tile-dim:0;position:absolute;display:block;padding:0!important;border:0;background:#101014;border-radius:0;cursor:pointer;transform:none;filter:blur(var(--tile-blur));box-shadow:none;isolation:isolate;touch-action:none;overflow:hidden}
 .ns-gallery-tile img{display:block;width:100%;height:100%;object-fit:cover;border-radius:inherit;pointer-events:none;user-select:none;transition:transform 700ms cubic-bezier(.4,0,.2,1)}
+.ns-gallery-tile-created img{object-position:center top;transform-origin:center top}
 .ns-gallery-tile:hover img{transform:scale(1.08)}
 .ns-gallery-tile::after{content:"";position:absolute;inset:0;z-index:1;border-radius:inherit;pointer-events:none;background:rgba(0,0,0,var(--tile-dim))}
 .ns-gallery-neon{display:none}
@@ -31,6 +32,7 @@
 .ns-catalog-review.ns-catalog-video-review .ns-receptionist-preview-copy{max-width:none}
 .ns-catalog-review h2{font-size:clamp(32px,3.5vw,48px);line-height:1.05;letter-spacing:-.045em;margin:18px 0 22px;color:#f3f3f5;font-weight:500}
 .ns-catalog-review-meta{margin:0;display:grid;grid-template-columns:1fr 1fr;gap:20px;padding:18px 0}
+.ns-catalog-review-meta.ns-catalog-review-meta-created{grid-template-columns:max-content minmax(0,1fr);column-gap:28px}
 .ns-catalog-review-meta dt,.ns-catalog-review-traits>span{font-size:9px;text-transform:uppercase;letter-spacing:.16em;color:#777781}
 .ns-catalog-review-meta dd{margin:8px 0 0;color:#dedee3;font-size:12px}
 .ns-catalog-review-meta button{background:none;border:0;padding:0;color:inherit;cursor:pointer}
@@ -40,6 +42,11 @@
 .ns-catalog-voice-preview>span{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:#8d8d96}
 .ns-catalog-review-traits{margin:12px 0 20px}.ns-catalog-review-traits>div{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.ns-catalog-review-traits>div>span{font-size:11px;color:#c5c5cd;border:1px solid #ffffff14;padding:6px 10px;border-radius:4px}
 .ns-catalog-review .ns-receptionist-preview-actions{flex-wrap:wrap}.ns-catalog-review .ns-primary{min-width:0;max-width:100%}
+.ns-catalog-hire-actions{display:contents}
+.ns-catalog-hire-actions.is-created{display:flex;flex-direction:column;align-items:stretch;gap:18px}
+.ns-catalog-review .ns-catalog-archive-action{align-self:center;padding:0;border:0;background:none;color:#f87171;font:inherit;font-size:11px;text-align:center;cursor:pointer}
+.ns-catalog-review .ns-catalog-archive-action:hover{color:#fca5a5}
+.ns-catalog-review .ns-catalog-archive-action:disabled{opacity:.5;cursor:default}
 .ns-catalog-review.ns-catalog-video-review .ns-receptionist-preview-body{padding:28px 32px}
 .ns-catalog-review.ns-catalog-video-review h2{margin:12px 0 16px}
 .ns-catalog-review.ns-catalog-video-review .ns-catalog-review-meta{display:flex;flex-wrap:wrap;align-items:baseline;gap:10px 32px;padding:12px 0}

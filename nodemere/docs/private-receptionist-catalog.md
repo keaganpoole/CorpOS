@@ -44,6 +44,27 @@ database checks. Fixture writes are enclosed in a transaction and rolled back.
 It verifies membership exclusion before Hire, media copying, ownership/business
 isolation, readiness, capacity, idempotency, and server-only RPC permissions.
 
-Vercel automatically deploys the `production` branch. The backend must also run
-this commit, and the frontend must have a working `VITE_API_URL` or API proxy.
-A ready frontend deployment alone does not verify the complete workflow.
+The intended operational backend runs locally on port 8000. The local frontend
+on port 5173 uses the existing Vite `/api` proxy to `127.0.0.1:8000`. Run the
+updated backend code and local frontend together for the complete workflow.
+Vercel automatically deploys the `production` branch for the public frontend;
+that deployment is separate from the local operational setup. No external backend
+hosting is required, and the public frontend should not point at localhost.
+
+Rollout verification: the migration and transactional rollback checks passed in
+the configured database, the updated local backend served authenticated dashboard
+and catalog requests successfully, and focused save/catalog/hire tests passed.
+Paid provider voice generation was not performed during verification.
+
+
+Created receptionist lifecycle (apply `sql/2026_09_27_created_receptionist_lifecycle.sql` after the original private catalog migration):
+
+- Teams **Remove from team** returns the saved creation to `ready` in the catalog. Its historical hired row remains inactive with status `catalog`, preserving appointment references and the creation link.
+- Catalog **Archive** changes only catalog placement to `archived`. Archives combines saved creations with existing archived non-system team records. **Restore to catalog** returns a saved creation to `ready`, without hiring it.
+- Re-hiring reactivates the same hired row, checks plan capacity again, and preserves the original media and profile. Converted-hire retries remain idempotent.
+- System hires cannot be archived through Delete or PATCH. A system hire with appointment history cannot be permanently deleted, so that operation returns a conflict instead. Existing voice-clone conventions remain intact.
+- The catalog detail has no visible Close pill; Escape, backdrop dismissal, focus trapping and focus restoration remain.
+
+Focused lifecycle checks: `python -m unittest backend.test_created_receptionist_archive backend.test_receptionist_catalog`. The expanded `backend/test_private_catalog_database.sql` validates removal, archive, restoration without hiring, capacity on rehire, row reuse, media retention and isolation inside a rolled-back transaction.
+
+Lifecycle rollout verification: the lifecycle migration was applied to the configured Supabase project through its existing SQL editor. The expanded database fixture transaction passed and rolled back. The running local backend OpenAPI includes the new lifecycle routes. Frontend browser inspection was not performed.

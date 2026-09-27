@@ -7219,7 +7219,7 @@ async def check_document_upload_status_tool(request: Request):
 
 from .voice_design import VoiceDesignRequest, VoiceSaveRequest, design_voice, save_voice
 from .portrait_generation import PortraitGenerationRequest, generate_portraits
-from .receptionist_catalog import private_created_catalog, hire_created_receptionist
+from .receptionist_catalog import private_created_catalog, hire_created_receptionist, created_receptionist_lifecycle, normalize_created_receptionist
 
 
 @app.post('/api/sonar/studio/design', tags=['Nodemere Studio'])
@@ -10460,6 +10460,8 @@ def get_sonar_agents(include_archived: bool = False, current_user: dict = Depend
         agents = []
         for row in response.data or []:
             is_archived = row.get("is_active") is False or str(row.get("status") or "").strip().lower() == "archived"
+            if row.get("status") == "catalog":
+                continue
             if not include_archived and is_archived:
                 continue
             row_direction = normalize_receptionist_direction(row.get("direction"))
@@ -10489,7 +10491,7 @@ async def restore_agent(agent_id: str, current_user: dict = Depends(get_current_
     existing_response = (
         supabase
         .table('hired_receptionists')
-        .select('id,user_id,full_name,first_name')
+        .select('id,user_id,full_name,first_name,business_id,stereotype')
         .eq('id', agent_id)
         .eq('user_id', current_user_id)
         .limit(1)
@@ -10498,6 +10500,16 @@ async def restore_agent(agent_id: str, current_user: dict = Depends(get_current_
     existing_agent = (existing_response.data or [None])[0]
     if not existing_agent:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found")
+
+    creation = (supabase.table('created_receptionists').select('id,status')
+                .eq('hired_receptionist_id', agent_id).eq('user_id', current_user_id)
+                .eq('business_id', existing_agent.get('business_id')).limit(1).execute().data or [])
+    if creation:
+        created_receptionist_lifecycle(supabase_admin.raw, created_id=creation[0]['id'],
+            owner_id=current_user_id, business_id=existing_agent['business_id'], action='restore')
+        return {"ok": True, "returned_to_catalog": True}
+    if existing_agent.get('stereotype') == 'Studio Voice Design':
+        raise HTTPException(409, "The saved creation could not be found; the team record was preserved")
 
     restore_payload = {
         "is_active": True,
@@ -11506,7 +11518,7 @@ async def patch_agent(agent_id: str, payload: dict, current_user: dict = Depends
     existing_response = (
         supabase
         .table('hired_receptionists')
-        .select('id,user_id,business_id,is_active,status,direction')
+        .select('id,user_id,business_id,is_active,status,direction,catalog_id,stereotype')
         .eq('id', agent_id)
         .eq('user_id', current_user_id)
         .limit(1)
@@ -11515,6 +11527,16 @@ async def patch_agent(agent_id: str, payload: dict, current_user: dict = Depends
     existing_agent = (existing_response.data or [None])[0]
     if not existing_agent:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found")
+
+    if existing_agent.get('catalog_id') is not None and (
+        str(payload.get('status', '')).strip().lower() == 'archived'
+        or ('is_active' in payload and payload['is_active'] is not None and not bool(payload['is_active']))
+    ):
+        raise HTTPException(409, "System receptionists cannot be archived")
+    if existing_agent.get('stereotype') == 'Studio Voice Design' and (
+        existing_agent.get('status') == 'catalog' or 'is_active' in payload or 'status' in payload
+    ):
+        raise HTTPException(409, "Use the created receptionist catalog lifecycle")
 
     allowed_fields = {"is_active", "status", "direction"}
     update_payload = {key: value for key, value in payload.items() if key in allowed_fields}
@@ -11556,7 +11578,7 @@ async def delete_agent(agent_id: str, current_user: dict = Depends(get_current_u
     existing_response = (
         supabase
         .table('hired_receptionists')
-        .select('id,user_id,full_name,first_name')
+        .select('id,user_id,full_name,first_name,stereotype,business_id,catalog_id')
         .eq('id', agent_id)
         .eq('user_id', current_user_id)
         .limit(1)
@@ -11565,6 +11587,18 @@ async def delete_agent(agent_id: str, current_user: dict = Depends(get_current_u
     existing_agent = (existing_response.data or [None])[0]
     if not existing_agent:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found")
+
+    creation = (supabase.table('created_receptionists').select('id')
+                .eq('hired_receptionist_id', agent_id).eq('user_id', current_user_id)
+                .eq('business_id', existing_agent.get('business_id')).limit(1).execute().data or [])
+    if creation:
+        result = created_receptionist_lifecycle(supabase_admin.raw, created_id=creation[0]['id'],
+            owner_id=current_user_id, business_id=existing_agent['business_id'], action='remove')
+        push_live_event("Receptionist returned to catalog.", actor="system", severity="info",
+            event_type="agent_removed", payload={"agent_id": agent_id, "user_id": current_user_id})
+        return {"ok": True, "id": agent_id, "returned_to_catalog": True}
+    if existing_agent.get('stereotype') == 'Studio Voice Design':
+        raise HTTPException(409, "The saved creation could not be found; the team record was preserved")
 
     linked_appointments = (
         supabase
@@ -11576,6 +11610,8 @@ async def delete_agent(agent_id: str, current_user: dict = Depends(get_current_u
         .data
         or []
     )
+    if linked_appointments and existing_agent.get('catalog_id') is not None:
+        raise HTTPException(409, "System receptionists cannot be archived; appointment history must be preserved")
     if linked_appointments:
         archive_payload = {
             "is_active": False,
@@ -12801,6 +12837,40 @@ async def hire_receptionist(payload: dict, current_user: dict = Depends(get_curr
     except Exception as exc:
         logging.error('main.hire_receptionist.event_9889')
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to hire receptionist")
+
+@app.get("/api/sonar/receptionists/catalog/video-candidates", tags=["Sonar Receptionists"])
+async def catalog_video_candidates(current_user: dict = Depends(get_current_user)):
+    # Bounded public catalog metadata; no private catalog/profile load for decoration.
+    rows = (supabase.table('receptionist_catalog').select('avatar_video')
+            .not_.is_('avatar_video', 'null').order('id').limit(8).execute().data or [])
+    return [row for row in rows if isinstance(row.get('avatar_video'), str) and row['avatar_video'].strip()]
+
+
+@app.get("/api/sonar/receptionists/created/archived", tags=["Sonar Receptionists"])
+async def list_archived_created_receptionists(current_user: dict = Depends(get_current_user)):
+    owner_id = business_owner_id(current_user)
+    business = load_business_by_user_id(owner_id)
+    if not business:
+        raise HTTPException(404, "Business not found")
+    rows = (supabase.table('created_receptionists').select('*').eq('user_id', owner_id)
+            .eq('business_id', business['id']).eq('status', 'archived').order('created_at', desc=True).execute().data or [])
+    return [normalize_created_receptionist(row) for row in rows]
+
+
+@app.post("/api/sonar/receptionists/created/{created_id}/{action}", tags=["Sonar Receptionists"])
+async def move_created_receptionist(created_id: str, action: str, current_user: dict = Depends(get_current_user)):
+    if action not in ('archive', 'restore'):
+        raise HTTPException(400, "Invalid catalog action")
+    owner_id = business_owner_id(current_user)
+    business = load_business_by_user_id(owner_id)
+    if not business:
+        raise HTTPException(404, "Business not found")
+    result = created_receptionist_lifecycle(supabase_admin.raw, created_id=created_id,
+        owner_id=owner_id, business_id=business['id'], action=action)
+    push_live_event("Receptionist catalog updated.", actor="system", severity="info",
+        event_type="created_receptionist_updated", payload={"user_id": owner_id, "created_id": created_id, "action": action})
+    return {"ok": True}
+
 
 @app.get("/api/sonar/receptionists/catalog", tags=["Sonar Receptionists"])
 async def list_receptionist_catalog(current_user: dict = Depends(get_current_user)):

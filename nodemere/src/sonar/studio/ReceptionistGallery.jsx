@@ -1,7 +1,7 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Minus, Plus, User } from 'lucide-react';
 import { useReducedMotion } from 'framer-motion';
-import { galleryCells, zoomAt, MIN_GALLERY_ZOOM } from './catalogGeometry';
+import { galleryCells, galleryRosterOrder, zoomAt, MIN_GALLERY_ZOOM } from './catalogGeometry';
 import './receptionistGallery.css';
 
 const DEFAULT_GALLERY_ZOOM = 1.4;
@@ -17,6 +17,7 @@ export default function ReceptionistGallery({ receptionists, onSelect, paused, c
   const [cells, setCells] = useState([]);
   const [zoomLevel, setZoomLevel] = useState(DEFAULT_GALLERY_ZOOM);
   const reducedMotion = useReducedMotion();
+  const rosterOrder = useMemo(() => galleryRosterOrder(receptionists), [receptionists]);
   const pausedRef = useRef(paused);
   pausedRef.current = paused;
 
@@ -143,7 +144,7 @@ export default function ReceptionistGallery({ receptionists, onSelect, paused, c
       current.scale += (target.scale - current.scale) * blend;
       const worldTransform = `translate(${current.x}px,${current.y}px) scale(${current.scale})`;
       if (worldRef.current.style.transform !== worldTransform) worldRef.current.style.transform = worldTransform;
-      const visible = galleryCells(current, size.width, size.height, receptionists.length);
+      const visible = galleryCells(current, size.width, size.height, rosterOrder.length);
       const signature = visible.map(cell => cell.key).join('|');
       if (signature !== cellSignature) { cellSignature = signature; setCells(visible); scheduleTick(); }
       for (const cell of visible) {
@@ -186,16 +187,19 @@ export default function ReceptionistGallery({ receptionists, onSelect, paused, c
       resetGesture(); resetGestureRef.current = null;
       root.removeEventListener('click', click, true); root.removeEventListener('keydown', key);
     };
-  }, [receptionists.length, reducedMotion]);
+  }, [rosterOrder.length, reducedMotion]);
 
   return <><div className="ns-receptionist-gallery" ref={rootRef} tabIndex={0} aria-label="Receptionist gallery. Drag to explore, scroll to zoom, or use the zoom controls.">
     <div className="ns-gallery-world" ref={worldRef} inert={paused ? '' : undefined} aria-hidden={paused || undefined}>
       {cells.map(cell => {
-        const person = receptionists[cell.personIndex];
-        return <button type="button" className="ns-gallery-tile" key={cell.key} draggable="false"
+        const personIndex = rosterOrder[cell.personIndex];
+        const person = receptionists[personIndex];
+        if (!person) return null;
+        const isCreated = person.source === 'created_receptionist' || person.created_receptionist_id != null;
+        return <button type="button" className={`ns-gallery-tile${isCreated ? ' ns-gallery-tile-created' : ''}`} key={cell.key} draggable="false"
           ref={getTileRef(cell.key)}
           style={{ left: cell.x, top: cell.y, width: cell.width, height: cell.height, zIndex: 1 }}
-          aria-label={`Meet ${person.full_name || 'receptionist'}`} onClick={() => onSelect(cell.personIndex)}>
+          aria-label={`Meet ${person.full_name || 'receptionist'}`} onClick={() => onSelect(personIndex)}>
           {person.avatar ? <img src={person.avatar} alt="" draggable="false" /> : <span className="ns-gallery-placeholder"><User size={40}/><span>{person.full_name || 'Receptionist'}</span></span>}
           <span className="ns-gallery-neon" aria-hidden="true"/>
         </button>;

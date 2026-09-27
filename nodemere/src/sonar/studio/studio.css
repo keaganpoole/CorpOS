@@ -1,4 +1,48 @@
 @property --ns-liquid-angle{syntax:"<angle>";inherits:false;initial-value:0deg}
+.ns-studio .ns-welcome-copy>.ns-primary{margin-top:32px}
+.ns-office.ns-choice-modal{width:min(1160px,100%);height:auto;min-height:0;margin:auto;background:transparent;overflow:visible}
+.ns-office.ns-choice-modal .ns-entry.ns-choice-modal-content{position:relative;inset:auto;min-height:0;padding:0;background:transparent;overflow:visible}
+.ns-office.ns-choice-modal .ns-choice-cards{max-width:1080px;transform:none}
+.ns-office.ns-choice-modal .ns-choice-card-cascade{display:flex;min-width:0}
+.ns-office.ns-choice-modal .ns-choice-card-cascade>.ns-choice-card{flex:1}
+.ns-office.ns-choice-modal .ns-choice-card-cascade[data-exiting] .ns-choice-card-edge{animation-play-state:paused}
+.ns-choice-modal-header{display:flex;align-items:center;justify-content:flex-end;max-width:1080px;margin:0 auto 24px;color:#f5f5f7}
+.ns-office.ns-choice-modal .ns-choice-card{min-height:439px}
+.ns-office.ns-choice-modal .ns-choice-card-icon{display:none}
+.ns-office.ns-choice-modal .ns-choice-card-title{font-size:clamp(40px,4.375vw,67.5px)}
+@container nodemere-office (max-width:1100px){.ns-office.ns-choice-modal .ns-choice-card-title{font-size:clamp(40px,5vw,65px)}}
+@container nodemere-office (max-width:680px){.ns-office.ns-choice-modal .ns-choice-card-title{font-size:45px}}
+.ns-office.ns-choice-modal .ns-choice-card{border-color:rgba(255,255,255,.065);border-left-color:rgba(255,255,255,.04);box-shadow:0 26px 68px rgba(0,0,0,.44),0 0 0 1px rgba(255,255,255,.012)}
+.ns-office.ns-choice-modal .ns-choice-card:hover{border-color:rgba(255,255,255,.085);box-shadow:0 32px 82px rgba(0,0,0,.52),0 0 0 1px rgba(255,255,255,.022)}
+.ns-office.ns-choice-modal .ns-choice-card .ns-choice-card-edge{padding:1.5px;opacity:.34;filter:saturate(.45) contrast(1.025)}
+.ns-office.ns-choice-modal .ns-choice-card.is-primary .ns-choice-card-edge{padding:2px;opacity:.43;filter:saturate(.5) contrast(1.05) drop-shadow(0 0 4px rgba(255,255,255,.07))}
+.ns-office.ns-choice-modal .ns-choice-card:hover .ns-choice-card-edge{opacity:.52}
+.ns-office.ns-choice-modal .ns-choice-card .ns-choice-card-edge--hover,.ns-office.ns-choice-modal .ns-choice-card.is-primary .ns-choice-card-edge--hover{opacity:0}
+.ns-office.ns-choice-modal .ns-choice-card:hover .ns-choice-card-edge--hover,.ns-office.ns-choice-modal .ns-choice-card.is-primary:hover .ns-choice-card-edge--hover{opacity:.43}
+.ns-office.ns-choice-modal .ns-choice-card:focus-visible{outline:2px solid rgba(255,255,255,.6);outline-offset:4px}
+.ns-office.ns-choice-modal .ns-choice-card{transform:none;transition:box-shadow .3s cubic-bezier(.4,0,.2,1),border-color .65s cubic-bezier(.25,.1,.25,1) .06s}
+.ns-office.ns-choice-modal .ns-choice-card .ns-choice-card-edge{animation-duration:36s!important;transition:opacity .9s cubic-bezier(.25,.1,.25,1) .06s}
+.ns-office.ns-choice-modal .ns-choice-card .ns-choice-card-edge--hover{animation-duration:14s!important;transition:opacity 1.2s cubic-bezier(.25,.1,.25,1) .06s}
+.ns-office.ns-choice-modal .ns-choice-card-action svg{transition:transform .55s cubic-bezier(.25,.1,.25,1)}
+.ns-office.ns-choice-modal .ns-choice-card:hover .ns-choice-card-action svg{transform:translateX(2px)}
+.ns-office.ns-choice-modal .ns-choice-card .ns-choice-card-edge{background:conic-gradient(from var(--ns-liquid-angle,0deg),#c9cbd3 0deg,#777985 18deg,#15151a 48deg,#b9bcc6 78deg,#33343d 116deg,#d6d8df 151deg,#777985 176deg,#19191f 221deg,#b9bcc6 263deg,#40424c 305deg,#c9cbd3 340deg,#777985 360deg),radial-gradient(190px 150px at var(--ns-liquid-x) var(--ns-liquid-y),rgba(214,216,225,.78),rgba(175,178,193,.52) 26%,transparent 70%);background-blend-mode:screen}
+.ns-office.ns-choice-modal .ns-choice-card-action{border-color:rgba(255,255,255,.12)}
+.ns-office.ns-choice-modal .ns-choice-card{background:linear-gradient(145deg,#09090b,#040405)}
+.ns-office.ns-choice-modal .ns-choice-card-decoration{filter:contrast(1.096) brightness(.936)}
+.ns-office.ns-choice-modal .ns-choice-card .ns-choice-card-edge{background-blend-mode:normal}
+.ns-office.ns-choice-modal .ns-choice-card-decoration{position:absolute;inset:3px;z-index:0;display:block;overflow:hidden;border-radius:23px;opacity:.05;pointer-events:none;contain:layout paint}
+.ns-choice-face-background{position:absolute;inset:0;display:block;width:100%;height:100%;object-fit:cover}
+.ns-choice-catalog-video{position:absolute;inset:0;display:block;width:100%;height:100%;object-fit:cover;opacity:.9;pointer-events:none}
+.ns-office.ns-choice-modal .ns-choice-face-background,.ns-office.ns-choice-modal .ns-choice-catalog-video{transform-origin:center center;transition:transform .7s cubic-bezier(.4,0,.2,1)}
+.ns-office.ns-choice-modal .ns-choice-face-background{transform-origin:center top}
+.ns-office.ns-choice-modal .ns-choice-card:hover .ns-choice-face-background,.ns-office.ns-choice-modal .ns-choice-card:hover .ns-choice-catalog-video{transform:scale(1.05)}
+@media(prefers-reduced-motion:reduce){.ns-office.ns-choice-modal .ns-choice-card .ns-choice-face-background,.ns-office.ns-choice-modal .ns-choice-card .ns-choice-catalog-video{transform:none!important;transition:none!important}}
+.ns-office.ns-choice-modal .ns-choice-card-decoration,.ns-office.ns-choice-modal .ns-choice-card-decoration span,.ns-office.ns-choice-modal .ns-choice-card-decoration img,.ns-office.ns-choice-modal .ns-choice-card-decoration video{border:0!important;outline:0!important;box-shadow:none!important}
+@container nodemere-office (max-width:1100px){.ns-office.ns-choice-modal .ns-choice-card{min-height:408px}}
+@container nodemere-office (max-width:680px){.ns-office.ns-choice-modal .ns-choice-card{min-height:347px}}
+.ns-choice-modal-header h2{margin:0;font-size:18px;font-weight:500;letter-spacing:-.03em}
+.ns-choice-modal-header button{display:grid;place-items:center;padding:8px;border:0;border-radius:8px;background:transparent;color:#a0a0a9}
+.ns-choice-modal-header button:hover{background:#ffffff0a;color:#fff}
 .ns-studio,.ns-entry{--ns-muted:#96969c;--ns-hairline:rgba(255,255,255,.1);color:var(--color-white,#f5f5f7);background:var(--pageBackground,#020202);font-family:Inter,var(--font-family-sans),sans-serif;position:relative;isolation:isolate;min-height:100%;width:100%;overflow:auto}
 .ns-persistent-wordmark{position:absolute;top:25px;left:calc(50% - 38px);z-index:8;transform:translateX(-50%);font-size:16px;font-weight:600;letter-spacing:-.05em;white-space:nowrap;color:#f3f3f5;pointer-events:none;text-shadow:0 2px 18px #000}.ns-persistent-wordmark span{font-weight:400;color:#999}
 .ns-content{min-height:100%;height:100%}.ns-studio button,.ns-entry button{font:inherit;cursor:pointer}.ns-studio button:disabled,.ns-entry button:disabled{cursor:default;opacity:.38}.ns-studio :focus-visible,.ns-entry :focus-visible{outline:2px solid var(--color-light-gray);outline-offset:5px}.ns-studio h1:focus{outline:none}.ns-studio.is-processing .ns-instrument{opacity:.4;pointer-events:none}.ns-studio.is-processing .ns-description{opacity:.55}.is-clone .voice-flow-page::before{position:absolute}
@@ -282,15 +326,18 @@
 @container nodemere-office (max-width:850px){.ns-office .ns-receptionist-preview-stage{min-height:0;padding:32px 0 64px}}
 @container nodemere-office (max-width:600px){.ns-office .ns-receptionist-preview-stage{min-height:0;padding:28px 0 48px;gap:22px}.ns-portrait-stage-heading h1,.ns-review-stage-heading h1{font-size:48px;white-space:normal}}
 
-/* Compact review metadata keeps the portrait and name field as the focus. */
-.ns-receptionist-preview-selections{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 24px;padding:16px 0;margin:8px 0 2px;border-top:1px solid rgba(255,255,255,.12);border-bottom:1px solid rgba(255,255,255,.12)}
-.ns-receptionist-preview-body>.ns-receptionist-preview-copy{margin-top:0;max-width:360px}
-.ns-receptionist-preview-selections div{min-width:0;display:flex;flex-direction:row;align-items:baseline;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.06)}
-.ns-receptionist-preview-selections div:nth-last-child(-n+2){border-bottom:0}
-.ns-receptionist-preview-selections div:last-child{grid-column:1 / -1;display:block;padding:16px 0 4px}
-.ns-receptionist-preview-selections small{font-size:8px;letter-spacing:.16em;color:#777781;flex:0 0 auto}
-.ns-receptionist-preview-selections strong{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;line-height:1.3;color:#dedee3;font-weight:500;text-align:right}
-.ns-receptionist-preview-selections div:last-child strong{display:block;margin-top:8px;white-space:normal;overflow:visible;text-overflow:clip;text-align:left;line-height:1.55;color:#f0eff1}
-.ns-receptionist-preview-selections{border:0;background:none}
-.ns-receptionist-preview-selections div,.ns-receptionist-preview-selections div:nth-last-child(-n+2){border:0}
-@container nodemere-office (max-width:600px){.ns-receptionist-preview-selections{gap:0 14px;padding:10px 0}.ns-receptionist-preview-selections div{display:block;padding:12px 0}.ns-receptionist-preview-selections div:last-child{grid-column:1 / -1;padding:16px 0 5px}.ns-receptionist-preview-selections small,.ns-receptionist-preview-selections strong{display:block;text-align:left}.ns-receptionist-preview-selections strong{margin-top:5px;font-size:11px}.ns-receptionist-preview-selections div:last-child strong{margin-top:7px;font-size:11px}}
+/* Review identity and consistently grouped label/value pairs. */
+.ns-review-identity{min-width:0}
+.ns-review-name{margin:0 0 14px;font-size:clamp(30px,3.2vw,44px);font-weight:500;line-height:1.12;letter-spacing:-.045em;overflow-wrap:anywhere;color:#f5f5f7}
+.ns-review-identity .ns-receptionist-preview-copy{max-width:360px;margin:0;font-size:13px;line-height:1.65;color:#9999a3}
+.ns-receptionist-preview-body{min-width:0;padding:clamp(28px,4vw,48px)}
+.ns-receptionist-preview-selections{grid-template-columns:repeat(2,minmax(0,1fr));gap:22px 24px;padding:24px 0;margin:24px 0 0;border-top:1px solid #ffffff16;border-bottom:1px solid #ffffff16}
+.ns-receptionist-preview-selections .ns-review-detail{min-width:0;display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-start;gap:7px;padding:0;border:0}
+.ns-receptionist-preview-selections .ns-review-detail-wide{grid-column:1 / -1}
+.ns-review-detail dt{display:flex;align-items:center;gap:8px;margin:0;font-size:9px;font-weight:500;line-height:16px;letter-spacing:.12em;text-transform:uppercase;color:#9696a1}
+.ns-review-detail dt svg{flex-shrink:0;stroke-width:1.5;color:#aaaab5}
+.ns-review-detail dd{margin:0;font-size:14px;font-weight:400;line-height:1.55;color:#e2e2e7;overflow-wrap:anywhere}
+.ns-receptionist-preview-actions{align-items:stretch;flex-direction:column;gap:16px;margin-top:24px}
+.ns-receptionist-preview-actions .ns-text-button{align-self:flex-start}
+.ns-receptionist-preview-actions .ns-primary{width:100%;min-width:0}
+@container nodemere-office (max-width:600px){.ns-receptionist-preview-body{padding:28px 24px 32px}.ns-review-name{font-size:32px}.ns-receptionist-preview-selections{gap:20px;padding:22px 0;margin-top:22px}.ns-review-detail dd{font-size:13px}}

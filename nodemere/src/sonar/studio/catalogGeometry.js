@@ -12,6 +12,50 @@ const HEIGHTS = [190, 286, 224, 334];
 const PERIOD = HEIGHTS.reduce((sum, height) => sum + height + TILE_GAP, 0);
 export const wrap = (value, length) => ((value % length) + length) % length;
 
+const identity = person => String(person.elevenlabs_voice_id || `${person.source || 'stock'}:${person.created_receptionist_id ?? person.custom_voice_id ?? person.id}`);
+const hash = value => {
+  let result = 2166136261;
+  for (const char of value) result = Math.imul(result ^ char.charCodeAt(0), 16777619);
+  return result >>> 0;
+};
+
+// Deal each source across both column palettes, then interleave sources within
+// each palette. Sorting by identity makes API ordering irrelevant.
+export function galleryRosterOrder(receptionists) {
+  const unique = new Map();
+  receptionists.forEach((person, index) => {
+    const key = identity(person);
+    if (!unique.has(key)) unique.set(key, { key, index, custom: Boolean(person.created_receptionist_id || person.custom_voice_id || ['created_receptionist', 'voice_clone', 'custom_voice'].includes(person.source)) });
+  });
+  const groups = [false, true].map(custom => [...unique.values()].filter(person => person.custom === custom)
+    .sort((a, b) => hash(a.key) - hash(b.key) || a.key.localeCompare(b.key)));
+  const palettes = [[], []];
+  for (const group of groups) for (const person of group) {
+    palettes[palettes[0].length <= palettes[1].length ? 0 : 1].push(person);
+  }
+  const mixed = palettes.map(palette => {
+    const stock = palette.filter(person => !person.custom), custom = palette.filter(person => person.custom);
+    const result = [], total = palette.length, customCount = custom.length;
+    // Spread the smaller source group throughout the larger one.
+    while (result.length < total) {
+      const position = result.length;
+      const takeCustom = Math.floor((position + 1) * customCount / total) > Math.floor(position * customCount / total);
+      result.push((takeCustom ? custom : stock).shift().index);
+    }
+    return result;
+  });
+  return Array.from({ length: unique.size }, (_, index) => mixed[index % 2][Math.floor(index / 2)]);
+}
+
+export function galleryPersonIndex(column, row, count) {
+  if (count <= 1) return 0;
+  // Adjacent masonry columns can overlap several rows. Disjoint palettes
+  // prevent duplicates across every overlapping edge, not just equal row IDs.
+  const parity = wrap(column, 2);
+  const length = Math.floor((count + 1 - parity) / 2);
+  return parity + 2 * wrap(row + Math.floor(column / 2), length);
+}
+
 // A periodic masonry world: every column fills continuously, including negative
 // coordinates. Only cells near the viewport are mounted.
 export function galleryCells(view, width, height, count) {
@@ -30,7 +74,7 @@ export function galleryCells(view, width, height, count) {
         const tileHeight = HEIGHTS[wrap(slot + column, HEIGHTS.length)];
         if (y + tileHeight >= top && y <= bottom) {
           const row = cycle * HEIGHTS.length + slot;
-          const personIndex = wrap(column * 7 + row * 3 + cycle, count);
+          const personIndex = galleryPersonIndex(column, row, count);
           cells.push({ key: `${column}:${row}`, x: column * step, y, width: TILE_WIDTH,
             height: tileHeight, personIndex });
         }

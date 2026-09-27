@@ -9,8 +9,15 @@ import { api } from '../lib/api';
 import CubePreloader from '../components/CubePreloader';
 import MbtiPersonalityModal, { getMbtiProfileSummary } from '../components/MbtiPersonalityModal';
 import ReceptionistGallery from '../studio/ReceptionistGallery';
+import ReceptionistActionConfirmation from '../components/ReceptionistActionConfirmation';
 import IntercomVoiceLine from '../nest/IntercomVoiceLine';
 import { avatarVideoUrl } from '../studio/catalogGeometry';
+import { CHARACTERISTICS, SUB_ACCENTS } from '../studio/voiceDefinition';
+
+const accentLabels = new Set([...CHARACTERISTICS.find(item => item.key === 'accent').options, ...Object.values(SUB_ACCENTS).flat()]);
+const isCreatedReceptionist = person => person.source === 'created_receptionist' || person.created_receptionist_id != null;
+const catalogAccentTraits = person => isCreatedReceptionist(person) && Array.isArray(person.traits) ? person.traits.filter(trait => accentLabels.has(trait)) : [];
+const catalogCoreTraits = person => Array.isArray(person.traits) ? person.traits.filter(trait => !isCreatedReceptionist(person) || !accentLabels.has(trait)) : [];
 
 const HireReceptionistModal = ({ onClose, onHire, embedded = false, initialCreatedId = null, hiredCatalogIds = [], hiredVoiceIds = [] }) => {
   const [receptionists, setReceptionists] = useState([]);
@@ -20,6 +27,8 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, initialCreat
   const [playingVoice, setPlayingVoice] = useState(null);
   const [voiceLevel, setVoiceLevel] = useState(0);
   const [hiringId, setHiringId] = useState(null);
+  const [archiveTarget, setArchiveTarget] = useState(null);
+  const [archiving, setArchiving] = useState(false);
   const [hireError, setHireError] = useState('');
   const [personalityPerson, setPersonalityPerson] = useState(null);
   const audioRef = useRef(null);
@@ -99,8 +108,8 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, initialCreat
     if (!embedded || selectedIndex === null) return;
     const panel = detailRef.current;
     const key = event => {
-      if (personalityPerson) return;
-      if (event.key === 'Escape' && !hiringId) { event.preventDefault(); closeDetail(); }
+      if (personalityPerson || archiveTarget) return;
+      if (event.key === 'Escape' && !hiringId && !archiving) { event.preventDefault(); closeDetail(); }
       if (event.key !== 'Tab') return;
       const buttons = [...panel.querySelectorAll('button:not(:disabled),[href],[tabindex="0"]')];
       const first = buttons[0], last = buttons[buttons.length - 1];
@@ -109,7 +118,7 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, initialCreat
     };
     document.addEventListener('keydown', key);
     return () => { document.removeEventListener('keydown', key); };
-  }, [embedded, selectedIndex, personalityPerson, hiringId]);
+  }, [embedded, selectedIndex, personalityPerson, hiringId, archiving, archiveTarget]);
 
   const nextCard = () => {
     if (isAnimating || receptionists.length === 0) return;
@@ -224,7 +233,7 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, initialCreat
           ? 'ns-gallery-detail'
           : 'fixed inset-0 z-[1000] flex items-center justify-center p-8 bg-black/80 backdrop-blur-md'
       }
-      onClick={embedded ? () => { if (!hiringId) closeDetail(); } : onClose}
+      onClick={embedded ? () => { if (!hiringId && !archiving) closeDetail(); } : onClose}
     >
       {!embedded && <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-zinc-700/10 blur-[120px] rounded-full animate-pulse" />
@@ -251,13 +260,13 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, initialCreat
         className={embedded ? 'ns-gallery-detail-inner relative z-10 flex flex-col items-center' : 'relative z-10 w-full max-w-[440px] flex flex-col items-center'}
         ref={detailRef}
         role={embedded ? 'dialog' : undefined}
-        aria-modal={embedded ? true : undefined}
+        aria-modal={embedded && !archiveTarget ? true : undefined}
+        inert={archiveTarget ? '' : undefined}
+        aria-hidden={archiveTarget ? true : undefined}
         aria-label={embedded ? `${receptionists[selectedIndex]?.full_name || 'Receptionist'} details` : undefined}
         onClick={(e) => e.stopPropagation()}
       >
-        {embedded && <button type="button" className="ns-gallery-detail-close" disabled={Boolean(hiringId)} onClick={closeDetail}>
-          <X size={14} /> Close
-        </button>}
+        {embedded && <span className="sr-only">Press Escape or click outside to close receptionist details.</span>}
         {/* Header */}
         {!embedded && <div className="text-center mb-10 space-y-2">
           <h1 className="text-xs uppercase tracking-[6px] font-bold text-white/20">RECEPTIONIST CATALOG</h1>
@@ -279,21 +288,25 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, initialCreat
             {embedded ? receptionists.filter((_, index) => index === selectedIndex).map(person => (
               <section className={`ns-receptionist-preview-card ns-catalog-review ${person.avatar_video ? 'ns-catalog-video-review' : ''}`} key={person.id || person.full_name}>
                 <div className="ns-receptionist-preview-image">
-                  {person.avatar_video ? <video src={avatarVideoUrl(person.avatar_video)} poster={person.avatar || undefined} autoPlay muted loop playsInline preload="metadata" aria-label={`${person.full_name || 'Receptionist'} video portrait`} /> : person.avatar ? <img src={person.avatar} alt={person.full_name || 'Receptionist'} /> : <div className="ns-gallery-placeholder"><User size={64}/></div>}
+                  {person.avatar_video ? <video src={avatarVideoUrl(person.avatar_video)} poster={person.avatar || undefined} autoPlay muted loop playsInline preload="metadata" aria-label={`${person.full_name || 'Receptionist'} video portrait`} /> : person.avatar ? <img src={person.avatar} alt={person.full_name || 'Receptionist'} style={person.source === 'created_receptionist' || person.created_receptionist_id != null ? { objectPosition: 'center top' } : undefined} /> : <div className="ns-gallery-placeholder"><User size={64}/></div>}
                   <div className="ns-receptionist-preview-image-wash" />
                 </div>
                 <div className="ns-receptionist-preview-body">
                   <span className="ns-eyebrow">{person.source === 'created_receptionist' ? 'YOUR CREATION' : 'AVAILABLE'}</span>
                   <h2>{person.full_name || 'Receptionist'}</h2>
                   {getMbtiProfileSummary(person.personality?.mbti || person.personality_type, person.first_name || person.full_name) && <p className="ns-receptionist-preview-copy">{getMbtiProfileSummary(person.personality?.mbti || person.personality_type, person.first_name || person.full_name)}</p>}
-                  <dl className="ns-catalog-review-meta">
+                  <dl className={`ns-catalog-review-meta${isCreatedReceptionist(person) ? ' ns-catalog-review-meta-created' : ''}`}>
                     {person.age && <div><dt>Age</dt><dd>{String(person.age).match(/^\d+$/) ? `${person.age} years old` : person.age}</dd></div>}
+                    {catalogAccentTraits(person).length > 0 && <div><dt>Accent</dt><dd>{catalogAccentTraits(person).join(' · ')}</dd></div>}
                     {(person.personality?.mbti || person.personality_type) && <div><dt>Personality</dt><dd><button type="button" onClick={() => setPersonalityPerson(person)}>{person.personality?.mbti || person.personality_type}</button></dd></div>}
                   </dl>
-                  {Array.isArray(person.traits) && person.traits.length > 0 && <div className="ns-catalog-review-traits"><span>Core traits</span><div>{person.traits.map((trait, i) => <span key={i}>{trait}</span>)}</div></div>}
+                  {catalogCoreTraits(person).length > 0 && <div className="ns-catalog-review-traits"><span>Core traits</span><div>{catalogCoreTraits(person).map((trait, i) => <span key={i}>{trait}</span>)}</div></div>}
                   <div className="ns-receptionist-preview-actions">
                     {person.voice ? <div className="ns-catalog-voice-preview"><button type="button" className="ns-take-play" aria-label={playingVoice === person.id ? 'Pause voice preview' : 'Play voice preview'} onClick={() => playVoice(person.voice, person.id)}>{playingVoice === person.id ? <Pause size={18}/> : <Play size={18}/>}</button><IntercomVoiceLine enabled={playingVoice === person.id} level={voiceLevel}/><span>{playingVoice === person.id ? 'Playing preview' : 'Preview voice'}</span></div> : <span className="ns-footnote">No voice preview</span>}
-                    <button type="button" className="ns-primary" disabled={Boolean(hiringId)} onClick={() => handleSelect(person)}>{hiringId === (person.created_receptionist_id ?? person.custom_voice_id ?? person.catalog_id ?? person.id) ? <><Loader2 size={16} className="animate-spin"/> Hiring…</> : <>Hire {person.first_name || person.full_name || 'receptionist'}</>}</button>
+                    <div className={`ns-catalog-hire-actions${isCreatedReceptionist(person) ? ' is-created' : ''}`}>
+                    <button type="button" className="ns-primary" disabled={Boolean(hiringId) || archiving} onClick={() => handleSelect(person)}>{hiringId === (person.created_receptionist_id ?? person.custom_voice_id ?? person.catalog_id ?? person.id) ? <><Loader2 size={16} className="animate-spin"/> Hiring…</> : <>Hire {person.first_name || person.full_name || 'receptionist'}</>}</button>
+                    {person.created_receptionist_id != null && <button type="button" className="ns-catalog-archive-action" disabled={Boolean(hiringId) || archiving} onClick={() => { setHireError(''); setArchiveTarget(person); }}>{archiving ? 'Archiving…' : 'Archive'}</button>}
+                    </div>
                   </div>
                 </div>
               </section>
@@ -331,6 +344,7 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, initialCreat
                             src={person.avatar}
                             alt={person.full_name || 'Receptionist'}
                             className="w-full h-full object-cover"
+                            style={person.source === 'created_receptionist' || person.created_receptionist_id != null ? { objectPosition: 'center top' } : undefined}
                           />
                         ) : (
                           <div className="w-full h-full bg-gradient-to-br from-zinc-900 to-[#050505] flex items-center justify-center">
@@ -516,9 +530,22 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, initialCreat
       {loadError && <button type="button" onClick={loadReceptionists}>Try again</button>}
     </>}
   </div>;
-  return <ReceptionistGallery receptionists={receptionists} onSelect={setSelectedIndex} paused={selectedIndex !== null}>
+  return <><AnimatePresence>{archiveTarget?.created_receptionist_id != null && <ReceptionistActionConfirmation
+    title="Archive Receptionist" action="Archive" name={archiveTarget.first_name || archiveTarget.full_name || 'receptionist'}
+    description="This moves your saved receptionist to Archives. Their portrait, voice, and profile are preserved. You can restore them to the catalog."
+    error={hireError} onClose={() => { setArchiveTarget(null); setHireError(''); }}
+    onConfirm={async () => {
+      setArchiving(true); setHireError('');
+      try {
+        const result = await api.archiveCreation(archiveTarget.created_receptionist_id);
+        if (!result?.ok) throw new Error('Could not archive receptionist. Please try again.');
+        setArchiveTarget(null); closeDetail(); await loadReceptionists();
+      } catch (error) { setHireError(error?.message || 'Could not archive receptionist. Please try again.'); }
+      finally { setArchiving(false); }
+    }}
+  />}</AnimatePresence><ReceptionistGallery receptionists={receptionists} onSelect={setSelectedIndex} paused={selectedIndex !== null}>
     <AnimatePresence>{selectedIndex !== null && detail}</AnimatePresence>
-  </ReceptionistGallery>;
+  </ReceptionistGallery></>;
 };
 
 export default HireReceptionistModal;

@@ -70,6 +70,9 @@ import CalendarPage from './pages/CalendarPage';
 import CallLogsPage, { normalizeCall } from './pages/CallLogsPage';
 import BusinessIntelligenceReport from './pages/BusinessIntelligenceReport';
 import CubePreloader from './components/CubePreloader';
+import ReceptionistActionConfirmation from './components/ReceptionistActionConfirmation';
+import ReceptionistChoiceModal from './studio/ReceptionistChoiceModal';
+import { preloadCatalogChoiceVideo, disposeCatalogChoiceVideo } from './studio/catalogChoiceVideo';
 import PlanLimitModal from '../components/modals/PlanLimitModal';
 import PlanChangePopupModal from '../components/modals/PlanChangePopupModal';
 import ModalSpectrumLine, { resolveModalSpectrumVariant } from '../components/ModalSpectrumLine';
@@ -739,6 +742,7 @@ const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = nul
           src={agent.avatar || `${AVATAR_BASE}/${agent.name.toLowerCase()}.jpg`}
           alt={agent.name}
           className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+          style={agent.stereotype === 'Studio Voice Design' ? { objectPosition: 'center 8%', transformOrigin: 'center top' } : undefined}
           onError={(e) => {
             e.target.style.display = 'none';
             e.target.parentElement.classList.add('bg-gradient-to-br', 'from-zinc-800', 'to-zinc-950');
@@ -762,6 +766,8 @@ const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = nul
         <div className="absolute top-4 right-4 flex items-center gap-2">
           <button
             onClick={(e) => { e.stopPropagation(); onTerminate && onTerminate(agent); }}
+            aria-label={agent.stereotype === 'Studio Voice Design' ? 'Remove from team' : 'Delete receptionist'}
+            title={agent.stereotype === 'Studio Voice Design' ? 'Remove from team' : 'Delete receptionist'}
             className="w-7 h-7 flex items-center justify-center rounded-full bg-black/60 backdrop-blur-xl border border-rose-500/20 text-rose-500 hover:bg-rose-500/20 hover:border-rose-500/40 transition-all opacity-0 group-hover:opacity-100"
           >
             <Trash2 size={13} />
@@ -1755,6 +1761,15 @@ const SonarDashboard = () => {
   const [receptionistsAgent, setReceptionistsAgent] = useState(null);
   const [teamExperience, setTeamExperience] = useState('team');
   const [studioLaunchDestination, setStudioLaunchDestination] = useState('create');
+  const [showReceptionistChoice, setShowReceptionistChoice] = useState(false);
+  useEffect(() => () => disposeCatalogChoiceVideo(), []);
+  useEffect(() => {
+    if (currentRoute !== 'receptionists') return;
+    // Begin asynchronously on Teams load; the page-session promise retains one
+    // random source and its media element across every modal opening.
+    void preloadCatalogChoiceVideo();
+  }, [currentRoute]);
+
   const studioDirty = useRef(false);
   const pendingStudioExit = useRef(null);
   const [showStudioExit, setShowStudioExit] = useState(false);
@@ -1798,6 +1813,7 @@ const SonarDashboard = () => {
   const [showCommander, setShowCommander] = useState(false);
   const [logoHover, setLogoHover] = useState(false);
   const [terminateAgent, setTerminateAgent] = useState(null);
+  const [teamActionError, setTeamActionError] = useState('');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [staffBusinessId, setStaffBusinessId] = useState(null);
   const [businessUsage, setBusinessUsage] = useState(null);
@@ -1821,7 +1837,6 @@ const SonarDashboard = () => {
   const [showPlanChangePopup, setShowPlanChangePopup] = useState(false);
   const [nestStageExpanded, setNestStageExpanded] = useState(false);
   const tasklistPersistRef = useRef('');
-  const archivedAgentsLoadedRef = useRef(false);
   const userId = authSession?.user?.id || profile?.id || null;
 
   useEffect(() => {
@@ -2073,22 +2088,21 @@ const SonarDashboard = () => {
   const loadArchivedAgents = useCallback(async () => {
     setArchivedAgentsLoading(true);
     try {
-      const allAgents = await api.getAgents({ includeArchived: true });
-      setArchivedAgents(Array.isArray(allAgents)
+      const [allAgents, creations] = await Promise.all([api.getAgents({ includeArchived: true }), api.getArchivedCreations()]);
+      setArchivedAgents([...(creations || []), ...(Array.isArray(allAgents)
         ? allAgents.filter((agent) => agent?.is_archived || agent?.is_active === false || String(agent?.raw_status || agent?.status || '').toLowerCase() === 'archived')
-        : []);
+        : [])]);
     } finally {
       setArchivedAgentsLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    if (currentRoute !== 'receptionists' || archivedAgentsLoadedRef.current) return;
-    archivedAgentsLoadedRef.current = true;
+    if (currentRoute !== 'receptionists' || teamExperience !== 'team') return;
     loadArchivedAgents().catch(() => {
-      archivedAgentsLoadedRef.current = false;
+      setTeamActionError('Could not load archived receptionists. Please try again.');
     });
-  }, [currentRoute, loadArchivedAgents]);
+  }, [currentRoute, teamExperience, loadArchivedAgents]);
 
   useEffect(() => {
     let cancelled = false;
@@ -2233,12 +2247,18 @@ const SonarDashboard = () => {
     };
   }, [loadTasklistState, staffBusinessId, userId]);
 
-  const handleRestoreAgent = useCallback(async (agentId) => {
-    const result = await api.restoreAgent(agentId);
-    if (!result?.ok) return;
-    setArchivedAgents((current) => current.filter((agent) => String(agent.id) !== String(agentId)));
-    await refresh();
-    await loadArchivedAgents();
+  const handleRestoreAgent = useCallback(async (agent) => {
+    setTeamActionError('');
+    try {
+      const agentId = agent.id;
+      const result = agent.created_receptionist_id != null ? await api.restoreCreation(agent.created_receptionist_id) : await api.restoreAgent(agentId);
+      if (!result?.ok) return;
+      setArchivedAgents((current) => current.filter((agent) => String(agent.id) !== String(agentId)));
+      await refresh();
+      await loadArchivedAgents();
+    } catch (error) {
+      setTeamActionError(error?.message || 'Could not restore receptionist. Please try again.');
+    }
   }, [loadArchivedAgents, refresh]);
 
   const enrichedAgents = (agents || []).map(a => {
@@ -2344,7 +2364,7 @@ const SonarDashboard = () => {
               <div className="flex items-center gap-3">
                 {teamView === 'receptionists' ? (
                   <>
-                    <button onClick={() => { setStudioLaunchDestination('create'); setTeamExperience('studio'); }} className="dashboard-neutral-button flex items-center gap-2 px-5 py-2.5 rounded-xl text-[11px] font-bold tracking-wider transition-all active:scale-95">New Receptionist</button>
+                    <button onClick={() => setShowReceptionistChoice(true)} className="dashboard-neutral-button flex items-center gap-2 px-5 py-2.5 rounded-xl text-[11px] font-bold tracking-wider transition-all active:scale-95">New Receptionist</button>
                   </>
                 ) : teamView === 'staff' ? (
                   <button onClick={() => window.dispatchEvent(new CustomEvent('team:open-staff-modal'))} className="dashboard-neutral-button flex items-center gap-2 px-5 py-2.5 rounded-xl text-[11px] font-bold tracking-wider transition-all active:scale-95">New Staff Member</button>
@@ -2394,7 +2414,7 @@ const SonarDashboard = () => {
                             onOpenMarketplace={setMarketplaceAgent}
                             onOpenScenarios={setReceptionistsAgent}
                             onUpdateDirection={(agent, nextDirection) => updateAgentDirection(agent.id, nextDirection)}
-                            onTerminate={(agent) => setTerminateAgent(agent)}
+                            onTerminate={(agent) => { setTeamActionError(''); setTerminateAgent(agent); }}
                             slim
                           />
                         </motion.div>
@@ -2411,6 +2431,7 @@ const SonarDashboard = () => {
                 style={{ pointerEvents: teamView === 'archived' && !teamInitialLoading ? 'auto' : 'none' }}
                 aria-hidden={teamView !== 'archived' || teamInitialLoading}
               >
+                {teamActionError && <p role="alert" className="mb-4 text-xs text-rose-300">{teamActionError}</p>}
                 {
                 archivedAgentsLoading ? (
                   <div className="flex min-h-full items-center justify-center pb-20">
@@ -2425,6 +2446,7 @@ const SonarDashboard = () => {
                             src={agent.avatar || `${AVATAR_BASE}/${(agent.name || 'receptionist').toLowerCase()}.jpg`}
                             alt={agent.name || 'Receptionist'}
                             className="h-full w-full object-cover grayscale transition duration-500"
+                            style={agent.stereotype === 'Studio Voice Design' ? { objectPosition: 'center 8%' } : undefined}
                             onError={(e) => {
                               e.target.style.display = 'none';
                               e.target.parentElement.classList.add('bg-gradient-to-br', 'from-zinc-800', 'to-zinc-950');
@@ -2440,14 +2462,14 @@ const SonarDashboard = () => {
                         </div>
                         <div className="space-y-4 p-6">
                           <p className="text-[12px] leading-5 text-zinc-500">
-                            This receptionist is hidden from the active roster but appointment history remains intact.
+                            {agent.created_receptionist_id != null ? 'Your saved receptionist is archived. Restore them to the catalog when you are ready.' : 'This receptionist is hidden from the active roster but appointment history remains intact.'}
                           </p>
                           <button
                             type="button"
-                            onClick={() => handleRestoreAgent(agent.id)}
+                            onClick={() => handleRestoreAgent(agent)}
                             className="dashboard-neutral-button flex w-full items-center justify-center rounded-xl px-5 py-2.5 text-[11px] font-bold tracking-wider transition-all active:scale-95"
                           >
-                            Restore Receptionist
+                            {agent.created_receptionist_id != null ? 'Restore to catalog' : 'Restore Receptionist'}
                           </button>
                         </div>
                       </motion.div>
@@ -2499,73 +2521,32 @@ const SonarDashboard = () => {
             </AnimatePresence>
 
             <AnimatePresence>
-              {terminateAgent && (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="fixed inset-0 z-[1000] flex items-center justify-center p-8 bg-black/80 backdrop-blur-md"
-                  onClick={() => setTerminateAgent(null)}
-                >
-                  <motion.div
-                    initial={{ scale: 0.95, opacity: 0, y: 20 }}
-                    animate={{ scale: 1, opacity: 1, y: 0 }}
-                    exit={{ scale: 0.95, opacity: 0, y: 20 }}
-                    onClick={(e) => e.stopPropagation()}
-                    className="w-full max-w-[400px] bg-[#0a0a0a] border border-white/[0.06] rounded-2xl overflow-hidden shadow-2xl"
-                  >
-                    <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.04]">
-                      <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest">
-                        {terminateAgentHasAppointments ? 'Archive Receptionist' : 'Delete Receptionist'}
-                      </span>
-                      <button onClick={() => setTerminateAgent(null)} className="p-1 rounded-lg text-zinc-600 hover:text-white hover:bg-white/[0.04] transition-all">
-                        <X size={14} />
-                      </button>
-                    </div>
-                    <div className="p-6">
-                      <div className="flex items-center gap-4 mb-5">
-                        <div className="w-12 h-12 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center shrink-0">
-                          <Trash2 size={18} className="text-rose-400" />
-                        </div>
-                        <div>
-                          <p className="text-[13px] text-zinc-200 font-medium">
-                            {terminateAgentHasAppointments ? 'Archive' : 'Delete'} <span className="text-white font-bold">{terminateAgent?.first_name || terminateAgent?.name}</span>?
-                          </p>
-                          <p className="text-[11px] text-zinc-600 mt-1">
-                            {terminateAgentHasAppointments
-                              ? 'This keeps appointment history intact and removes them from the active roster.'
-                              : 'This action cannot be undone.'}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-end gap-3">
-                        <button
-                          onClick={() => setTerminateAgent(null)}
-                          className="px-4 py-2 rounded-xl text-[11px] font-bold text-zinc-500 uppercase tracking-wider hover:text-zinc-300 hover:bg-white/[0.03] transition-all"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          onClick={async () => {
-                            try {
-                              const result = await api.deleteAgent(terminateAgent.id);
-                              if (!result?.ok) throw new Error('Failed to remove receptionist');
-                              removeAgent(terminateAgent.id);
-                              setTerminateAgent(null);
-                              await loadAgentScenarios();
-                            } catch (err) {
-                              console.error("SonarDashboard.jsx:event_2476");
-                            }
-                          }}
-                          className="px-5 py-2 rounded-xl bg-rose-500 text-white text-[11px] font-black uppercase tracking-wider hover:bg-rose-400 transition-all shadow-[0_0_15px_rgba(239,68,68,0.3)] active:scale-95"
-                        >
-                          {terminateAgentHasAppointments ? 'Archive' : 'Delete'}
-                        </button>
-                      </div>
-                    </div>
-                  </motion.div>
-                </motion.div>
-              )}
+              {showReceptionistChoice && <ReceptionistChoiceModal
+                onClose={() => setShowReceptionistChoice(false)}
+                onCreate={() => { setShowReceptionistChoice(false); setStudioLaunchDestination('studio'); setTeamExperience('studio'); }}
+                onHire={() => { setShowReceptionistChoice(false); setStudioLaunchDestination('catalog'); setTeamExperience('studio'); }}
+              />}
+            </AnimatePresence>
+            <AnimatePresence>
+              {terminateAgent && <ReceptionistActionConfirmation
+                title={terminateAgent.stereotype === 'Studio Voice Design' ? 'Remove from team' : terminateAgentHasAppointments && terminateAgent.catalog_id == null ? 'Archive Receptionist' : 'Delete Receptionist'}
+                action={terminateAgent.stereotype === 'Studio Voice Design' ? 'Remove from team' : terminateAgentHasAppointments && terminateAgent.catalog_id == null ? 'Archive' : 'Delete'}
+                name={terminateAgent.first_name || terminateAgent.name}
+                description={terminateAgent.stereotype === 'Studio Voice Design' ? 'This returns your saved receptionist to the catalog. Their portrait, voice, profile, and history are preserved.' : terminateAgentHasAppointments && terminateAgent.catalog_id != null ? 'System receptionists with appointment history cannot be deleted or archived.' : terminateAgentHasAppointments ? 'This removes them from the active roster and preserves their record, portrait, voice, and history. You can restore them from Archived.' : 'This action cannot be undone.'}
+                error={teamActionError}
+                onClose={() => setTerminateAgent(null)}
+                onConfirm={async () => {
+                  try {
+                    setTeamActionError('');
+                    const result = await api.deleteAgent(terminateAgent.id);
+                    if (!result?.ok) throw new Error('Failed to remove receptionist');
+                    removeAgent(terminateAgent.id);
+                    setTerminateAgent(null);
+                    await loadArchivedAgents();
+                    await loadAgentScenarios();
+                  } catch (error) { setTeamActionError(error?.message || 'Could not remove receptionist. Please try again.'); }
+                }}
+              />}
             </AnimatePresence>
           </div>
         );

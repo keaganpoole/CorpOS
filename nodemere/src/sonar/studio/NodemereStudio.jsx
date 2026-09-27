@@ -1,10 +1,11 @@
 import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from 'framer-motion';
-import { ArrowLeft, ArrowRight, CalendarDays, Check, ChevronDown, Globe2, Headphones, Heart, Pause, Play, RotateCcw, SlidersHorizontal, Sparkles, UserRound } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, ChevronDown, Headphones, Pause, Play, RotateCcw, SlidersHorizontal, Sparkles } from 'lucide-react';
 import SplashScreenAlternate from '../../components/SplashScreenAlternate';
 import CubePreloader from '../components/CubePreloader';
 import useInstrumentTilt from '../hooks/useInstrumentTilt';
 import { api } from '../lib/api';
+import ReceptionistReviewDetails from './ReceptionistReviewDetails';
 import { ACCENT_LANDSCAPES, ACCENT_PALETTES, CHARACTERISTICS, DEFAULT_PREVIEW, SUB_ACCENTS, SUB_ACCENT_PALETTES, composeDescription, describeToneWeights, inferLoudnessFromToneWeights } from './voiceDefinition';
 import useAudition from './useAudition';
 import IntercomVoiceLine from '../nest/IntercomVoiceLine';
@@ -501,7 +502,8 @@ export default function NodemereStudio({ onReturn, onDirtyChange, onSaved, onOpe
         <div className="ns-review-stage-heading"><h1 ref={focusHeading} tabIndex={-1}>Review &amp; confirm</h1></div>
         <div className="ns-receptionist-preview-card">
           <div className="ns-receptionist-preview-image"><img src={selectedPortrait?.data_url} alt="Selected receptionist portrait" /><div className="ns-receptionist-preview-image-wash" /></div>
-           <div className="ns-receptionist-preview-body"><p className="ns-receptionist-preview-copy">A voice and presence designed for the first hello.</p><div className="ns-receptionist-preview-selections"><div><span className="ns-review-meta-icon"><UserRound size={16}/><small>GENDER</small></span><strong>{generation?.values?.gender || 'Custom'}</strong></div><div><span className="ns-review-meta-icon"><CalendarDays size={16}/><small>AGE</small></span><strong>{generation?.values?.age || 'Custom'}</strong></div><div><span className="ns-review-meta-icon"><Globe2 size={16}/><small>ACCENT</small></span><strong>{accentSelections(generation?.values || {}).map(accentName).join(' · ') || 'Custom'}</strong></div><div><span className="ns-review-meta-icon"><Heart size={16}/><small>PERSONALITY</small></span><strong>{describeToneWeights(generation?.values?.toneWeights || {}) || generation?.values?.tone || 'Custom'}</strong></div></div><div className="ns-receptionist-preview-actions"><button className="ns-text-button" disabled={saving} onClick={()=>setStage(PORTRAIT_STAGE)}><ArrowLeft size={14}/> Change portrait</button><button className="ns-primary" onClick={save} disabled={!name.trim()||saving||portraitBusy}>{saving?'Adding to your catalog…':'Add to your catalog'}<ArrowRight size={15}/></button></div>{error?<p role="alert" className="ns-error">{error}</p>:null}</div>
+           <div className="ns-receptionist-preview-body"><ReceptionistReviewDetails name={name} gender={generation?.values?.gender} age={generation?.values?.age} accent={accentSelections(generation?.values || {}).map(accentName).join(' · ')} personality={describeToneWeights(generation?.values?.toneWeights || {}) || generation?.values?.tone}/>
+            <div className="ns-receptionist-preview-actions"><button className="ns-text-button" disabled={saving} onClick={()=>setStage(PORTRAIT_STAGE)}><ArrowLeft size={14}/> Change portrait</button><button className="ns-primary" onClick={save} disabled={!name.trim()||saving||portraitBusy}>{saving?'Adding to your catalog…':'Add to receptionist catalog'}<ArrowRight size={15}/></button></div>{error?<p role="alert" className="ns-error">{error}</p>:null}</div>
         </div>
       </div>:null}
       {complete?<div className="ns-complete"><span className="ns-eyebrow"><Check size={14}/> ADDED TO YOUR CATALOG</span><h1 ref={focusHeading} tabIndex={-1}>Hello,<br/><span>{name}.</span></h1><p>Your receptionist and portrait are saved in your private catalog.<br/>Open the catalog and choose Hire when you're ready to add them to your team.</p><button className="ns-primary" onClick={()=>onOpenCatalog?.(saved?.created_receptionist_id)}>View your catalog<ArrowRight size={16}/></button><button className="ns-text-button" onClick={onReturn}>Return to Team</button>{error?<p role="alert" className="ns-error">{error}</p>:null}</div>:null}

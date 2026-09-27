@@ -51,6 +51,22 @@ class PrivateCatalogTests(unittest.TestCase):
             rows = private_created_catalog(ScopedClient(self.db), owner_id='owner', business_id=7)
         self.assertEqual([r['created_receptionist_id'] for r in rows], [1])
 
+    def test_catalog_get_route_includes_private_creation_and_stock_without_writes(self):
+        tree = ast.parse(Path(__file__).with_name('main.py').read_text(encoding='utf-8'))
+        node = next(n for n in tree.body if isinstance(n, ast.AsyncFunctionDef) and n.name == 'list_receptionist_catalog')
+        node.decorator_list = []
+        self.db.tables['receptionist_catalog'] = [{'id': 9, 'full_name': 'Stock'}]
+        namespace = dict(supabase=self.db, business_owner_id=lambda user: 'owner',
+                         load_business_by_user_id=lambda owner: {'id': 7},
+                         private_created_catalog=private_created_catalog, HTTPException=HTTPException,
+                         Depends=lambda f: None, get_current_user=lambda: None, logging=Mock())
+        exec(compile(ast.Module(body=[node], type_ignores=[]), 'catalog_get', 'exec'), namespace)
+        rows = asyncio.run(namespace['list_receptionist_catalog'](current_user={'id': 'manager'}))
+        self.assertEqual([row['id'] for row in rows], ['created:1', 9])
+        self.assertEqual(rows[0]['avatar'], self.ready['selected_portrait_url'])
+        self.assertEqual(rows[0]['voice'], self.ready['voice_preview_url'])
+        self.assertEqual(self.db.writes, [])
+
     def test_hire_uses_only_server_owned_scope_and_preserves_retry_flag(self):
         db = Mock()
         db.rpc.return_value.execute.return_value.data = {'receptionist': {'id': 20}, 'newly_hired': False}

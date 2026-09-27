@@ -1,4 +1,4 @@
--- Run after sql/2026_09_27_private_receptionist_catalog.sql. All fixture writes roll back.
+-- Run after both private catalog and created receptionist lifecycle migrations. All fixture writes roll back.
 begin;
 do $$
 declare
@@ -65,6 +65,65 @@ begin
   end if;
   if (select count(*) from public.hired_receptionists where business_id = business.id) <> before_count + 1 then
     raise exception 'Incorrect membership count';
+  end if;
+  perform public.nodemere_created_receptionist_lifecycle(creation_id, business.user_id, business.id, 'remove');
+  if not exists(select 1 from public.created_receptionists where id = creation_id and status = 'ready' and hired_receptionist_id = hired_id)
+    or not exists(select 1 from public.hired_receptionists where id = hired_id and status = 'catalog' and is_active = false and direction = 'none') then
+    raise exception 'Removal did not return to catalog and preserve membership history';
+  end if;
+  perform public.nodemere_created_receptionist_lifecycle(creation_id, business.user_id, business.id, 'remove');
+  perform public.nodemere_created_receptionist_lifecycle(creation_id, business.user_id, business.id, 'archive');
+  if (select status from public.created_receptionists where id = creation_id) <> 'archived' then
+    raise exception 'Catalog archive did not persist';
+  end if;
+  rejected := false;
+  begin
+    perform public.nodemere_hire_created_receptionist(creation_id, business.user_id, business.id, null);
+  exception when others then
+    if sqlerrm not like '%created_not_ready%' then raise; end if;
+    rejected := true;
+  end;
+  if not rejected then raise exception 'Archived creation was hired'; end if;
+  rejected := false;
+  begin
+    perform public.nodemere_created_receptionist_lifecycle(creation_id, business.user_id, -1, 'restore');
+  exception when others then
+    if sqlerrm not like '%created_not_found%' then raise; end if;
+    rejected := true;
+  end;
+  if not rejected then raise exception 'Cross-business lifecycle succeeded'; end if;
+  perform public.nodemere_created_receptionist_lifecycle(creation_id, business.user_id, business.id, 'restore');
+  if (select status from public.created_receptionists where id = creation_id) <> 'ready'
+    or (select is_active from public.hired_receptionists where id = hired_id) then
+    raise exception 'Restore hired instead of returning to catalog';
+  end if;
+  rejected := false;
+  begin
+    perform public.nodemere_hire_created_receptionist(creation_id, business.user_id, business.id, 0);
+  exception when others then
+    if sqlerrm not like '%created_plan_limit%' then raise; end if;
+    rejected := true;
+  end;
+  if not rejected then raise exception 'Rehire bypassed capacity'; end if;
+  retry := public.nodemere_hire_created_receptionist(creation_id, business.user_id, business.id, null);
+  if not (retry->>'newly_hired')::boolean or (retry->'receptionist'->>'id')::bigint <> hired_id
+    or (select count(*) from public.hired_receptionists where business_id = business.id) <> before_count + 1 then
+    raise exception 'Rehire failed to reuse membership';
+  end if;
+  if retry->'receptionist'->>'avatar' <> 'https://example.com/portrait.png'
+    or retry->'receptionist'->>'elevenlabs_voice_id' <> 'synthetic-test-voice' then
+    raise exception 'Lifecycle lost media';
+  end if;
+  rejected := false;
+  begin
+    perform public.nodemere_created_receptionist_lifecycle(creation_id, business.user_id, business.id, 'archive');
+  exception when others then
+    if sqlerrm not like '%created_invalid_transition%' then raise; end if;
+    rejected := true;
+  end;
+  if not rejected then raise exception 'Active team member archived through catalog'; end if;
+  if has_function_privilege('authenticated', 'public.nodemere_created_receptionist_lifecycle(bigint,uuid,bigint,text)', 'execute') then
+    raise exception 'Lifecycle RPC exposed to browser clients';
   end if;
   insert into public.created_receptionists(user_id, business_id, status) values (business.user_id, business.id, 'draft') returning id into draft_id;
   rejected := false;
