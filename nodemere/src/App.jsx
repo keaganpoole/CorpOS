@@ -30,6 +30,7 @@ import { visitorIntelligenceApi } from './lib/visitorIntelligenceApi';
 const VisitorsPage = lazy(() => import('./pages/VisitorsPage'));
 const ConceptsPage = lazy(() => import('./pages/concepts/ConceptsPage'));
 const DesignsPage = lazy(() => import('./pages/designs/DesignsPage'));
+const LogoPage = lazy(() => import('./pages/logo/LogoPage'));
 
 function DashboardGate() {
   const { session, profile, isLoading, workforce } = useAuth();
@@ -116,6 +117,10 @@ function AppContent() {
   const isVisitors = location.pathname.startsWith('/visitors');
   const isConcepts = location.pathname === '/concepts';
   const isDesigns = location.pathname === '/designs';
+
+  if (location.pathname === '/logo' || location.pathname === '/logo/') {
+    return <Suspense fallback={<div style={{ minHeight: '100vh', background: '#070b13' }} />}><LogoPage /></Suspense>;
+  }
 
   if (isConcepts) {
     return <Suspense fallback={<div style={{ minHeight: '100vh', background: '#0b0d0e' }} />}><ConceptsPage /></Suspense>;
