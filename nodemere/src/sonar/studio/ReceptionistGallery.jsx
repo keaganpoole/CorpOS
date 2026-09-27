@@ -1,29 +1,15 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Minus, Plus, User } from 'lucide-react';
 import { useReducedMotion } from 'framer-motion';
-import { galleryCells, zoomAt, MIN_GALLERY_ZOOM, avatarVideoUrl } from './catalogGeometry';
+import { galleryCells, zoomAt, MIN_GALLERY_ZOOM } from './catalogGeometry';
 import './receptionistGallery.css';
-
-function GalleryTileMedia({ person }) {
-  const ref = useRef(null);
-  const [visible, setVisible] = useState(false);
-  useEffect(() => {
-    const element = ref.current;
-    if (!element || !person.avatar_video) return;
-    const observer = new IntersectionObserver(([entry]) => setVisible(entry.isIntersecting), { rootMargin: '120px' });
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, [person.avatar_video]);
-  if (person.avatar_video) return <video ref={ref} src={visible ? avatarVideoUrl(person.avatar_video) : undefined} poster={person.avatar || undefined} autoPlay={visible} muted loop playsInline preload="none" aria-hidden="true" />;
-  if (person.avatar) return <img src={person.avatar} alt="" draggable="false" />;
-  return <span className="ns-gallery-placeholder"><User size={40}/><span>{person.full_name || 'Receptionist'}</span></span>;
-}
 
 export default function ReceptionistGallery({ receptionists, onSelect, paused, children }) {
   const DRAG_RESISTANCE = 0.78;
   const FOLLOW_STIFFNESS = 5.1;
   const INERTIA_DAMPING = 2.35;
   const rootRef = useRef(null), worldRef = useRef(null), tilesRef = useRef(new Map());
+  const tileRefCallbacks = useRef(new Map());
   const controlsRef = useRef(null);
   const [cells, setCells] = useState([]);
   const [zoomLevel, setZoomLevel] = useState(1);
@@ -31,12 +17,25 @@ export default function ReceptionistGallery({ receptionists, onSelect, paused, c
   const pausedRef = useRef(paused);
   pausedRef.current = paused;
 
+  const getTileRef = key => {
+    if (!tileRefCallbacks.current.has(key)) {
+      tileRefCallbacks.current.set(key, node => {
+        if (node) tilesRef.current.set(key, node);
+        else { tilesRef.current.delete(key); tileRefCallbacks.current.delete(key); }
+      });
+    }
+    return tileRefCallbacks.current.get(key);
+  };
+
   useEffect(() => {
     const root = rootRef.current;
     let size = { width: root.clientWidth, height: root.clientHeight };
     let current = { x: -110, y: -120, scale: 1 }, target = { ...current };
     let drag = null, moved = false;
-    let velocity = { x: 0, y: 0 }, lastTime = 0, frame, cellSignature = '';
+    let velocity = { x: 0, y: 0 }, lastTime = 0, frame = null, cellSignature = '';
+    const styleCache = new WeakMap();
+    let tick;
+    const scheduleTick = () => { if (frame === null) frame = requestAnimationFrame(tick); };
     const point = event => {
       const rect = root.getBoundingClientRect();
       return { x: event.clientX - rect.left, y: event.clientY - rect.top };
@@ -45,6 +44,7 @@ export default function ReceptionistGallery({ receptionists, onSelect, paused, c
       target = zoomAt(target, scale, anchor);
       setZoomLevel(target.scale);
       velocity = { x: 0, y: 0 };
+      scheduleTick();
     };
     controlsRef.current = action => setZoom(action === 'default' ? 1 : target.scale * (action === 'in' ? 1.2 : 1 / 1.2));
     const wheel = event => {
@@ -60,6 +60,7 @@ export default function ReceptionistGallery({ receptionists, onSelect, paused, c
       moved = false;
       velocity = { x: 0, y: 0 };
       root.classList.add('is-dragging');
+      scheduleTick();
     };
     const move = event => {
       if (pausedRef.current) return;
@@ -72,6 +73,7 @@ export default function ReceptionistGallery({ receptionists, onSelect, paused, c
       target.x += dx * DRAG_RESISTANCE; target.y += dy * DRAG_RESISTANCE;
       velocity = { x: Math.max(-1400, Math.min(1400, dx * DRAG_RESISTANCE / dt)), y: Math.max(-1400, Math.min(1400, dy * DRAG_RESISTANCE / dt)) };
       drag = { ...drag, ...p, time: now };
+      scheduleTick();
     };
     const release = event => {
       if (!drag) return;
@@ -79,6 +81,7 @@ export default function ReceptionistGallery({ receptionists, onSelect, paused, c
       if (root.hasPointerCapture(event.pointerId)) root.releasePointerCapture(event.pointerId);
       drag = null;
       root.classList.remove('is-dragging');
+      scheduleTick();
     };
     const cancel = event => { moved = true; release(event); velocity = { x: 0, y: 0 }; };
     const click = event => {
@@ -87,12 +90,13 @@ export default function ReceptionistGallery({ receptionists, onSelect, paused, c
     const key = event => {
       if (pausedRef.current || event.target.closest('button')) return;
       const offsets = { ArrowLeft: [100, 0], ArrowRight: [-100, 0], ArrowUp: [0, 100], ArrowDown: [0, -100] };
-      if (offsets[event.key]) { event.preventDefault(); target.x += offsets[event.key][0]; target.y += offsets[event.key][1]; }
+      if (offsets[event.key]) { event.preventDefault(); target.x += offsets[event.key][0]; target.y += offsets[event.key][1]; scheduleTick(); }
       if (event.key === '+' || event.key === '=') { event.preventDefault(); controlsRef.current('in'); }
       if (event.key === '-') { event.preventDefault(); controlsRef.current('out'); }
       if (event.key === '0') { event.preventDefault(); controlsRef.current('default'); }
     };
-    const tick = time => {
+    tick = time => {
+      frame = null;
       const dt = Math.min(.04, (time - (lastTime || time)) / 1000);
       lastTime = time;
       const blend = reducedMotion ? 1 : 1 - Math.exp(-FOLLOW_STIFFNESS * dt);
@@ -104,10 +108,11 @@ export default function ReceptionistGallery({ receptionists, onSelect, paused, c
       current.x += (target.x - current.x) * blend;
       current.y += (target.y - current.y) * blend;
       current.scale += (target.scale - current.scale) * blend;
-      worldRef.current.style.transform = `translate(${current.x}px,${current.y}px) scale(${current.scale})`;
+      const worldTransform = `translate(${current.x}px,${current.y}px) scale(${current.scale})`;
+      if (worldRef.current.style.transform !== worldTransform) worldRef.current.style.transform = worldTransform;
       const visible = galleryCells(current, size.width, size.height, receptionists.length);
       const signature = visible.map(cell => cell.key).join('|');
-      if (signature !== cellSignature) { cellSignature = signature; setCells(visible); }
+      if (signature !== cellSignature) { cellSignature = signature; setCells(visible); scheduleTick(); }
       for (const cell of visible) {
         const element = tilesRef.current.get(cell.key);
         if (!element) continue;
@@ -116,22 +121,27 @@ export default function ReceptionistGallery({ receptionists, onSelect, paused, c
         const centerDistance = Math.hypot(screenX - size.width / 2, screenY - size.height / 2);
         const edgeBlur = Math.min(1.5, Math.max(0, (centerDistance - 340) / 450) * 1.05);
         const edgeDim = Math.min(.36, Math.max(0, (centerDistance - 280) / 520) * .29);
-        element.style.setProperty('--tile-blur', `${edgeBlur.toFixed(2)}px`);
-        element.style.setProperty('--tile-dim', edgeDim.toFixed(3));
-        element.style.zIndex = '1';
+        const blurValue = `${edgeBlur.toFixed(2)}px`, dimValue = edgeDim.toFixed(3);
+        const previous = styleCache.get(element);
+        if (previous?.blur !== blurValue) element.style.setProperty('--tile-blur', blurValue);
+        if (previous?.dim !== dimValue) element.style.setProperty('--tile-dim', dimValue);
+        if (!previous) element.style.zIndex = '1';
+        styleCache.set(element, { blur: blurValue, dim: dimValue });
       }
-      frame = requestAnimationFrame(tick);
+      const stillFollowingTarget = Math.abs(target.x - current.x) > .02 || Math.abs(target.y - current.y) > .02 || Math.abs(target.scale - current.scale) > .0001;
+      const stillCoasting = !drag && !pausedRef.current && (Math.abs(velocity.x) > .1 || Math.abs(velocity.y) > .1);
+      if (stillFollowingTarget || stillCoasting) scheduleTick();
     };
-    const resize = new ResizeObserver(() => { size = { width: root.clientWidth, height: root.clientHeight }; });
+    const resize = new ResizeObserver(() => { size = { width: root.clientWidth, height: root.clientHeight }; scheduleTick(); });
     resize.observe(root);
     root.addEventListener('wheel', wheel, { passive: false });
     root.addEventListener('pointerdown', down); root.addEventListener('pointermove', move);
     root.addEventListener('pointerup', release); root.addEventListener('pointercancel', cancel);
     root.addEventListener('click', click, true);
     root.addEventListener('keydown', key);
-    frame = requestAnimationFrame(tick);
+    scheduleTick();
     return () => {
-      cancelAnimationFrame(frame); resize.disconnect(); controlsRef.current = null;
+      if (frame !== null) cancelAnimationFrame(frame); resize.disconnect(); controlsRef.current = null;
       root.removeEventListener('wheel', wheel); root.removeEventListener('pointerdown', down);
       root.removeEventListener('pointermove', move); root.removeEventListener('pointerup', release);
       root.removeEventListener('pointercancel', cancel);
@@ -144,10 +154,10 @@ export default function ReceptionistGallery({ receptionists, onSelect, paused, c
       {cells.map(cell => {
         const person = receptionists[cell.personIndex];
         return <button type="button" className="ns-gallery-tile" key={cell.key}
-          ref={node => { if (node) tilesRef.current.set(cell.key, node); else tilesRef.current.delete(cell.key); }}
-          style={{ left: cell.x, top: cell.y, width: cell.width, height: cell.height }}
+          ref={getTileRef(cell.key)}
+          style={{ left: cell.x, top: cell.y, width: cell.width, height: cell.height, zIndex: 1 }}
           aria-label={`Meet ${person.full_name || 'receptionist'}`} onClick={() => onSelect(cell.personIndex)}>
-          <GalleryTileMedia person={person} />
+          {person.avatar ? <img src={person.avatar} alt="" draggable="false" /> : <span className="ns-gallery-placeholder"><User size={40}/><span>{person.full_name || 'Receptionist'}</span></span>}
           <span className="ns-gallery-neon" aria-hidden="true"/>
         </button>;
       })}
