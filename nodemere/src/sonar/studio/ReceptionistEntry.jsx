@@ -28,7 +28,7 @@ function ChoiceCard({ primary = false, icon: Icon, eyebrow, title, copy, action,
       <span className="ns-eyebrow">{eyebrow}</span>
       <span className="ns-choice-card-icon"><Icon size={22} strokeWidth={1.5} /></span>
     </Part>
-    <Part className="ns-choice-card-title" {...reveal(.115)}>{title}</Part>
+    <Part className="ns-choice-card-title" data-title={typeof title === 'string' ? title : undefined} {...reveal(.115)}>{title}</Part>
     <Part className="ns-choice-card-copy" {...reveal(.155)}>{copy}</Part>
     <Part className="ns-choice-card-action" {...reveal(.035)}>{action}<ArrowRight size={17} /></Part>
   </button>;
