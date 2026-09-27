@@ -12,7 +12,7 @@ import ReceptionistGallery from '../studio/ReceptionistGallery';
 import IntercomVoiceLine from '../nest/IntercomVoiceLine';
 import { avatarVideoUrl } from '../studio/catalogGeometry';
 
-const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalogIds = [], hiredVoiceIds = [] }) => {
+const HireReceptionistModal = ({ onClose, onHire, embedded = false, initialCreatedId = null, hiredCatalogIds = [], hiredVoiceIds = [] }) => {
   const [receptionists, setReceptionists] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -56,10 +56,14 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
         (row) => !hiredIds.has(String(row.id)) && !hiredVoices.has(String(row.elevenlabs_voice_id || row.provider_voice_id || ''))
       ).map((row) => ({
         ...row,
-        catalog_id: row.catalog_id ?? row.id,
+        catalog_id: row.source ? (row.catalog_id ?? null) : (row.catalog_id ?? row.id),
       }));
 
       setReceptionists(availableReceptionists);
+      if (initialCreatedId != null) {
+        const createdIndex = availableReceptionists.findIndex(row => String(row.created_receptionist_id) === String(initialCreatedId));
+        if (createdIndex >= 0) setSelectedIndex(createdIndex);
+      }
     } catch (err) {
       console.error("HireReceptionistModal.jsx:event_46");
       setLoadError('The catalog couldn’t load. Please try again.');
@@ -195,15 +199,11 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
 
   const handleSelect = async (receptionist) => {
     if (hiringId) return;
-    const receptionistId = receptionist.catalog_id ?? receptionist.id;
+    const receptionistId = receptionist.created_receptionist_id ?? receptionist.custom_voice_id ?? receptionist.catalog_id ?? receptionist.id;
     setHiringId(receptionistId);
     setHireError('');
     try {
-      await onHire?.({
-        ...receptionist,
-        id: receptionistId,
-        catalog_id: receptionistId,
-      });
+      await onHire?.(receptionist);
       onClose?.();
     } catch (err) {
       console.error("HireReceptionistModal.jsx:event_113");
@@ -283,17 +283,17 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
                   <div className="ns-receptionist-preview-image-wash" />
                 </div>
                 <div className="ns-receptionist-preview-body">
-                  <span className="ns-eyebrow">AVAILABLE</span>
+                  <span className="ns-eyebrow">{person.source === 'created_receptionist' ? 'YOUR CREATION' : 'AVAILABLE'}</span>
                   <h2>{person.full_name || 'Receptionist'}</h2>
                   {getMbtiProfileSummary(person.personality?.mbti || person.personality_type, person.first_name || person.full_name) && <p className="ns-receptionist-preview-copy">{getMbtiProfileSummary(person.personality?.mbti || person.personality_type, person.first_name || person.full_name)}</p>}
                   <dl className="ns-catalog-review-meta">
-                    {person.age && <div><dt>Age</dt><dd>{person.age} years old</dd></div>}
+                    {person.age && <div><dt>Age</dt><dd>{String(person.age).match(/^\d+$/) ? `${person.age} years old` : person.age}</dd></div>}
                     {(person.personality?.mbti || person.personality_type) && <div><dt>Personality</dt><dd><button type="button" onClick={() => setPersonalityPerson(person)}>{person.personality?.mbti || person.personality_type}</button></dd></div>}
                   </dl>
                   {Array.isArray(person.traits) && person.traits.length > 0 && <div className="ns-catalog-review-traits"><span>Core traits</span><div>{person.traits.map((trait, i) => <span key={i}>{trait}</span>)}</div></div>}
                   <div className="ns-receptionist-preview-actions">
                     {person.voice ? <div className="ns-catalog-voice-preview"><button type="button" className="ns-take-play" aria-label={playingVoice === person.id ? 'Pause voice preview' : 'Play voice preview'} onClick={() => playVoice(person.voice, person.id)}>{playingVoice === person.id ? <Pause size={18}/> : <Play size={18}/>}</button><IntercomVoiceLine enabled={playingVoice === person.id} level={voiceLevel}/><span>{playingVoice === person.id ? 'Playing preview' : 'Preview voice'}</span></div> : <span className="ns-footnote">No voice preview</span>}
-                    <button type="button" className="ns-primary" disabled={Boolean(hiringId)} onClick={() => handleSelect(person)}>{hiringId === (person.catalog_id ?? person.id) ? <><Loader2 size={16} className="animate-spin"/> Hiring…</> : <>Hire {person.first_name || person.full_name || 'receptionist'}</>}</button>
+                    <button type="button" className="ns-primary" disabled={Boolean(hiringId)} onClick={() => handleSelect(person)}>{hiringId === (person.created_receptionist_id ?? person.custom_voice_id ?? person.catalog_id ?? person.id) ? <><Loader2 size={16} className="animate-spin"/> Hiring…</> : <>Hire {person.first_name || person.full_name || 'receptionist'}</>}</button>
                   </div>
                 </div>
               </section>
@@ -348,7 +348,7 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
                             {person.age && (
                               <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-bold tracking-wide text-white/50">
                                 <CalendarDays size={11} />
-                                <span>{person.age} years old</span>
+                                <span>{String(person.age).match(/^\d+$/) ? `${person.age} years old` : person.age}</span>
                               </span>
                             )}
                             {(person.personality?.mbti || person.personality_type) && (
@@ -436,7 +436,7 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
                             }}
                             className="mt-auto w-full h-11 bg-white text-black font-bold rounded-2xl tracking-wide flex items-center justify-center gap-2 hover:bg-white/90 transition-all active:scale-[0.98] shadow-lg shadow-white/5 disabled:opacity-60 disabled:cursor-not-allowed"
                           >
-                            {hiringId === (person.catalog_id ?? person.id) && <Loader2 size={16} className="animate-spin" />}
+                            {hiringId === (person.created_receptionist_id ?? person.custom_voice_id ?? person.catalog_id ?? person.id) && <Loader2 size={16} className="animate-spin" />}
                             ✨ Hire {person.first_name || person.full_name || 'Receptionist'}
                           </button>
                         )}

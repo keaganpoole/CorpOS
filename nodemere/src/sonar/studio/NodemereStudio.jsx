@@ -230,7 +230,7 @@ function AccentDna({ values, previewOption }) {
   </section>;
 }
 
-export default function NodemereStudio({ onReturn, onDirtyChange, onSaved, skipIntro = false, onSceneState }) {
+export default function NodemereStudio({ onReturn, onDirtyChange, onSaved, onOpenCatalog, skipIntro = false, onSceneState }) {
   const reducedMotion = useReducedMotion();
   const [canHoverFine,setCanHoverFine]=useState(()=>typeof window !== 'undefined' ? Boolean(window.matchMedia?.('(hover: hover) and (pointer: fine)').matches) : false);
   const [intro,setIntro]=useState(!skipIntro), [showWelcome,setShowWelcome]=useState(true), [identityReady,setIdentityReady]=useState(false), [mode,setMode]=useState('design'), [stage,setStage]=useState(0);
@@ -242,7 +242,7 @@ export default function NodemereStudio({ onReturn, onDirtyChange, onSaved, skipI
   const [previews,setPreviews]=useState(EMPTY_PREVIEWS), [generation,setGeneration]=useState(null), [selected,setSelected]=useState(null);
   const [portraitOptions,setPortraitOptions]=useState([]), [selectedPortrait,setSelectedPortrait]=useState(null), [portraitBusy,setPortraitBusy]=useState(false);
   const [busy,setBusy]=useState(false), [saving,setSaving]=useState(false), [error,setError]=useState(''), [name,setName]=useState('');
-  const [saved,setSaved]=useState(null), [hiring,setHiring]=useState(false), [cloneToken,setCloneToken]=useState('');
+  const [saved,setSaved]=useState(null), [cloneToken,setCloneToken]=useState('');
   const [cloneLink,setCloneLink]=useState('');
   const panel=useRef(null), heading=useRef(null), advance=useRef(null), mounted=useRef(true), dirty=useRef({design:false,clone:false});
   const returnToRoom=useRef(false), guidedSurface=useRef(null);
@@ -373,18 +373,11 @@ export default function NodemereStudio({ onReturn, onDirtyChange, onSaved, skipI
       const toneTraits=describeToneWeights(voiceValues.toneWeights).split(', ').filter(Boolean);
       const accentTraits=accentSelections(voiceValues).map(accentName);
       const traits=[...accentTraits.slice(0,6),...toneTraits].filter(Boolean).slice(0,6);
-      const result=await api.saveDesignedVoice({ticket:selected.ticket,voice_name:name.trim(),traits,gender:voiceValues.gender,age:voiceValues.age,portrait_image:selectedPortrait.data_url});
+      const result=await api.saveDesignedVoice({ticket:selected.ticket,voice_name:name.trim(),traits,gender:voiceValues.gender,age:voiceValues.age,portrait_image:selectedPortrait.data_url,preview_audio:selected.audio_base_64});
       if(mounted.current){setSaved(result);markDirty('design',false);setStage(COMPLETE_STAGE);}
+      await Promise.resolve(onSaved?.()).catch(()=>{});
     }catch(err){if(mounted.current)setError(err.message||'Your voice could not be saved.');}
     finally{if(mounted.current)setSaving(false);}
-  };
-  const hire=async()=>{
-    if(hiring)return;
-    if(saved.hired){onReturn();return;}
-    setHiring(true);setError('');
-    try{await api.hireReceptionist({custom_voice_id:saved.id,created_receptionist_id:saved.created_receptionist_id,source:'custom_voice'});setSaved(current=>({...current,hired:true}));await Promise.resolve(onSaved?.()).catch(()=>{});onReturn();}
-    catch(err){setError(`Your voice is saved in the catalog. ${err.message||'It could not be added to your team yet.'}`);}
-    finally{setHiring(false);}
   };
   const beginClone=async()=>{
     touch();setBusy(true);setError('');
@@ -508,10 +501,10 @@ export default function NodemereStudio({ onReturn, onDirtyChange, onSaved, skipI
         <div className="ns-review-stage-heading"><h1 ref={focusHeading} tabIndex={-1}>Review &amp; confirm</h1></div>
         <div className="ns-receptionist-preview-card">
           <div className="ns-receptionist-preview-image"><img src={selectedPortrait?.data_url} alt="Selected receptionist portrait" /><div className="ns-receptionist-preview-image-wash" /></div>
-           <div className="ns-receptionist-preview-body"><p className="ns-receptionist-preview-copy">A voice and presence designed for the first hello.</p><div className="ns-receptionist-preview-selections"><div><span className="ns-review-meta-icon"><UserRound size={16}/><small>GENDER</small></span><strong>{generation?.values?.gender || 'Custom'}</strong></div><div><span className="ns-review-meta-icon"><CalendarDays size={16}/><small>AGE</small></span><strong>{generation?.values?.age || 'Custom'}</strong></div><div><span className="ns-review-meta-icon"><Globe2 size={16}/><small>ACCENT</small></span><strong>{accentSelections(generation?.values || {}).map(accentName).join(' · ') || 'Custom'}</strong></div><div><span className="ns-review-meta-icon"><Heart size={16}/><small>PERSONALITY</small></span><strong>{describeToneWeights(generation?.values?.toneWeights || {}) || generation?.values?.tone || 'Custom'}</strong></div></div><div className="ns-receptionist-preview-actions"><button className="ns-text-button" disabled={saving} onClick={()=>setStage(PORTRAIT_STAGE)}><ArrowLeft size={14}/> Change portrait</button><button className="ns-primary" onClick={save} disabled={!name.trim()||saving||portraitBusy}>{saving?'Saving your receptionist…':'Save receptionist'}<ArrowRight size={15}/></button></div>{error?<p role="alert" className="ns-error">{error}</p>:null}</div>
+           <div className="ns-receptionist-preview-body"><p className="ns-receptionist-preview-copy">A voice and presence designed for the first hello.</p><div className="ns-receptionist-preview-selections"><div><span className="ns-review-meta-icon"><UserRound size={16}/><small>GENDER</small></span><strong>{generation?.values?.gender || 'Custom'}</strong></div><div><span className="ns-review-meta-icon"><CalendarDays size={16}/><small>AGE</small></span><strong>{generation?.values?.age || 'Custom'}</strong></div><div><span className="ns-review-meta-icon"><Globe2 size={16}/><small>ACCENT</small></span><strong>{accentSelections(generation?.values || {}).map(accentName).join(' · ') || 'Custom'}</strong></div><div><span className="ns-review-meta-icon"><Heart size={16}/><small>PERSONALITY</small></span><strong>{describeToneWeights(generation?.values?.toneWeights || {}) || generation?.values?.tone || 'Custom'}</strong></div></div><div className="ns-receptionist-preview-actions"><button className="ns-text-button" disabled={saving} onClick={()=>setStage(PORTRAIT_STAGE)}><ArrowLeft size={14}/> Change portrait</button><button className="ns-primary" onClick={save} disabled={!name.trim()||saving||portraitBusy}>{saving?'Adding to your catalog…':'Add to your catalog'}<ArrowRight size={15}/></button></div>{error?<p role="alert" className="ns-error">{error}</p>:null}</div>
         </div>
       </div>:null}
-      {complete?<div className="ns-complete"><span className="ns-eyebrow"><Check size={14}/> VOICE SAVED</span><h1 ref={focusHeading} tabIndex={-1}>Hello,<br/><span>{name}.</span></h1><p>A voice of their own. Ready for your front desk.<br/>Your receptionist is saved in the catalog.</p><button className="ns-primary" disabled={hiring} onClick={hire}>{hiring?'Adding to Team…':saved?.hired?'Return to Team':'Add to Team'}<ArrowRight size={16}/></button><button className="ns-text-button" onClick={onReturn}>Return to Team</button>{error?<p role="alert" className="ns-error">{error}</p>:null}</div>:null}
+      {complete?<div className="ns-complete"><span className="ns-eyebrow"><Check size={14}/> ADDED TO YOUR CATALOG</span><h1 ref={focusHeading} tabIndex={-1}>Hello,<br/><span>{name}.</span></h1><p>Your receptionist and portrait are saved in your private catalog.<br/>Open the catalog and choose Hire when you're ready to add them to your team.</p><button className="ns-primary" onClick={()=>onOpenCatalog?.(saved?.created_receptionist_id)}>View your catalog<ArrowRight size={16}/></button><button className="ns-text-button" onClick={onReturn}>Return to Team</button>{error?<p role="alert" className="ns-error">{error}</p>:null}</div>:null}
     </>:null}
     <div hidden={mode!=='clone'}>{cloneToken?<Suspense fallback={<CubePreloader/>}><Clone embedded active={mode==='clone'} sessionToken={cloneToken} skipSplash onDirty={()=>markDirty('clone',true)} onComplete={()=>markDirty('clone',false)} onFinish={onReturn}/></Suspense>:mode==='clone'?<div className="ns-clone-entry"><span className="ns-eyebrow">YOUR VOICE. A NEW POSSIBILITY.</span><h1 ref={focusHeading} tabIndex={-1}>Already one<br/><span>of a kind.</span></h1><p>Bring your own voice into Audition. Review your consent, record or upload a sample, then shape your receptionist.</p><button className="ns-primary" disabled={busy} onClick={beginClone}>{busy?'Preparing your session…':'Begin voice cloning'}<ArrowRight size={16}/></button><details className="ns-script"><summary>Continue an existing clone session <ChevronDown size={14}/></summary><label>Clone session link<input value={cloneLink} placeholder="Paste your Nodemere clone link" onChange={e=>{touch();setCloneLink(e.target.value);}}/></label><button className="ns-text-button" onClick={useCloneLink}>Continue session <ArrowRight size={13}/></button></details>{error?<p className="ns-error" role="alert">{error}</p>:null}</div>:null}</div>
     </div>

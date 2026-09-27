@@ -4,7 +4,7 @@ import { useReducedMotion } from 'framer-motion';
 import { galleryCells, zoomAt, MIN_GALLERY_ZOOM } from './catalogGeometry';
 import './receptionistGallery.css';
 
-const DEFAULT_GALLERY_ZOOM = 1.25;
+const DEFAULT_GALLERY_ZOOM = 1.4;
 
 export default function ReceptionistGallery({ receptionists, onSelect, paused, children }) {
   const DRAG_RESISTANCE = 0.78;

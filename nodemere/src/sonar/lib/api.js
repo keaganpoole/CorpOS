@@ -1,3 +1,5 @@
+import { receptionistHirePayload } from './receptionistHirePayload';
+
 /**
  * SONAR API Client — Connects to local backend controller
  * Handles REST fetches and WebSocket subscriptions
@@ -204,22 +206,7 @@ export const api = {
   restoreAgent: (agentId) => postJSON(`/api/agents/${agentId}/restore`, {}),
   getPendingRestarts: () => fetchJSON('/api/pending-restarts'),
   clearPendingRestart: (id) => deleteJSON(`/api/pending-restarts/${id}`),
-  hireReceptionist: (receptionist) => {
-    if (receptionist && typeof receptionist === 'object') {
-      const catalogId = receptionist.catalog_id
-        ?? receptionist.catalogId
-        ?? receptionist.receptionist_catalog_id
-        ?? receptionist.id;
-      return postJSON('/api/sonar/receptionists/hire', {
-        catalog_id: catalogId,
-        id: catalogId,
-        source: receptionist.source,
-        custom_voice_id: receptionist.custom_voice_id,
-        created_receptionist_id: receptionist.created_receptionist_id,
-      });
-    }
-    return postJSON('/api/sonar/receptionists/hire', { catalog_id: receptionist });
-  },
+  hireReceptionist: (receptionist) => postJSON('/api/sonar/receptionists/hire', receptionistHirePayload(receptionist)),
 
   // Control commands via REST (fallback when IPC unavailable)
   setRuntime: (mode) => postJSON('/api/control/runtime', { mode }),

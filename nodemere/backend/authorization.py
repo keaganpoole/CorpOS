@@ -25,7 +25,7 @@ current_tenant = ContextVar("nodemere_tenant", default=None)
 current_identity = ContextVar("nodemere_identity", default=None)
 
 BUSINESS_TABLES = frozenset({
-    "people", "appointments", "staff", "services", "call_logs", "hired_receptionists",
+    "people", "appointments", "staff", "services", "call_logs", "hired_receptionists", "created_receptionists",
     "scenarios", "flow_executions", "people_docs", "people_schema", "appointments_schema",
     "requests", "contracts", "custom_voices", "jobs", "purchased_numbers", "account_settings",
     "nest", "intercom", "intercom_usage_daily", "bugs", "reviews", "billing_overage_events", "scenario_events", "drop_ins",

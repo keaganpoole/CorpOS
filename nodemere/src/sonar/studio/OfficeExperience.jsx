@@ -12,6 +12,7 @@ import './studio.css';
 const Studio = lazy(() => import('./NodemereStudio'));
 export default function OfficeExperience({ initialDestination = 'entry', onReturn, onCreateStarted, onHire, onDirtyChange, onSaved, hiredCatalogIds = [], hiredVoiceIds = [], portraitAssets = STUDIO_PORTRAITS }) {
   const [destination, setDestination] = useState(initialDestination);
+  const [createdCatalogId, setCreatedCatalogId] = useState(null);
   const [ready, setReady] = useState(false), [failed, setFailed] = useState(false), [attempt, setAttempt] = useState(0);
   const [definition, setDefinition] = useState({ stage: 0, values: { toneWeights: {} }, previewOption: null, quiet: false, mode: 'design', playing: false });
   const reducedMotion = useReducedMotion();
@@ -32,6 +33,7 @@ export default function OfficeExperience({ initialDestination = 'entry', onRetur
       <button className="ns-return ns-catalog-back" onClick={()=>setDestination('entry')}><ArrowLeft size={15}/> Back</button>
       <HireReceptionistModal
         embedded
+        initialCreatedId={createdCatalogId}
         hiredCatalogIds={hiredCatalogIds}
         hiredVoiceIds={hiredVoiceIds}
         onClose={()=>setDestination('entry')}
@@ -40,6 +42,6 @@ export default function OfficeExperience({ initialDestination = 'entry', onRetur
         }}
       />
     </div>:null}
-    {destination==='studio'?<Suspense fallback={<div className="ns-office-loading"><CubePreloader size={28}/></div>}><Studio skipIntro onSceneState={updateScene} onReturn={onReturn} onDirtyChange={onDirtyChange} onSaved={onSaved}/></Suspense>:null}
+    {destination==='studio'?<Suspense fallback={<div className="ns-office-loading"><CubePreloader size={28}/></div>}><Studio skipIntro onSceneState={updateScene} onReturn={onReturn} onDirtyChange={onDirtyChange} onSaved={onSaved} onOpenCatalog={id=>{setCreatedCatalogId(id);setDestination('catalog');}}/></Suspense>:null}
   </div>;
 }

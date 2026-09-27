@@ -44,6 +44,7 @@ class VoiceSaveRequest(BaseModel):
     gender: Optional[Literal["Female", "Male", "Androgynous"]] = None
     age: Optional[Literal["Young adult", "Middle-aged", "Mature"]] = None
     portrait_image: Optional[str] = Field(default=None, max_length=12_000_000)
+    preview_audio: Optional[str] = Field(default=None, max_length=12_000_000)
 
 
 def candidate_ticket(candidate_id, description, owner_id, secret, now=None):
@@ -123,59 +124,106 @@ def design_voice(payload, *, api_key, owner_id):
     } for p in previews]}
 
 
+def _saved_catalog_result(row):
+    return {"id": row["id"], "voice_name": row.get("voice_name"), "voice_id": row.get("voice_id"),
+            "created_receptionist_id": row["id"]}
+
+
+def _upload_preview(db, audio, *, owner_id, candidate_id):
+    if not audio:
+        return None
+    try:
+        content = base64.b64decode(audio, validate=True)
+    except (ValueError, base64.binascii.Error):
+        raise HTTPException(400, "The selected voice preview is invalid.") from None
+    if not content or len(content) > 8_000_000:
+        raise HTTPException(400, "The selected voice preview is too large.")
+    storage = db.storage.from_("voices")
+    path = f"generated-receptionists/{owner_id}/{candidate_id}.mp3"
+    try:
+        storage.upload(path, content, {"content-type": "audio/mpeg", "upsert": "true"})
+        return storage.get_public_url(path)
+    except Exception:
+        raise HTTPException(503, "The selected voice preview could not be saved.") from None
+
+
 def save_voice(payload, *, db, api_key, owner_id, business_id):
     if not api_key:
         raise HTTPException(503, "Voice Design is not configured on this server.")
     candidate = verify_ticket(payload.ticket, owner_id, api_key)
+    def existing():
+        rows = (db.table("created_receptionists").select("*").eq("user_id", str(owner_id))
+                .eq("business_id", business_id).eq("design_candidate_id", candidate["id"]).limit(1).execute().data or [])
+        return rows[0] if rows else None
+    row = existing()
+    if row and row.get("status") in {"ready", "converted"} and row.get("voice_id"):
+        return _saved_catalog_result(row)
+    if row and row.get("status") != "draft":
+        raise HTTPException(409, "This voice save is still being confirmed. Contact support before saving it again.")
+    try:
+        if row:
+            reserved = (db.table("created_receptionists").update({"status": "generating"})
+                        .eq("id", row["id"]).eq("user_id", str(owner_id)).eq("business_id", business_id)
+                        .eq("status", "draft").execute().data or [])
+        else:
+            reserved = db.table("created_receptionists").insert({
+                "user_id": str(owner_id), "business_id": business_id, "status": "generating",
+                "design_candidate_id": candidate["id"], "full_name": payload.voice_name,
+                "first_name": payload.voice_name.split()[0],
+            }).execute().data or []
+    except Exception:
+        row = existing()
+        if row and row.get("status") in {"ready", "converted"} and row.get("voice_id"):
+            return _saved_catalog_result(row)
+        raise HTTPException(409, "This voice save is already being processed. Please wait before trying again.") from None
+    if not reserved:
+        raise HTTPException(409, "This voice save is already being processed.")
+    row = reserved[0]
+    def update(values):
+        return (db.table("created_receptionists").update(values).eq("id", row["id"])
+                .eq("user_id", str(owner_id)).eq("business_id", business_id).execute().data or [])
     business_name = "Nodemere"
     try:
         business_rows = db.table("businesses").select("name").eq("id", business_id).limit(1).execute().data or []
-        business_name = str((business_rows[0] or {}).get("name") or "Nodemere").strip() or "Nodemere"
+        if business_rows:
+            business_name = str(business_rows[0].get("name") or "Nodemere").strip() or "Nodemere"
     except Exception:
-        business_name = "Nodemere"
+        pass
     voice_description = candidate["description"]
     if business_name.lower() not in voice_description.lower():
         voice_description = f"{voice_description.rstrip()} The receptionist represents {business_name} and should sound natural when welcoming callers to the business."
-    row_id = str(uuid5(NAMESPACE_URL, f"nodemere:voice-design:{owner_id}:{candidate['id']}"))
-    profile = {"full_name": payload.voice_name, "first_name": payload.voice_name.split()[0],
-               "description": voice_description, "traits": [str(t)[:40] for t in payload.traits],
-               "gender": payload.gender.lower() if payload.gender else None,
-               "stereotype": "Studio Voice Design"}
-    portrait_url = upload_portrait(db, payload.portrait_image, owner_id=str(owner_id), voice_id=row_id)
-    if portrait_url:
-        profile["avatar"] = portrait_url
+    asset_id = str(uuid5(NAMESPACE_URL, f"nodemere:voice-design:{owner_id}:{candidate['id']}"))
+    try:
+        portrait_url = upload_portrait(db, payload.portrait_image, owner_id=str(owner_id), voice_id=asset_id)
+        preview_url = _upload_preview(db, payload.preview_audio, owner_id=str(owner_id), candidate_id=asset_id)
+    except Exception:
+        update({"status": "draft"})  # No provider write was attempted; retry is safe.
+        raise
     try:
         voice = provider_post("", {"voice_name": payload.voice_name, "voice_description": voice_description,
                                    "generated_voice_id": candidate["id"],
                                    "gender": payload.gender.lower() if payload.gender else None}, api_key)
     except HTTPException as error:
-        # Retry only a definitive rejection. Timeouts may already have created
-        # the provider voice; preserve the reservation for reconciliation.
+        if getattr(error, "provider_rejected", False):
+            update({"status": "draft"})
+        # Ambiguous timeouts keep the reservation; never create the provider voice twice.
         raise
     voice_id = voice.get("voice_id")
     if not voice_id:
         raise HTTPException(502, "The provider did not confirm a saved voice. Contact support before trying again.")
-    profile["voice"] = voice.get("preview_url")
     try:
-        created = db.table("created_receptionists").insert({
-            "user_id": str(owner_id),
-            "business_id": business_id,
-            "status": "ready",
-            "full_name": payload.voice_name,
-            "first_name": payload.voice_name.split()[0],
-            "gender": payload.gender,
-            "age": payload.age,
-            "description": voice_description,
-            "traits": [str(t)[:40] for t in payload.traits],
-            "voice_id": voice_id,
-            "voice_name": payload.voice_name,
-            "voice_description": voice_description,
+        created = update({
+            "status": "ready", "full_name": payload.voice_name, "first_name": payload.voice_name.split()[0],
+            "gender": payload.gender, "age": payload.age, "description": voice_description,
+            "traits": [str(t)[:40] for t in payload.traits], "voice_id": voice_id,
+            "voice_name": payload.voice_name, "voice_description": voice_description,
+            "voice_preview_url": preview_url or voice.get("preview_url"),
             "portrait_options": ([{"id": "selected", "url": portrait_url}] if portrait_url else []),
             "selected_portrait_id": "selected" if portrait_url else None,
             "selected_portrait_url": portrait_url,
-        }).execute().data
+        })
     except Exception:
-        raise HTTPException(503, "Voice saved, but audition storage is not ready. Apply the created_receptionists migration before continuing.") from None
-    created_row = (created or [{}])[0]
-    return {"id": row_id, "voice_name": payload.voice_name, "voice_id": voice_id,
-            "created_receptionist_id": created_row.get("id")}
+        raise HTTPException(503, "Your voice was saved, but the catalog could not confirm it. Contact support before retrying.") from None
+    if not created:
+        raise HTTPException(503, "Your voice was saved, but the catalog could not confirm it. Contact support before retrying.")
+    return _saved_catalog_result(created[0])

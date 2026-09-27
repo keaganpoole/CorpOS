@@ -7219,6 +7219,7 @@ async def check_document_upload_status_tool(request: Request):
 
 from .voice_design import VoiceDesignRequest, VoiceSaveRequest, design_voice, save_voice
 from .portrait_generation import PortraitGenerationRequest, generate_portraits
+from .receptionist_catalog import private_created_catalog, hire_created_receptionist
 
 
 @app.post('/api/sonar/studio/design', tags=['Nodemere Studio'])
@@ -12716,152 +12717,71 @@ async def hire_receptionist(payload: dict, current_user: dict = Depends(get_curr
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="catalog_id is required")
 
     current_user_id = business_owner_id(current_user)
-    plan_context = require_plan_access(current_user_id, "receptionists")
-    enforce_plan_limit(
-        plan_context,
-        "receptionists",
-        count_active_receptionists(current_user_id),
-        "max_receptionists",
-    )
     try:
-        created_draft = None
+        business = load_business_by_user_id(current_user_id)
+        if not business:
+            raise HTTPException(404, "Business not found")
+        business_id = business["id"]
+        plan_context = require_plan_access(current_user_id, "receptionists")
         if created_receptionist_id:
-            draft_response = (
-                supabase.table("created_receptionists")
-                .select("*")
-                .eq("id", str(created_receptionist_id))
-                .eq("user_id", current_user_id)
-                .limit(1)
-                .execute()
+            # Dedicated server-only RPC; SQL rechecks owner/business and locks the creation.
+            result = hire_created_receptionist(
+                supabase_admin.raw, created_id=created_receptionist_id, owner_id=current_user_id,
+                business_id=business_id, limit=plan_context["entitlements"].get("max_receptionists"),
             )
-            created_draft = (draft_response.data or [None])[0]
-            if not created_draft:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Created receptionist not found")
-            if created_draft.get("status") == "converted" and created_draft.get("hired_receptionist_id"):
-                return load_receptionist_by_id(str(created_draft["hired_receptionist_id"]))
-            custom_voice_id = created_draft.get("voice_id") or custom_voice_id
-            source = "custom_voice"
-            is_voice_clone_hire = True
-        if created_receptionist_id:
-            catalog_row = {
-                "provider_voice_id": created_draft.get("voice_id"),
-                "full_name": created_draft.get("full_name"),
-                "first_name": created_draft.get("first_name"),
-                "description": created_draft.get("description"),
-                "traits": created_draft.get("traits"),
-                "age": created_draft.get("age"),
-                "gender": created_draft.get("gender"),
-                "avatar": created_draft.get("selected_portrait_url"),
-                "voice": None,
-                "stereotype": "Studio Voice Design",
-            }
-        elif is_voice_clone_hire:
-            voice_response = (
-                supabase.table("custom_voices")
-                .select("*")
-                .eq("id", str(custom_voice_id or str(catalog_id).replace("voice-clone:", "", 1)))
-                .limit(1)
-                .execute()
-            )
-            catalog_row = (voice_response.data or [None])[0]
-            if not catalog_row:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Voice clone not found")
-            if not catalog_row.get("provider_voice_id"):
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Voice clone is missing a voice id")
-            owner_id = catalog_row.get("user_id")
-            if owner_id and str(owner_id) != current_user_id:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Voice clone not found")
+            created = result["receptionist"]
+            if not result["newly_hired"]:
+                return created
         else:
-            catalog_response = (
-                supabase.table("receptionist_catalog")
-                .select("*")
-                .eq("id", str(catalog_id))
-                .limit(1)
-                .execute()
-            )
-            catalog_row = (catalog_response.data or [None])[0]
-            if not catalog_row:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Catalog receptionist not found")
-
-        business_response = (
-            supabase.table("businesses")
-            .select("id")
-            .eq("user_id", current_user_id)
-            .limit(1)
-            .execute()
-        )
-        business_row = (business_response.data or [None])[0]
-
-        if created_receptionist_id:
-            draft_age = created_draft.get("age")
-            if isinstance(draft_age, str) and not draft_age.strip().isdigit():
-                draft_age = None
-            insert_payload = {
-                "catalog_id": None,
-                "full_name": created_draft.get("full_name"),
-                "description": created_draft.get("description"),
-                "stereotype": "Studio Voice Design",
-                "avatar": created_draft.get("selected_portrait_url"),
-                "traits": created_draft.get("traits") or [],
-                "voice": None,
-                "age": int(draft_age) if draft_age is not None else None,
-                "first_name": created_draft.get("first_name"),
-                "gender": created_draft.get("gender"),
-                "is_active": True,
-                "direction": "all",
-                "user_id": current_user_id,
-                "business_id": business_row.get("id") if business_row else None,
-                "elevenlabs_voice_id": created_draft.get("voice_id"),
-            }
-        elif is_voice_clone_hire:
-            normalized = normalize_custom_voice_receptionist(catalog_row)
-            insert_payload = {
-                "catalog_id": None,
-                "full_name": normalized.get("full_name"),
-                "description": normalized.get("description"),
-                "stereotype": normalized.get("stereotype"),
-                "avatar": normalized.get("avatar"),
-                "traits": normalized.get("traits"),
-                "voice": normalized.get("voice"),
-                "age": normalized.get("age"),
-                "first_name": normalized.get("first_name"),
-                "gender": normalized.get("gender"),
-                "is_active": True,
-                "direction": "all",
-                "user_id": current_user_id,
-                "business_id": business_row.get("id") if business_row else None,
-                "elevenlabs_voice_id": catalog_row.get("provider_voice_id"),
-            }
-        else:
-            insert_payload = {
-                "catalog_id": catalog_row.get("id"),
-                "full_name": catalog_row.get("full_name"),
-                "description": catalog_row.get("description"),
-                "stereotype": catalog_row.get("stereotype"),
-                "avatar": catalog_row.get("avatar"),
-                "traits": catalog_row.get("traits"),
-                "voice": catalog_row.get("voice"),
-                "age": catalog_row.get("age"),
-                "first_name": catalog_row.get("first_name"),
-                "gender": catalog_row.get("gender"),
-                "is_active": True,
-                "direction": "all",
-                "user_id": current_user_id,
-                "business_id": business_row.get("id") if business_row else None,
-                "elevenlabs_voice_id": catalog_row.get("elevenlabs_voice_id") or catalog_row.get("elevenlabs_agent_id"),
-            }
-        response = supabase.table("hired_receptionists").insert(insert_payload).execute()
-        created = response.data[0] if response.data else insert_payload
-        if created_receptionist_id and created.get("id"):
-            supabase.table("created_receptionists").update({
-                "status": "converted",
-                "hired_receptionist_id": created.get("id"),
-                "converted_at": datetime.now(timezone.utc).isoformat(),
-            }).eq("id", str(created_receptionist_id)).eq("user_id", current_user_id).execute()
-        clear_inbound_call_boot_cache(created.get("business_id") or (business_row or {}).get("id"))
+            if is_voice_clone_hire:
+                voice_response = (
+                    supabase.table("custom_voices").select("*")
+                    .eq("id", str(custom_voice_id or str(catalog_id).replace("voice-clone:", "", 1)))
+                    .limit(1).execute()
+                )
+                catalog_row = (voice_response.data or [None])[0]
+                if not catalog_row or (catalog_row.get("user_id") and str(catalog_row["user_id"]) != current_user_id):
+                    raise HTTPException(404, "Voice clone not found")
+                if not catalog_row.get("provider_voice_id"):
+                    raise HTTPException(400, "Voice clone is missing a voice id")
+                # Legacy custom-voice identifiers cannot bypass creation status/atomic hiring.
+                linked = (supabase.table("created_receptionists").select("id")
+                          .eq("user_id", current_user_id).eq("business_id", business_id)
+                          .eq("voice_id", catalog_row["provider_voice_id"]).limit(1).execute().data or [])
+                if linked:
+                    result = hire_created_receptionist(
+                        supabase_admin.raw, created_id=linked[0]["id"], owner_id=current_user_id,
+                        business_id=business_id, limit=plan_context["entitlements"].get("max_receptionists"),
+                    )
+                    created = result["receptionist"]
+                    if not result["newly_hired"]:
+                        return created
+                else:
+                    enforce_plan_limit(plan_context, "receptionists", count_active_receptionists(current_user_id), "max_receptionists")
+                    normalized = normalize_custom_voice_receptionist(catalog_row)
+                    insert_payload = {key: normalized.get(key) for key in (
+                        "full_name", "description", "stereotype", "avatar", "traits", "voice", "age", "first_name", "gender"
+                    )}
+                    insert_payload.update(catalog_id=None, elevenlabs_voice_id=catalog_row["provider_voice_id"])
+            else:
+                enforce_plan_limit(plan_context, "receptionists", count_active_receptionists(current_user_id), "max_receptionists")
+                catalog_response = (supabase.table("receptionist_catalog").select("*")
+                                    .eq("id", str(catalog_id)).limit(1).execute())
+                catalog_row = (catalog_response.data or [None])[0]
+                if not catalog_row:
+                    raise HTTPException(404, "Catalog receptionist not found")
+                insert_payload = {key: catalog_row.get(key) for key in (
+                    "full_name", "description", "stereotype", "avatar", "traits", "voice", "age", "first_name", "gender"
+                )}
+                insert_payload.update(catalog_id=catalog_row["id"], elevenlabs_voice_id=catalog_row.get("elevenlabs_voice_id") or catalog_row.get("elevenlabs_agent_id"))
+            if not is_voice_clone_hire or not linked:
+                insert_payload.update(is_active=True, direction="all", user_id=current_user_id, business_id=business_id)
+                response = supabase.table("hired_receptionists").insert(insert_payload).execute()
+                created = response.data[0] if response.data else insert_payload
+        clear_inbound_call_boot_cache(created.get("business_id") or business_id)
         claim_nest_milestone(
             supabase,
-            business_id=created.get("business_id") or (business_row or {}).get("id"),
+            business_id=created.get("business_id") or business_id,
             user_id=created.get("user_id") or current_user_id,
             milestone_key="first_receptionist_hired",
             title="First receptionist hired",
@@ -12895,6 +12815,15 @@ async def list_receptionist_catalog(current_user: dict = Depends(get_current_use
         for row in (response.data or [])
         if row.get("id") is not None
     ]
+    owner_id = business_owner_id(current_user)
+    business = load_business_by_user_id(owner_id)
+    if not business:
+        raise HTTPException(404, "Business not found")
+    created_rows = private_created_catalog(supabase, owner_id=owner_id, business_id=business["id"])
+    created_voice_ids = {row.get("voice_id") for row in (
+        supabase.table("created_receptionists").select("voice_id")
+        .eq("user_id", owner_id).eq("business_id", business["id"]).execute().data or []
+    )}
     clone_rows = []
     try:
         custom_voice_response = (
@@ -12902,15 +12831,17 @@ async def list_receptionist_catalog(current_user: dict = Depends(get_current_use
             .select("id,user_id,provider_voice_id,voice_name,speaker_name,status,created_at,metadata")
             .in_("status", ["ready", "requires_verification"])
             .not_.is_("provider_voice_id", "null")
-            .or_(f"user_id.eq.{current_user.id},user_id.is.null")
+            .or_(f"user_id.eq.{owner_id},user_id.is.null")
             .order("created_at", desc=True)
             .execute()
         )
         for row in custom_voice_response.data or []:
-            clone_rows.append(normalize_custom_voice_receptionist(row))
-    except Exception as exc:
+            if row.get("provider_voice_id") not in created_voice_ids:
+                clone_rows.append(normalize_custom_voice_receptionist(row))
+    except Exception:
         logging.warning('main.list_receptionist_catalog.event_9915')
-    return [*catalog_rows, *clone_rows]
+    return [*created_rows, *catalog_rows, *clone_rows]
+
 
 
 def _voice_catalog_payload(raw: dict, *, availability: str = "available") -> dict:
