@@ -1,8 +1,23 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Minus, Plus, User } from 'lucide-react';
 import { useReducedMotion } from 'framer-motion';
-import { galleryCells, zoomAt, MIN_GALLERY_ZOOM } from './catalogGeometry';
+import { galleryCells, zoomAt, MIN_GALLERY_ZOOM, avatarVideoUrl } from './catalogGeometry';
 import './receptionistGallery.css';
+
+function GalleryTileMedia({ person }) {
+  const ref = useRef(null);
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const element = ref.current;
+    if (!element || !person.avatar_video) return;
+    const observer = new IntersectionObserver(([entry]) => setVisible(entry.isIntersecting), { rootMargin: '120px' });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [person.avatar_video]);
+  if (person.avatar_video) return <video ref={ref} src={visible ? avatarVideoUrl(person.avatar_video) : undefined} poster={person.avatar || undefined} autoPlay={visible} muted loop playsInline preload="none" aria-hidden="true" />;
+  if (person.avatar) return <img src={person.avatar} alt="" draggable="false" />;
+  return <span className="ns-gallery-placeholder"><User size={40}/><span>{person.full_name || 'Receptionist'}</span></span>;
+}
 
 export default function ReceptionistGallery({ receptionists, onSelect, paused, children }) {
   const DRAG_RESISTANCE = 0.78;
@@ -132,7 +147,7 @@ export default function ReceptionistGallery({ receptionists, onSelect, paused, c
           ref={node => { if (node) tilesRef.current.set(cell.key, node); else tilesRef.current.delete(cell.key); }}
           style={{ left: cell.x, top: cell.y, width: cell.width, height: cell.height }}
           aria-label={`Meet ${person.full_name || 'receptionist'}`} onClick={() => onSelect(cell.personIndex)}>
-          {person.avatar ? <img src={person.avatar} alt="" draggable="false" /> : <span className="ns-gallery-placeholder"><User size={40}/><span>{person.full_name || 'Receptionist'}</span></span>}
+          <GalleryTileMedia person={person} />
           <span className="ns-gallery-neon" aria-hidden="true"/>
         </button>;
       })}

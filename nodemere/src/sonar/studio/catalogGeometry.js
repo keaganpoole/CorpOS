@@ -1,6 +1,13 @@
 export const TILE_WIDTH = 210;
 export const TILE_GAP = 4;
-export const MIN_GALLERY_ZOOM = 0.75;
+export const MIN_GALLERY_ZOOM = 0.9;
+const AVATAR_VIDEO_BASE = 'https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/avatars/videos';
+export function avatarVideoUrl(value) {
+  if (!value) return '';
+  const path = String(value).trim();
+  if (/^https?:\/\//i.test(path)) return path;
+  return `${AVATAR_VIDEO_BASE}/${path.split('/').map(encodeURIComponent).join('/')}`;
+}
 const HEIGHTS = [190, 286, 224, 334];
 const PERIOD = HEIGHTS.reduce((sum, height) => sum + height + TILE_GAP, 0);
 export const wrap = (value, length) => ((value % length) + length) % length;
@@ -23,8 +30,9 @@ export function galleryCells(view, width, height, count) {
         const tileHeight = HEIGHTS[wrap(slot + column, HEIGHTS.length)];
         if (y + tileHeight >= top && y <= bottom) {
           const row = cycle * HEIGHTS.length + slot;
+          const personIndex = wrap(column * 7 + row * 3 + cycle, count);
           cells.push({ key: `${column}:${row}`, x: column * step, y, width: TILE_WIDTH,
-            height: tileHeight, personIndex: wrap(column * 7 + row * 3 + cycle, count) });
+            height: tileHeight, personIndex });
         }
         y += tileHeight + TILE_GAP;
       }

@@ -9,6 +9,8 @@ import { api } from '../lib/api';
 import CubePreloader from '../components/CubePreloader';
 import MbtiPersonalityModal from '../components/MbtiPersonalityModal';
 import ReceptionistGallery from '../studio/ReceptionistGallery';
+import IntercomVoiceLine from '../nest/IntercomVoiceLine';
+import { avatarVideoUrl } from '../studio/catalogGeometry';
 
 const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalogIds = [], hiredVoiceIds = [] }) => {
   const [receptionists, setReceptionists] = useState([]);
@@ -16,10 +18,14 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
   const [playingVoice, setPlayingVoice] = useState(null);
+  const [voiceLevel, setVoiceLevel] = useState(0);
   const [hiringId, setHiringId] = useState(null);
   const [hireError, setHireError] = useState('');
   const [personalityPerson, setPersonalityPerson] = useState(null);
   const audioRef = useRef(null);
+  const audioContextRef = useRef(null);
+  const analyserRef = useRef(null);
+  const levelFrameRef = useRef(0);
   const detailRef = useRef(null);
   const [selectedIndex, setSelectedIndex] = useState(null);
   const [loadError, setLoadError] = useState('');
@@ -66,11 +72,13 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
     loadReceptionists();
   }, [hiredCatalogKey, hiredVoiceKey]);
 
-  useEffect(() => () => { audioRef.current?.pause(); }, []);
+  useEffect(() => () => { audioRef.current?.pause(); cancelAnimationFrame(levelFrameRef.current); audioContextRef.current?.close(); }, []);
 
   const closeDetail = () => {
     audioRef.current?.pause();
+    cancelAnimationFrame(levelFrameRef.current);
     setPlayingVoice(null);
+    setVoiceLevel(0);
     setSelectedIndex(null);
     setHireError('');
   };
@@ -125,6 +133,7 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
   }, [embedded, isAnimating, receptionists.length]);
 
   const playVoice = (voiceUrl, receptionistId) => {
+    cancelAnimationFrame(levelFrameRef.current);
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current = null;
@@ -132,21 +141,56 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
 
     if (playingVoice === receptionistId) {
       setPlayingVoice(null);
+      setVoiceLevel(0);
       return;
     }
 
-    const audio = new Audio(voiceUrl);
+    const audio = new Audio();
+    audio.crossOrigin = 'anonymous';
+    audio.src = voiceUrl;
     audioRef.current = audio;
-    setPlayingVoice(receptionistId);
-
-    audio.play().catch(err => {
-      console.error("HireReceptionistModal.jsx:event_96");
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (AudioContext) {
+      try {
+        audioContextRef.current ||= new AudioContext();
+        const context = audioContextRef.current;
+        const analyser = context.createAnalyser();
+        analyser.fftSize = 256;
+        const source = context.createMediaElementSource(audio);
+        source.connect(analyser);
+        analyser.connect(context.destination);
+        analyserRef.current = analyser;
+      } catch { analyserRef.current = null; }
+    }
+    const stop = () => {
+      cancelAnimationFrame(levelFrameRef.current);
       setPlayingVoice(null);
-    });
-
-    audio.onended = () => {
-      setPlayingVoice(null);
+      setVoiceLevel(0);
     };
+    audio.onended = stop;
+    audio.onerror = stop;
+    const start = async () => {
+      try {
+        await audioContextRef.current?.resume();
+        await audio.play();
+        setPlayingVoice(receptionistId);
+        const samples = new Uint8Array(analyserRef.current?.frequencyBinCount || 0);
+        const sample = () => {
+          if (audioRef.current !== audio) return;
+          if (analyserRef.current) {
+            analyserRef.current.getByteTimeDomainData(samples);
+            let sum = 0;
+            for (const value of samples) { const amplitude = (value - 128) / 128; sum += amplitude * amplitude; }
+            setVoiceLevel(Math.sqrt(sum / samples.length));
+          }
+          levelFrameRef.current = requestAnimationFrame(sample);
+        };
+        levelFrameRef.current = requestAnimationFrame(sample);
+      } catch {
+        stop();
+      }
+    };
+    start();
   };
 
   const handleSelect = async (receptionist) => {
@@ -212,7 +256,6 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        {embedded && <button type="button" className="ns-gallery-detail-close" disabled={Boolean(hiringId)} onClick={closeDetail}><X size={14}/> Back to gallery</button>}
         {!embedded && <div className="text-center mb-10 space-y-2">
           <h1 className="text-xs uppercase tracking-[6px] font-bold text-white/20">RECEPTIONIST CATALOG</h1>
           <p className="text-2xl font-semibold tracking-tight text-white">Hire a Receptionist</p>
@@ -230,7 +273,28 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
         ) : (
           <>
             {/* Card Carousel — 3D perspective */}
-            <div className="relative w-full aspect-[2/3] mb-6" style={{ perspective: '1500px' }}>
+            {embedded ? receptionists.filter((_, index) => index === selectedIndex).map(person => (
+              <section className={`ns-receptionist-preview-card ns-catalog-review ${person.avatar_video ? 'ns-catalog-video-review' : ''}`} key={person.id || person.full_name}>
+                <div className="ns-receptionist-preview-image">
+                  {person.avatar_video ? <video src={avatarVideoUrl(person.avatar_video)} poster={person.avatar || undefined} autoPlay muted loop playsInline preload="metadata" aria-label={`${person.full_name || 'Receptionist'} video portrait`} /> : person.avatar ? <img src={person.avatar} alt={person.full_name || 'Receptionist'} /> : <div className="ns-gallery-placeholder"><User size={64}/></div>}
+                  <div className="ns-receptionist-preview-image-wash" />
+                </div>
+                <div className="ns-receptionist-preview-body">
+                  <span className="ns-eyebrow">YOUR NEXT FIRST HELLO</span>
+                  <h2>{person.full_name || 'Receptionist'}</h2>
+                  {(person.description || person.bio) && <p className="ns-receptionist-preview-copy">{person.description || person.bio}</p>}
+                  <dl className="ns-catalog-review-meta">
+                    {person.age && <div><dt>Age</dt><dd>{person.age} years old</dd></div>}
+                    {(person.personality?.mbti || person.personality_type) && <div><dt>Personality</dt><dd><button type="button" onClick={() => setPersonalityPerson(person)}>{person.personality?.mbti || person.personality_type}</button></dd></div>}
+                  </dl>
+                  {Array.isArray(person.traits) && person.traits.length > 0 && <div className="ns-catalog-review-traits"><span>Core traits</span><div>{person.traits.map((trait, i) => <span key={i}>{trait}</span>)}</div></div>}
+                  <div className="ns-receptionist-preview-actions">
+                    {person.voice ? <div className="ns-catalog-voice-preview"><button type="button" className="ns-take-play" aria-label={playingVoice === person.id ? 'Pause voice preview' : 'Play voice preview'} onClick={() => playVoice(person.voice, person.id)}>{playingVoice === person.id ? <Pause size={18}/> : <Play size={18}/>}</button><IntercomVoiceLine enabled={playingVoice === person.id} level={voiceLevel}/><span>{playingVoice === person.id ? 'Playing preview' : 'Preview voice'}</span></div> : <span className="ns-footnote">No voice preview</span>}
+                    <button type="button" className="ns-primary" disabled={Boolean(hiringId)} onClick={() => handleSelect(person)}>{hiringId === (person.catalog_id ?? person.id) ? <><Loader2 size={16} className="animate-spin"/> Hiring…</> : <>Hire {person.first_name || person.full_name || 'receptionist'}</>}</button>
+                  </div>
+                </div>
+              </section>
+            )) : <div className="relative w-full aspect-[2/3] mb-6" style={{ perspective: '1500px' }}>
               {receptionists.map((person, index) => {
                 if (embedded && index !== selectedIndex) return null;
                 const hasNeighbors = receptionists.length > 1;
@@ -257,7 +321,9 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
                     <div className="relative h-full w-full bg-[#0a0a0a] border border-white/10 rounded-[40px] overflow-hidden shadow-2xl flex flex-col">
                       {/* Header Image Area */}
                       <div className="relative h-[75%] w-full group overflow-hidden">
-                        {person.avatar ? (
+                        {person.avatar_video ? (
+                          <video src={avatarVideoUrl(person.avatar_video)} poster={person.avatar || undefined} autoPlay muted loop playsInline preload="metadata" aria-label={person.full_name || 'Receptionist video portrait'} className="h-full w-full object-cover" />
+                        ) : person.avatar ? (
                           <img
                             src={person.avatar}
                             alt={person.full_name || 'Receptionist'}
@@ -293,7 +359,7 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
                                 }}
                                 className="inline-flex items-center rounded-full border border-violet-300/20 bg-violet-300/10 px-2.5 py-1 text-[10px] font-bold tracking-[0.14em] text-violet-100/75 transition hover:border-violet-200/35 hover:bg-violet-300/15 hover:text-white"
                               >
-                                {person.personality?.mbti || person.personality_type}
+                    {person.personality?.mbti || person.personality_type}
                               </button>
                             )}
                           </div>
@@ -376,7 +442,7 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
                   </div>
                 );
               })}
-            </div>
+            </div>}
 
             {/* Navigation arrows */}
             {!embedded && receptionists.length > 1 && (

@@ -12886,7 +12886,7 @@ async def hire_receptionist(payload: dict, current_user: dict = Depends(get_curr
 async def list_receptionist_catalog(current_user: dict = Depends(get_current_user)):
     response = (
         supabase.table("receptionist_catalog")
-        .select("id,full_name,description,stereotype,avatar,traits,voice,age,first_name,elevenlabs_voice_id,call_types,phone_number,is_active,compliments,complaints,showcase_in_hero,hero_avatar,banner_id,gender,personality_type,personality_id,personality:personalities(mbti,personality)")
+        .select("id,full_name,description,stereotype,avatar,avatar_video,traits,voice,age,first_name,elevenlabs_voice_id,call_types,phone_number,is_active,compliments,complaints,showcase_in_hero,hero_avatar,banner_id,gender,personality_type,personality_id,personality:personalities(mbti,personality)")
         .order("full_name")
         .execute()
     )
