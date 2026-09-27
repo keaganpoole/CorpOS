@@ -131,6 +131,7 @@ export const api = {
   getSession: () => fetchJSON('/api/session'),
   getPipeline: () => fetchJSON('/api/pipeline'),
   getReceptionistCatalog: () => fetchJSON('/api/sonar/receptionists/catalog'),
+  checkReceptionistVoiceHealth: () => strictGetJSON('/api/sonar/receptionists/voice-health'),
   getVoiceCatalog: ({ includeUnavailable = false, recheck = false } = {}) => strictGetJSON(`/api/voice-catalog?include_unavailable=${includeUnavailable ? 'true' : 'false'}&recheck=${recheck ? 'true' : 'false'}`),
   getVoiceCatalogVoice: (voiceId) => strictGetJSON(`/api/voice-catalog/${encodeURIComponent(voiceId)}`),
   getPeople: (limit = 500) => fetchJSON(`/api/sonar/people?limit=${limit}`),

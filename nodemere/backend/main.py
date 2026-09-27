@@ -12974,6 +12974,50 @@ def _voice_catalog_id_is_safe(voice_id: str) -> bool:
     return bool(re.fullmatch(r"[A-Za-z0-9_-]{1,128}", voice_id or ""))
 
 
+@app.get("/api/sonar/receptionists/voice-health", tags=["Sonar Receptionists"])
+async def check_receptionist_voice_health():
+    catalog_response = supabase.table("receptionist_catalog").select("id,elevenlabs_voice_id,is_active").execute()
+    hired_response = supabase.table("hired_receptionists").select("id,elevenlabs_voice_id,is_active").execute()
+    catalog_rows = catalog_response.data or []
+    hired_rows = hired_response.data or []
+
+    sources = {}
+    missing = 0
+    for source, rows in (("catalog", catalog_rows), ("current", hired_rows)):
+        for row in rows:
+            voice_id = str(row.get("elevenlabs_voice_id") or row.get("elevenlabs_agent_id") or "").strip()
+            if not voice_id:
+                missing += 1
+                continue
+            entry = sources.setdefault(voice_id, {"catalog": False, "current": False})
+            entry[source] = True
+
+    semaphore = asyncio.Semaphore(8)
+
+    async def validate(voice_id: str) -> str:
+        async with semaphore:
+            availability, _ = await asyncio.to_thread(_fetch_elevenlabs_voice, voice_id)
+        return availability
+
+    results = await asyncio.gather(*(validate(voice_id) for voice_id in sources))
+    counts = {"available": 0, "unavailable": 0, "errors": 0}
+    for availability in results:
+        counts[availability if availability in counts else "errors"] += 1
+    return {
+        "checked_at": datetime.now(timezone.utc).isoformat(),
+        "stats": {
+            "total": len(catalog_rows) + len(hired_rows),
+            "unique_voice_ids": len(sources),
+            "available": counts["available"],
+            "unavailable": counts["unavailable"],
+            "errors": counts["errors"],
+            "missing_voice_id": missing,
+            "catalog": len(catalog_rows),
+            "current": len(hired_rows),
+        },
+    }
+
+
 @app.get("/api/voice-catalog", tags=["Voice Catalog"])
 async def list_voice_catalog(
     include_unavailable: bool = False,

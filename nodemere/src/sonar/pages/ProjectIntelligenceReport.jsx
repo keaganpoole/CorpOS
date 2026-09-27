@@ -242,6 +242,7 @@ export default function ProjectIntelligenceReport({ publicView = false }) {
   const [busy, setBusy] = useState(null);
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
+  const [voiceHealth, setVoiceHealth] = useState(null);
 
   const loadReport = useCallback(async (loader, kind = 'load', successMessage = '') => {
     setBusy(kind);
@@ -287,6 +288,20 @@ export default function ProjectIntelligenceReport({ publicView = false }) {
 
   const runReanalysis = () => loadReport(api.reanalyzeProjectIntelligence, 'analysis', 'Project analysis refreshed');
   const runMarketRefresh = () => loadReport(api.refreshMarketResearch, 'market', 'Market research cache refreshed');
+  const runVoiceHealthCheck = async () => {
+    setBusy('voice-health');
+    setStatus('');
+    setError('');
+    try {
+      const result = await api.checkReceptionistVoiceHealth();
+      setVoiceHealth(result);
+      setStatus('ElevenLabs receptionist voices checked');
+    } catch (requestError) {
+      setError(requestError.message || 'Could not check receptionist voices.');
+    } finally {
+      setBusy(null);
+    }
+  };
   const exportPdf = async () => {
     const element = document.getElementById('report-top');
     if (!element) return;
@@ -349,6 +364,7 @@ export default function ProjectIntelligenceReport({ publicView = false }) {
             <button type="button" onClick={exportPdf} disabled={busy === 'pdf'} className="brand-gradient inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-[10px] font-bold uppercase tracking-[0.12em] text-white transition hover:brightness-110 disabled:cursor-wait disabled:opacity-60" title="Download this report as a PDF"><Download size={13} className={busy === 'pdf' ? 'animate-pulse' : ''} /> {busy === 'pdf' ? 'Preparing PDF' : 'Export PDF'}</button>
             {!publicView && <button type="button" onClick={runReanalysis} disabled={Boolean(busy === 'analysis')} className="inline-flex items-center gap-2 rounded-xl border border-white/[0.1] bg-white/[0.04] px-4 py-2.5 text-[10px] font-bold uppercase tracking-[0.12em] text-zinc-200 transition hover:bg-white/[0.08] disabled:cursor-wait disabled:opacity-60"><RefreshCw size={13} className={busy === 'analysis' ? 'animate-spin' : ''} /> Reanalyze Project</button>}
             {!publicView && <button type="button" onClick={runMarketRefresh} disabled={Boolean(busy === 'market')} className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-[10px] font-bold uppercase tracking-[0.12em] text-black transition hover:bg-zinc-200 disabled:cursor-wait disabled:opacity-60"><Globe2 size={13} className={busy === 'market' ? 'animate-pulse' : ''} /> Refresh Market Research</button>}
+            <button type="button" onClick={runVoiceHealthCheck} disabled={busy === 'voice-health'} className="inline-flex items-center gap-2 rounded-xl border border-cyan-300/20 bg-cyan-300/[0.07] px-4 py-2.5 text-[10px] font-bold uppercase tracking-[0.12em] text-cyan-100 transition hover:bg-cyan-300/[0.12] disabled:cursor-wait disabled:opacity-60"><RefreshCw size={13} className={busy === 'voice-health' ? 'animate-spin' : ''} /> {busy === 'voice-health' ? 'Checking Voices' : 'Check ElevenLabs Voices'}</button>
           </div>
         </div>
 
@@ -358,7 +374,7 @@ export default function ProjectIntelligenceReport({ publicView = false }) {
           <div className="grid gap-8 xl:grid-cols-[220px_minmax(0,1fr)_360px] xl:items-center">
             <div className="flex flex-col items-center gap-5 text-center sm:flex-row sm:items-center sm:text-left xl:block xl:text-left"><ScoreRing score={overallScore} /><div className="xl:mt-5"><p className="text-[11px] font-bold uppercase tracking-[0.16em] text-zinc-500">{report.project?.classification}</p><p className="mt-1 text-[11px] leading-5 text-zinc-600">{report.project?.classification_explanation}</p></div></div>
             <div><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-600">Executive read</p><h2 className="mt-3 max-w-2xl text-[27px] font-semibold leading-[1.12] tracking-[-0.045em] text-white">{report.project?.headline}</h2><p className="mt-5 max-w-2xl text-[12px] leading-6 text-zinc-500">{report.project?.disclaimer}</p><div className="mt-5 flex flex-wrap gap-2"><span className="inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.025] px-3 py-2 text-[10px] font-bold uppercase tracking-[0.11em] text-zinc-400"><CheckCircle2 size={12} className="text-emerald-300" /> Source fingerprint {report.analysis_fingerprint}</span><span className="inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.025] px-3 py-2 text-[10px] font-bold uppercase tracking-[0.11em] text-zinc-400"><Shield size={12} className="brand-icon" /> {report.core_metric_count} core signals</span></div></div>
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1"><HeroStat label="Completion" value={completion} explanation="Calculated from visible product surface and hardening signals." icon={Activity} /><HeroStat label="Project size" value={size.split(' · ')[0]} explanation={size.includes(' · ') ? size.split(' · ')[1] : size} icon={Code2} /><HeroStat label="Backend routes" value={evidence.backend_routes?.length?.toLocaleString() || 'Not enough data'} explanation="Declared FastAPI endpoints." icon={Zap} /><HeroStat label="Meaningful competitors" value={marketCount} explanation="Cached working set, not the entire market." icon={Globe2} /></div>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1"><HeroStat label="Completion" value={completion} explanation="Calculated from visible product surface and hardening signals." icon={Activity} /><HeroStat label="Project size" value={size.split(' · ')[0]} explanation={size.includes(' · ') ? size.split(' · ')[1] : size} icon={Code2} /><HeroStat label="Backend routes" value={evidence.backend_routes?.length?.toLocaleString() || 'Not enough data'} explanation="Declared FastAPI endpoints." icon={Zap} /><HeroStat label="Meaningful competitors" value={marketCount} explanation="Cached working set, not the entire market." icon={Globe2} /><div className="rounded-2xl border border-cyan-300/15 bg-cyan-300/[0.04] p-4"><div className="flex items-center justify-between gap-3"><span className="text-[10px] font-bold uppercase tracking-[0.14em] text-cyan-100/70">ElevenLabs voice health</span><Shield size={14} className="text-cyan-200/70" /></div>{voiceHealth ? <div className="mt-3 grid grid-cols-3 gap-2 text-center"><div><p className="text-[18px] font-semibold text-emerald-200">{voiceHealth.stats.available}</p><p className="text-[8px] font-bold uppercase tracking-[0.12em] text-zinc-600">Active</p></div><div><p className="text-[18px] font-semibold text-rose-200">{voiceHealth.stats.unavailable}</p><p className="text-[8px] font-bold uppercase tracking-[0.12em] text-zinc-600">Unavailable</p></div><div><p className="text-[18px] font-semibold text-amber-200">{voiceHealth.stats.missing_voice_id + voiceHealth.stats.errors}</p><p className="text-[8px] font-bold uppercase tracking-[0.12em] text-zinc-600">Needs review</p></div></div> : <p className="mt-2 text-[10px] leading-4 text-zinc-500">Check stored catalog and current receptionist voice IDs.</p>}</div></div>
           </div>
         </Panel>
 
