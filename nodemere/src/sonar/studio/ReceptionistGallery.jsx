@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Minus, Plus, User } from 'lucide-react';
 import { useReducedMotion } from 'framer-motion';
 import { galleryCells, zoomAt, MIN_GALLERY_ZOOM } from './catalogGeometry';
@@ -13,11 +13,16 @@ export default function ReceptionistGallery({ receptionists, onSelect, paused, c
   const rootRef = useRef(null), worldRef = useRef(null), tilesRef = useRef(new Map());
   const tileRefCallbacks = useRef(new Map());
   const controlsRef = useRef(null);
+  const resetGestureRef = useRef(null);
   const [cells, setCells] = useState([]);
   const [zoomLevel, setZoomLevel] = useState(DEFAULT_GALLERY_ZOOM);
   const reducedMotion = useReducedMotion();
   const pausedRef = useRef(paused);
   pausedRef.current = paused;
+
+  useLayoutEffect(() => {
+    if (paused) resetGestureRef.current?.();
+  }, [paused]);
 
   const getTileRef = key => {
     if (!tileRefCallbacks.current.has(key)) {
@@ -38,7 +43,7 @@ export default function ReceptionistGallery({ receptionists, onSelect, paused, c
       y: center.y - (center.y + 120) * DEFAULT_GALLERY_ZOOM,
       scale: DEFAULT_GALLERY_ZOOM,
     }, target = { ...current };
-    let drag = null, moved = false;
+    let drag = null, moved = false, clickTarget = null;
     let velocity = { x: 0, y: 0 }, lastTime = 0, frame = null, cellSignature = '';
     const styleCache = new WeakMap();
     let tick;
@@ -63,7 +68,14 @@ export default function ReceptionistGallery({ receptionists, onSelect, paused, c
     const down = event => {
       if (pausedRef.current || drag || event.button !== 0 || event.target.closest('[data-gallery-controls]')) return;
       const p = point(event);
+      // Native selection/HTML dragging competes with the captured pan gesture.
+      event.preventDefault();
+      root.focus({ preventScroll: true });
+      // Capture on the stable root before virtualization can remove the tile.
+      root.setPointerCapture(event.pointerId);
+      target = { ...current };
       drag = { ...p, startX: p.x, startY: p.y, time: performance.now(), id: event.pointerId };
+      clickTarget = event.target.closest('.ns-gallery-tile');
       moved = false;
       velocity = { x: 0, y: 0 };
       root.classList.add('is-dragging');
@@ -72,27 +84,41 @@ export default function ReceptionistGallery({ receptionists, onSelect, paused, c
     const move = event => {
       if (pausedRef.current) return;
       const p = point(event);
-      if (!drag) return;
+      if (!drag || event.pointerId !== drag.id) return;
       const now = performance.now(), dt = Math.max(.008, (now - drag.time) / 1000);
       const dx = p.x - drag.x, dy = p.y - drag.y;
       moved ||= Math.hypot(p.x - drag.startX, p.y - drag.startY) > 7;
-      if (moved && !root.hasPointerCapture(event.pointerId)) root.setPointerCapture(event.pointerId);
       target.x += dx * DRAG_RESISTANCE; target.y += dy * DRAG_RESISTANCE;
       velocity = { x: Math.max(-1400, Math.min(1400, dx * DRAG_RESISTANCE / dt)), y: Math.max(-1400, Math.min(1400, dy * DRAG_RESISTANCE / dt)) };
       drag = { ...drag, ...p, time: now };
       scheduleTick();
     };
     const release = event => {
-      if (!drag) return;
-      if (!moved || reducedMotion) velocity = { x: 0, y: 0 };
-      if (root.hasPointerCapture(event.pointerId)) root.releasePointerCapture(event.pointerId);
+      if (!drag || event.pointerId !== drag.id) return;
+      if (!moved || reducedMotion || performance.now() - drag.time > 100) velocity = { x: 0, y: 0 };
       drag = null;
       root.classList.remove('is-dragging');
+      if (root.hasPointerCapture(event.pointerId)) root.releasePointerCapture(event.pointerId);
       scheduleTick();
     };
-    const cancel = event => { moved = true; release(event); velocity = { x: 0, y: 0 }; };
+    const cancel = event => {
+      if (!drag || event.pointerId !== drag.id) return;
+      moved = true; clickTarget = null; release(event); velocity = { x: 0, y: 0 };
+    };
+    const resetGesture = () => {
+      const pointerId = drag?.id;
+      drag = null; moved = false; clickTarget = null;
+      velocity = { x: 0, y: 0 };
+      root.classList.remove('is-dragging');
+      if (pointerId !== undefined && root.hasPointerCapture(pointerId)) root.releasePointerCapture(pointerId);
+    };
+    resetGestureRef.current = resetGesture;
     const click = event => {
+      const tile = clickTarget;
+      clickTarget = null;
       if (moved) { event.preventDefault(); event.stopPropagation(); moved = false; }
+      // Pointer capture can retarget a tap's click to the root.
+      else if (event.target === root && tile?.isConnected) tile.click();
     };
     const key = event => {
       if (pausedRef.current || event.target.closest('button')) return;
@@ -142,25 +168,31 @@ export default function ReceptionistGallery({ receptionists, onSelect, paused, c
     const resize = new ResizeObserver(() => { size = { width: root.clientWidth, height: root.clientHeight }; scheduleTick(); });
     resize.observe(root);
     root.addEventListener('wheel', wheel, { passive: false });
+    const preventNativeDrag = event => event.preventDefault();
+    root.addEventListener('dragstart', preventNativeDrag);
     root.addEventListener('pointerdown', down); root.addEventListener('pointermove', move);
     root.addEventListener('pointerup', release); root.addEventListener('pointercancel', cancel);
+    root.addEventListener('lostpointercapture', cancel);
     root.addEventListener('click', click, true);
     root.addEventListener('keydown', key);
     scheduleTick();
     return () => {
       if (frame !== null) cancelAnimationFrame(frame); resize.disconnect(); controlsRef.current = null;
       root.removeEventListener('wheel', wheel); root.removeEventListener('pointerdown', down);
+      root.removeEventListener('dragstart', preventNativeDrag);
       root.removeEventListener('pointermove', move); root.removeEventListener('pointerup', release);
       root.removeEventListener('pointercancel', cancel);
+      root.removeEventListener('lostpointercapture', cancel);
+      resetGesture(); resetGestureRef.current = null;
       root.removeEventListener('click', click, true); root.removeEventListener('keydown', key);
     };
   }, [receptionists.length, reducedMotion]);
 
-  return <div className="ns-receptionist-gallery" ref={rootRef} tabIndex={0} aria-label="Receptionist gallery. Drag to explore, scroll to zoom, or use the zoom controls.">
+  return <><div className="ns-receptionist-gallery" ref={rootRef} tabIndex={0} aria-label="Receptionist gallery. Drag to explore, scroll to zoom, or use the zoom controls.">
     <div className="ns-gallery-world" ref={worldRef} inert={paused ? '' : undefined} aria-hidden={paused || undefined}>
       {cells.map(cell => {
         const person = receptionists[cell.personIndex];
-        return <button type="button" className="ns-gallery-tile" key={cell.key}
+        return <button type="button" className="ns-gallery-tile" key={cell.key} draggable="false"
           ref={getTileRef(cell.key)}
           style={{ left: cell.x, top: cell.y, width: cell.width, height: cell.height, zIndex: 1 }}
           aria-label={`Meet ${person.full_name || 'receptionist'}`} onClick={() => onSelect(cell.personIndex)}>
@@ -174,6 +206,8 @@ export default function ReceptionistGallery({ receptionists, onSelect, paused, c
       <button type="button" aria-pressed={Math.abs(zoomLevel - DEFAULT_GALLERY_ZOOM) < .001} onClick={() => controlsRef.current?.('default')}>Default</button>
       <button type="button" disabled={zoomLevel >= 1.8} onClick={() => controlsRef.current?.('in')}>Zoom In <Plus size={14}/></button>
     </div>
+  </div>
+    {/* Details remain mounted during their exit animation, outside the pan surface. */}
     {children}
-  </div>;
+  </>;
 }

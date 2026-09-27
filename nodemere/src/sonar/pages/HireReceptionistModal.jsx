@@ -88,7 +88,7 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
     const previousFocus = document.activeElement;
     const panel = detailRef.current;
     panel?.querySelector('button')?.focus();
-    return () => { previousFocus?.focus(); };
+    return () => { previousFocus?.focus({ preventScroll: true }); };
   }, [embedded, selectedIndex]);
 
   useEffect(() => {
@@ -244,9 +244,9 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
       )}
 
       <motion.div
-        initial={{ scale: 0.95, opacity: 0, y: 20 }}
-        animate={{ scale: 1, opacity: 1, y: 0 }}
-        exit={{ scale: 0.95, opacity: 0, y: 20 }}
+        initial={embedded ? { opacity: 0 } : { scale: 0.95, opacity: 0, y: 20 }}
+        animate={embedded ? { opacity: 1 } : { scale: 1, opacity: 1, y: 0 }}
+        exit={embedded ? { opacity: 0 } : { scale: 0.95, opacity: 0, y: 20 }}
         transition={embedded ? { duration: reducedMotion ? 0 : .68, ease: [.77, 0, .175, 1] } : undefined}
         className={embedded ? 'ns-gallery-detail-inner relative z-10 flex flex-col items-center' : 'relative z-10 w-full max-w-[440px] flex flex-col items-center'}
         ref={detailRef}
@@ -255,6 +255,9 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, hiredCatalog
         aria-label={embedded ? `${receptionists[selectedIndex]?.full_name || 'Receptionist'} details` : undefined}
         onClick={(e) => e.stopPropagation()}
       >
+        {embedded && <button type="button" className="ns-gallery-detail-close" disabled={Boolean(hiringId)} onClick={closeDetail}>
+          <X size={14} /> Close
+        </button>}
         {/* Header */}
         {!embedded && <div className="text-center mb-10 space-y-2">
           <h1 className="text-xs uppercase tracking-[6px] font-bold text-white/20">RECEPTIONIST CATALOG</h1>
