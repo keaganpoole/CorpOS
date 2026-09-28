@@ -19,7 +19,7 @@ export const CallLogsProvider = ({ children, normalizeCall, enabled = true }) =>
   const loadingRef = useRef(false);
   const activeQueryRef = useRef('');
 
-  const loadCallLogs = async ({ initial = false, force = false, append = false, searchQuery = activeQueryRef.current } = {}) => {
+  const loadCallLogs = async ({ initial = false, force = false, append = false, silent = false, searchQuery = activeQueryRef.current } = {}) => {
     if (!enabled) {
       setCalls([]);
       setLoading(false);
@@ -44,8 +44,8 @@ export const CallLogsProvider = ({ children, normalizeCall, enabled = true }) =>
     loadingRef.current = true;
     activeQueryRef.current = normalizedQuery;
     const offset = append && !queryChanged ? calls.length : 0;
-    setLoading(!append && (initial || force || queryChanged || !hasLoadedRef.current));
-    setLoadingMore(append);
+    setLoading(!silent && !append && (initial || force || queryChanged || !hasLoadedRef.current));
+    setLoadingMore(!silent && append);
     setError('');
     try {
       const response = await fetch(`${API_BASE_URL}/api/sonar/call-logs/search`, {
@@ -108,7 +108,7 @@ export const CallLogsProvider = ({ children, normalizeCall, enabled = true }) =>
     const scheduleRefresh = () => {
       if (refreshTimer) window.clearTimeout(refreshTimer);
       refreshTimer = window.setTimeout(() => {
-        if (!cancelled) loadCallLogs({ force: true });
+        if (!cancelled) loadCallLogs({ force: true, silent: true });
       }, 350);
     };
 
@@ -118,7 +118,7 @@ export const CallLogsProvider = ({ children, normalizeCall, enabled = true }) =>
     // consistent with the provider even when no realtime event arrives.
     const pollCallLogs = () => {
       if (cancelled) return;
-      loadCallLogs({ force: true });
+      loadCallLogs({ force: true, silent: true });
       pollingTimer = window.setTimeout(pollCallLogs, 5000);
     };
     pollingTimer = window.setTimeout(pollCallLogs, 5000);

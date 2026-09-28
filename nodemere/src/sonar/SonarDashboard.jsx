@@ -1829,6 +1829,7 @@ const SonarDashboard = () => {
   const [archivedAgents, setArchivedAgents] = useState([]);
   const [archivedAgentsLoading, setArchivedAgentsLoading] = useState(false);
   const [teamStaffLoading, setTeamStaffLoading] = useState(true);
+  const [teamHasLoaded, setTeamHasLoaded] = useState(false);
   const [dismissedPopupIds, setDismissedPopupIds] = useState([]);
   const [manualPopupId, setManualPopupId] = useState(null);
   const [backendTasklistState, setBackendTasklistState] = useState(null);
@@ -2268,7 +2269,13 @@ const SonarDashboard = () => {
     }
     return { ...a, _scenario: null, scenario_name: null, scenario_id: null };
   });
-  const teamInitialLoading = agentsLoading || archivedAgentsLoading || teamStaffLoading;
+  useEffect(() => {
+    if (!agentsLoading && !archivedAgentsLoading && !teamStaffLoading) {
+      setTeamHasLoaded(true);
+    }
+  }, [agentsLoading, archivedAgentsLoading, teamStaffLoading]);
+
+  const teamInitialLoading = !teamHasLoaded && (agentsLoading || archivedAgentsLoading || teamStaffLoading);
   const popupContext = {
     currentRoute,
     teamView,
@@ -2337,7 +2344,12 @@ const SonarDashboard = () => {
           return result;
         }} onDirtyChange={updateStudioDirty} onSaved={async () => { await refresh(); await loadAgentScenarios(); }} /></Suspense>;
         return (
-          <div className={`receptionists-page-scope h-full ${marketplaceAgent ? 'overflow-hidden' : 'overflow-auto'} custom-scrollbar bg-[#020202] flex flex-col`}>
+          <div className={`receptionists-page-scope relative h-full ${marketplaceAgent ? 'overflow-hidden' : 'overflow-auto'} custom-scrollbar bg-[#020202] flex flex-col`}>
+            {teamInitialLoading ? (
+              <div className="absolute inset-0 z-30 flex items-center justify-center bg-[#020202]">
+                <CubePreloader />
+              </div>
+            ) : null}
             <div className="shrink-0 px-10 pb-3 pt-8 flex items-center justify-between">
               <div className="flex items-center gap-5">
                 <div className="flex rounded-xl border border-white/[0.08] bg-white/[0.02] p-1">
@@ -2576,7 +2588,7 @@ const SonarDashboard = () => {
 
   return (
     <AudioPlayerProvider>
-    <CallLogsProvider normalizeCall={normalizeCall} enabled={currentRoute === 'call-logs'}>
+    <CallLogsProvider normalizeCall={normalizeCall} enabled={mountedRoutes.includes('call-logs')}>
     <NestProvider
       businessId={staffBusinessId || businessUsage?.business_id || profile?.business_id}
       tasklistState={backendTasklistState}
