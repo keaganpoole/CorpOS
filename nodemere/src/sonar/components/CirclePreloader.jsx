@@ -12,10 +12,23 @@ export default function CirclePreloader({ className = '', size = 22 }) {
   const root = useRef(null);
   const glowId = 'loader-glow-' + useId().replace(/:/g, '');
   useEffect(() => {
-    const paths = [...root.current.querySelectorAll('[data-wave]')];
+    const element = root.current;
+    if (!element) return undefined;
+    const paths = [...element.querySelectorAll('[data-wave]')];
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
     let raf = 0, last = 0, time = 0, amplitude = 0, velocity = 0;
     let pointerX = CENTER + RADIUS, pointerY = CENTER;
+    let cursorX = pointerX, cursorY = pointerY, hovering = false;
+    function movePointer(event) {
+      const bounds = element.getBoundingClientRect();
+      cursorX = (event.clientX - bounds.left) / bounds.width * 96;
+      cursorY = (event.clientY - bounds.top) / bounds.height * 96;
+      hovering = true;
+    }
+    function leavePointer() { hovering = false; }
+    element.addEventListener('pointermove', movePointer);
+    element.addEventListener('pointerenter', movePointer);
+    element.addEventListener('pointerleave', leavePointer);
     function draw() {
       const geometry = COLORS.map((_, layer) => {
         let d = '';
@@ -41,8 +54,10 @@ export default function CirclePreloader({ className = '', size = 22 }) {
       last = now; time += dt;
       const orbit = time * 1.8;
       const follow = 1 - Math.exp(-dt * 18);
-      pointerX += (CENTER + Math.cos(orbit) * RADIUS - pointerX) * follow;
-      pointerY += (CENTER + Math.sin(orbit) * RADIUS - pointerY) * follow;
+      const desiredX = hovering ? cursorX : CENTER + Math.cos(orbit) * RADIUS;
+      const desiredY = hovering ? cursorY : CENTER + Math.sin(orbit) * RADIUS;
+      pointerX += (desiredX - pointerX) * follow;
+      pointerY += (desiredY - pointerY) * follow;
       // Reference hover spring: stiffness 500, damping 32; amplitude 15/300*96.
       for(let step=0;step<4;step++){
         velocity += ((4.8-amplitude)*500-velocity*32)*dt/4;
@@ -59,7 +74,14 @@ export default function CirclePreloader({ className = '', size = 22 }) {
     refresh();
     document.addEventListener('visibilitychange', refresh);
     reduced.addEventListener('change', refresh);
-    return () => { cancelAnimationFrame(raf); document.removeEventListener('visibilitychange', refresh); reduced.removeEventListener('change', refresh); };
+    return () => {
+      cancelAnimationFrame(raf);
+      element.removeEventListener('pointermove', movePointer);
+      element.removeEventListener('pointerenter', movePointer);
+      element.removeEventListener('pointerleave', leavePointer);
+      document.removeEventListener('visibilitychange', refresh);
+      reduced.removeEventListener('change', refresh);
+    };
   }, []);
   return <div ref={root} className={`cube-preloader circle-preloader ${className}`} role="status" aria-label="Loading" style={{ width: size * 3.55, height: size * 3.55, flexShrink: 0 }}>
     <svg viewBox="0 0 96 96" aria-hidden="true" style={{ display: 'block', width: '100%', height: '100%', overflow: 'visible', isolation: 'isolate' }}>
