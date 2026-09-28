@@ -6,7 +6,7 @@ import './receptionistGallery.css';
 
 const DEFAULT_GALLERY_ZOOM = 1.4;
 
-export default function ReceptionistGallery({ receptionists, onSelect, paused, allowWheelZoom = true, children }) {
+export default function ReceptionistGallery({ receptionists, onSelect, onInteraction, paused, allowWheelZoom = true, showZoomControls = true, children }) {
   const DRAG_RESISTANCE = 0.78;
   const FOLLOW_STIFFNESS = 5.1;
   const INERTIA_DAMPING = 2.35;
@@ -117,9 +117,10 @@ export default function ReceptionistGallery({ receptionists, onSelect, paused, a
     const click = event => {
       const tile = clickTarget;
       clickTarget = null;
-      if (moved) { event.preventDefault(); event.stopPropagation(); moved = false; }
+      if (moved) { onInteraction?.('drag'); event.preventDefault(); event.stopPropagation(); moved = false; }
       // Pointer capture can retarget a tap's click to the root.
-      else if (event.target === root && tile?.isConnected) tile.click();
+      else if (event.target === root && tile?.isConnected) { onInteraction?.('tap'); tile.click(); }
+      else if (event.target.closest('.ns-gallery-tile')) onInteraction?.('tap');
     };
     const key = event => {
       if (pausedRef.current || event.target.closest('button')) return;
@@ -187,9 +188,9 @@ export default function ReceptionistGallery({ receptionists, onSelect, paused, a
       resetGesture(); resetGestureRef.current = null;
       root.removeEventListener('click', click, true); root.removeEventListener('keydown', key);
     };
-  }, [allowWheelZoom, rosterOrder.length, reducedMotion]);
+  }, [allowWheelZoom, onInteraction, rosterOrder.length, reducedMotion]);
 
-  return <><div className="ns-receptionist-gallery" ref={rootRef} tabIndex={0} aria-label="Receptionist gallery. Drag to explore, scroll to zoom, or use the zoom controls.">
+  return <><div className="ns-receptionist-gallery" ref={rootRef} tabIndex={0} aria-label="Receptionist gallery. Drag to explore and pinch to zoom.">
     <div className="ns-gallery-world" ref={worldRef} inert={paused ? '' : undefined} aria-hidden={paused || undefined}>
       {cells.map(cell => {
         const personIndex = rosterOrder[cell.personIndex];
@@ -205,11 +206,11 @@ export default function ReceptionistGallery({ receptionists, onSelect, paused, a
         </button>;
       })}
     </div>
-    <div className="ns-gallery-toolbar" data-gallery-controls role="toolbar" aria-label="Gallery zoom" inert={paused ? '' : undefined}>
+    {showZoomControls && <div className="ns-gallery-toolbar" data-gallery-controls role="toolbar" aria-label="Gallery zoom" inert={paused ? '' : undefined}>
       <button type="button" disabled={zoomLevel <= MIN_GALLERY_ZOOM} onClick={() => controlsRef.current?.('out')}><Minus size={14}/> Zoom Out</button>
       <button type="button" aria-pressed={Math.abs(zoomLevel - DEFAULT_GALLERY_ZOOM) < .001} onClick={() => controlsRef.current?.('default')}>Default</button>
       <button type="button" disabled={zoomLevel >= 1.8} onClick={() => controlsRef.current?.('in')}>Zoom In <Plus size={14}/></button>
-    </div>
+    </div>}
   </div>
     {/* Details remain mounted during their exit animation, outside the pan surface. */}
     {children}

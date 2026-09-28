@@ -285,7 +285,8 @@ const StackedHeroShowcase = ({ sectionRef }) => {
     if (!root || typeof window === 'undefined') return;
     const top = root.getBoundingClientRect().top + window.scrollY;
     const distance = Math.max(root.offsetHeight - window.innerHeight, 1);
-    window.scrollTo({ top: top + distance * 0.64, behavior: 'smooth' });
+    // Land clearly into the feature sequence so the catalog is fully exited.
+    window.scrollTo({ top: top + distance * 0.72, behavior: 'smooth' });
   };
 
   return (

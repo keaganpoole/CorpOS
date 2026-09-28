@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ArrowDown } from 'lucide-react';
+import { ArrowDown, Hand, MousePointer2, Volume2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../sonar/lib/api';
@@ -12,6 +12,9 @@ const catalogFields = 'id,full_name,description,stereotype,avatar,avatar_video,t
 
 export default function HomepageReceptionistCatalog({ active, onContinue }) {
   const [catalogRows, setCatalogRows] = useState(null);
+  const [showGestureHint, setShowGestureHint] = useState(true);
+  const [gestureMode, setGestureMode] = useState('pan');
+  const [showContinueCue, setShowContinueCue] = useState(false);
   const { session } = useAuth();
   const navigate = useNavigate();
 
@@ -41,6 +44,15 @@ export default function HomepageReceptionistCatalog({ active, onContinue }) {
     return () => { cancelled = true; };
   }, []);
 
+  useEffect(() => {
+    if (!active) return undefined;
+    setShowGestureHint(true);
+    setGestureMode('pan');
+    setShowContinueCue(false);
+    const timer = window.setTimeout(() => setShowContinueCue(true), 4500);
+    return () => window.clearTimeout(timer);
+  }, [active]);
+
   const hire = async (receptionist) => {
     const catalogId = receptionist.catalog_id ?? receptionist.id;
     if (!session) {
@@ -62,13 +74,26 @@ export default function HomepageReceptionistCatalog({ active, onContinue }) {
         autoPlayOnOpen
         hideVoiceButton
         allowGalleryWheelZoom={false}
+        showGalleryZoomControls={false}
+        onGalleryInteraction={(interaction) => {
+          if (interaction === 'tap') setShowGestureHint(false);
+          if (interaction === 'drag') { setGestureMode('tap'); setShowGestureHint(true); }
+        }}
         interactive={active}
         portalDetail
       />
-      {active && (
-        <button type="button" className="homepage-catalog-continue" onClick={onContinue}>
-          <span>Continue</span>
-          <ArrowDown size={15} aria-hidden="true" />
+      {active && showGestureHint && (
+        <div className="homepage-catalog-gesture-hint" aria-hidden="true">
+          <div className="homepage-catalog-gesture-icon">
+            {gestureMode === 'pan' ? <><Hand size={24} /><MousePointer2 size={16} /></> : <><MousePointer2 size={25} /><Volume2 size={15} /></>}
+          </div>
+          <span>{gestureMode === 'pan' ? 'Drag to explore' : 'Tap to listen'}</span>
+          <small>{gestureMode === 'pan' ? <><Volume2 size={13} aria-hidden="true" /> Tap a receptionist to listen</> : 'Select any receptionist tile'}</small>
+        </div>
+      )}
+      {active && showContinueCue && (
+        <button type="button" className="homepage-catalog-continue" onClick={onContinue} aria-label="Continue past receptionist catalog">
+          <ArrowDown size={22} aria-hidden="true" />
         </button>
       )}
     </div>

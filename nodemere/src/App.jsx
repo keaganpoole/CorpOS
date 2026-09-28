@@ -185,7 +185,7 @@ function AppContent() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       <CookieNotice />
-      {!isVisitors && <CustomerExperienceFeedback />}
+      {location.pathname.startsWith('/dashboard') && <CustomerExperienceFeedback />}
     </>
   );
 }
