@@ -206,7 +206,7 @@ function MetamorphicFluidAura({ colors }) {
   );
 }
 
-const HeroSlider = React.forwardRef(({ receptionists, embedded = false }, ref) => {
+const HeroSlider = React.forwardRef(({ receptionists, embedded = false, autoplayEnabled = true }, ref) => {
   const [index, setIndex] = useState(0);
   const [direction, setDirection] = useState(0);
   const [isPlaying, setIsPlaying] = useState(null);
@@ -289,13 +289,13 @@ const HeroSlider = React.forwardRef(({ receptionists, embedded = false }, ref) =
   }, []);
 
   useEffect(() => {
-    if (!isInView || shouldPause) {
+    if (!autoplayEnabled || !isInView || shouldPause) {
       clearInterval(autoPlayRef.current);
       return undefined;
     }
     autoPlayRef.current = setInterval(() => nextSlide(), 9000);
     return () => clearInterval(autoPlayRef.current);
-  }, [receptionists.length, shouldPause, isInView, autoPlayResetKey]);
+  }, [autoplayEnabled, receptionists.length, shouldPause, isInView, autoPlayResetKey]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
@@ -354,7 +354,7 @@ const HeroSlider = React.forwardRef(({ receptionists, embedded = false }, ref) =
 
   useEffect(() => {
     const root = innerRef.current;
-    if (!root || copyVisible) return undefined;
+    if (!root || copyVisible || !autoplayEnabled) return undefined;
 
     const observer = new IntersectionObserver(
       ([entry]) => {
@@ -372,7 +372,7 @@ const HeroSlider = React.forwardRef(({ receptionists, embedded = false }, ref) =
 
     observer.observe(root);
     return () => observer.disconnect();
-  }, [copyVisible]);
+  }, [autoplayEnabled, copyVisible]);
 
   useEffect(() => {
     const root = innerRef.current;
@@ -689,7 +689,7 @@ const HeroSlider = React.forwardRef(({ receptionists, embedded = false }, ref) =
   );
 });
 
-const HeroConcept = React.forwardRef(({ embedded = false }, ref) => {
+const HeroConcept = React.forwardRef(({ embedded = false, autoplayEnabled = true }, ref) => {
   const [receptionists, setReceptionists] = useState([]);
 
   useEffect(() => {
@@ -720,7 +720,7 @@ const HeroConcept = React.forwardRef(({ embedded = false }, ref) => {
   return (
     <>
       {receptionists.length > 0 && (
-        <HeroSlider ref={ref} receptionists={receptionists} embedded={embedded} />
+        <HeroSlider ref={ref} receptionists={receptionists} embedded={embedded} autoplayEnabled={autoplayEnabled} />
       )}
 
       {receptionists.length === 0 && (

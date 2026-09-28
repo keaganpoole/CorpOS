@@ -38,6 +38,7 @@
 .ns-catalog-review-meta button{background:none;border:0;padding:0;color:inherit;cursor:pointer}
 .ns-catalog-voice-preview{display:grid;grid-template-columns:44px minmax(100px,1fr);align-items:center;gap:4px 14px;min-width:200px;color:#9a9a9e}
 .ns-catalog-voice-preview .ns-take-play{grid-row:span 2;width:44px;height:44px;display:grid;place-items:center;border-radius:50%;background:#ececed;color:#111}
+.ns-catalog-voice-control-spacer{grid-row:span 2;width:44px;height:44px;display:block}
 .ns-catalog-voice-preview .intercom-voice-line{width:100%;height:36px}
 .ns-catalog-voice-preview>span{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:#8d8d96}
 .ns-catalog-review-traits{margin:12px 0 20px}.ns-catalog-review-traits>div{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.ns-catalog-review-traits>div>span{font-size:11px;color:#c5c5cd;border:1px solid #ffffff14;padding:6px 10px;border-radius:4px}

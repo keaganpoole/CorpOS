@@ -41,7 +41,7 @@ import expandedTicketmaster from '@/assets/t1-expanded-ticketmaster.png';
 import expandedWifi from '@/assets/t1-expanded-wifi.png';
 import expandedX from '@/assets/t1-expanded-x.png';
 import TypingAnimation from '../components/TypingAnimation';
-import HeroConcept from '../components/HeroConcept';
+import HomepageReceptionistCatalog from '../components/HomepageReceptionistCatalog';
 import CalendarShowcase, { RightFeatureList } from '../components/CalendarShowcase';
 import EncryptionShowcase from '../components/EncryptionShowcase';
 import WorkWeekComparison from '../components/WorkWeekComparison';
@@ -280,6 +280,13 @@ const StackedHeroShowcase = ({ sectionRef }) => {
   const heroFeatureProgress = Math.min(1, Math.max(0, (sectionProgress - 0.64) / 0.3));
   const heroFeatureOpacity = heroFeaturesEntered ? 1 : 0;
   const jitterState = sectionProgress < 0.64 ? 'inactive' : heroFeatureProgress < 1 ? 'entering' : sectionProgress < 1 ? 'locked' : 'exiting';
+  const continuePastCatalog = () => {
+    const root = rootRef.current;
+    if (!root || typeof window === 'undefined') return;
+    const top = root.getBoundingClientRect().top + window.scrollY;
+    const distance = Math.max(root.offsetHeight - window.innerHeight, 1);
+    window.scrollTo({ top: top + distance * 0.64, behavior: 'smooth' });
+  };
 
   return (
     <div ref={(el) => { rootRef.current = el; if (sectionRef) sectionRef.current = el; }} className="relative h-[280vh] bg-[#020202]"
@@ -328,7 +335,7 @@ const StackedHeroShowcase = ({ sectionRef }) => {
             filter: `blur(${receptionistBlur}px) brightness(${receptionistBrightness})`,
           }}
         >
-          <HeroConcept />
+          <HomepageReceptionistCatalog active={receptionistEntered && !heroFeaturesEntered} onContinue={continuePastCatalog} />
         </div>
 
         <div
@@ -342,7 +349,7 @@ const StackedHeroShowcase = ({ sectionRef }) => {
         >
           <div className="mx-auto w-full max-w-[1120px]">
             <RightFeatureList
-              featureProgress={heroFeatureProgress}
+              featureProgress={isCompactFeatureViewport ? heroFeatureProgress : (heroFeaturesEntered ? 1 : 0)}
               items={HERO_RECEPTIONIST_FEATURE_ITEMS}
               useScrollHighlight={isCompactFeatureViewport}
               mobilePageSize={3}

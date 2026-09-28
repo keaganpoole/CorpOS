@@ -6,7 +6,7 @@ import './receptionistGallery.css';
 
 const DEFAULT_GALLERY_ZOOM = 1.4;
 
-export default function ReceptionistGallery({ receptionists, onSelect, paused, children }) {
+export default function ReceptionistGallery({ receptionists, onSelect, paused, allowWheelZoom = true, children }) {
   const DRAG_RESISTANCE = 0.78;
   const FOLLOW_STIFFNESS = 5.1;
   const INERTIA_DAMPING = 2.35;
@@ -61,7 +61,7 @@ export default function ReceptionistGallery({ receptionists, onSelect, paused, c
     };
     controlsRef.current = action => setZoom(action === 'default' ? DEFAULT_GALLERY_ZOOM : target.scale * (action === 'in' ? 1.2 : 1 / 1.2));
     const wheel = event => {
-      if (pausedRef.current) return;
+      if (pausedRef.current || !allowWheelZoom) return;
       event.preventDefault();
       const delta = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? size.height : 1);
       setZoom(target.scale * Math.exp(-Math.max(-160, Math.min(160, delta)) * .0018), point(event));
@@ -187,7 +187,7 @@ export default function ReceptionistGallery({ receptionists, onSelect, paused, c
       resetGesture(); resetGestureRef.current = null;
       root.removeEventListener('click', click, true); root.removeEventListener('keydown', key);
     };
-  }, [rosterOrder.length, reducedMotion]);
+  }, [allowWheelZoom, rosterOrder.length, reducedMotion]);
 
   return <><div className="ns-receptionist-gallery" ref={rootRef} tabIndex={0} aria-label="Receptionist gallery. Drag to explore, scroll to zoom, or use the zoom controls.">
     <div className="ns-gallery-world" ref={worldRef} inert={paused ? '' : undefined} aria-hidden={paused || undefined}>

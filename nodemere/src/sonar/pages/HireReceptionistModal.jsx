@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import {
   X, Play, Pause, Sparkles,
@@ -19,7 +20,20 @@ const isCreatedReceptionist = person => person.source === 'created_receptionist'
 const catalogAccentTraits = person => isCreatedReceptionist(person) && Array.isArray(person.traits) ? person.traits.filter(trait => accentLabels.has(trait)) : [];
 const catalogCoreTraits = person => Array.isArray(person.traits) ? person.traits.filter(trait => !isCreatedReceptionist(person) || !accentLabels.has(trait)) : [];
 
-const HireReceptionistModal = ({ onClose, onHire, embedded = false, initialCreatedId = null, hiredCatalogIds = [], hiredVoiceIds = [] }) => {
+const HireReceptionistModal = ({
+  onClose,
+  onHire,
+  embedded = false,
+  initialCreatedId = null,
+  hiredCatalogIds = [],
+  hiredVoiceIds = [],
+  catalogRows,
+  autoPlayOnOpen = false,
+  hideVoiceButton = false,
+  allowGalleryWheelZoom = true,
+  interactive = true,
+  portalDetail = false,
+}) => {
   const [receptionists, setReceptionists] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -52,11 +66,15 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, initialCreat
     .join('|');
 
   const loadReceptionists = async () => {
+    if (catalogRows === null) {
+      setLoading(true);
+      return;
+    }
     setLoading(true);
     setLoadError('');
     setSelectedIndex(null);
     try {
-      const catalogData = await api.getReceptionistCatalog();
+      const catalogData = catalogRows === undefined ? await api.getReceptionistCatalog() : catalogRows;
 
       const hiredIds = new Set((hiredCatalogIds || []).filter(Boolean).map((value) => String(value)));
       const hiredVoices = new Set((hiredVoiceIds || []).filter(Boolean).map((value) => String(value)));
@@ -83,7 +101,7 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, initialCreat
 
   useEffect(() => {
     loadReceptionists();
-  }, [hiredCatalogKey, hiredVoiceKey]);
+  }, [catalogRows, hiredCatalogKey, hiredVoiceKey]);
 
   useEffect(() => () => { audioRef.current?.pause(); cancelAnimationFrame(levelFrameRef.current); audioContextRef.current?.close(); }, []);
 
@@ -184,8 +202,9 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, initialCreat
     audio.onerror = stop;
     const start = async () => {
       try {
-        await audioContextRef.current?.resume();
-        await audio.play();
+        const resumePromise = audioContextRef.current?.resume();
+        const playPromise = audio.play();
+        await Promise.all([resumePromise, playPromise]);
         setPlayingVoice(receptionistId);
         const samples = new Uint8Array(analyserRef.current?.frequencyBinCount || 0);
         const sample = () => {
@@ -204,6 +223,16 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, initialCreat
       }
     };
     start();
+  };
+
+  const openDetail = (index) => {
+    const receptionist = receptionists[index];
+    // Start directly inside the tile's click gesture so browser autoplay
+    // policies allow the preview without showing an extra play control.
+    if (embedded && autoPlayOnOpen && receptionist?.voice) {
+      playVoice(receptionist.voice, receptionist.id);
+    }
+    setSelectedIndex(index);
   };
 
   const handleSelect = async (receptionist) => {
@@ -230,7 +259,7 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, initialCreat
       transition={embedded ? { duration: reducedMotion ? 0 : .68, ease: [.9, 0, .1, 1] } : undefined}
         className={
         embedded
-          ? 'ns-gallery-detail'
+          ? `ns-gallery-detail${portalDetail ? ' ns-gallery-detail-portal' : ''}`
           : 'fixed inset-0 z-[1000] flex items-center justify-center p-8 bg-black/80 backdrop-blur-md'
       }
       onClick={embedded ? () => { if (!hiringId && !archiving) closeDetail(); } : onClose}
@@ -302,7 +331,7 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, initialCreat
                   </dl>
                   {catalogCoreTraits(person).length > 0 && <div className="ns-catalog-review-traits"><span>Core traits</span><div>{catalogCoreTraits(person).map((trait, i) => <span key={i}>{trait}</span>)}</div></div>}
                   <div className="ns-receptionist-preview-actions">
-                    {person.voice ? <div className="ns-catalog-voice-preview"><button type="button" className="ns-take-play" aria-label={playingVoice === person.id ? 'Pause voice preview' : 'Play voice preview'} onClick={() => playVoice(person.voice, person.id)}>{playingVoice === person.id ? <Pause size={18}/> : <Play size={18}/>}</button><IntercomVoiceLine enabled={playingVoice === person.id} level={voiceLevel}/><span>{playingVoice === person.id ? 'Playing preview' : 'Preview voice'}</span></div> : <span className="ns-footnote">No voice preview</span>}
+                    {person.voice ? <div className="ns-catalog-voice-preview">{hideVoiceButton ? <span className="ns-catalog-voice-control-spacer" aria-hidden="true" /> : <button type="button" className="ns-take-play" aria-label={playingVoice === person.id ? 'Pause voice preview' : 'Play voice preview'} onClick={() => playVoice(person.voice, person.id)}>{playingVoice === person.id ? <Pause size={18}/> : <Play size={18}/>}</button>}<IntercomVoiceLine enabled={playingVoice === person.id} level={voiceLevel}/><span>{playingVoice === person.id ? 'Playing preview' : 'Preview voice'}</span></div> : <span className="ns-footnote">No voice preview</span>}
                     <div className={`ns-catalog-hire-actions${isCreatedReceptionist(person) ? ' is-created' : ''}`}>
                     <button type="button" className="ns-primary" disabled={Boolean(hiringId) || archiving} onClick={() => handleSelect(person)}>{hiringId === (person.created_receptionist_id ?? person.custom_voice_id ?? person.catalog_id ?? person.id) ? <><Loader2 size={16} className="animate-spin"/> Hiring…</> : <>Hire {person.first_name || person.full_name || 'receptionist'}</>}</button>
                     {person.created_receptionist_id != null && <button type="button" className="ns-catalog-archive-action" disabled={Boolean(hiringId) || archiving} onClick={() => { setHireError(''); setArchiveTarget(person); }}>{archiving ? 'Archiving…' : 'Archive'}</button>}
@@ -543,9 +572,13 @@ const HireReceptionistModal = ({ onClose, onHire, embedded = false, initialCreat
       } catch (error) { setHireError(error?.message || 'Could not archive receptionist. Please try again.'); }
       finally { setArchiving(false); }
     }}
-  />}</AnimatePresence><ReceptionistGallery receptionists={receptionists} onSelect={setSelectedIndex} paused={selectedIndex !== null}>
-    <AnimatePresence>{selectedIndex !== null && detail}</AnimatePresence>
-  </ReceptionistGallery></>;
+  />}</AnimatePresence><ReceptionistGallery receptionists={receptionists} onSelect={openDetail} paused={!interactive || selectedIndex !== null} allowWheelZoom={allowGalleryWheelZoom}>
+    {!portalDetail && <AnimatePresence>{selectedIndex !== null && detail}</AnimatePresence>}
+  </ReceptionistGallery>
+  {portalDetail && typeof document !== 'undefined' && createPortal(
+    <AnimatePresence>{selectedIndex !== null && detail}</AnimatePresence>,
+    document.body,
+  )}</>;
 };
 
 export default HireReceptionistModal;
