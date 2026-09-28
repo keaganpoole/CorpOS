@@ -21,14 +21,14 @@ const hash = value => {
 
 // Deal each source across both column palettes, then interleave sources within
 // each palette. Sorting by identity makes API ordering irrelevant.
-export function galleryRosterOrder(receptionists) {
+export function galleryRosterOrder(receptionists, seed = '') {
   const unique = new Map();
   receptionists.forEach((person, index) => {
     const key = identity(person);
     if (!unique.has(key)) unique.set(key, { key, index, custom: Boolean(person.created_receptionist_id || person.custom_voice_id || ['created_receptionist', 'voice_clone', 'custom_voice'].includes(person.source)) });
   });
   const groups = [false, true].map(custom => [...unique.values()].filter(person => person.custom === custom)
-    .sort((a, b) => hash(a.key) - hash(b.key) || a.key.localeCompare(b.key)));
+    .sort((a, b) => hash(`${seed}:${a.key}`) - hash(`${seed}:${b.key}`) || a.key.localeCompare(b.key)));
   const palettes = [[], []];
   for (const group of groups) for (const person of group) {
     palettes[palettes[0].length <= palettes[1].length ? 0 : 1].push(person);
@@ -44,7 +44,18 @@ export function galleryRosterOrder(receptionists) {
     }
     return result;
   });
-  return Array.from({ length: unique.size }, (_, index) => mixed[index % 2][Math.floor(index / 2)]);
+  const order = Array.from({ length: unique.size }, (_, index) => mixed[index % 2][Math.floor(index / 2)]);
+  const preferred = ['kayla', 'maggie', 'chloe'];
+  const preferredIndexes = preferred.map(name => {
+    const entry = [...unique.values()].find(item => String(receptionists[item.index]?.full_name || '').toLowerCase().includes(name));
+    return entry?.index;
+  }).filter(index => index != null);
+  preferredIndexes.forEach((personIndex, slot) => {
+    const currentPosition = order.indexOf(personIndex);
+    if (currentPosition < 0 || currentPosition === slot) return;
+    [order[slot], order[currentPosition]] = [order[currentPosition], order[slot]];
+  });
+  return order;
 }
 
 export function galleryPersonIndex(column, row, count) {
@@ -53,7 +64,10 @@ export function galleryPersonIndex(column, row, count) {
   // prevent duplicates across every overlapping edge, not just equal row IDs.
   const parity = wrap(column, 2);
   const length = Math.floor((count + 1 - parity) / 2);
-  return parity + 2 * wrap(row + Math.floor(column / 2), length);
+  // Walk the roster with a coprime stride so repeated receptionist images
+  // are separated across the masonry instead of appearing in nearby rows.
+  const stride = length > 3 && length % 5 !== 0 ? 5 : (length > 3 && length % 2 !== 0 ? 2 : 1);
+  return parity + 2 * wrap(row * stride + Math.floor(column / 2), length);
 }
 
 // A periodic masonry world: every column fills continuously, including negative

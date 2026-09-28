@@ -19,6 +19,13 @@ const accentLabels = new Set([...CHARACTERISTICS.find(item => item.key === 'acce
 const isCreatedReceptionist = person => person.source === 'created_receptionist' || person.created_receptionist_id != null;
 const catalogAccentTraits = person => isCreatedReceptionist(person) && Array.isArray(person.traits) ? person.traits.filter(trait => accentLabels.has(trait)) : [];
 const catalogCoreTraits = person => Array.isArray(person.traits) ? person.traits.filter(trait => !isCreatedReceptionist(person) || !accentLabels.has(trait)) : [];
+const catalogMbti = person => {
+  let personality = Array.isArray(person.personality) ? person.personality[0] : person.personality;
+  if (typeof personality === 'string') {
+    try { personality = JSON.parse(personality); } catch { return person.personality_type || person.mbti || person.personality; }
+  }
+  return personality?.mbti || person.personality_type || person.mbti || '';
+};
 
 const HireReceptionistModal = ({
   onClose,
@@ -32,6 +39,8 @@ const HireReceptionistModal = ({
   hideVoiceButton = false,
   allowGalleryWheelZoom = true,
   showGalleryZoomControls = true,
+  galleryDefaultZoom,
+  randomizeGalleryRoster = false,
   onGalleryInteraction,
   interactive = true,
   portalDetail = false,
@@ -328,11 +337,11 @@ const HireReceptionistModal = ({
                     {hideVoiceButton && person.voice && <IntercomVoiceLine enabled={playingVoice === person.id} level={voiceLevel}/>} 
                   </div>
                   <h2>{person.full_name || 'Receptionist'}</h2>
-                  {getMbtiProfileSummary(person.personality?.mbti || person.personality_type, person.first_name || person.full_name) && <p className="ns-receptionist-preview-copy">{getMbtiProfileSummary(person.personality?.mbti || person.personality_type, person.first_name || person.full_name)}</p>}
+                  {(person.description || getMbtiProfileSummary(person.personality?.mbti || person.personality_type, person.first_name || person.full_name)) && <p className="ns-receptionist-preview-copy">{person.description || getMbtiProfileSummary(person.personality?.mbti || person.personality_type, person.first_name || person.full_name)}</p>}
                   <dl className={`ns-catalog-review-meta${isCreatedReceptionist(person) ? ' ns-catalog-review-meta-created' : ''}`}>
                     {person.age && <div><dt>Age</dt><dd>{String(person.age).match(/^\d+$/) ? `${person.age} years old` : person.age}</dd></div>}
+                    {catalogMbti(person) && <div><dt>Personality</dt><dd><button type="button" onClick={() => setPersonalityPerson(person)}>{catalogMbti(person)}</button></dd></div>}
                     {catalogAccentTraits(person).length > 0 && <div><dt>Accent</dt><dd>{catalogAccentTraits(person).join(' · ')}</dd></div>}
-                    {(person.personality?.mbti || person.personality_type) && <div><dt>Personality</dt><dd><button type="button" onClick={() => setPersonalityPerson(person)}>{person.personality?.mbti || person.personality_type}</button></dd></div>}
                   </dl>
                   {catalogCoreTraits(person).length > 0 && <div className="ns-catalog-review-traits"><span>Core traits</span><div>{catalogCoreTraits(person).map((trait, i) => <span key={i}>{trait}</span>)}</div></div>}
                   <div className="ns-receptionist-preview-actions">
@@ -577,7 +586,7 @@ const HireReceptionistModal = ({
       } catch (error) { setHireError(error?.message || 'Could not archive receptionist. Please try again.'); }
       finally { setArchiving(false); }
     }}
-  />}</AnimatePresence><ReceptionistGallery receptionists={receptionists} onSelect={openDetail} onInteraction={onGalleryInteraction} paused={!interactive || selectedIndex !== null} allowWheelZoom={allowGalleryWheelZoom} showZoomControls={showGalleryZoomControls}>
+  />}</AnimatePresence><ReceptionistGallery receptionists={receptionists} onSelect={openDetail} onInteraction={onGalleryInteraction} paused={!interactive || selectedIndex !== null} allowWheelZoom={allowGalleryWheelZoom} showZoomControls={showGalleryZoomControls} defaultZoom={galleryDefaultZoom} randomizeRoster={randomizeGalleryRoster}>
     {!portalDetail && <AnimatePresence>{selectedIndex !== null && detail}</AnimatePresence>}
   </ReceptionistGallery>
   {portalDetail && typeof document !== 'undefined' && createPortal(

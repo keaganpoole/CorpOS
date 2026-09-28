@@ -162,7 +162,7 @@ export default function MbtiPersonalityModal({ person, onClose }) {
           )}
 
           <div className="mt-10 border-t border-white/[.045] pt-5">
-            <p className="text-center text-[10px] leading-4 text-zinc-700">MBTI is a helpful communication lens, not a limit on how a person can think or behave.</p>
+            <p className="text-center text-[10px] leading-4 text-zinc-700">Personality type is a helpful communication lens, not a limit on how someone can think, grow, or behave.</p>
           </div>
         </div>
       </motion.section>

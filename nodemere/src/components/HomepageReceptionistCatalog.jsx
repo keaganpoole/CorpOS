@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ArrowDown, Hand, MousePointer2, Volume2 } from 'lucide-react';
+import { ArrowDown, Hand, MousePointer2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../sonar/lib/api';
@@ -30,10 +30,36 @@ export default function HomepageReceptionistCatalog({ active, onContinue }) {
         });
         if (!response.ok) throw new Error(`Catalog request failed (${response.status})`);
         const data = await response.json();
+        const rows = Array.isArray(data) ? data : [];
+        let catalogRowsForHomepage = rows;
+        try {
+          const enrichedRows = await api.getReceptionistCatalog();
+          if (Array.isArray(enrichedRows) && enrichedRows.length > 0) catalogRowsForHomepage = enrichedRows;
+        } catch {
+          // Keep the public Supabase rows when the authenticated catalog route is unavailable.
+        }
+        catalogRowsForHomepage = catalogRowsForHomepage.filter((person) => (
+          person.source !== 'created_receptionist' && person.created_receptionist_id == null && person.is_custom !== true
+        ));
+        const personalityIds = [...new Set(catalogRowsForHomepage.map((person) => person.personality_id).filter(Boolean))];
+        const personalityMap = new Map();
+        await Promise.all(personalityIds.map(async (personalityId) => {
+          const personalityResponse = await fetch(`${supabaseUrl}/rest/v1/personalities?id=eq.${encodeURIComponent(personalityId)}&select=mbti,personality`, {
+            headers: { apikey: publicKey, Authorization: `Bearer ${publicKey}` },
+          });
+          if (personalityResponse.ok) {
+            const personalityRows = await personalityResponse.json();
+            if (personalityRows[0]) personalityMap.set(String(personalityId), personalityRows[0]);
+          }
+        }));
         if (cancelled) return;
-        setCatalogRows((Array.isArray(data) ? data : [])
+        setCatalogRows(catalogRowsForHomepage
           .filter((person) => person.id != null)
-          .map((person) => ({ ...person, catalog_id: person.catalog_id ?? person.id })));
+          .map((person) => ({
+            ...person,
+            personality: person.personality || personalityMap.get(String(person.personality_id)),
+            catalog_id: person.catalog_id ?? person.id,
+          })));
       } catch (error) {
         if (cancelled) return;
         console.error('Homepage receptionist catalog could not load.', error);
@@ -75,6 +101,8 @@ export default function HomepageReceptionistCatalog({ active, onContinue }) {
         hideVoiceButton
         allowGalleryWheelZoom={false}
         showGalleryZoomControls={false}
+        galleryDefaultZoom={typeof window !== 'undefined' && window.innerWidth > 1180 ? 2.05 : undefined}
+        randomizeGalleryRoster
         onGalleryInteraction={(interaction) => {
           if (interaction === 'tap') setShowGestureHint(false);
           if (interaction === 'drag') { setGestureMode('tap'); setShowGestureHint(true); }
@@ -82,13 +110,13 @@ export default function HomepageReceptionistCatalog({ active, onContinue }) {
         interactive={active}
         portalDetail
       />
-      {active && showGestureHint && (
+      {active && catalogRows?.length > 0 && showGestureHint && (
         <div className="homepage-catalog-gesture-hint" aria-hidden="true">
           <div className="homepage-catalog-gesture-icon">
-            {gestureMode === 'pan' ? <><Hand size={24} /><MousePointer2 size={16} /></> : <><MousePointer2 size={25} /><Volume2 size={15} /></>}
+            {gestureMode === 'pan' ? <Hand className="is-pan-hand" size={24} /> : <MousePointer2 size={25} />}
           </div>
           <span>{gestureMode === 'pan' ? 'Drag to explore' : 'Tap to listen'}</span>
-          <small>{gestureMode === 'pan' ? <><Volume2 size={13} aria-hidden="true" /> Tap a receptionist to listen</> : 'Select any receptionist tile'}</small>
+          <small>Tap to listen</small>
         </div>
       )}
       {active && showContinueCue && (

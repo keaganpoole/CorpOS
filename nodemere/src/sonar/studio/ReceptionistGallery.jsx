@@ -6,7 +6,7 @@ import './receptionistGallery.css';
 
 const DEFAULT_GALLERY_ZOOM = 1.4;
 
-export default function ReceptionistGallery({ receptionists, onSelect, onInteraction, paused, allowWheelZoom = true, showZoomControls = true, children }) {
+export default function ReceptionistGallery({ receptionists, onSelect, onInteraction, paused, allowWheelZoom = true, showZoomControls = true, defaultZoom = DEFAULT_GALLERY_ZOOM, randomizeRoster = false, children }) {
   const DRAG_RESISTANCE = 0.78;
   const FOLLOW_STIFFNESS = 5.1;
   const INERTIA_DAMPING = 2.35;
@@ -15,9 +15,10 @@ export default function ReceptionistGallery({ receptionists, onSelect, onInterac
   const controlsRef = useRef(null);
   const resetGestureRef = useRef(null);
   const [cells, setCells] = useState([]);
-  const [zoomLevel, setZoomLevel] = useState(DEFAULT_GALLERY_ZOOM);
+  const [zoomLevel, setZoomLevel] = useState(defaultZoom);
   const reducedMotion = useReducedMotion();
-  const rosterOrder = useMemo(() => galleryRosterOrder(receptionists), [receptionists]);
+  const rosterSeedRef = useRef(randomizeRoster ? Math.random().toString(36).slice(2) : '');
+  const rosterOrder = useMemo(() => galleryRosterOrder(receptionists, rosterSeedRef.current), [receptionists]);
   const pausedRef = useRef(paused);
   pausedRef.current = paused;
 
@@ -40,10 +41,30 @@ export default function ReceptionistGallery({ receptionists, onSelect, onInterac
     let size = { width: root.clientWidth, height: root.clientHeight };
     const center = { x: size.width / 2, y: size.height / 2 };
     let current = {
-      x: center.x - (center.x + 110) * DEFAULT_GALLERY_ZOOM,
-      y: center.y - (center.y + 120) * DEFAULT_GALLERY_ZOOM,
-      scale: DEFAULT_GALLERY_ZOOM,
+      x: center.x - (center.x + 110) * defaultZoom,
+      y: center.y - (center.y + 120) * defaultZoom,
+      scale: defaultZoom,
     }, target = { ...current };
+    const focalIndexes = receptionists
+      .map((person, index) => /^(maggie)\b/i.test(String(person.full_name || '').trim()) ? index : -1)
+      .filter(index => index >= 0);
+    if (focalIndexes.length) {
+      const initialCells = galleryCells(current, size.width, size.height, rosterOrder.length);
+      const focalCells = focalIndexes.map(index => initialCells
+        .filter(cell => rosterOrder[cell.personIndex] === index)
+        .sort((a, b) => Math.hypot((a.x + a.width / 2) * defaultZoom + current.x - center.x, (a.y + a.height / 2) * defaultZoom + current.y - center.y) - Math.hypot((b.x + b.width / 2) * defaultZoom + current.x - center.x, (b.y + b.height / 2) * defaultZoom + current.y - center.y))[0])
+        .filter(Boolean);
+      if (focalCells.length) {
+        const focalCell = focalCells[0];
+        const focalCenter = {
+          x: (focalCell.x + focalCell.width / 2) * defaultZoom + current.x,
+          y: (focalCell.y + focalCell.height / 2) * defaultZoom + current.y,
+        };
+        current.x += center.x - focalCenter.x;
+        current.y += center.y - focalCenter.y;
+        target = { ...current };
+      }
+    }
     let drag = null, moved = false, clickTarget = null;
     let velocity = { x: 0, y: 0 }, lastTime = 0, frame = null, cellSignature = '';
     const styleCache = new WeakMap();
@@ -59,7 +80,7 @@ export default function ReceptionistGallery({ receptionists, onSelect, onInterac
       velocity = { x: 0, y: 0 };
       scheduleTick();
     };
-    controlsRef.current = action => setZoom(action === 'default' ? DEFAULT_GALLERY_ZOOM : target.scale * (action === 'in' ? 1.2 : 1 / 1.2));
+    controlsRef.current = action => setZoom(action === 'default' ? defaultZoom : target.scale * (action === 'in' ? 1.2 : 1 / 1.2));
     const wheel = event => {
       if (pausedRef.current || !allowWheelZoom) return;
       event.preventDefault();
@@ -188,7 +209,7 @@ export default function ReceptionistGallery({ receptionists, onSelect, onInterac
       resetGesture(); resetGestureRef.current = null;
       root.removeEventListener('click', click, true); root.removeEventListener('keydown', key);
     };
-  }, [allowWheelZoom, onInteraction, rosterOrder.length, reducedMotion]);
+  }, [allowWheelZoom, defaultZoom, onInteraction, rosterOrder.length, reducedMotion]);
 
   return <><div className="ns-receptionist-gallery" ref={rootRef} tabIndex={0} aria-label="Receptionist gallery. Drag to explore and pinch to zoom.">
     <div className="ns-gallery-world" ref={worldRef} inert={paused ? '' : undefined} aria-hidden={paused || undefined}>
@@ -208,7 +229,7 @@ export default function ReceptionistGallery({ receptionists, onSelect, onInterac
     </div>
     {showZoomControls && <div className="ns-gallery-toolbar" data-gallery-controls role="toolbar" aria-label="Gallery zoom" inert={paused ? '' : undefined}>
       <button type="button" disabled={zoomLevel <= MIN_GALLERY_ZOOM} onClick={() => controlsRef.current?.('out')}><Minus size={14}/> Zoom Out</button>
-      <button type="button" aria-pressed={Math.abs(zoomLevel - DEFAULT_GALLERY_ZOOM) < .001} onClick={() => controlsRef.current?.('default')}>Default</button>
+      <button type="button" aria-pressed={Math.abs(zoomLevel - defaultZoom) < .001} onClick={() => controlsRef.current?.('default')}>Default</button>
       <button type="button" disabled={zoomLevel >= 1.8} onClick={() => controlsRef.current?.('in')}>Zoom In <Plus size={14}/></button>
     </div>}
   </div>
