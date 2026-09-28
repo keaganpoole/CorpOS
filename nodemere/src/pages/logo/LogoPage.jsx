@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Download, RotateCcw } from 'lucide-react';
+import { Download } from 'lucide-react';
 import { initializeLogo } from './logoAnimation';
 import './logo.css';
 
@@ -7,7 +7,7 @@ export default function LogoPage() {
   const page = useRef(null);
   useEffect(() => {
     const previousTitle = document.title;
-    document.title = 'Nodemere — Logo in motion';
+    document.title = 'Nodemere — Logo';
     const dispose = initializeLogo(page.current);
     return () => { dispose(); document.title = previousTitle; };
   }, []);
@@ -17,30 +17,24 @@ export default function LogoPage() {
       <div className="ambient" aria-hidden="true" />
       <header>
         <a className="brand" href="/logo" aria-label="Nodemere logo page"><img src="/logo/nodemere.svg" alt="" width="30" height="30" /><span>nodemere</span></a>
-        <span className="page-label">IDENTITY IN MOTION <span className="edition">01 / LOGO</span></span>
+        <span className="page-label">NODEMERE IDENTITY <span className="edition">01 / LOGO</span></span>
         <a className="download" href="/logo/nodemere.svg" download="nodemere.svg">Download SVG <Download size={16} strokeWidth={1.6} aria-hidden="true" /></a>
       </header>
       <main>
         <div className="logo-exhibit">
-        <div className="stage" id="stage" tabIndex={0} aria-label="Interactive Nodemere logo. Move your pointer or drag to animate. Press Enter to play a wave.">
+        <div className="stage" id="stage" style={{ cursor: 'default' }}>
           <span className="corner tl" aria-hidden="true" /><span className="corner tr" aria-hidden="true" /><span className="corner bl" aria-hidden="true" /><span className="corner br" aria-hidden="true" />
           <svg id="mark" viewBox="0 0 520 520" role="img" aria-labelledby="logo-title">
-            <title id="logo-title">Nodemere animated logo</title>
+            <title id="logo-title">Nodemere logo</title>
             <defs><filter id="glow" x="-35%" y="-35%" width="170%" height="170%"><feGaussianBlur stdDeviation="6" /></filter></defs>
             <g id="bloom" filter="url(#glow)" opacity=".45" /><g id="lines" />
           </svg>
         </div>
-        <div className="caption"><h1>Nodemere</h1><p id="hint">Move through the mark. Feel the wave.</p></div>
+        <div className="caption"><h1>Nodemere</h1></div>
         </div>
       </main>
       <footer>
-        <div className="signature"><span className="line-sample" aria-hidden="true" />A mark, alive.</div>
-        <div className="controls">
-          <button id="replay" type="button" aria-label="Replay selected animation"><RotateCcw size={16} strokeWidth={1.5} aria-hidden="true" />Replay</button>
-          <button id="loop" type="button" aria-pressed="false">Loop preview</button>
-          <span className="divider" />
-          <button id="pause" type="button" aria-pressed="false"><span id="pause-icon" aria-hidden="true">Ⅱ</span><span id="pause-label">Pause</span></button>
-        </div>
+        <div className="signature"><span className="line-sample" aria-hidden="true" />Nodemere</div>
         <span className="footnote">VECTOR / NO. 001</span>
       </footer>
     </div>

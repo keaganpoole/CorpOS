@@ -6,8 +6,8 @@ export const SPLASH_LOGO_HOLD_MS = 2900;
 export default function SplashLogo() {
   const root = useRef(null);
   const id = 'splash-logo-' + useId().replace(/:/g, '');
-  useEffect(() => initializeLogo(root.current, { delay: 1, interactive: false, idPrefix: id, strokeWidth: 13, expressive: true }), [id]);
-  return <div ref={root} data-logo-stage style={{ width: 'clamp(136.9px, 14.63vw, 182.2px)', aspectRatio: '1' }}>
+  useEffect(() => initializeLogo(root.current, { strokeWidth: 14 }), []);
+  return <div ref={root} data-logo-stage style={{ width: 'clamp(123.2px, 13.167vw, 164px)', aspectRatio: '1' }}>
     <svg data-logo-mark viewBox="0 0 520 520" role="img" aria-label="Nodemere logo" style={{ width: '100%', height: '100%', overflow: 'visible', display: 'block' }}>
       <defs><filter id={id + '-glow'} x="-35%" y="-35%" width="170%" height="170%"><feGaussianBlur stdDeviation="6" /></filter></defs>
       <g data-logo-bloom filter={`url(#${id}-glow)`} opacity=".45" /><g data-logo-lines />
