@@ -323,7 +323,10 @@ const HireReceptionistModal = ({
                   <div className="ns-receptionist-preview-image-wash" />
                 </div>
                 <div className="ns-receptionist-preview-body">
-                  <span className="ns-eyebrow">{person.source === 'created_receptionist' ? 'YOUR CREATION' : 'AVAILABLE'}</span>
+                  <div className={`ns-catalog-status-row${hideVoiceButton ? ' is-autoplay' : ''}`}>
+                    <span className="ns-eyebrow">{person.source === 'created_receptionist' ? 'YOUR CREATION' : 'AVAILABLE'}</span>
+                    {hideVoiceButton && person.voice && <IntercomVoiceLine enabled={playingVoice === person.id} level={voiceLevel}/>} 
+                  </div>
                   <h2>{person.full_name || 'Receptionist'}</h2>
                   {getMbtiProfileSummary(person.personality?.mbti || person.personality_type, person.first_name || person.full_name) && <p className="ns-receptionist-preview-copy">{getMbtiProfileSummary(person.personality?.mbti || person.personality_type, person.first_name || person.full_name)}</p>}
                   <dl className={`ns-catalog-review-meta${isCreatedReceptionist(person) ? ' ns-catalog-review-meta-created' : ''}`}>
@@ -333,7 +336,7 @@ const HireReceptionistModal = ({
                   </dl>
                   {catalogCoreTraits(person).length > 0 && <div className="ns-catalog-review-traits"><span>Core traits</span><div>{catalogCoreTraits(person).map((trait, i) => <span key={i}>{trait}</span>)}</div></div>}
                   <div className="ns-receptionist-preview-actions">
-                    {person.voice ? <div className="ns-catalog-voice-preview">{hideVoiceButton ? <span className="ns-catalog-voice-control-spacer" aria-hidden="true" /> : <button type="button" className="ns-take-play" aria-label={playingVoice === person.id ? 'Pause voice preview' : 'Play voice preview'} onClick={() => playVoice(person.voice, person.id)}>{playingVoice === person.id ? <Pause size={18}/> : <Play size={18}/>}</button>}<IntercomVoiceLine enabled={playingVoice === person.id} level={voiceLevel}/><span>{playingVoice === person.id ? 'Playing preview' : 'Preview voice'}</span></div> : <span className="ns-footnote">No voice preview</span>}
+                    {person.voice && !hideVoiceButton ? <div className="ns-catalog-voice-preview"><button type="button" className="ns-take-play" aria-label={playingVoice === person.id ? 'Pause voice preview' : 'Play voice preview'} onClick={() => playVoice(person.voice, person.id)}>{playingVoice === person.id ? <Pause size={18}/> : <Play size={18}/>}</button><IntercomVoiceLine enabled={playingVoice === person.id} level={voiceLevel}/><span>{playingVoice === person.id ? 'Playing preview' : 'Preview voice'}</span></div> : !person.voice ? <span className="ns-footnote">No voice preview</span> : null}
                     <div className={`ns-catalog-hire-actions${isCreatedReceptionist(person) ? ' is-created' : ''}`}>
                     <button type="button" className="ns-primary" disabled={Boolean(hiringId) || archiving} onClick={() => handleSelect(person)}>{hiringId === (person.created_receptionist_id ?? person.custom_voice_id ?? person.catalog_id ?? person.id) ? <><Loader2 size={16} className="animate-spin"/> Hiring…</> : <>Hire {person.first_name || person.full_name || 'receptionist'}</>}</button>
                     {person.created_receptionist_id != null && <button type="button" className="ns-catalog-archive-action" disabled={Boolean(hiringId) || archiving} onClick={() => { setHireError(''); setArchiveTarget(person); }}>{archiving ? 'Archiving…' : 'Archive'}</button>}
