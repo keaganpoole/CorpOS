@@ -2523,7 +2523,7 @@ const SonarDashboard = () => {
             <AnimatePresence>
               {showReceptionistChoice && <ReceptionistChoiceModal
                 onClose={() => setShowReceptionistChoice(false)}
-                onCreate={() => { setShowReceptionistChoice(false); setStudioLaunchDestination('studio'); setTeamExperience('studio'); }}
+                onCreate={() => { setShowReceptionistChoice(false); setStudioLaunchDestination('create'); setTeamExperience('studio'); }}
                 onHire={() => { setShowReceptionistChoice(false); setStudioLaunchDestination('catalog'); setTeamExperience('studio'); }}
               />}
             </AnimatePresence>

@@ -17,10 +17,10 @@ export default function OfficeExperience({ initialDestination = 'entry', onRetur
   const [definition, setDefinition] = useState({ stage: 0, values: { toneWeights: {} }, previewOption: null, quiet: false, mode: 'design', playing: false });
   const reducedMotion = useReducedMotion();
   const updateScene = useCallback(next => setDefinition(next), []);
-  const finishCreateSplash = useCallback(() => setDestination('entry'), []);
+  const finishCreateSplash = useCallback(() => setDestination('studio'), []);
   const begin = path => {
     if (!ready) return;
-    setDestination(path);
+    setDestination(path === 'studio' ? 'create' : path);
     if (path === 'studio') onCreateStarted?.();
   };
   return <div className={`ns-office is-${destination} ${ready?'is-ready':''} ${reducedMotion?'is-reduced-motion':''} ${definition.stage===4?'is-room':''} ${definition.stage===5?'is-audition':''} ${definition.mode==='clone'?'is-office-clone':''} ${definition.playing?'is-playing':''}`}>

@@ -30,6 +30,8 @@ import { visitorIntelligenceApi } from './lib/visitorIntelligenceApi';
 const VisitorsPage = lazy(() => import('./pages/VisitorsPage'));
 const ConceptsPage = lazy(() => import('./pages/concepts/ConceptsPage'));
 const DesignsPage = lazy(() => import('./pages/designs/DesignsPage'));
+const LoaderPreview = lazy(() => import('./pages/logo/LoaderPreview'));
+const SplashComparison = lazy(() => import('./pages/logo/SplashComparison'));
 const LogoPage = lazy(() => import('./pages/logo/LogoPage'));
 
 function DashboardGate() {
@@ -117,6 +119,14 @@ function AppContent() {
   const isVisitors = location.pathname.startsWith('/visitors');
   const isConcepts = location.pathname === '/concepts';
   const isDesigns = location.pathname === '/designs';
+
+  if (location.pathname === '/logo/loader') {
+    return <Suspense fallback={<div style={{ minHeight: '100vh', background: '#070b13' }} />}><LoaderPreview /></Suspense>;
+  }
+
+  if (location.pathname === '/logo/compare') {
+    return <Suspense fallback={<div style={{ minHeight: '100vh', background: '#020202' }} />}><SplashComparison /></Suspense>;
+  }
 
   if (location.pathname === '/logo' || location.pathname === '/logo/') {
     return <Suspense fallback={<div style={{ minHeight: '100vh', background: '#070b13' }} />}><LogoPage /></Suspense>;

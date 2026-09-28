@@ -676,14 +676,6 @@ const HomePage = () => {
     }
   }, [location]);
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setShowSplash(false);
-    }, 1000);
-
-    return () => clearTimeout(timer);
-  }, []);
-
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
 
   const cardImages = [pgg1, pgg20, pgg3, pgg4, pgg5, pgg6, pgg7];
@@ -785,7 +777,7 @@ const HomePage = () => {
             exit={{ opacity: 0, transition: { duration: 0.5 } }}
             style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 9999, pointerEvents: 'none' }}
           >
-            <SplashScreen />
+            <SplashScreen onAnimationEnd={() => setShowSplash(false)} />
           </motion.div>
         )}
       </AnimatePresence>
