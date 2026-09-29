@@ -14,6 +14,7 @@ export default function ReceptionistGallery({ receptionists, onSelect, onInterac
   const tileRefCallbacks = useRef(new Map());
   const controlsRef = useRef(null);
   const resetGestureRef = useRef(null);
+  const onInteractionRef = useRef(onInteraction);
   const [cells, setCells] = useState([]);
   const [zoomLevel, setZoomLevel] = useState(defaultZoom);
   const reducedMotion = useReducedMotion();
@@ -21,6 +22,7 @@ export default function ReceptionistGallery({ receptionists, onSelect, onInterac
   const rosterOrder = useMemo(() => galleryRosterOrder(receptionists, rosterSeedRef.current), [receptionists]);
   const pausedRef = useRef(paused);
   pausedRef.current = paused;
+  onInteractionRef.current = onInteraction;
 
   useLayoutEffect(() => {
     if (paused) resetGestureRef.current?.();
@@ -138,10 +140,10 @@ export default function ReceptionistGallery({ receptionists, onSelect, onInterac
     const click = event => {
       const tile = clickTarget;
       clickTarget = null;
-      if (moved) { onInteraction?.('drag'); event.preventDefault(); event.stopPropagation(); moved = false; }
+      if (moved) { onInteractionRef.current?.('drag'); event.preventDefault(); event.stopPropagation(); moved = false; }
       // Pointer capture can retarget a tap's click to the root.
-      else if (event.target === root && tile?.isConnected) { onInteraction?.('tap'); tile.click(); }
-      else if (event.target.closest('.ns-gallery-tile')) onInteraction?.('tap');
+      else if (event.target === root && tile?.isConnected) { onInteractionRef.current?.('tap'); tile.click(); }
+      else if (event.target.closest('.ns-gallery-tile')) onInteractionRef.current?.('tap');
     };
     const key = event => {
       if (pausedRef.current || event.target.closest('button')) return;
@@ -209,7 +211,7 @@ export default function ReceptionistGallery({ receptionists, onSelect, onInterac
       resetGesture(); resetGestureRef.current = null;
       root.removeEventListener('click', click, true); root.removeEventListener('keydown', key);
     };
-  }, [allowWheelZoom, defaultZoom, onInteraction, rosterOrder.length, reducedMotion]);
+  }, [allowWheelZoom, defaultZoom, rosterOrder.length, reducedMotion]);
 
   return <><div className="ns-receptionist-gallery" ref={rootRef} tabIndex={0} aria-label="Receptionist gallery. Drag to explore and pinch to zoom.">
     <div className="ns-gallery-world" ref={worldRef} inert={paused ? '' : undefined} aria-hidden={paused || undefined}>

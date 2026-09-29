@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowDown, Hand, MousePointer2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -15,6 +15,7 @@ export default function HomepageReceptionistCatalog({ active, onContinue }) {
   const [showGestureHint, setShowGestureHint] = useState(true);
   const [gestureMode, setGestureMode] = useState('pan');
   const [showContinueCue, setShowContinueCue] = useState(false);
+  const hasListenedRef = useRef(false);
   const { session } = useAuth();
   const navigate = useNavigate();
 
@@ -72,12 +73,26 @@ export default function HomepageReceptionistCatalog({ active, onContinue }) {
 
   useEffect(() => {
     if (!active) return undefined;
-    setShowGestureHint(true);
-    setGestureMode('pan');
+    if (!hasListenedRef.current) {
+      setShowGestureHint(true);
+      setGestureMode('pan');
+    }
     setShowContinueCue(false);
     const timer = window.setTimeout(() => setShowContinueCue(true), 4500);
     return () => window.clearTimeout(timer);
   }, [active]);
+
+  const handleGalleryInteraction = useCallback((interaction) => {
+    if (interaction === 'tap') {
+      hasListenedRef.current = true;
+      setShowGestureHint(false);
+      return;
+    }
+    if (interaction === 'drag' && !hasListenedRef.current) {
+      setGestureMode('tap');
+      setShowGestureHint(true);
+    }
+  }, []);
 
   const hire = async (receptionist) => {
     const catalogId = receptionist.catalog_id ?? receptionist.id;
@@ -103,10 +118,7 @@ export default function HomepageReceptionistCatalog({ active, onContinue }) {
         showGalleryZoomControls={false}
         galleryDefaultZoom={typeof window !== 'undefined' && window.innerWidth > 1180 ? 2.05 : undefined}
         randomizeGalleryRoster
-        onGalleryInteraction={(interaction) => {
-          if (interaction === 'tap') setShowGestureHint(false);
-          if (interaction === 'drag') { setGestureMode('tap'); setShowGestureHint(true); }
-        }}
+        onGalleryInteraction={handleGalleryInteraction}
         interactive={active}
         portalDetail
       />
