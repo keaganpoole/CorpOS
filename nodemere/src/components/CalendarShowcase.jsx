@@ -269,7 +269,7 @@ const CRM_FEATURE_ITEMS = [
   },
   {
     icon: <ClipboardList className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:-translate-y-1" />,
-    title: 'Custom Intake Fields',
+    title: 'Intake Rules',
     copy: 'Tell your receptionist which details matter most, and it will prioritize collecting them during the call before saving them to the customer record.',
   },
   {
@@ -298,12 +298,7 @@ const MONITORING_FEATURE_ITEMS = [
   {
     icon: <AudioLines className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:scale-110" />,
     title: 'Call Listening',
-    copy: 'Access recorded conversations so finding important information is always simple.',
-  },
-  {
-    icon: <Phone className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:-translate-y-1" />,
-    title: 'Live Call Visibility',
-    copy: 'Experience every call as it happens with a live visual flow that reveals the path your AI receptionist takes from start to finish.',
+    copy: 'Need to hear what was said? Look back on past conversations and find the details that matter.',
   },
   {
     icon: <Layers className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:-translate-y-1" />,
@@ -1590,6 +1585,7 @@ function RightCalendarGrid({ hasAnimatedDots, calendarVisible = true }) {
       return statuses[hashSeed(`${day}-${event.title}-${event.time}-${index}-status`) % statuses.length];
     };
 
+    const usedCustomerNames = new Set();
     return Object.fromEntries(
       Object.entries(displayItemsDatabase).map(([day, events]) => [
         day,
@@ -1599,8 +1595,16 @@ function RightCalendarGrid({ hasAnimatedDots, calendarVisible = true }) {
           const customerNames = DEMO_MENS_APPOINTMENT_TITLES.has(event.title)
             ? DEMO_CUSTOMER_MALE_FIRST_NAMES
             : DEMO_CUSTOMER_FIRST_NAMES.slice(0, 12);
-          const customerIndex = hashSeed(`${seedDay}-${event.title}-${event.time}-${index}-customer`) % customerNames.length;
-          const customerLastNameIndex = hashSeed(`${seedDay}-${event.title}-${event.time}-${index}-customer-last`) % DEMO_CUSTOMER_LAST_NAMES.length;
+          const customerSeed = hashSeed(`${seedDay}-${event.title}-${event.time}-${index}-customer`);
+          let customerIndex = customerSeed % customerNames.length;
+          let customerLastNameIndex = hashSeed(`${seedDay}-${event.title}-${event.time}-${index}-customer-last`) % DEMO_CUSTOMER_LAST_NAMES.length;
+          let customerName = `${customerNames[customerIndex]} ${DEMO_CUSTOMER_LAST_NAMES[customerLastNameIndex]}`;
+          for (let attempt = 0; usedCustomerNames.has(customerName) && attempt < customerNames.length * DEMO_CUSTOMER_LAST_NAMES.length; attempt += 1) {
+            customerIndex = (customerIndex + 1) % customerNames.length;
+            if (customerIndex === 0) customerLastNameIndex = (customerLastNameIndex + 1) % DEMO_CUSTOMER_LAST_NAMES.length;
+            customerName = `${customerNames[customerIndex]} ${DEMO_CUSTOMER_LAST_NAMES[customerLastNameIndex]}`;
+          }
+          usedCustomerNames.add(customerName);
           const receptionist = Number(day) === currentDay
             ? (defaultReceptionistAssignments[index] || pool[poolIndex])
             : pool[poolIndex];

@@ -415,7 +415,7 @@ export default function IntercomShowcase() {
             <div className="intercom-showcase__headline-block">
               <h2 id="homepage-intercom-title" aria-label="Live intercom"><span className="intercom-showcase__lead">Live</span>{' '}<span className="intercom-showcase__word">interc<span aria-hidden="true" className="intercom-showcase__letter-o"><CubePreloader size={10} strokeWidth={8.5} wiggleIntensity={1.2} primaryGradient={['var(--brandGradientEnd)', 'var(--brandGradientStart)']} /></span>m</span></h2>
             </div>
-            <p>Talk to your receptionist through the Nest. Ask for a follow-up, a reschedule, or a missing document—and keep your day moving.</p>
+            <p>Check in with your receptionist whenever you want. Ask how things are going, why something happened, or who needs attention. Then put them to work, moving appointments, following up on leads, or making just about any call you ask of them</p>
           </div>
         </div>
 

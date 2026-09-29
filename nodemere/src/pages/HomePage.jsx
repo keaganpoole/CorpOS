@@ -63,8 +63,8 @@ const HERO_RECEPTIONIST_FEATURE_ITEMS = [
   },
   {
     icon: <FileUp className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:-translate-y-1" />,
-    title: 'Real-time Docs',
-    copy: 'Allow customers to securely upload documents by sending them a secure upload link during the call, eliminating the need to email files or call back later.',
+    title: 'Upload Documents',
+    copy: 'Allow your AI receptionist to request documents from the customer by sending them a secure upload link while on the call.',
   },
   {
     icon: <CreditCard className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:rotate-3" />,
