@@ -27,39 +27,43 @@
 }
 .intercom-showcase__copy { display: flex; flex-direction: column; justify-content: center; min-height: 300px; padding: 0; }
 .intercom-showcase__copy-content { display: flex; flex-direction: column; gap: 24px; }
+.intercom-showcase__headline-block { display: flex; max-width: 100%; flex-direction: column; align-items: flex-start; }
+.intercom-showcase__word { display: inline-flex; align-items: center; justify-content: center; white-space: nowrap; font-weight: 500; }
+.intercom-showcase__lead { display: inline-block; padding-right: .06em; margin-right: -.06em; font-weight: 700; }
+.intercom-showcase__letter-o { position: relative; top: .16em; left: .025em; display: inline-flex; width: .6em; height: .6em; flex: none; margin: 0; }
+.intercom-showcase__letter-o .circle-preloader { width: 100% !important; height: 100% !important; }
 
 .intercom-showcase.has-entered .intercom-showcase__copy,
 .intercom-showcase.has-entered .intercom-showcase__visual { opacity: 1; transform: none; }
 .intercom-showcase__visual { transition-delay: 180ms; }
 .intercom-showcase__eyebrow { display: block; margin-bottom: 24px; color: #93939e; font-size: 10px; font-weight: 600; letter-spacing: .22em; }
-.intercom-showcase__copy h2 { margin: 0; max-width: 440px; padding-bottom: 2px; font-size: 4rem; font-weight: 700; line-height: .98; letter-spacing: -.05em; }
-.intercom-showcase__copy h2 span { color: #b4b5bd; background: linear-gradient(180deg, #fff, #92939f); background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.intercom-showcase__copy h2 { position: relative; margin: 0; max-width: 440px; padding-bottom: 2px; font-size: 4rem; font-weight: 700; line-height: .98; letter-spacing: -.05em; }
+.intercom-showcase__copy h2 .intercom-showcase__lead { color: #fff; background: linear-gradient(to bottom, #fff, #fafafa, #d4d4d8); background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.intercom-showcase__copy h2 .intercom-showcase__word { color: #fff; background: linear-gradient(to bottom, #fff, #f4f4f5, #71717a); background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
 .intercom-showcase .intercom-showcase__copy p { margin: 0; max-width: 384px; color: #d4d4d8; font-size: 16px; font-weight: 600; line-height: 1.45; letter-spacing: -.02em; }
 .intercom-showcase__visual { position: relative; display: flex; align-items: center; min-height: 430px; padding-top: 26px; }
 .intercom-showcase__dialogue { position: relative; width: 100%; min-height: 360px; display: flex; align-items: center; }
 .intercom-showcase__exchange { display: grid; width: 100%; gap: 44px; }
 .intercom-showcase__line { position: relative; display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 20px; align-items: start; }
 .intercom-showcase__line > * { position: relative; z-index: 2; }
-.intercom-showcase__line--reply { isolation: isolate; overflow: hidden; margin: -20px -24px; padding: 20px 24px; border: 1px solid #ffffff0a; border-radius: 22px; background: #07080b; box-shadow: inset 0 1px #ffffff08, 0 18px 50px #00000026; }
+.intercom-showcase__line--reply { isolation: isolate; overflow: hidden; margin: -20px -24px; padding: 20px 24px; border: 1px solid #ffffff0a; border-radius: 22px; background: #050505; box-shadow: inset 0 1px #ffffff08, 0 18px 50px #00000026; }
 .intercom-showcase__reply-banner { position: absolute; inset: 0 0 0 auto; z-index: 0; width: 59%; background-position: 40% 38%; background-repeat: no-repeat; background-size: cover; opacity: .3; filter: saturate(.62) contrast(1.02) brightness(.78); transform: translateX(-50%) scale(1.03); transform-origin: right center; }
-.intercom-showcase__reply-scrim { position: absolute; inset: 0; z-index: 1; background: linear-gradient(90deg, rgba(2,2,3,.94), rgba(5,6,8,.76) 32%, rgba(7,6,8,.48) 62%, rgba(3,3,4,.3)); box-shadow: inset 0 1px #ffffff08, inset 0 -1px #ffffff06; }
+.intercom-showcase__reply-scrim { position: absolute; inset: 0; z-index: 1; background: linear-gradient(90deg, rgba(0,0,0,.94), rgba(0,0,0,.76) 32%, rgba(0,0,0,.48) 62%, rgba(0,0,0,.3)); box-shadow: inset 0 1px #ffffff08, inset 0 -1px #ffffff06; }
 .intercom-showcase__avatar { display: grid; place-items: center; width: 56px; height: 56px; margin-top: 4px; overflow: hidden; border-radius: 50%; background: #151922; color: #c4d4ec; border: 1px solid #ffffff14; }
 .intercom-showcase__avatar--user { background: #ffffff06; color: #a4a7af; }
 .intercom-showcase__avatar img { width: 100%; height: 100%; object-fit: cover; object-position: center 20%; }
 .intercom-showcase__avatar--receptionist img { transform: scale(1.35); }
 .intercom-showcase__speaker { display: flex; align-items: center; gap: 13px; height: 20px; margin-bottom: 6px; color: #8c8e99; font-size: 9px; letter-spacing: .18em; font-weight: 600; }
-.intercom-showcase__industry { display: inline-flex; align-items: center; gap: 6px; height: 20px; padding: 0 9px; border: 1px solid #ffffff12; border-radius: 999px; color: #b8bac4; background: linear-gradient(180deg, #ffffff0a, #ffffff04); box-shadow: inset 0 1px #ffffff08; font-size: 8px; letter-spacing: .12em; white-space: nowrap; }
-.intercom-showcase__industry i { width: 4px; height: 4px; border-radius: 50%; background: linear-gradient(135deg, #f45fd2, #7c3aed); box-shadow: 0 0 8px #c45bea99; }
+.intercom-showcase__industry { display: inline-flex; align-items: center; gap: 7px; height: 20px; color: #b8bac4; font-size: 8px; letter-spacing: .09em; white-space: nowrap; }
+.intercom-showcase__industry-icon { display: grid; place-items: center; width: 20px; height: 20px; border: 1px solid #ffffff16; border-radius: 6px; color: #d8d8de; background: #ffffff07; box-shadow: inset 0 1px #ffffff08; }
 .intercom-showcase .intercom-showcase__line p { margin: 0; color: #d9dae1; font-size: 22px; font-weight: 400; line-height: 1.5; letter-spacing: -.015em; }
-.intercom-showcase .intercom-showcase__line--reply p { color: #d9dae1; }
-.intercom-showcase__voice { display: flex; align-items: center; gap: 2px; height: 18px; }
-.intercom-showcase__voice > span { display: block; width: 1px; height: var(--bar-height); background: linear-gradient(180deg, #f45fd2 0%, #7c3aed 100%); animation: intercom-showcase-voice 1.3s ease-in-out infinite alternate; animation-delay: var(--bar-delay); animation-play-state: paused; transform-origin: center; }
-.intercom-showcase.is-running .intercom-showcase__voice > span { animation-play-state: running; }
-@keyframes intercom-showcase-voice { from { transform: scaleY(.35); opacity: .5; } to { transform: scaleY(1); opacity: 1; } }
+.intercom-showcase .intercom-showcase__line--reply p { color: #d9dae1; font-size: clamp(18px, calc(22px * var(--response-size-scale, 1)), 22px); }
+.intercom-showcase__speaker .intercom-voice-line { width: 54px; height: 18px; overflow: visible; }
 
 @media (max-width: 1023px) {
   .intercom-showcase__layout { grid-template-columns: 1fr; gap: 54px; min-height: 0; padding: 0 40px; }
   .intercom-showcase__copy { min-height: 0; text-align: center; }
+  .intercom-showcase__headline-block { align-items: center; }
   .intercom-showcase__copy h2 { max-width: none; font-size: 64px; }
   .intercom-showcase .intercom-showcase__copy p { max-width: 520px; margin-left: auto; margin-right: auto; }
   .intercom-showcase__visual { width: 100%; max-width: 680px; min-height: 360px; margin: 0 auto; padding-top: 0; }
@@ -69,7 +73,7 @@
 @media (max-width: 600px) {
   .intercom-showcase { padding: 84px 0 64px; }
   .intercom-showcase__layout { padding: 0 24px; gap: 44px; }
-  .intercom-showcase__copy h2 { font-size: 48px; }
+  .intercom-showcase__copy h2 { font-size: clamp(1.65rem, 7.5vw, 3rem); }
   .intercom-showcase__eyebrow { margin-bottom: 20px; font-size: 9px; }
   .intercom-showcase .intercom-showcase__copy p { font-size: 14px; line-height: 1.6; }
   .intercom-showcase__visual { min-height: 280px; }
@@ -77,8 +81,10 @@
   .intercom-showcase__line { grid-template-columns: 32px minmax(0, 1fr); gap: 12px; }
   .intercom-showcase__avatar { width: 32px; height: 32px; }
   .intercom-showcase .intercom-showcase__line p { font-size: 14px; line-height: 1.6; }
+  .intercom-showcase .intercom-showcase__line--reply p { font-size: clamp(12px, calc(14px * var(--response-size-scale, 1)), 14px); }
   .intercom-showcase__speaker { font-size: 8px; }
-  .intercom-showcase__industry { height: 18px; padding: 0 7px; font-size: 7px; }
+  .intercom-showcase__industry { height: 18px; font-size: 7px; }
+  .intercom-showcase__industry-icon { width: 18px; height: 18px; }
   .intercom-showcase__line--reply { margin: -12px -14px; padding: 12px 14px; border-radius: 16px; }
   .intercom-showcase__reply-banner { width: 70%; opacity: .25; }
   .intercom-showcase__dialogue { min-height: 220px; }
@@ -87,5 +93,4 @@
 
 @media (prefers-reduced-motion: reduce) {
   .intercom-showcase__copy, .intercom-showcase__visual { opacity: 1; transform: none; transition: none; }
-  .intercom-showcase__voice > span { animation: none; }
 }

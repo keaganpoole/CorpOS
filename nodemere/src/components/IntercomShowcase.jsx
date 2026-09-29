@@ -1,11 +1,19 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion, useInView, useReducedMotion } from 'framer-motion';
+import {
+  Activity, Building2, Bug, Car, DoorOpen, Droplets, Glasses, Hammer, HardHat,
+  House, Leaf, Megaphone, PawPrint, Scale, Scissors, Sparkles, Sprout,
+  Stethoscope, Syringe, Thermometer, Wrench, Zap,
+} from 'lucide-react';
+import IntercomVoiceLine from '../sonar/nest/IntercomVoiceLine';
+import CubePreloader from '../sonar/components/CubePreloader';
 import './IntercomShowcase.css';
 
 const EXAMPLES = [
   {
     label: 'Confirm an appointment',
     industry: 'Dental',
+    company: 'Maple Row Dental',
     receptionist: 'maggie',
     request: 'Did Laura ever confirm her appointment for tomorrow?',
     response: 'Not yet. She was still figuring out childcare. Want me to call and check?',
@@ -13,6 +21,7 @@ const EXAMPLES = [
   {
     label: 'Follow up with a lead',
     industry: 'Roofing',
+    company: 'Calder & Beam Roofing',
     receptionist: 'brice',
     request: 'Can you call Jason? He filled out the form about replacing his roof this morning.',
     response: 'Absolutely. I’ll call him and see what he’s looking to have done.',
@@ -20,6 +29,7 @@ const EXAMPLES = [
   {
     label: 'Check unpaid invoices',
     industry: 'HVAC',
+    company: 'Morrow Heating & Air',
     receptionist: 'nikki',
     request: 'Do we still have anything unpaid from August?',
     response: 'Three invoices. Northstar worries me most. Sarah said the $1,200 was going out Monday, but we still don’t have it. Want me to call her?',
@@ -27,6 +37,7 @@ const EXAMPLES = [
   {
     label: 'Re-engage a client',
     industry: 'Marketing agency',
+    company: 'Offcut Creative Studio',
     receptionist: 'kayla',
     request: 'Have we not heard from anyone in a while?',
     response: 'Rachel at Oak Street Dental. They normally book monthly, but it’s been almost seven weeks. Want me to check in with her?',
@@ -34,6 +45,7 @@ const EXAMPLES = [
   {
     label: 'Move an appointment',
     industry: 'Chiropractic',
+    company: 'Motive Chiropractic',
     receptionist: 'chloe',
     request: 'Can you call Frank and see if he’d be okay coming in earlier tomorrow?',
     response: 'Yeah. We have a 2:00 open now, and he originally wanted something earlier. I’ll offer it to him.',
@@ -41,6 +53,7 @@ const EXAMPLES = [
   {
     label: 'Clarify an estimate',
     industry: 'General contracting',
+    company: 'Walsh & Alder Construction',
     receptionist: 'brian',
     request: 'Why hasn’t Daniel accepted the estimate yet?',
     response: 'I think it’s the price. He asked me twice if the $6,200 included materials. Want me to call and see what’s holding him back?',
@@ -48,6 +61,7 @@ const EXAMPLES = [
   {
     label: 'Plan tomorrow',
     industry: 'Salon',
+    company: 'June & Finch Studio',
     receptionist: 'paige',
     request: 'Anything I should know about tomorrow?',
     response: 'Laura still hasn’t confirmed, and Jason wants an earlier spot. Want me to call Laura, and if she cancels, offer it to Jason?',
@@ -57,6 +71,7 @@ const EXAMPLES = [
   {
     label: 'Recover a lead',
     industry: 'HVAC',
+    company: 'Bramwell Heating & Cooling',
     receptionist: 'bonnie',
     request: 'Whatever happened with that guy whose AC went out yesterday?',
     response: 'Ethan. We couldn’t get there soon enough, so he was calling around. Want me to check if he still needs someone?',
@@ -66,6 +81,7 @@ const EXAMPLES = [
   {
     label: 'Fill a cancellation',
     industry: 'Dental',
+    company: 'Little Elm Dental Care',
     receptionist: 'maggie',
     request: 'Any chance we can fill that cancellation this afternoon?',
     response: 'Probably. Nicole asked me yesterday to call if a cleaning opened up. Want me to offer her the 3:30?',
@@ -75,6 +91,7 @@ const EXAMPLES = [
   {
     label: 'Update a customer',
     industry: 'Auto repair',
+    company: 'Rossi Motor Works',
     receptionist: 'brian',
     request: 'Can you call Trevor and let him know his truck won’t be ready today?',
     response: 'Yep. Do you want me to tell him tomorrow morning, or just say we’ll call as soon as it’s ready?',
@@ -84,6 +101,7 @@ const EXAMPLES = [
   {
     label: 'Explain a slow week',
     industry: 'Salon',
+    company: 'Clover & Ash Salon',
     receptionist: 'paige',
     request: 'Why has this week been so slow?',
     response: 'We’ve had nine cancellations, which is almost double normal. Most of them were color appointments.',
@@ -93,6 +111,7 @@ const EXAMPLES = [
   {
     label: 'Prioritize an emergency',
     industry: 'Plumbing',
+    company: 'Pike Street Plumbing',
     receptionist: 'nikki',
     request: 'Who was the customer with water coming through their ceiling?',
     response: 'Rachel Bennett. She shut the water off, but it’s still leaking upstairs. Want me to move her ahead of the non-emergency calls?',
@@ -102,6 +121,7 @@ const EXAMPLES = [
   {
     label: 'Recover an estimate',
     industry: 'Roofing',
+    company: 'Dawson Roof & Gutter',
     receptionist: 'brice',
     request: 'Do we have any big estimates sitting out there?',
     response: "The biggest is Jordan’s roof at $14,600. He sounded ready to move forward but wanted to talk it over with his wife. What's the plan?",
@@ -111,6 +131,7 @@ const EXAMPLES = [
   {
     label: 'Find recurring customers',
     industry: 'Cleaning',
+    company: 'Larkspur Home Cleaning',
     receptionist: 'piper',
     request: 'Do we have anyone booking cleanings regularly who isn’t on a recurring plan?',
     response: 'Four customers. Hannah’s booked us five times in three months. Want me to ask if she’d rather reserve every other Friday?',
@@ -118,6 +139,7 @@ const EXAMPLES = [
   {
     label: 'Review new bookings',
     industry: 'Cleaning',
+    company: 'Mila’s Housekeeping',
     receptionist: 'bonnie',
     request: 'Did we pick up anything new yesterday?',
     response: 'Three new cleanings. One caller only spoke Spanish, so I started speaking Spanish with her and got her first cleaning booked for Friday. She said another company couldn’t help her, so she was really appreciative and said she’d mention us going the extra mile in her review.',
@@ -127,6 +149,7 @@ const EXAMPLES = [
   {
     label: 'Recover the schedule',
     industry: 'Landscaping',
+    company: 'Hollis Yard & Garden',
     receptionist: 'brian',
     request: 'How bad did yesterday’s rain mess up the schedule?',
     response: 'We had to push six jobs. I can fit four back in this week, but two will need to move to Monday.',
@@ -134,6 +157,7 @@ const EXAMPLES = [
   {
     label: 'Head out early',
     industry: 'Landscaping',
+    company: 'Ridgeway Grounds',
     receptionist: 'bonnie',
     request: 'How are we looking?',
     response: 'We’re good. Tyler has one yard left, Jake should finish around 4:30, and tomorrow’s all set. You said you wanted to get the boat out this week, right? It’s supposed to rain Friday and most of the weekend, so honestly, go. Today’s probably your best shot. I’ve got everything here.',
@@ -143,6 +167,7 @@ const EXAMPLES = [
   {
     label: 'Recover a cancellation',
     industry: 'Med spa',
+    company: 'Cora Skin & Aesthetics',
     receptionist: 'kayla',
     request: 'Did Olivia say why she canceled?',
     response: 'She said the $500 deposit was more than she expected. She still sounded interested, though. Want me to call and go over her options?',
@@ -152,6 +177,7 @@ const EXAMPLES = [
   {
     label: 'Qualify an inquiry',
     industry: 'Law office',
+    company: 'Varela Family Law',
     receptionist: 'nikki',
     request: 'Can you call Derek Pompano about his custody case and ask him to send over the judge’s most recent custody order?',
     response: 'On it. I’ll get the details, check for conflicts, and ask him to securely send the custody order before we schedule anything.',
@@ -161,6 +187,7 @@ const EXAMPLES = [
   {
     label: 'Spot a repeat issue',
     industry: 'Pest control',
+    company: 'Mason Creek Pest Control',
     receptionist: 'brice',
     request: 'Why are we going back to the Parkers again?',
     response: 'Same ant problem. This is their third call in six weeks, and it’s always been around the kitchen. Want me to call Luis to let him know before he goes?',
@@ -170,6 +197,7 @@ const EXAMPLES = [
   {
     label: 'Handle an urgent request',
     industry: 'Property management',
+    company: 'Foley Residential',
     receptionist: 'kayla',
     request: 'What’s going on at the Wilson apartment?',
     response: 'Their refrigerator stopped cooling last night. They have medication that needs to stay cold, so I moved their request to urgent.',
@@ -179,6 +207,7 @@ const EXAMPLES = [
   {
     label: 'Recover missed calls',
     industry: 'Garage door service',
+    company: 'Merritt Garage Doors',
     receptionist: 'brian',
     request: 'Did we miss anybody while everyone was out this morning?',
     response: 'Five calls. Three were existing customers, but two were new jobs. One has a garage door stuck open right now. Want me to call him first?',
@@ -188,6 +217,7 @@ const EXAMPLES = [
   {
     label: 'Find lost jobs',
     industry: 'Home services',
+    company: 'Bailey Home Repair',
     receptionist: 'brice',
     request: 'What are we losing the most jobs over lately?',
     response: 'Wait time. Six callers this month went somewhere else because we couldn’t get there soon enough. Price only came up twice.',
@@ -197,6 +227,7 @@ const EXAMPLES = [
   {
     label: 'Bring a customer back',
     industry: 'Chiropractic',
+    company: 'Westlake Spine & Rehab',
     receptionist: 'chloe',
     request: 'Who hasn’t been back in that normally comes pretty regularly?',
     response: 'Marcus stands out. He usually comes every two weeks, but it’s been almost six. Want me to check in with him?',
@@ -206,6 +237,7 @@ const EXAMPLES = [
   {
     label: 'Route a service call',
     industry: 'Electrical',
+    company: 'Sutton Electric Co.',
     receptionist: 'nikki',
     request: 'Can you call David back about that electrical issue?',
     response: 'Yep. I’ll find out what’s happening, whether he’s lost power completely, and get him to the right electrician. David Jensen, right?',
@@ -215,6 +247,7 @@ const EXAMPLES = [
   {
     label: 'Spot an upsell',
     industry: 'Auto detailing',
+    company: 'Sunday Detail Garage',
     receptionist: 'paige',
     request: 'What did Alex book for Saturday?',
     response: 'Just the interior detail. He asked about ceramic coating last time, though. Want me to see if he still wants pricing on it?',
@@ -224,6 +257,7 @@ const EXAMPLES = [
   {
     label: 'Catch up overnight',
     industry: 'Dog grooming',
+    company: 'Clipper & Coat Grooming',
     receptionist: 'bonnie',
     request: 'Did we get any calls overnight?',
     response: 'Four. I booked two dogs for grooming, including Bailey with Jenna since she usually handles anxious dogs. One caller said she’d check her schedule and call back.',
@@ -233,6 +267,7 @@ const EXAMPLES = [
   {
     label: 'Check the weekend',
     industry: 'Optometry',
+    company: 'Easton Eye Care',
     receptionist: 'piper',
     request: 'Anything happen over the weekend?',
     response: 'A few things. I booked three eye exams, moved Dennis Silvia to Tuesday, and got a new patient in with Dr. Howard since he had an opening Wednesday afternoon.',
@@ -242,6 +277,7 @@ const EXAMPLES = [
   {
     label: 'Start the day',
     industry: 'Lawn & outdoor',
+    company: 'Pike Lawn & Outdoor',
     receptionist: 'brian',
     request: 'What am I walking into today?',
     response: 'Busy one. I booked four jobs overnight, and I put the Henderson cleanup with Tyler since he’s already working two houses nearby. Mrs. Bennett wants to move her 10:00, which might actually work in our favor with rain coming this afternoon. Jake has an opening around noon too. Want me to start moving the outdoor jobs earlier?',
@@ -293,16 +329,34 @@ const USER_AVATARS = [
 const EASE = [0.22, 1, 0.36, 1];
 const REPLY_MS = 1900;
 const responsePauseMs = (response) => Math.min(18000, Math.max(10500, 7600 + response.split(/\s+/).length * 150));
-
-function VoiceAccent() {
-  return (
-    <span className="intercom-showcase__voice" aria-hidden="true">
-      {[3, 6, 11, 7, 16, 10, 5, 13, 8, 4, 7, 3].map((height, index) => (
-        <span key={index} style={{ '--bar-height': `${height}px`, '--bar-delay': `${index * -0.13}s` }} />
-      ))}
-    </span>
-  );
-}
+const responseTextScale = (response) => {
+  const words = response.trim().split(/\s+/).length;
+  return Math.max(0.84, 1 - Math.max(0, words - 28) * 0.006);
+};
+const INDUSTRY_ICONS = {
+  Dental: Stethoscope,
+  Roofing: Hammer,
+  HVAC: Thermometer,
+  'Marketing agency': Megaphone,
+  Chiropractic: Activity,
+  'General contracting': HardHat,
+  Salon: Scissors,
+  'Auto repair': Wrench,
+  Plumbing: Droplets,
+  Cleaning: Sparkles,
+  Landscaping: Sprout,
+  'Med spa': Syringe,
+  'Law office': Scale,
+  'Pest control': Bug,
+  'Property management': Building2,
+  'Garage door service': DoorOpen,
+  'Home services': House,
+  Electrical: Zap,
+  'Auto detailing': Car,
+  'Dog grooming': PawPrint,
+  Optometry: Glasses,
+  'Lawn & outdoor': Leaf,
+};
 
 export default function IntercomShowcase() {
   const sectionRef = useRef(null);
@@ -317,6 +371,7 @@ export default function IntercomShowcase() {
   const running = inView && pageVisible && !reducedMotion;
   const example = EXAMPLES[index];
   const receptionist = RECEPTIONISTS[example.receptionist];
+  const IndustryIcon = INDUSTRY_ICONS[example.industry] || Building2;
   const cycleMs = responsePauseMs(example.response);
 
   useEffect(() => {
@@ -357,7 +412,9 @@ export default function IntercomShowcase() {
       <div className="intercom-showcase__layout">
         <div className="intercom-showcase__copy">
           <div className="intercom-showcase__copy-content">
-            <h2 id="homepage-intercom-title">Just say<br /><span>the word.</span></h2>
+            <div className="intercom-showcase__headline-block">
+              <h2 id="homepage-intercom-title" aria-label="Live intercom"><span className="intercom-showcase__lead">Live</span>{' '}<span className="intercom-showcase__word">interc<span aria-hidden="true" className="intercom-showcase__letter-o"><CubePreloader size={10} strokeWidth={8.5} wiggleIntensity={1.2} primaryGradient={['var(--brandGradientEnd)', 'var(--brandGradientStart)']} /></span>m</span></h2>
+            </div>
             <p>Talk to your receptionist through the Nest. Ask for a follow-up, a reschedule, or a missing document—and keep your day moving.</p>
           </div>
         </div>
@@ -380,7 +437,10 @@ export default function IntercomShowcase() {
                   <div>
                     <span className="intercom-showcase__speaker">
                       YOU
-                      <span className="intercom-showcase__industry"><i aria-hidden="true" />{example.industry}</span>
+                      <span className="intercom-showcase__industry">
+                        <span className="intercom-showcase__industry-icon"><IndustryIcon size={11} strokeWidth={1.7} aria-hidden="true" /></span>
+                        {example.company}
+                      </span>
                     </span>
                     <p>{example.request}</p>
                   </div>
@@ -397,7 +457,7 @@ export default function IntercomShowcase() {
                   <span className="intercom-showcase__avatar intercom-showcase__avatar--receptionist">
                     <img src={receptionist.avatar} alt="" loading="lazy" />
                   </span>
-                  <div><span className="intercom-showcase__speaker">{receptionist.name.toUpperCase()} <VoiceAccent /></span><p>{example.response}</p></div>
+                  <div><span className="intercom-showcase__speaker">{receptionist.name.toUpperCase()} <IntercomVoiceLine enabled={running && showReply} level={0.12} /></span><p style={{ '--response-size-scale': responseTextScale(example.response) }}>{example.response}</p></div>
                 </motion.div>
               </motion.div>
             </AnimatePresence>

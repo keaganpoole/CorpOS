@@ -54,7 +54,7 @@ const HERO_RECEPTIONIST_FEATURE_ITEMS = [
   {
     icon: <Phone className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:-translate-y-1" />,
     title: '24/7 Call Handling',
-    copy: 'Be there for every caller, day or night. Keep your existing business number or claim a dedicated line through Nodemere, and let your AI receptionist answer instantly instead of sending customers to voicemail.',
+    copy: 'Keep your front desk running 24/7. While the competition wakes up to voicemails, you wake up to appointments already booked.',
   },
   {
     icon: <MessagesSquare className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:scale-110" />,
@@ -64,22 +64,22 @@ const HERO_RECEPTIONIST_FEATURE_ITEMS = [
   {
     icon: <FileUp className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:-translate-y-1" />,
     title: 'Real-time Docs',
-    copy: 'Allow customers to securely upload documents by texting them a secure upload link during the call, eliminating the need to email files or call back later.',
+    copy: 'Allow customers to securely upload documents by sending them a secure upload link during the call, eliminating the need to email files or call back later.',
   },
   {
     icon: <CreditCard className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:rotate-3" />,
     title: 'Payments',
-    copy: 'Collect deposits, send payment links, process payments, and answer billing questions without handing the call to staff.',
+    copy: 'Take payments, collect deposits, send payment links, and handle billing questions right on the call.',
   },
   {
     icon: <PhoneOutgoing className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:translate-x-1 group-hover:-translate-y-1" />,
     title: 'Outbound Calling',
-    copy: 'Have your AI receptionist place calls for reminders, confirmations, updates, and any custom tasks you desire, without tying up your team.',
+    copy: 'Have your AI receptionist place calls for reminders, confirmations, updates, and almost anything else you desire, without tying up your team.',
   },
   {
     icon: <Globe2 className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:rotate-12" />,
     title: '30+ Languages',
-    copy: "Detect a caller's language automatically and respond fluently without transfers, translators, or awkward misunderstandings.",
+    copy: "Detect a caller's language in real-time and respond fluently without transfers, translators, or awkward misunderstandings.",
   },
 ];
 

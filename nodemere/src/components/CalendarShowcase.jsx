@@ -209,12 +209,12 @@ const FEATURE_ITEMS = [
   {
     icon: <Activity className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:scale-110" />,
     title: 'Booking CRM',
-    copy: 'Create beautifully organized appointment records that bring together customer details, history, notes, and everything else surrounding each visit.',
+    copy: 'Create beautifully organized appointment records that bring together customer details, history, notes, and anything else you desire.',
   },
   {
   icon: <Users className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:-translate-y-1" />,
   title: 'Staff Matching',
-  copy: 'Match every customer with the staff member who best fits their needs while checking availability in real time.'
+  copy: 'Your receptionist knows your team. Their specialties, strengths, and schedules, so every caller can be matched with the right person.'
   },
   {
     icon: <CalendarIcon className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:-translate-y-1" />,
@@ -228,8 +228,8 @@ const FEATURE_ITEMS = [
   },
   {
     icon: <CreditCard className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:rotate-3" />,
-    title: 'Deposits & Payments',
-    copy: 'Collect payment or send deposit links during booking when an appointment needs to be secured.',
+    title: 'Intake Rules',
+    copy: 'Your business in unique. Define the essential information your AI receptionist must collect before booking each appointment.',
   },
 ];
 

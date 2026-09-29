@@ -8,9 +8,10 @@ const CENTER = 48;
 
 // Same circle response as the Vibey reference, scaled from its 300px canvas.
 // A virtual pointer supplies continuous hover while the application is loading.
-export default function CirclePreloader({ className = '', size = 22 }) {
+export default function CirclePreloader({ className = '', size = 22, colors = COLORS, strokeWidth = 5.2, viewBox = '0 0 96 96', primaryGradient, blendMode = 'screen', glowOpacity = .35, wiggleIntensity = 1 }) {
   const root = useRef(null);
   const glowId = 'loader-glow-' + useId().replace(/:/g, '');
+  const gradientId = `${glowId}-gradient`;
   useEffect(() => {
     const element = root.current;
     if (!element) return undefined;
@@ -30,7 +31,7 @@ export default function CirclePreloader({ className = '', size = 22 }) {
     element.addEventListener('pointerenter', movePointer);
     element.addEventListener('pointerleave', leavePointer);
     function draw() {
-      const geometry = COLORS.map((_, layer) => {
+      const geometry = colors.map((_, layer) => {
         let d = '';
         for (let i = 0; i <= 150; i++) {
           const progress = i / 150;
@@ -60,7 +61,7 @@ export default function CirclePreloader({ className = '', size = 22 }) {
       pointerY += (desiredY - pointerY) * follow;
       // Reference hover spring: stiffness 500, damping 32; amplitude 15/300*96.
       for(let step=0;step<4;step++){
-        velocity += ((4.8-amplitude)*500-velocity*32)*dt/4;
+        velocity += ((4.8 * wiggleIntensity-amplitude)*500-velocity*32)*dt/4;
         amplitude += velocity*dt/4;
       }
       draw();
@@ -82,12 +83,15 @@ export default function CirclePreloader({ className = '', size = 22 }) {
       document.removeEventListener('visibilitychange', refresh);
       reduced.removeEventListener('change', refresh);
     };
-  }, []);
+  }, [wiggleIntensity]);
   return <div ref={root} className={`cube-preloader circle-preloader ${className}`} role="status" aria-label="Loading" style={{ width: size * 3.55, height: size * 3.55, flexShrink: 0 }}>
-    <svg viewBox="0 0 96 96" aria-hidden="true" style={{ display: 'block', width: '100%', height: '100%', overflow: 'visible', isolation: 'isolate' }}>
-      <defs><filter id={glowId} x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="3.2" /></filter></defs>
-      {[true, false].map(glow => <g key={String(glow)} fill="none" strokeWidth="5.2" strokeLinecap="round" strokeLinejoin="round" opacity={glow ? .35 : 1} filter={glow ? `url(#${glowId})` : undefined}>
-        {[3, 2, 1, 0].map(layer => <path key={layer} data-wave={layer} stroke={COLORS[layer]} style={{ mixBlendMode: 'screen' }} />)}
+    <svg viewBox={viewBox} aria-hidden="true" style={{ display: 'block', width: '100%', height: '100%', overflow: 'visible', isolation: 'isolate' }}>
+      <defs>
+        <filter id={glowId} x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="3.2" /></filter>
+        {primaryGradient && <linearGradient id={gradientId} x1="0" y1="0" x2="1" y2="0" gradientUnits="objectBoundingBox">{primaryGradient.map((color, index) => <stop key={index} offset={`${index / (primaryGradient.length - 1) * 100}%`} style={{ stopColor: color }} />)}</linearGradient>}
+      </defs>
+      {[true, false].map(glow => <g key={String(glow)} fill="none" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" opacity={glow ? glowOpacity : 1} filter={glow ? `url(#${glowId})` : undefined}>
+        {[3, 2, 1, 0].map(layer => <path key={layer} data-wave={layer} stroke={layer === 0 && primaryGradient ? `url(#${gradientId})` : colors[layer]} style={{ mixBlendMode: blendMode }} />)}
       </g>)}
     </svg>
   </div>;
