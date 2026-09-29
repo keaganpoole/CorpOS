@@ -183,7 +183,7 @@
     box-shadow: 0 14px 34px rgba(0, 0, 0, 0.28);
 }
 .comparison-results-disclaimer {
-    bottom: 10px;
+    position: static;
     font-size: 8px;
     font-weight: 700;
     letter-spacing: 0.2em;

@@ -2,19 +2,19 @@ import React, { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 
 const TIMELINE = [
+  { id: 'sun', day: 'Sunday', time: '06:15 PM', scenario: 'Service Opportunity', context: 'A customer is ready to book', human: 'Not scheduled', ai: 'Booked three appointments', netTime: 45, netRev: 150 },
   { id: 'mon', day: 'Monday', time: '08:00 AM', scenario: 'Unexpected Absence', context: 'Receptionist calls out sick', human: 'Returns missed calls', ai: 'Appointments are already booked', netTime: 180, netRev: 400 },
   { id: 'tue', day: 'Tuesday', time: '12:30 PM', scenario: 'Language Barrier', context: 'A customer speaks another language', human: 'Awkward language barrier', ai: 'Detected language and responded fluently', netTime: 45, netRev: 240 },
   { id: 'wed', day: 'Wednesday', time: '10:15 AM', scenario: 'Call Surge', context: 'Several customers call at once', human: 'Callers wait on hold', ai: 'Everyone is helped instantly', netTime: 60, netRev: 320 },
   { id: 'thu', day: 'Thursday', time: '02:00 PM', scenario: 'Lead Follow-Up', context: 'A new lead needs a response', human: 'Forgot to follow up with lead', ai: 'Lead is contacted instantly', netTime: 30, netRev: 275 },
   { id: 'fri', day: 'Friday', time: '04:45 PM', scenario: 'Appointment Reminder', context: 'Tomorrow’s appointments need reminders', human: 'Reminders are missed', ai: 'Every reminder is sent', netTime: 40, netRev: 180 },
   { id: 'sat', day: 'Saturday', time: '11:30 AM', scenario: 'Weekend Inquiry', context: 'A customer calls while the office is closed', human: 'Called out sick', ai: 'Immortal 🥷', netTime: 20, netRev: 350 },
-  { id: 'sun', day: 'Sunday', time: '06:15 PM', scenario: 'Service Opportunity', context: 'A customer is ready to book', human: 'Not scheduled', ai: 'Booked three appointments', netTime: 15, netRev: 150 },
 ];
 
 const easeOutExpoSoft = (progress) => (progress === 1 ? 1 : 1 - Math.pow(2, -8 * progress));
 const easeOutQuint = (progress) => 1 - Math.pow(1 - progress, 5);
 
-const AnimatedStat = ({ value, prefix = '', suffix = '', label, colorClass = 'text-white', shouldReveal = true, centered = false }) => {
+const AnimatedStat = ({ value, prefix = '', suffix = '', label, colorClass = 'text-white', shouldReveal = true, centered = false, formatValue }) => {
   const [display, setDisplay] = useState(0);
 
   useEffect(() => {
@@ -51,7 +51,7 @@ const AnimatedStat = ({ value, prefix = '', suffix = '', label, colorClass = 'te
     >
       <span className="mb-2 text-[10px] uppercase tracking-[0.3em] text-white/30 md:text-xs">{label}</span>
       <span className={`text-3xl font-light tracking-tighter md:text-5xl ${colorClass}`}>
-        {prefix}{display}{suffix}
+        {prefix}{formatValue ? formatValue(display) : `${display}${suffix}`}
       </span>
     </motion.div>
   );
@@ -282,7 +282,7 @@ export default function WorkWeekComparison({ scrollStep = null, scrollDirection 
     <div ref={containerRef} className="comparison-section relative flex h-[100dvh] flex-col overflow-hidden bg-[#020202] font-sans text-white selection:bg-white selection:text-black" data-jitter-debug-list={jitterDebugEnabled ? 'comparison' : undefined}>
       <header className="pointer-events-none absolute left-0 top-0 z-50 flex w-full items-start justify-between p-8 md:p-12">
         <motion.div className={finaleComplete ? 'pointer-events-auto absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2' : 'pointer-events-auto'} animate={finaleComplete ? { opacity: 0, scale: 0.9 } : { opacity: 1, scale: 1 }} transition={{ duration: 0.55 }}>
-          <AnimatedStat value={displayStats.time} suffix=" mins" label="Time Recovered" shouldReveal={statsReveal} />
+          <AnimatedStat value={displayStats.time} label="Time Recovered" shouldReveal={statsReveal} formatValue={(minutes) => minutes > 60 ? `${minutes / 60 % 1 === 0 ? minutes / 60 : (minutes / 60).toFixed(1)} hrs` : `${minutes} mins`} />
         </motion.div>
         <motion.div className={finaleComplete ? 'pointer-events-auto absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2' : 'pointer-events-auto'} animate={finaleComplete ? { opacity: 0, scale: 0.9 } : { opacity: 1, scale: 1 }} transition={{ duration: 0.55 }}>
           <AnimatedStat value={displayStats.rev} prefix="$" label="Revenue Saved" colorClass="text-[#34C759]" shouldReveal={statsReveal} />
@@ -354,6 +354,14 @@ export default function WorkWeekComparison({ scrollStep = null, scrollDirection 
               >
                 ${annualDisplay.toLocaleString()}
               </motion.span>
+              <motion.span
+                className="comparison-results-disclaimer pointer-events-none mt-5 whitespace-nowrap uppercase text-white/10"
+                initial={false}
+                animate={{ opacity: finaleRevealStage >= 3 ? 1 : 0, y: finaleRevealStage >= 3 ? 0 : 8, filter: finaleRevealStage >= 3 ? 'blur(0px)' : 'blur(6px)' }}
+                transition={{ duration: 0.45, delay: finaleRevealStage >= 3 ? 0.9 : 0, ease: [0.16, 1, 0.3, 1] }}
+              >
+                Results may vary
+              </motion.span>
             </div>
           </div>
         </motion.div>
@@ -410,7 +418,6 @@ export default function WorkWeekComparison({ scrollStep = null, scrollDirection 
         </motion.div>
       </main>
 
-      <div className="comparison-results-disclaimer pointer-events-none fixed left-1/2 z-50 -translate-x-1/2 whitespace-nowrap uppercase text-white/10">Results may vary</div>
     </div>
   );
 }

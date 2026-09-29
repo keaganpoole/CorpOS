@@ -92,7 +92,7 @@ export default function EncryptionShowcase() {
               AES-256-GCM Encryption
             </h2>
             <div className={`homepage-copy-reveal homepage-copy-reveal--delayed mx-auto mt-6 max-w-[870px] text-base font-semibold leading-[1.55] tracking-[-0.02em] text-[#d4d4d8] md:text-xl ${copyVisible ? 'is-visible' : ''}`}>
-              The same encryption standard trusted by the U.S. government for classified information. Built for Nodemere. Some platforms stop at securing the database. Nodemere goes further, protecting sensitive information with business-specific encryption and keeping the keys separate from the data
+              The same encryption standard used by the U.S. government to protect classified information. Sensitive data is encrypted separately for each business, with encryption keys kept isolated from the data itself. With today’s technology, brute-forcing the encryption is considered computationally infeasible.
             </div>
           </div>
         </div>
