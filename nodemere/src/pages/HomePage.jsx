@@ -321,8 +321,8 @@ const StackedHeroShowcase = ({ sectionRef }) => {
                 <span className="inline-block bg-gradient-to-r from-[var(--brandGradientStart)] to-[var(--brandGradientEnd)] bg-clip-text pr-[0.04em] text-transparent [-webkit-box-decoration-break:clone] [box-decoration-break:clone]">future</span>
                 <span className="bg-gradient-to-b from-white via-zinc-100 to-zinc-500 bg-clip-text text-transparent"> of the front desk</span>
               </h2>
-              <div className="mx-auto mt-6 max-w-[820px] text-base font-semibold leading-[1.55] tracking-[-0.02em] text-[#d4d4d8] md:text-xl">
-                Deploy advanced AI receptionists and transform your front desk into a 24/7 operation for routine calls, general questions, scheduling, payments, and CRM work—while your team remains available for requests that require authorized human handling.
+              <div className="mx-auto mt-6 max-w-[820px] text-base font-semibold leading-[1.55] tracking-[-0.02em] text-[#d4d4d8] md:text-xl">Deploy the world's most advanced AI receptionists and transform your front desk into a 24/7 operation that answers calls, manages everyday front desk work, and doubles as an assistant your team can talk to and put to work.
+                
               </div>
             </div>
           </div>

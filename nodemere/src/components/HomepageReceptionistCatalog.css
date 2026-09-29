@@ -7,6 +7,11 @@
   background: #020202;
 }
 
+@keyframes homepage-catalog-hand-drift {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(0, 7px); }
+}
+
 .homepage-catalog-continue {
   display: none;
 }
@@ -203,6 +208,8 @@
     animation: homepage-catalog-hand-drift 1.5s ease-in-out infinite;
   }
   .homepage-catalog-gesture-icon .is-pan-hand { color: rgba(255,255,255,.9); }
+  .homepage-catalog-gesture-icon svg { position: static; color: rgba(255,255,255,.9); }
+  .homepage-catalog-gesture-icon { animation: homepage-catalog-hand-drift 1.5s ease-in-out infinite !important; }
   .homepage-catalog-gesture-hint span { font: 700 11px/1 Inter, sans-serif; letter-spacing: .14em; text-transform: uppercase; }
   .homepage-catalog-gesture-hint small { color: rgba(255,255,255,.58); font: 400 11px/1.3 Inter, sans-serif; }
 }
@@ -238,10 +245,8 @@
   }
 
   .homepage-catalog-gesture-icon svg:last-child {
-    position: absolute;
-    right: 5px;
-    bottom: 4px;
-    color: #d8b8f5;
+    position: static;
+    color: rgba(255,255,255,.9);
   }
 
   .homepage-catalog-gesture-icon .is-pan-hand {
