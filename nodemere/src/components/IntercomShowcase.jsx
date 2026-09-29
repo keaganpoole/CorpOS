@@ -1,21 +1,54 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion, useInView, useReducedMotion } from 'framer-motion';
-import { UserRound } from 'lucide-react';
 import './IntercomShowcase.css';
 
 const EXAMPLES = [
   {
-    label: 'Reschedule',
-    request: 'Call John and reschedule his appointment for Thursday.',
-    response: 'I’ll call John, find a time that works, and update his appointment.',
+    label: 'Confirm an appointment',
+    request: 'Did Laura ever confirm her appointment for tomorrow?',
+    response: 'Not yet. She was still figuring out childcare. Want me to call and check?',
   },
   {
-    label: 'Follow up',
-    request: 'Let Cindy know we still need her insurance card.',
-    response: 'I’ll follow up with Cindy and send her a secure upload link.',
+    label: 'Follow up with a lead',
+    request: 'Can you call Jason? He filled out the form about replacing his roof this morning.',
+    response: 'Absolutely. I’ll call him and see what he’s looking to have done.',
+  },
+  {
+    label: 'Check unpaid invoices',
+    request: 'Do we still have anything unpaid from August?',
+    response: 'Three invoices. Northstar worries me most. Sarah said the $1,200 was going out Monday, but we still don’t have it. Want me to call her?',
+  },
+  {
+    label: 'Re-engage a client',
+    request: 'Have we not heard from anyone in a while?',
+    response: 'Rachel at Oak Street Dental. They normally book monthly, but it’s been almost seven weeks. Want me to check in with her?',
+  },
+  {
+    label: 'Move an appointment',
+    request: 'Can you call Frank and see if he’d be okay coming in earlier tomorrow?',
+    response: 'Yeah. We have a 2:00 open now, and he originally wanted something earlier. I’ll offer it to him.',
+  },
+  {
+    label: 'Clarify an estimate',
+    request: 'Why hasn’t Daniel accepted the estimate yet?',
+    response: 'I think it’s the price. He asked me twice if the $6,200 included materials. Want me to call and see what’s holding him back?',
+  },
+  {
+    label: 'Plan tomorrow',
+    request: 'Anything I should know about tomorrow?',
+    response: 'Laura still hasn’t confirmed, and Jason wants an earlier spot. Want me to call Laura, and if she cancels, offer it to Jason?',
   },
 ];
 const MAGGIE_AVATAR = 'https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/avatars/maggie.png';
+const USER_AVATARS = [
+  'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=160&q=80',
+  'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=160&q=80',
+  'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=160&q=80',
+  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=160&q=80',
+  'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=160&q=80',
+  'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=160&q=80',
+  'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&w=160&q=80',
+];
 const EASE = [0.22, 1, 0.36, 1];
 const CYCLE_MS = 10500;
 const REPLY_MS = 1900;
@@ -99,7 +132,9 @@ export default function IntercomShowcase() {
                 transition={{ duration: reducedMotion ? 0 : 0.6, ease: EASE }}
               >
                 <div className="intercom-showcase__line">
-                  <span className="intercom-showcase__avatar intercom-showcase__avatar--user"><UserRound size={20} strokeWidth={1.4} aria-hidden="true" /></span>
+                  <span className="intercom-showcase__avatar intercom-showcase__avatar--user">
+                    <img src={USER_AVATARS[index]} alt="" loading="lazy" />
+                  </span>
                   <div><span className="intercom-showcase__speaker">YOU</span><p>{example.request}</p></div>
                 </div>
                 <motion.div

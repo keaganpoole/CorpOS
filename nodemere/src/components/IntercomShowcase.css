@@ -44,9 +44,9 @@
 .intercom-showcase__avatar img { width: 100%; height: 100%; object-fit: cover; object-position: center 20%; }
 .intercom-showcase__speaker { display: flex; align-items: center; gap: 13px; height: 20px; margin-bottom: 6px; color: #8c8e99; font-size: 9px; letter-spacing: .18em; font-weight: 600; }
 .intercom-showcase .intercom-showcase__line p { margin: 0; color: #d9dae1; font-size: 22px; font-weight: 400; line-height: 1.5; letter-spacing: -.015em; }
-.intercom-showcase .intercom-showcase__line--reply p { color: #a9bfdc; }
+.intercom-showcase .intercom-showcase__line--reply p { color: #d9dae1; }
 .intercom-showcase__voice { display: flex; align-items: center; gap: 2px; height: 18px; }
-.intercom-showcase__voice > span { display: block; width: 1px; height: var(--bar-height); background: #83b7f1; animation: intercom-showcase-voice 1.3s ease-in-out infinite alternate; animation-delay: var(--bar-delay); animation-play-state: paused; transform-origin: center; }
+.intercom-showcase__voice > span { display: block; width: 1px; height: var(--bar-height); background: linear-gradient(180deg, #f45fd2 0%, #7c3aed 100%); animation: intercom-showcase-voice 1.3s ease-in-out infinite alternate; animation-delay: var(--bar-delay); animation-play-state: paused; transform-origin: center; }
 .intercom-showcase.is-running .intercom-showcase__voice > span { animation-play-state: running; }
 @keyframes intercom-showcase-voice { from { transform: scaleY(.35); opacity: .5; } to { transform: scaleY(1); opacity: 1; } }
 
