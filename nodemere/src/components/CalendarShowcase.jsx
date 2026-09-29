@@ -3,17 +3,18 @@ import { supabase } from '../supabaseClient';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   Activity,
-  AudioLines,
   ArrowRight,
   Calendar as CalendarIcon,
+  CalendarCheck2,
   ClipboardList,
-  CreditCard,
   GitBranch,
   Layers,
+  ListChecks,
   Phone,
   PlayCircle,
   TimerReset,
   Users,
+  WalletCards,
   Workflow,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -217,7 +218,7 @@ const FEATURE_ITEMS = [
   copy: 'Your receptionist knows your team. Their specialties, strengths, and schedules, so every caller can be matched with the right person.'
   },
   {
-    icon: <CalendarIcon className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:-translate-y-1" />,
+    icon: <CalendarCheck2 className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:-translate-y-1" />,
     title: 'Fully Managed',
     copy: 'Handle the full appointment flow during the call, from new bookings to changes and cancellations.',
   },
@@ -227,7 +228,7 @@ const FEATURE_ITEMS = [
     copy: 'Send confirmations, reminders, and appointment updates so customers know exactly what was booked and what happens next.',
   },
   {
-    icon: <CreditCard className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:rotate-3" />,
+    icon: <ListChecks className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:rotate-3" />,
     title: 'Intake Rules',
     copy: 'Your business in unique. Define the essential information your AI receptionist must collect before booking each appointment.',
   },
@@ -245,7 +246,7 @@ const SCENARIO_FEATURE_ITEMS = [
     copy: 'Stay on top of every customer by following up at the right time based on specific triggers within your business.',
   },
   {
-    icon: <CreditCard className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:rotate-3" />,
+    icon: <WalletCards className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:rotate-3" />,
     title: 'Built-In Payments',
     copy: 'Automate billing tasks like payment collection, invoice creation, and payment links as part of the conversation.',
   },
@@ -296,8 +297,8 @@ const MONITORING_FEATURE_ITEMS = [
     copy: 'Track calls, appointments, customers, revenue, and payment activity in real time from one live dashboard.',
   },
   {
-    icon: <AudioLines className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:scale-110" />,
-    title: 'Call Listening',
+    icon: <ClipboardList className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:scale-110" />,
+    title: 'Call Logs',
     copy: 'Need to hear what was said? Look back on past conversations and find the details that matter.',
   },
   {
