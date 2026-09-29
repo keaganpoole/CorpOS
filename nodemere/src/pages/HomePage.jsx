@@ -43,6 +43,7 @@ import expandedX from '@/assets/t1-expanded-x.png';
 import TypingAnimation from '../components/TypingAnimation';
 import HomepageReceptionistCatalog from '../components/HomepageReceptionistCatalog';
 import CalendarShowcase, { RightFeatureList } from '../components/CalendarShowcase';
+import IntercomShowcase from '../components/IntercomShowcase';
 import EncryptionShowcase from '../components/EncryptionShowcase';
 import WorkWeekComparison from '../components/WorkWeekComparison';
 import JitterDebugOverlay from '../components/JitterDebugOverlay';
@@ -856,6 +857,8 @@ const HomePage = () => {
         <section className="content-section content-section--showcase content-section--booking dark-bg text-center" data-visitor-section="calendar" data-visitor-section-index="1">
           <CalendarShowcase />
         </section>
+
+        <IntercomShowcase />
 
         <section className="content-section content-section--showcase dark-bg text-center" data-visitor-section="people-crm" data-visitor-section-index="2">
           <CalendarShowcase variant="people-crm" />
