@@ -2,13 +2,13 @@ import React, { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 
 const TIMELINE = [
-  { id: 'mon', day: 'Monday', time: '08:00 AM', scenario: 'Unexpected Absence', context: 'Receptionist calls out sick.', human: 'The owner covers the phones.', ai: 'Every call is handled normally.', netTime: 180, netRev: 400 },
-  { id: 'tue', day: 'Tuesday', time: '12:30 PM', scenario: 'Lunch Break', context: 'Calls arrive during lunch.', human: 'Calls go unanswered.', ai: 'Every call is answered.', netTime: 45, netRev: 240 },
-  { id: 'wed', day: 'Wednesday', time: '10:15 AM', scenario: 'Call Surge', context: 'Several customers call at once.', human: 'Callers wait on hold.', ai: 'Everyone is helped instantly.', netTime: 60, netRev: 320 },
-  { id: 'thu', day: 'Thursday', time: '02:00 PM', scenario: 'Lead Follow-Up', context: 'A new lead needs a response.', human: 'The follow-up is forgotten.', ai: 'The lead is contacted instantly.', netTime: 30, netRev: 275 },
-  { id: 'fri', day: 'Friday', time: '04:45 PM', scenario: 'Appointment Reminder', context: 'Tomorrow’s appointments need reminders.', human: 'Reminders are missed.', ai: 'Every reminder is sent.', netTime: 40, netRev: 180 },
-  { id: 'sat', day: 'Saturday', time: '11:30 AM', scenario: 'Weekend Inquiry', context: 'A customer calls while the office is closed.', human: 'The caller reaches voicemail.', ai: 'The inquiry becomes a booking.', netTime: 20, netRev: 350 },
-  { id: 'sun', day: 'Sunday', time: '06:15 PM', scenario: 'Service Opportunity', context: 'A customer is ready to book.', human: 'The extra service is never offered.', ai: 'A relevant service is recommended.', netTime: 15, netRev: 150 },
+  { id: 'mon', day: 'Monday', time: '08:00 AM', scenario: 'Unexpected Absence', context: 'Receptionist calls out sick', human: 'Returns missed calls', ai: 'Appointments are already booked', netTime: 180, netRev: 400 },
+  { id: 'tue', day: 'Tuesday', time: '12:30 PM', scenario: 'Language Barrier', context: 'A customer speaks another language', human: 'Awkward language barrier', ai: 'Detected language and responded fluently', netTime: 45, netRev: 240 },
+  { id: 'wed', day: 'Wednesday', time: '10:15 AM', scenario: 'Call Surge', context: 'Several customers call at once', human: 'Callers wait on hold', ai: 'Everyone is helped instantly', netTime: 60, netRev: 320 },
+  { id: 'thu', day: 'Thursday', time: '02:00 PM', scenario: 'Lead Follow-Up', context: 'A new lead needs a response', human: 'Forgot to follow up with lead', ai: 'Lead is contacted instantly', netTime: 30, netRev: 275 },
+  { id: 'fri', day: 'Friday', time: '04:45 PM', scenario: 'Appointment Reminder', context: 'Tomorrow’s appointments need reminders', human: 'Reminders are missed', ai: 'Every reminder is sent', netTime: 40, netRev: 180 },
+  { id: 'sat', day: 'Saturday', time: '11:30 AM', scenario: 'Weekend Inquiry', context: 'A customer calls while the office is closed', human: 'Called out sick', ai: 'Immortal 🥷', netTime: 20, netRev: 350 },
+  { id: 'sun', day: 'Sunday', time: '06:15 PM', scenario: 'Service Opportunity', context: 'A customer is ready to book', human: 'Not scheduled', ai: 'Booked three appointments', netTime: 15, netRev: 150 },
 ];
 
 const easeOutExpoSoft = (progress) => (progress === 1 ? 1 : 1 - Math.pow(2, -8 * progress));
@@ -404,7 +404,7 @@ export default function WorkWeekComparison({ scrollStep = null, scrollDirection 
           <div className="flex-1 flex flex-col items-center lg:items-start text-center lg:text-left w-full">
             <motion.span variants={textVariants} className="text-[10px] uppercase tracking-[0.24em] text-white/35 mb-4 lg:mb-6 flex items-center justify-center gap-2 font-semibold"><span className="bg-gradient-to-r from-[var(--brandGradientStart)] to-[var(--brandGradientEnd)] bg-clip-text text-transparent drop-shadow-[0_0_10px_color-mix(in_srgb,var(--brandGradientStart)_28%,transparent)]">Nodemere</span> AI Receptionist</motion.span>
             <AnimatePresence mode="wait">
-              <motion.p key={`${current.id}-ai`} variants={statementVariants.ai} initial="initial" animate={contentReveal ? 'animate' : 'initial'} exit="exit" className="comparison-ai-statement text-3xl lg:text-5xl text-white font-medium leading-snug">{current.ai}<svg className="inline-block w-6 h-6 lg:w-8 lg:h-8 ml-1 -mt-2 shrink-0 align-middle" fill="none" viewBox="0 0 24 24" strokeWidth={3}><defs><linearGradient id="comparison-check-gradient" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stopColor="var(--brandGradientStart)" /><stop offset="100%" stopColor="var(--brandGradientEnd)" /></linearGradient></defs><path stroke="url(#comparison-check-gradient)" strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg></motion.p>
+              <motion.p key={`${current.id}-ai`} variants={statementVariants.ai} initial="initial" animate={contentReveal ? 'animate' : 'initial'} exit="exit" className="comparison-ai-statement text-3xl lg:text-5xl text-white font-medium leading-snug">{current.ai}<svg className="inline-block w-6 h-6 lg:w-8 lg:h-8 ml-3 -mt-2 shrink-0 align-middle" fill="none" viewBox="0 0 24 24" strokeWidth={3}><defs><linearGradient id="comparison-check-gradient" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stopColor="var(--brandGradientStart)" /><stop offset="100%" stopColor="var(--brandGradientEnd)" /></linearGradient></defs><path stroke="url(#comparison-check-gradient)" strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg></motion.p>
             </AnimatePresence>
           </div>
         </motion.div>
