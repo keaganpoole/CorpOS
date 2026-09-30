@@ -23,7 +23,16 @@
 }
 
 .homepage-copy-reveal--delayed {
-    transition-delay: 160ms;
+    transition-delay: 320ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .homepage-copy-reveal {
+        opacity: 1;
+        transform: none;
+        filter: none;
+        transition: none;
+    }
 }
 
 .header, .h1-part, .hero-section .hero-headline, .hero-section .hero-subheadline, .hero-image, .content-section h3:not(.typing-animation-container), .content-section:not(.comparison-host) p, .content-section-image, .feature-card, .footer {
@@ -223,10 +232,15 @@
     box-shadow: 0 18px 36px rgba(139, 92, 246, 0.28);
 }
 .dashboard-gradient-button {
-    box-shadow: 0 10px 22px rgba(139, 92, 246, 0.14);
+    background-image: linear-gradient(135deg, #ffffff 0%, #e4e4e7 100%);
+    color: #18181b;
+    transform: none;
+    box-shadow: 0 10px 22px rgba(139, 92, 246, 0.1);
 }
 .dashboard-gradient-button:hover {
-    box-shadow: 0 13px 28px rgba(139, 92, 246, 0.2);
+    background-image: linear-gradient(135deg, #ffffff 0%, #f4f4f5 100%);
+    transform: none;
+    box-shadow: 0 12px 24px rgba(255, 255, 255, 0.11);
 }
 
 .homepage-brand-cta {
@@ -304,9 +318,6 @@ main > section.content-section--showcase {
 .content-section.dark-bg:not(.comparison-host) p { color: var(--color-light-gray); }
 .content-section--showcase .calendar-showcase-description {
     display: block;
-    opacity: 1;
-    transform: none;
-    filter: none;
     margin: 1.5rem 0 0;
     max-width: 24rem;
     color: #d4d4d8;
@@ -844,6 +855,23 @@ main > section.content-section--showcase {
         line-height: 1.34;
         letter-spacing: -0.01em;
     }
+    .homepage-feature-list .homepage-feature-pages {
+        display: grid;
+    }
+    .homepage-feature-list .homepage-feature-page {
+        grid-area: 1 / 1;
+        opacity: 0;
+        transform: translateY(10px);
+        pointer-events: none;
+        transition: opacity 360ms cubic-bezier(0.16, 1, 0.3, 1), transform 360ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .homepage-feature-list .homepage-feature-page.is-active {
+        opacity: 1;
+        transform: translateY(0);
+        pointer-events: auto;
+    }
+}
+@media (min-width: 768px) and (max-width: 1023px) {
     .homepage-feature-list .homepage-feature-pages {
         display: grid;
     }

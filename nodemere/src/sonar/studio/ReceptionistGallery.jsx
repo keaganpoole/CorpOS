@@ -6,7 +6,7 @@ import './receptionistGallery.css';
 
 const DEFAULT_GALLERY_ZOOM = 1.4;
 
-export default function ReceptionistGallery({ receptionists, onSelect, onInteraction, paused, allowWheelZoom = true, showZoomControls = true, defaultZoom = DEFAULT_GALLERY_ZOOM, randomizeRoster = false, children }) {
+export default function ReceptionistGallery({ receptionists, onSelect, onInteraction, paused, allowWheelZoom = true, showZoomControls = true, defaultZoom = DEFAULT_GALLERY_ZOOM, randomizeRoster = false, introOnActive = false, children }) {
   const DRAG_RESISTANCE = 0.78;
   const FOLLOW_STIFFNESS = 5.1;
   const INERTIA_DAMPING = 2.35;
@@ -17,6 +17,8 @@ export default function ReceptionistGallery({ receptionists, onSelect, onInterac
   const onInteractionRef = useRef(onInteraction);
   const [cells, setCells] = useState([]);
   const [zoomLevel, setZoomLevel] = useState(defaultZoom);
+  const [introTiles, setIntroTiles] = useState(null);
+  const introPlayedRef = useRef(false);
   const reducedMotion = useReducedMotion();
   const rosterSeedRef = useRef(randomizeRoster ? Math.random().toString(36).slice(2) : '');
   const rosterOrder = useMemo(() => galleryRosterOrder(receptionists, rosterSeedRef.current), [receptionists]);
@@ -27,6 +29,32 @@ export default function ReceptionistGallery({ receptionists, onSelect, onInterac
   useLayoutEffect(() => {
     if (paused) resetGestureRef.current?.();
   }, [paused]);
+
+  useLayoutEffect(() => {
+    if (!introOnActive || paused || reducedMotion || introPlayedRef.current || !cells.length) return;
+    const root = rootRef.current;
+    if (!root) return;
+    const bounds = root.getBoundingClientRect();
+    if (!bounds.width || !bounds.height) return;
+    const visibleTiles = cells.map(cell => {
+      const element = tilesRef.current.get(cell.key);
+      if (!element) return null;
+      const rect = element.getBoundingClientRect();
+      if (rect.right < bounds.left || rect.left > bounds.right || rect.bottom < bounds.top || rect.top > bounds.bottom) return null;
+      const x = Math.min(1, Math.max(0, ((rect.left + rect.right) / 2 - bounds.left) / bounds.width));
+      const y = Math.min(1, Math.max(0, ((rect.top + rect.bottom) / 2 - bounds.top) / bounds.height));
+      return { key: cell.key, delay: Math.round(300 + 620 * (x + y) / 2) };
+    }).filter(Boolean);
+    if (!visibleTiles.length) return;
+    introPlayedRef.current = true;
+    setIntroTiles(new Map(visibleTiles.map(tile => [tile.key, tile.delay])));
+  }, [cells, introOnActive, paused, reducedMotion]);
+
+  useEffect(() => {
+    if (!introTiles) return undefined;
+    const timer = window.setTimeout(() => setIntroTiles(null), 1950);
+    return () => window.clearTimeout(timer);
+  }, [introTiles]);
 
   const getTileRef = key => {
     if (!tileRefCallbacks.current.has(key)) {
@@ -213,16 +241,16 @@ export default function ReceptionistGallery({ receptionists, onSelect, onInterac
     };
   }, [allowWheelZoom, defaultZoom, rosterOrder.length, reducedMotion]);
 
-  return <><div className="ns-receptionist-gallery" ref={rootRef} tabIndex={0} aria-label="Receptionist gallery. Drag to explore and pinch to zoom.">
+  return <><div className={`ns-receptionist-gallery${introOnActive && !introPlayedRef.current && !reducedMotion ? ' ns-gallery-intro-pending' : ''}`} ref={rootRef} tabIndex={0} aria-label="Receptionist gallery. Drag to explore and pinch to zoom.">
     <div className="ns-gallery-world" ref={worldRef} inert={paused ? '' : undefined} aria-hidden={paused || undefined}>
       {cells.map(cell => {
         const personIndex = rosterOrder[cell.personIndex];
         const person = receptionists[personIndex];
         if (!person) return null;
         const isCreated = person.source === 'created_receptionist' || person.created_receptionist_id != null;
-        return <button type="button" className={`ns-gallery-tile${isCreated ? ' ns-gallery-tile-created' : ''}`} key={cell.key} draggable="false"
+        return <button type="button" className={`ns-gallery-tile${isCreated ? ' ns-gallery-tile-created' : ''}${introTiles?.has(cell.key) ? ' ns-gallery-tile--intro' : ''}`} key={cell.key} draggable="false"
           ref={getTileRef(cell.key)}
-          style={{ left: cell.x, top: cell.y, width: cell.width, height: cell.height, zIndex: 1 }}
+          style={{ left: cell.x, top: cell.y, width: cell.width, height: cell.height, zIndex: 1, '--tile-intro-delay': `${introTiles?.get(cell.key) ?? 0}ms` }}
           aria-label={`Meet ${person.full_name || 'receptionist'}`} onClick={() => onSelect(personIndex)}>
           {person.avatar ? <img src={person.avatar} alt="" draggable="false" /> : <span className="ns-gallery-placeholder"><User size={40}/><span>{person.full_name || 'Receptionist'}</span></span>}
           <span className="ns-gallery-neon" aria-hidden="true"/>

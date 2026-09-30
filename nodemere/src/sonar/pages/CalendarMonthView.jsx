@@ -29,11 +29,11 @@ const HOMEPAGE_TAG_COLORS = {
   Blowout: '#fbbf24',
 };
 const STATUS_COLORS = {
-  Confirmed: '#34d399',
-  Pending: '#fbbf24',
-  Completed: '#22c55e',
-  Missed: '#fb7185',
-  Cancelled: '#f43f5e',
+  Confirmed: '#22c55e',
+  Pending: '#ffb84d',
+  Completed: '#38bdf8',
+  Missed: '#fb3b71',
+  Cancelled: '#fb3b71',
 };
 const MAGGIE_PREVIEW_RECEPTIONIST = {
   name: 'Maggie',

@@ -118,6 +118,7 @@ export default function HomepageReceptionistCatalog({ active, onContinue }) {
         showGalleryZoomControls={false}
         galleryDefaultZoom={typeof window !== 'undefined' && window.innerWidth > 1180 ? 2.05 : undefined}
         randomizeGalleryRoster
+        galleryIntroReveal
         onGalleryInteraction={handleGalleryInteraction}
         interactive={active}
         portalDetail

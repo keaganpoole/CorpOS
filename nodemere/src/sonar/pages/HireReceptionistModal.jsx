@@ -41,6 +41,7 @@ const HireReceptionistModal = ({
   showGalleryZoomControls = true,
   galleryDefaultZoom,
   randomizeGalleryRoster = false,
+  galleryIntroReveal = false,
   onGalleryInteraction,
   interactive = true,
   portalDetail = false,
@@ -586,7 +587,7 @@ const HireReceptionistModal = ({
       } catch (error) { setHireError(error?.message || 'Could not archive receptionist. Please try again.'); }
       finally { setArchiving(false); }
     }}
-  />}</AnimatePresence><ReceptionistGallery receptionists={receptionists} onSelect={openDetail} onInteraction={onGalleryInteraction} paused={!interactive || selectedIndex !== null} allowWheelZoom={allowGalleryWheelZoom} showZoomControls={showGalleryZoomControls} defaultZoom={galleryDefaultZoom} randomizeRoster={randomizeGalleryRoster}>
+  />}</AnimatePresence><ReceptionistGallery receptionists={receptionists} onSelect={openDetail} onInteraction={onGalleryInteraction} paused={!interactive || selectedIndex !== null} allowWheelZoom={allowGalleryWheelZoom} showZoomControls={showGalleryZoomControls} defaultZoom={galleryDefaultZoom} randomizeRoster={randomizeGalleryRoster} introOnActive={galleryIntroReveal}>
     {!portalDetail && <AnimatePresence>{selectedIndex !== null && detail}</AnimatePresence>}
   </ReceptionistGallery>
   {portalDetail && typeof document !== 'undefined' && createPortal(

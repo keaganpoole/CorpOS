@@ -33,10 +33,10 @@ const TAG_COLORS = {
   Blowout: HERO_COLORS[5],
 };
 const DEMO_APPOINTMENT_STATUS_COLORS = {
-  Completed: '#22c55e',
-  Cancelled: '#f43f5e',
-  Confirmed: '#a78bfa',
-  Booked: '#f59e0b',
+  Completed: '#38bdf8',
+  Cancelled: '#fb3b71',
+  Confirmed: '#22c55e',
+  Booked: '#ffb84d',
 };
 
 const getDemoAppointmentActions = (status) => {
@@ -1024,7 +1024,7 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
                     </>
                   )}
                 </h2>
-                <div className={`homepage-copy-reveal ${variant === 'calendar' ? '' : 'homepage-copy-reveal--delayed'} calendar-showcase-description mx-auto mt-6 max-w-[24rem] text-base font-semibold leading-[1.45] tracking-[-0.02em] text-[#d4d4d8] md:mx-auto md:max-w-[36rem] md:text-center md:text-[1.1rem] md:leading-[1.55] lg:mx-0 lg:max-w-[24rem] lg:text-left lg:text-base lg:leading-[1.45] ${copyVisible ? 'is-visible' : ''}`}>
+                <div className={`homepage-copy-reveal homepage-copy-reveal--delayed calendar-showcase-description mx-auto mt-6 max-w-[24rem] text-base font-semibold leading-[1.45] tracking-[-0.02em] text-[#d4d4d8] md:mx-auto md:max-w-[36rem] md:text-center md:text-[1.1rem] md:leading-[1.55] lg:mx-0 lg:max-w-[24rem] lg:text-left lg:text-base lg:leading-[1.45] ${copyVisible ? 'is-visible' : ''}`}>
                   {isScenariosVariant ? (
                     <>Build the exact workflows your business needs with triggers, branching logic, live variables, and actions that run across calls, records, appointments, payments, and <GradientWord>follow-ups</GradientWord>.</>
                   ) : (
@@ -1097,12 +1097,13 @@ const areFeatureListPropsEqual = (previous, next) => (
   previous.items === next.items
   && previous.useScrollHighlight === next.useScrollHighlight
   && previous.mobilePageSize === next.mobilePageSize
+  && previous.mobilePageBreakpoint === next.mobilePageBreakpoint
   && previous.mobileMaxItems === next.mobileMaxItems
   && previous.debugId === next.debugId
   && getFeatureListVisualState(previous) === getFeatureListVisualState(next)
 );
 
-export const RightFeatureList = memo(function RightFeatureList({ featureProgress, items, useScrollHighlight = false, mobilePageSize = null, mobileMaxItems = null, debugId = null }) {
+export const RightFeatureList = memo(function RightFeatureList({ featureProgress, items, useScrollHighlight = false, mobilePageSize = null, mobilePageBreakpoint = 768, mobileMaxItems = null, debugId = null }) {
   const [hoveredIndex, setHoveredIndex] = useState(null);
   const [isTouchDevice, setIsTouchDevice] = useState(false);
   const [isMobileFeatureViewport, setIsMobileFeatureViewport] = useState(false);
@@ -1123,7 +1124,7 @@ export const RightFeatureList = memo(function RightFeatureList({ featureProgress
     if (typeof window === 'undefined') return undefined;
 
     const updateViewport = () => {
-      setIsMobileFeatureViewport(window.innerWidth < 768);
+      setIsMobileFeatureViewport(window.innerWidth < mobilePageBreakpoint);
     };
 
     updateViewport();
@@ -1132,7 +1133,7 @@ export const RightFeatureList = memo(function RightFeatureList({ featureProgress
     return () => {
       window.removeEventListener('resize', updateViewport);
     };
-  }, []);
+  }, [mobilePageBreakpoint]);
 
   const shouldUseScrollHighlight = useScrollHighlight || isTouchDevice;
   const visibleItems = mobileMaxItems && isMobileFeatureViewport ? items.slice(0, mobileMaxItems) : items;
@@ -1749,11 +1750,11 @@ function RightCalendarGrid({ hasAnimatedDots, calendarVisible = true }) {
                 onClick={() => setSelectedDay(dayNum)}
                 className={`relative flex aspect-square flex-col justify-between overflow-hidden border transition-all duration-300 ${isMobile ? 'rounded-lg p-1.5' : isCompact ? 'rounded-lg p-2' : 'rounded-xl p-2'} ${
                   isSelected
-                    ? 'z-10 border-transparent bg-gradient-to-tr from-violet-600 via-purple-600 to-fuchsia-600 text-white shadow-[0_0_18px_rgba(139,92,246,0.3)]'
+                    ? 'z-10 border-transparent bg-gradient-to-tr from-zinc-300 via-zinc-100 to-white text-zinc-900 shadow-[0_0_18px_rgba(255,255,255,0.18)]'
                     : 'border-white/5 bg-zinc-950/60 text-zinc-400 hover:border-white/20'
                 }`}
               >
-                <span className={`${isMobile ? 'text-[9px]' : isCompact ? 'text-[10px]' : 'text-[11px]'} font-bold ${isSelected ? 'text-white' : 'text-zinc-500'}`}>
+                <span className={`${isMobile ? 'text-[9px]' : isCompact ? 'text-[10px]' : 'text-[11px]'} font-bold ${isSelected ? 'text-zinc-900' : 'text-zinc-500'}`}>
                   {dayNum}
                 </span>
 
@@ -1763,7 +1764,7 @@ function RightCalendarGrid({ hasAnimatedDots, calendarVisible = true }) {
                       key={`${dayNum}-${event.title}`}
                       className={`dot-item rounded-full ${isMobile ? 'h-[3px] w-[3px]' : isCompact ? 'h-1 w-1' : 'h-1.5 w-1.5'}`}
                       style={{
-                        backgroundColor: isSelected ? '#ffffff' : event.statusColor,
+                        backgroundColor: isSelected ? '#52525b' : event.statusColor,
                         animationDelay: shouldRevealCalendarDetails ? `${dayNum * 24 + dotIndex * 80}ms` : '0ms',
                         animationDuration: '720ms',
                       }}

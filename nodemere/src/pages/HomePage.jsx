@@ -4,7 +4,7 @@ import useLegacyAnimation from '../hooks/useLegacyAnimation';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { motion, AnimatePresence, useInView } from 'framer-motion';
-import { CreditCard, FileUp, Globe2, Menu as MenuIcon, MessagesSquare, Phone, PhoneOutgoing, ShieldCheck, X as XIcon, ArrowRight, Check } from 'lucide-react';
+import { CreditCard, FileUp, Globe2, Menu as MenuIcon, MessagesSquare, Mic, Phone, PhoneCall, PhoneOutgoing, ShieldCheck, X as XIcon, ArrowRight, Check } from 'lucide-react';
 import SplashScreen from '../components/SplashScreen';
 import { getCookie } from '../utils/cookieUtils';
 import '../styles/HomePage.css';
@@ -62,9 +62,14 @@ const HERO_RECEPTIONIST_FEATURE_ITEMS = [
     copy: 'Handle multiple conversations simultaneously, making hold queues virtually nonexistent.',
   },
   {
-    icon: <FileUp className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:-translate-y-1" />,
-    title: 'Upload Documents',
-    copy: 'Allow your AI receptionist to request documents from the customer by sending them a secure upload link while on the call.',
+    icon: <PhoneOutgoing className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:translate-x-1 group-hover:-translate-y-1" />,
+    title: 'Outbound Calling',
+    copy: 'Have your AI receptionist place calls for reminders, confirmations, updates, and almost anything else you desire, without tying up your team.',
+  },
+  {
+    icon: <PhoneCall className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:-translate-y-1" />,
+    title: 'Live Handoff',
+    copy: 'When a caller needs a person, your receptionist briefs the right team member first, then merges everyone into the same call so they have context on the situation.',
   },
   {
     icon: <CreditCard className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:rotate-3" />,
@@ -72,9 +77,14 @@ const HERO_RECEPTIONIST_FEATURE_ITEMS = [
     copy: 'Take payments, collect deposits, send payment links, and handle billing questions right on the call.',
   },
   {
-    icon: <PhoneOutgoing className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:translate-x-1 group-hover:-translate-y-1" />,
-    title: 'Outbound Calling',
-    copy: 'Have your AI receptionist place calls for reminders, confirmations, updates, and almost anything else you desire, without tying up your team.',
+    icon: <Mic className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:scale-110" />,
+    title: 'Voice Audition',
+    copy: 'Build a receptionist from the voice up. Fine-tune their accent, tone, and personality to make them the perfect fit for your front desk.',
+  },
+  {
+    icon: <FileUp className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:-translate-y-1" />,
+    title: 'Upload Documents',
+    copy: 'Allow your AI receptionist to request documents from the customer by sending them a secure upload link while on the call.',
   },
   {
     icon: <Globe2 className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:rotate-12" />,
@@ -354,8 +364,9 @@ const StackedHeroShowcase = ({ sectionRef }) => {
               featureProgress={isCompactFeatureViewport ? heroFeatureProgress : (heroFeaturesEntered ? 1 : 0)}
               items={HERO_RECEPTIONIST_FEATURE_ITEMS}
               useScrollHighlight={isCompactFeatureViewport}
-              mobilePageSize={3}
-              mobileMaxItems={6}
+              mobilePageSize={4}
+              mobilePageBreakpoint={1024}
+              mobileMaxItems={8}
               debugId={jitterDebugEnabled ? 'hero' : null}
             />
           </div>
