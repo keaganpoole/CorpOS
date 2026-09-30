@@ -3,7 +3,6 @@ import { supabase } from '../supabaseClient';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   Activity,
-  ArrowRight,
   Calendar as CalendarIcon,
   CalendarCheck2,
   ClipboardList,
@@ -692,7 +691,7 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
   const calendarOpacity = calendarExited ? 0 : 1;
   const featureOpacity = featureEntered ? 1 : 0;
   const isCompactBookingViewport = viewportSize.width < 1024;
-  const mobileIntroExited = sectionProgress >= 0.24;
+  const mobileIntroExited = sectionProgress >= 0.18;
   const mobileCalendarEntered = sectionProgress >= 0.18;
   const mobileFeatureStartProgress = 0.56;
   const mobileCalendarExited = sectionProgress >= mobileFeatureStartProgress;
@@ -892,7 +891,6 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
                 <div className="mt-8 flex justify-center">
                   <Link to="/auth" state={{ isSignUp: true }} className="homepage-brand-cta" data-visitor-event="cta_click" data-visitor-id={`${variant}-get-started`}>
                     Get Started
-                    <ArrowRight size={16} strokeWidth={2.4} />
                   </Link>
                 </div>
               )}
@@ -900,7 +898,6 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
                 <div className="mt-12 flex justify-center">
                   <Link to="/auth" state={{ isSignUp: true }} className="homepage-brand-cta" data-visitor-event="cta_click" data-visitor-id={`${variant}-booking-calls`}>
                     Start Booking Calls
-                    <ArrowRight size={16} strokeWidth={2.4} />
                   </Link>
                 </div>
               )}
@@ -1956,20 +1953,18 @@ function RightCalendarGrid({ hasAnimatedDots, calendarVisible = true }) {
                           </span>
                         </span>
                         <span className={`demo-calendar-appointment-text ${showActionLane ? 'demo-calendar-appointment-text--peek-hidden' : ''} truncate font-semibold text-zinc-200 ${isMobile ? 'text-[10px]' : isCompact ? 'text-[11px]' : 'text-xs'}`}>{event.title}</span>
-                        {!isMobile && !isCompact && <span className={`demo-calendar-appointment-text ${showActionLane ? 'demo-calendar-appointment-text--peek-hidden' : ''} text-[10px] font-medium italic text-zinc-500`}>with</span>}
+                        <span className={`demo-calendar-appointment-text ${showActionLane ? 'demo-calendar-appointment-text--peek-hidden' : ''} text-[10px] font-medium italic text-zinc-500`}>with</span>
                         <span className={`demo-calendar-appointment-text ${showActionLane ? 'demo-calendar-appointment-text--peek-hidden' : ''} text-[10px] font-medium text-zinc-400`}>{event.customerFirstName} {event.customerLastName}</span>
-                        {!isMobile && !isCompact && <span className={`demo-calendar-appointment-text ${showActionLane ? 'demo-calendar-appointment-text--peek-hidden' : ''} text-[10px] font-medium italic text-zinc-500`}>via</span>}
-                        <span className={`demo-calendar-appointment-text ${showActionLane ? 'demo-calendar-appointment-text--peek-hidden' : ''} ${isCompact ? 'hidden' : 'text-[10px]'} font-medium text-zinc-400`}>
+                        {!isMobile && <span className={`demo-calendar-appointment-text ${showActionLane ? 'demo-calendar-appointment-text--peek-hidden' : ''} text-[10px] font-medium italic text-zinc-500`}>via</span>}
+                        {!isMobile && <span className={`demo-calendar-appointment-text ${showActionLane ? 'demo-calendar-appointment-text--peek-hidden' : ''} text-[10px] font-medium text-zinc-400`}>
                           {event.receptionistName}
-                        </span>
+                        </span>}
                       </motion.div>
                       <div className="flex shrink-0 items-center space-x-1.5">
-                        <span
-                        className={`font-bold uppercase tracking-wider text-zinc-500 ${isMobile ? 'text-[7px]' : isCompact ? 'text-[8px]' : 'text-[9px]'}`}
-                        >
+                        {!isMobile && <span className={`font-bold uppercase tracking-wider text-zinc-500 ${isCompact ? 'text-[8px]' : 'text-[9px]'}`}>
                           {event.category}
-                        </span>
-                        <span className={`${isMobile ? 'h-3' : 'h-4'} w-px bg-white/[0.12]`} aria-hidden="true" />
+                        </span>}
+                        {!isMobile && <span className="h-4 w-px bg-white/[0.12]" aria-hidden="true" />}
                         <span className={`${isMobile ? 'text-[8px]' : isCompact ? 'text-[9px]' : 'text-[10px]'} font-mono text-zinc-400`}>{event.time}</span>
                       </div>
                     </button>

@@ -491,6 +491,14 @@ const HomepagePeopleCrmDemo = ({ className = '', entranceActive = false, onDemoL
   const [entranceComplete, setEntranceComplete] = useState(false);
   const [entranceStarted, setEntranceStarted] = useState(false);
 
+  // The entrance animation is only for the initial presentation. An inline
+  // editor can mount after a click, and it must not inherit that animation.
+  const finishEntranceOnInteraction = useCallback(() => {
+    if (entranceStarted && !entranceComplete) {
+      setEntranceComplete(true);
+    }
+  }, [entranceComplete, entranceStarted]);
+
   React.useEffect(() => {
     if (rows.length > 14) {
       onDemoLimitExceeded?.();
@@ -556,7 +564,11 @@ const HomepagePeopleCrmDemo = ({ className = '', entranceActive = false, onDemoL
   }, []);
 
   return (
-    <div className={`relative h-full w-full bg-[#020202] crm-demo-entrance ${entranceStarted ? 'has-started' : 'is-waiting'} ${entranceComplete ? 'is-loaded' : 'is-entering'} ${className}`}>
+    <div
+      className={`relative h-full w-full bg-[#020202] crm-demo-entrance homepage-crm-demo--compact-indicator-dots ${entranceStarted ? 'has-started' : 'is-waiting'} ${entranceComplete ? 'is-loaded' : 'is-entering'} ${className}`}
+      onPointerDownCapture={finishEntranceOnInteraction}
+      onFocusCapture={finishEntranceOnInteraction}
+    >
       <LeadsTable
         leads={filteredRows}
         loading={false}

@@ -30,7 +30,7 @@
 .intercom-showcase__headline-block { display: flex; max-width: 100%; flex-direction: column; align-items: flex-start; }
 .intercom-showcase__word { display: inline-flex; align-items: center; justify-content: center; white-space: nowrap; font-weight: 500; }
 .intercom-showcase__lead { display: inline-block; padding-right: .06em; margin-right: -.06em; font-weight: 700; }
-.intercom-showcase__letter-o { position: relative; top: .16em; left: .025em; display: inline-flex; width: .6em; height: .6em; flex: none; margin: 0; }
+.intercom-showcase__letter-o { position: relative; top: .16em; left: .025em; display: inline-flex; width: .57em; height: .57em; flex: none; margin: 0; }
 .intercom-showcase__letter-o .circle-preloader { width: 100% !important; height: 100% !important; }
 
 .intercom-showcase.has-entered .intercom-showcase__copy,

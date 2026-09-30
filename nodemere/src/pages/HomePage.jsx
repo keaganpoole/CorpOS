@@ -4,7 +4,7 @@ import useLegacyAnimation from '../hooks/useLegacyAnimation';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { motion, AnimatePresence, useInView } from 'framer-motion';
-import { CreditCard, FileUp, Globe2, Menu as MenuIcon, MessagesSquare, Mic, Phone, PhoneCall, PhoneOutgoing, ShieldCheck, X as XIcon, ArrowRight, Check } from 'lucide-react';
+import { CreditCard, FileUp, Globe2, Menu as MenuIcon, MessagesSquare, Mic, Phone, PhoneCall, PhoneOutgoing, ShieldCheck, X as XIcon, Check } from 'lucide-react';
 import SplashScreen from '../components/SplashScreen';
 import { getCookie } from '../utils/cookieUtils';
 import '../styles/HomePage.css';
