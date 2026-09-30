@@ -198,9 +198,11 @@
   .sonar-dashboard-shell[data-responsive="true"] .ns-office :is(.ns-control-room, .ns-audition-layout) { padding: 18px 20px 32px; gap: 24px; }
   .sonar-dashboard-shell[data-responsive="true"] .ns-office .ns-description { min-height: 180px; font-size: 16px; }
   .sonar-dashboard-shell[data-responsive="true"] .ns-office .ns-portrait-option-image { height: clamp(180px, 34dvh, 290px); aspect-ratio: auto; }
+  .sonar-dashboard-shell[data-responsive="true"] .ns-office .ns-portrait-option-image img { object-position: center 24%; }
   .sonar-dashboard-shell[data-responsive="true"] .ns-office .ns-portrait-stage { gap: 14px; padding-top: 16px; padding-bottom: 24px; }
   .sonar-dashboard-shell[data-responsive="true"] .ns-office .ns-portrait-panel-footer { gap: 12px; padding-top: 12px; }
   .sonar-dashboard-shell[data-responsive="true"] .ns-office .ns-receptionist-preview-image { height: 260px; min-height: 260px; }
+  .sonar-dashboard-shell[data-responsive="true"] .ns-office .ns-receptionist-preview-image img { object-position: center 24%; }
   .sonar-dashboard-shell[data-responsive="true"] .ns-office .ns-receptionist-preview-body { padding: 22px; }
   .sonar-dashboard-shell[data-responsive="true"] .ns-office :is(.ns-writing, .ns-instrument, .ns-audition-heading) > .ns-eyebrow { display: none; }
   .sonar-dashboard-shell[data-responsive="true"] .ns-office .ns-topbar { min-height: var(--phone-studio-header); height: var(--phone-studio-header); gap: 0 10px; padding: 8px 16px; }
@@ -208,7 +210,7 @@
   .sonar-dashboard-shell[data-responsive="true"] .ns-office.is-studio .ns-office-environment,
   .sonar-dashboard-shell[data-responsive="true"] .ns-office.is-studio .ns-office-environment:has(.ns-portrait-preview) { top: var(--phone-studio-header); left: 0; right: 0; height: var(--phone-face-height); width: 100%; }
   .sonar-dashboard-shell[data-responsive="true"] .ns-office :is(.ns-portrait-preview, .ns-welcome-portrait) { width: 100%; height: 100%; top: 0; right: 0; opacity: 1; mask-image: linear-gradient(#000 92%,transparent); -webkit-mask-image: linear-gradient(#000 92%,transparent); }
-  .sonar-dashboard-shell[data-responsive="true"] .ns-office :is(.ns-portrait-preview img, .ns-welcome-portrait img) { object-fit: cover; object-position: 50% 48% !important; transform: none !important; }
+  .sonar-dashboard-shell[data-responsive="true"] .ns-office :is(.ns-portrait-preview img, .ns-welcome-portrait img) { object-fit: cover; object-position: 50% 38% !important; transform: none !important; }
   .sonar-dashboard-shell[data-responsive="true"] .ns-office .ns-portrait-tone { opacity: .25; }
   .sonar-dashboard-shell[data-responsive="true"] .ns-office .ns-welcome { padding: calc(var(--phone-face-height) + 20px) 20px 24px; }
   .sonar-dashboard-shell[data-responsive="true"] .ns-office .ns-welcome h1 { font-size: 34px; margin: 8px 0 14px; }
