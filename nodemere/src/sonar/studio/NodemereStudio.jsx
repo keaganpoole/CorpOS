@@ -9,6 +9,7 @@ import ReceptionistReviewDetails from './ReceptionistReviewDetails';
 import { ACCENT_LANDSCAPES, ACCENT_PALETTES, CHARACTERISTICS, DEFAULT_PREVIEW, SUB_ACCENTS, SUB_ACCENT_PALETTES, composeDescription, describeToneWeights, inferLoudnessFromToneWeights } from './voiceDefinition';
 import useAudition from './useAudition';
 import IntercomVoiceLine from '../nest/IntercomVoiceLine';
+import useDashboardViewport from '../hooks/useDashboardViewport';
 import './studio.css';
 
 const Clone = lazy(() => import('../../pages/VoiceCloneExperience'));
@@ -233,6 +234,9 @@ function AccentDna({ values, previewOption }) {
 
 export default function NodemereStudio({ onReturn, onDirtyChange, onSaved, onOpenCatalog, skipIntro = false, onSceneState }) {
   const reducedMotion = useReducedMotion();
+  const { isPhone } = useDashboardViewport();
+  const swipeStart = useRef(null);
+  const [swipeUsed, setSwipeUsed] = useState(false);
   const [canHoverFine,setCanHoverFine]=useState(()=>typeof window !== 'undefined' ? Boolean(window.matchMedia?.('(hover: hover) and (pointer: fine)').matches) : false);
   const [intro,setIntro]=useState(!skipIntro), [showWelcome,setShowWelcome]=useState(true), [identityReady,setIdentityReady]=useState(false), [mode,setMode]=useState('design'), [stage,setStage]=useState(0);
   const [values,setValues]=useState({toneWeights:{},accents:[]}), [manual,setManual]=useState(null);
@@ -249,7 +253,7 @@ export default function NodemereStudio({ onReturn, onDirtyChange, onSaved, onOpe
   const returnToRoom=useRef(false), guidedSurface=useRef(null);
   const toneDefaultsInitialized=useRef(false);
   useEffect(()=>{let active=true;api.getBusinessProfile().then(profile=>{if(active)setBusinessName(String(profile?.name||'Nodemere').trim()||'Nodemere');}).catch(()=>{});return()=>{active=false;};},[]);
-  const focusHeading=useCallback(node=>{heading.current=node;node?.focus({preventScroll:true});},[]);
+  const focusHeading=useCallback(node=>{heading.current=node;node?.focus({preventScroll:true});if(isPhone){const area=node?.closest('.ns-guided-space');if(area)area.scrollTop=0;}},[isPhone]);
   const audition=useAudition(previews);
   const room=stage===ROOM_STAGE, auditioning=stage===AUDITION_STAGE, portraits=stage===PORTRAIT_STAGE, previewing=stage===PREVIEW_STAGE, complete=stage===COMPLETE_STAGE;
   useInstrumentTilt(panel, room&&!intro);
@@ -286,7 +290,7 @@ export default function NodemereStudio({ onReturn, onDirtyChange, onSaved, onOpe
     touch(); clearTimeout(advance.current);
     setPreviewOption({key,option:value});
     setValues(s=>({...s,[key]:value,...(key==='accent'?{subAccent:'',accents:[{accent:value,subAccent:''}]}:{})}));
-    if(canHoverFine&&key!=='accent'){
+    if(canHoverFine&&!isPhone&&key!=='accent'){
       advance.current=setTimeout(continueGuided,reducedMotion?0:520);
     }
   };
@@ -406,7 +410,21 @@ export default function NodemereStudio({ onReturn, onDirtyChange, onSaved, onOpe
           : stage===TONE_STAGE
             ? (namedReceptionist?`Give ${namedReceptionist} a personality people can feel and remember.`:CHARACTERISTICS[stage].hint)
             : CHARACTERISTICS[stage]?.hint;
-  return <section onScroll={event=>event.currentTarget.closest('.ns-office')?.style.setProperty('--office-scroll',`${-event.currentTarget.scrollTop}px`)} className={`ns-studio ${room?'is-room':''} ${auditioning?'is-audition':''} ${mode==='clone'?'is-clone':''} ${busy?'is-processing':''}`}>
+  const mobileGuided = isPhone && mode === 'design' && !showWelcome && stage < ROOM_STAGE;
+  const canAdvance = !busy && !saving && (stage === 0 ? Boolean(name.trim()) && (!identityReady || Boolean(values.gender)) : stage === TONE_STAGE ? Object.keys(values.toneWeights || {}).length > 0 : Boolean(values[CHARACTERISTICS[stage]?.key]));
+  const mobileNext = () => { if (!canAdvance) return; if (stage === 0 && !identityReady) setIdentityReady(true); else continueGuided(); };
+  const mobileBack = () => { clearTimeout(advance.current); if (stage === 0) setIdentityReady(false); else setStage(s => s - 1); };
+  return <section onTouchStart={event => {
+    if (!mobileGuided || event.target.closest('input, textarea, select, button')) return;
+    const t = event.touches[0]; swipeStart.current = t.clientX > 24 && t.clientX < window.innerWidth - 24 ? { x: t.clientX, y: t.clientY } : null;
+  }} onTouchEnd={event => {
+    const start = swipeStart.current; swipeStart.current = null;
+    if (!mobileGuided || !start) return;
+    const t = event.changedTouches[0], dx = t.clientX - start.x, dy = t.clientY - start.y;
+    if (Math.abs(dx) < 65 || Math.abs(dx) < Math.abs(dy) * 1.6) return;
+    if (dx < 0 && canAdvance) { mobileNext(); setSwipeUsed(true); }
+    else if (dx > 0 && (stage > 0 || identityReady)) { mobileBack(); setSwipeUsed(true); }
+  }} onScroll={event=>event.currentTarget.closest('.ns-office')?.style.setProperty('--office-scroll',`${-event.currentTarget.scrollTop}px`)} className={`ns-studio ${mobileGuided?'is-mobile-guided':''} ${room?'is-room':''} ${auditioning?'is-audition':''} ${mode==='clone'?'is-clone':''} ${busy?'is-processing':''}`}>
     {intro?<div className="ns-intro"><SplashScreenAlternate label="Audition" onAnimationEnd={finishIntro}/><button className="ns-skip" onClick={finishIntro}>Enter Audition <ArrowRight size={14}/></button></div>:null}
     <div className="ns-content" inert={intro?'':undefined}>
     <header className="ns-topbar">
@@ -421,6 +439,7 @@ export default function NodemereStudio({ onReturn, onDirtyChange, onSaved, onOpe
       <button type="button" aria-current={stage===PORTRAIT_STAGE?'step':undefined} disabled={!portraitOptions.length} onClick={()=>setStage(PORTRAIT_STAGE)}>Portrait</button>
       <button type="button" aria-current={stage===PREVIEW_STAGE||stage===COMPLETE_STAGE?'step':undefined} disabled={!selectedPortrait} onClick={()=>setStage(PREVIEW_STAGE)}>Review</button>
     </nav>:null}
+    {mobileGuided && <nav className="ns-mobile-progress" aria-label="Audition steps"><button type="button" aria-label="Previous step" disabled={stage === 0 && !identityReady} onClick={mobileBack}><ArrowLeft size={19} /></button><div><span>{stage === 0 ? identityReady ? 2 : 1 : stage + 2} / {ROOM_STAGE + 1}</span>{!swipeUsed && <small>Swipe left to continue</small>}</div><button type="button" aria-label="Next step" disabled={!canAdvance} onClick={mobileNext}><ArrowRight size={19} /></button></nav>}
     {mode==='design'?<>
       {audition.playing||complete?<div className="ns-scene-caption"><span className={audition.playing?'is-speaking':''}/>{audition.playing?'YOUR VOICE, IN THE ROOM':name}</div>:null}
       <LayoutGroup id="studio-primary-surface">{showWelcome?<div className="ns-welcome ns-fade-in">

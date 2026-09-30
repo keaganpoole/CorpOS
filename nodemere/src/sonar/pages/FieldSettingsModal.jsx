@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { AVAILABLE_ICONS } from '../lib/fieldConfig';
 import { normalizeOptionValue } from '../lib/leadSchema';
+import ResponsiveDialog from '../components/ResponsiveDialog';
 
 const ICON_MAP = {
   building: Building2, user: User, briefcase: Briefcase, factory: Factory,
@@ -414,11 +415,11 @@ const FieldSettingsModal = ({
     : normalizedOptions;
 
   return createPortal(
-    <motion.div
+    <ResponsiveDialog phoneOnly aria-label="Edit field"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70"
+      className="responsive-dialog field-settings-dialog fixed inset-0 z-[200] flex items-center justify-center bg-black/70"
       onClick={onClose}
     >
       <svg width="0" height="0" className="absolute">
@@ -455,6 +456,7 @@ const FieldSettingsModal = ({
             )}
             <button
               onClick={onClose}
+              aria-label="Close field settings"
               className="rounded-lg p-1.5 text-zinc-600 transition-all hover:bg-white/5 hover:text-white"
             >
               <X size={14} />
@@ -706,7 +708,7 @@ const FieldSettingsModal = ({
           </button>
         </div>
       </motion.div>
-    </motion.div>,
+    </ResponsiveDialog>,
     document.body
   );
 };

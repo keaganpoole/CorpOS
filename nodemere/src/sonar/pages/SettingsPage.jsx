@@ -1,4 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
+import useDashboardViewport from '../hooks/useDashboardViewport';
+import ResponsiveDialog from '../components/ResponsiveDialog';
+import MobileSchedule from '../components/MobileSchedule';
+import MobileUsageSummary from '../components/MobileUsageSummary';
+import MobileSheet from '../components/MobileSheet';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Settings, Building2, Phone, Bell, Calendar,
@@ -732,11 +737,11 @@ const LateHoursTermsModal = ({ isSaving = false, onAccept, onClose }) => {
   }, []);
 
   return (
-    <motion.div
+    <ResponsiveDialog
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[220] flex items-center justify-center bg-black/75 px-4 backdrop-blur-sm"
+      className="responsive-dialog settings-dialog fixed inset-0 z-[220] flex items-center justify-center bg-black/75 px-4 backdrop-blur-sm"
     >
       <motion.section
         initial={{ opacity: 0, y: 18, scale: 0.98 }}
@@ -784,11 +789,12 @@ const LateHoursTermsModal = ({ isSaving = false, onAccept, onClose }) => {
           </button>
         </div>
       </motion.section>
-    </motion.div>
+    </ResponsiveDialog>
   );
 };
 
 const SettingsScheduleBuilder = ({ value, onChange, outboundLateHoursAccepted, onOutboundLateHours }) => {
+  const { isCompact } = useDashboardViewport();
   const dragPreviewRef = useRef(null);
   const [snapMinutes, setSnapMinutes] = useState(15);
   const [colorblindMode, setColorblindMode] = useState(false);
@@ -997,7 +1003,7 @@ const SettingsScheduleBuilder = ({ value, onChange, outboundLateHoursAccepted, o
               <span className={`h-2.5 w-2.5 rounded-full bg-gradient-to-r ${layer.gradient} ${DAYS.some((day) => schedule.days[day]?.layers?.[layer.id]?.enabled) ? '' : 'opacity-30'}`} />{layer.label}
             </button>
           ))}
-          <div className="flex items-center gap-2 text-[11px] text-zinc-500">
+          <div className="responsive-schedule-snap flex items-center gap-2 text-[11px] text-zinc-500">
             <span>Snap</span>
             <SnapDropdown value={snapMinutes} onChange={setSnapMinutes} />
           </div>
@@ -1013,8 +1019,8 @@ const SettingsScheduleBuilder = ({ value, onChange, outboundLateHoursAccepted, o
       </div>
       <AnimatePresence>
         {importModalOpen ? (
-          <motion.div
-            className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm"
+          <ResponsiveDialog
+            className="responsive-dialog settings-dialog fixed inset-0 z-[70] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -1045,11 +1051,21 @@ const SettingsScheduleBuilder = ({ value, onChange, outboundLateHoursAccepted, o
                 <button type="button" onClick={importSchedule} className="h-9 rounded-lg bg-white px-3 text-xs font-semibold text-black transition hover:bg-zinc-200">Import schedule</button>
               </div>
             </motion.div>
-          </motion.div>
+          </ResponsiveDialog>
         ) : null}
       </AnimatePresence>
 
-      <div className="space-y-4 rounded-[22px] border border-white/[0.06] bg-black/20 p-4 sm:p-5">
+      {isCompact && <MobileSchedule days={DAYS}
+        tracksFor={(day) => activeLayerTypes.map((type) => ({ ...type, ...schedule.days[day].layers[type.id] }))}
+        onToggleDay={toggleDay} onToggleTrack={toggleLayer} onCopy={copyDay}
+        onRange={(day, id, start, end) => {
+          const layer = { ...schedule.days[day].layers[id], start, end };
+          updateLayer(day, id, layer);
+          if (id === 'outbound' && !outboundLateHoursAccepted && isOutboundLateHoursLayer(layer)) onOutboundLateHours?.();
+        }}
+        totals={activeLayerTypes.map((type) => `${type.label}: ${formatWeeklyHours(weeklyTotals[type.id])}`).join(' · ')}
+      />}
+      <div className="responsive-schedule-timeline space-y-4 rounded-[22px] border border-white/[0.06] bg-black/20 p-4 sm:p-5">
         <div className="flex pl-32 pr-12 text-[11px] font-mono text-zinc-600">
           <div className="relative h-5 flex-1 select-none">{[0, 4, 8, 12, 16, 20, 24].map((hour) => <span key={hour} className="absolute -translate-x-1/2" style={{ left: `${(hour / timelineHours) * 100}%` }}>{formatScheduleTime(hour)}</span>)}</div>
         </div>
@@ -1120,6 +1136,7 @@ const SettingsScheduleBuilder = ({ value, onChange, outboundLateHoursAccepted, o
 };
 
 const StaffScheduleBuilder = ({ value, onChange, businessHours, acknowledgements = {}, onAcknowledge, escalationsValue, onEscalationsChange, escalationLocked = false, onEscalationBlocked, colorblindMode = false, onColorblindModeChange }) => {
+  const { isCompact } = useDashboardViewport();
   const dragPreviewRef = useRef(null);
   const dragMovedRef = useRef(false);
   const [snapMinutes, setSnapMinutes] = useState(15);
@@ -1391,7 +1408,7 @@ const StaffScheduleBuilder = ({ value, onChange, businessHours, acknowledgements
           <span className="flex items-center gap-1.5 font-medium text-zinc-500"><CalendarClock className="h-3.5 w-3.5" /> Schedule:</span>
           <button type="button" onClick={toggleAllStaff} className={`flex items-center gap-1.5 text-[11px] font-medium transition hover:text-white ${DAYS.some((day) => schedule[day]?.enabled) ? 'text-zinc-300' : 'text-zinc-700'}`}><span className={`h-2.5 w-2.5 rounded-full bg-gradient-to-r ${scheduleLayer.gradient} ${DAYS.some((day) => schedule[day]?.enabled) ? '' : 'opacity-30'}`} />Staff Availability</button>
           {escalationsValue ? <button type="button" onClick={toggleEscalations} className={`flex items-center gap-1.5 text-[11px] font-medium transition hover:text-white ${DAYS.some((day) => escalationsSchedule[day]?.enabled) ? 'text-zinc-300' : 'text-zinc-700'} ${escalationLocked && !DAYS.some((day) => escalationsSchedule[day]?.enabled) ? 'cursor-not-allowed' : ''}`}><span className={`h-2.5 w-2.5 rounded-full bg-gradient-to-r ${escalationsLayer.gradient} ${DAYS.some((day) => escalationsSchedule[day]?.enabled) ? '' : 'opacity-30'}`} />Escalations</button> : null}
-          <div className="flex items-center gap-2 text-[11px] text-zinc-500">
+          <div className="responsive-schedule-snap flex items-center gap-2 text-[11px] text-zinc-500">
             <span>Snap</span>
             <SnapDropdown value={snapMinutes} onChange={setSnapMinutes} />
           </div>
@@ -1407,8 +1424,8 @@ const StaffScheduleBuilder = ({ value, onChange, businessHours, acknowledgements
       </div>
       <AnimatePresence>
         {importModalOpen ? (
-          <motion.div
-            className="fixed inset-0 z-[1400] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm"
+          <ResponsiveDialog
+            className="responsive-dialog settings-dialog fixed inset-0 z-[1400] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -1439,11 +1456,32 @@ const StaffScheduleBuilder = ({ value, onChange, businessHours, acknowledgements
                 <button type="button" onClick={importSchedule} className="h-9 rounded-lg bg-white px-3 text-xs font-semibold text-black transition hover:bg-zinc-200">Import schedule</button>
               </div>
             </motion.div>
-          </motion.div>
+          </ResponsiveDialog>
         ) : null}
       </AnimatePresence>
 
-      <div className="space-y-4 rounded-[22px] border border-white/[0.06] bg-black/20 p-4 sm:p-5">
+      {isCompact && <MobileSchedule days={DAYS}
+        tracksFor={(day) => [
+          { ...scheduleLayer, enabled: schedule[day].enabled, start: timeToDecimalHour(schedule[day].open, 9), end: timeToDecimalHour(schedule[day].close, 17) },
+          ...(escalationsValue ? [{ ...escalationsLayer, enabled: escalationsSchedule[day].enabled, start: timeToDecimalHour(escalationsSchedule[day].open, 9), end: timeToDecimalHour(escalationsSchedule[day].close, 17), locked: escalationLocked }] : []),
+        ]}
+        onToggleDay={toggleDayTracks} onToggleTrack={(day, track) => toggleTrack(track, day)} onCopy={copyDay}
+        onRange={(day, track, start, end) => {
+          const source = track === 'escalations' ? escalationsSchedule : schedule;
+          const nextDay = { ...source[day], open: decimalHourToTime(start), close: decimalHourToTime(end) };
+          if (track === 'escalations') {
+            if (escalationLocked) { onEscalationBlocked?.(); return; }
+            onEscalationsChange?.({ ...escalationsSchedule, [day]: nextDay });
+          } else {
+            updateDay(day, nextDay);
+            const outside = hasOutsideBusinessHours({ ...schedule, [day]: nextDay });
+            if (!outside) outsideHoursAcknowledgedRef.current = false;
+            if (outside && !outsideHoursAcknowledgedRef.current) setOutsideHoursNotice(true);
+          }
+        }}
+        totals={`Staff: ${formatWeeklyHours(weeklyHours)}${escalationsValue ? ` · Escalations: ${formatWeeklyHours(weeklyEscalationsHours)}` : ''}`}
+      />}
+      <div className="responsive-schedule-timeline space-y-4 rounded-[22px] border border-white/[0.06] bg-black/20 p-4 sm:p-5">
         <div className="flex pl-24 pr-12 text-[11px] font-mono text-zinc-600">
           <div className="relative h-5 flex-1 select-none">{[0, 4, 8, 12, 16, 20, 24].map((hour) => <span key={hour} className="absolute -translate-x-1/2" style={{ left: `${(hour / timelineHours) * 100}%` }}>{formatScheduleTime(hour)}</span>)}</div>
         </div>
@@ -1522,8 +1560,8 @@ const StaffScheduleBuilder = ({ value, onChange, businessHours, acknowledgements
       {notice ? <div className="px-1 text-right text-[10px] text-emerald-300">{notice}</div> : null}
       <AnimatePresence>
         {outsideHoursNotice ? (
-          <motion.div
-            className="fixed inset-0 z-[1400] flex items-center justify-center bg-black/70 px-5 backdrop-blur-sm"
+          <ResponsiveDialog
+            className="responsive-dialog settings-dialog fixed inset-0 z-[1400] flex items-center justify-center bg-black/70 px-5 backdrop-blur-sm"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -1561,7 +1599,7 @@ const StaffScheduleBuilder = ({ value, onChange, businessHours, acknowledgements
                 </button>
               </div>
             </motion.div>
-          </motion.div>
+          </ResponsiveDialog>
         ) : null}
       </AnimatePresence>
     </div>
@@ -1808,11 +1846,11 @@ const StaffDetailsModal = ({ staff, onClose, onEdit }) => {
   ];
 
   return (
-    <motion.div
+    <ResponsiveDialog
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[1180] flex items-center justify-center bg-black/80 p-6 backdrop-blur-xl"
+      className="responsive-dialog settings-dialog fixed inset-0 z-[1180] flex items-center justify-center bg-black/80 p-6 backdrop-blur-xl"
       onClick={onClose}
     >
       <motion.section
@@ -1889,7 +1927,7 @@ const StaffDetailsModal = ({ staff, onClose, onEdit }) => {
           </div>
         </div>
       </motion.section>
-    </motion.div>
+    </ResponsiveDialog>
   );
 };
 
@@ -1962,7 +2000,7 @@ const ServiceForm = ({ initial, onSave, onCancel }) => {
 };
 
 const SettingsServiceInfoModal = ({ title, intro, points, footer, onClose, dense = false, maxWidthClass = 'max-w-[620px]' }) => (
-  <motion.div className="fixed inset-0 z-[1300] flex items-center justify-center bg-black/70 px-5 backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onMouseDown={onClose} onClick={(event) => event.stopPropagation()}>
+  <ResponsiveDialog className="responsive-dialog settings-dialog fixed inset-0 z-[1300] flex items-center justify-center bg-black/70 px-5 backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onMouseDown={onClose} onClick={(event) => event.stopPropagation()}>
     <motion.div initial={{ opacity: 0, y: 16, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 16, scale: 0.98 }} transition={{ duration: 0.18 }} className={`relative w-full ${maxWidthClass} overflow-hidden rounded-[30px] border border-white/[0.08] bg-[#070707] shadow-[0_28px_90px_rgba(0,0,0,0.62)]`} onMouseDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()}>
       <ModalSpectrumLine variant="tips" />
       <div className="pointer-events-none absolute right-[-140px] top-[-180px] h-72 w-72 rounded-full bg-white/[0.035] blur-[72px]" />
@@ -1981,7 +2019,7 @@ const SettingsServiceInfoModal = ({ title, intro, points, footer, onClose, dense
         {footer ? <div className="relative mt-7 border-t border-white/[0.06] pt-5"><p className="max-w-[520px] text-[13px] leading-6 text-zinc-500">{footer}</p></div> : null}
       </div>
     </motion.div>
-  </motion.div>
+  </ResponsiveDialog>
 );
 
 const SettingsServiceModal = ({ initialService, industry, onClose, onSave }) => {
@@ -2002,7 +2040,7 @@ const SettingsServiceModal = ({ initialService, industry, onClose, onSave }) => 
   const toggleMagicDescription = () => setDraft((prev) => ({ ...prev, description: prev.description === serviceDescriptionMagicTemplate(prev.name, industry) ? '' : serviceDescriptionMagicTemplate(prev.name, industry) }));
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[1200] flex items-center justify-center bg-black/75 px-4 py-6 backdrop-blur-xl">
+    <ResponsiveDialog initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="responsive-dialog settings-dialog fixed inset-0 z-[1200] flex items-center justify-center bg-black/75 px-4 py-6 backdrop-blur-xl">
       <motion.section initial={{ opacity: 0, y: 18, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 18, scale: 0.98 }} className="w-full max-w-[720px] overflow-visible rounded-[30px] border border-white/[0.08] bg-[#070707] shadow-[0_28px_90px_rgba(0,0,0,0.62)]">
         <div className="flex items-start justify-between gap-4 border-b border-white/[0.05] px-6 py-5">
           <div><h2 className="text-xl font-semibold tracking-[-0.04em] text-white">{initialService ? 'Edit service' : 'Create service'}</h2><p className="mt-1 text-sm leading-6 text-zinc-500">Add a service customers can ask about or book.</p></div>
@@ -2028,11 +2066,11 @@ const SettingsServiceModal = ({ initialService, industry, onClose, onSave }) => 
         <div className="flex items-center justify-end gap-3 border-t border-white/[0.05] px-6 py-5"><button type="button" onClick={onClose} className="h-11 rounded-full px-8 text-sm font-normal text-zinc-500 transition hover:text-white">Cancel</button><button type="button" onClick={() => onSave(draft)} disabled={!draft.name.trim()} className="flex h-11 min-w-[170px] items-center justify-center gap-2 rounded-full bg-white px-8 text-sm font-bold text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-40"><Check className="h-4 w-4" /><span>Save service</span></button></div>
       </motion.section>
       <AnimatePresence>
-        {descriptionEditorOpen ? <motion.div className="fixed inset-0 z-[1300] flex items-center justify-center bg-black/70 px-5 backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onMouseDown={() => setDescriptionEditorOpen(false)}><motion.div initial={{ opacity: 0, y: 16, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 16, scale: 0.98 }} transition={{ duration: 0.18 }} className="w-full max-w-[760px] overflow-hidden rounded-[30px] border border-white/[0.08] bg-[#070707] shadow-[0_28px_90px_rgba(0,0,0,0.62)]" onMouseDown={(event) => event.stopPropagation()}><div className="flex items-start justify-between gap-4 border-b border-white/[0.05] px-6 py-5"><div><p className="mb-2 text-[10px] font-bold uppercase tracking-[0.22em] text-zinc-600">Service description</p><h2 className="text-xl font-semibold tracking-[-0.04em] text-white">Edit full description</h2></div><button type="button" onClick={() => setDescriptionEditorOpen(false)} className="flex h-8 w-8 shrink-0 items-center justify-center text-zinc-600 transition hover:text-white" aria-label="Close description editor"><X className="h-4 w-4" /></button></div><div className="p-6"><textarea value={draft.description} onChange={(event) => setDraftValue('description', event.target.value)} placeholder="Describe what this service includes and what customers should expect." autoFocus className={`${settingsFieldClass} h-[420px] resize-none py-4 leading-6`} /></div><div className="flex items-center justify-end border-t border-white/[0.05] px-6 py-5"><button type="button" onClick={() => setDescriptionEditorOpen(false)} className="h-11 rounded-full bg-white px-8 text-sm font-bold text-black transition hover:bg-zinc-200">Done</button></div></motion.div></motion.div> : null}
+        {descriptionEditorOpen ? <ResponsiveDialog className="responsive-dialog settings-dialog fixed inset-0 z-[1300] flex items-center justify-center bg-black/70 px-5 backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onMouseDown={() => setDescriptionEditorOpen(false)}><motion.div initial={{ opacity: 0, y: 16, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 16, scale: 0.98 }} transition={{ duration: 0.18 }} className="w-full max-w-[760px] overflow-hidden rounded-[30px] border border-white/[0.08] bg-[#070707] shadow-[0_28px_90px_rgba(0,0,0,0.62)]" onMouseDown={(event) => event.stopPropagation()}><div className="flex items-start justify-between gap-4 border-b border-white/[0.05] px-6 py-5"><div><p className="mb-2 text-[10px] font-bold uppercase tracking-[0.22em] text-zinc-600">Service description</p><h2 className="text-xl font-semibold tracking-[-0.04em] text-white">Edit full description</h2></div><button type="button" onClick={() => setDescriptionEditorOpen(false)} className="flex h-8 w-8 shrink-0 items-center justify-center text-zinc-600 transition hover:text-white" aria-label="Close description editor"><X className="h-4 w-4" /></button></div><div className="p-6"><textarea value={draft.description} onChange={(event) => setDraftValue('description', event.target.value)} placeholder="Describe what this service includes and what customers should expect." autoFocus className={`${settingsFieldClass} h-[420px] resize-none py-4 leading-6`} /></div><div className="flex items-center justify-end border-t border-white/[0.05] px-6 py-5"><button type="button" onClick={() => setDescriptionEditorOpen(false)} className="h-11 rounded-full bg-white px-8 text-sm font-bold text-black transition hover:bg-zinc-200">Done</button></div></motion.div></ResponsiveDialog> : null}
         {serviceDetailsHelpOpen ? <SettingsServiceInfoModal dense maxWidthClass="max-w-[480px]" title="Billing units" intro="Use this to tell your receptionist how the service is normally priced or discussed when customers ask about cost." points={[{ title: 'Session.', body: 'Each appointment or visit has its own price.' }, { title: 'Hourly.', body: 'Price is based on the amount of time worked.' }, { title: 'Weekly.', body: 'Price is charged per week.' }, { title: 'Monthly.', body: 'Price is charged per month.' }, { title: 'Yearly.', body: 'Price is charged per year.' }]} onClose={() => setServiceDetailsHelpOpen(false)} /> : null}
         {descriptionHelpOpen ? <SettingsServiceInfoModal title="Write a useful service description" intro="A good description helps your receptionist understand when this service fits, how to answer questions about it, and what next step to recommend." points={[{ title: 'Focus on fit.', body: 'Explain what the service is for, when someone needs it, and what outcome they can expect.' }, { title: 'Stay concise.', body: 'One clear paragraph is usually enough. Pricing and billing details live in their own fields.' }, { title: 'Example:', body: exampleService.serviceDescription(exampleService.serviceName).split('\n\n')[0].replace('Service overview:\n', '') }]} footer="Keep it practical: what it is, when it applies, and anything else your receptionist should know about it." onClose={() => setDescriptionHelpOpen(false)} /> : null}
       </AnimatePresence>
-    </motion.div>
+    </ResponsiveDialog>
   );
 };
 
@@ -2200,7 +2238,7 @@ const ServicesManager = ({ businessId, ensureBusinessRecord, onBusinessLinked, i
 
   // ServiceForm is defined outside to prevent React state resets
   return (
-    <div className="border border-white/[0.04] rounded-2xl bg-gradient-to-b from-zinc-950/40 to-transparent overflow-hidden">
+    <div className="settings-services border border-white/[0.04] rounded-2xl bg-gradient-to-b from-zinc-950/40 to-transparent overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between gap-4 px-5 py-4 border-b border-white/[0.03]">
         <p className="text-[12px] font-medium text-zinc-600">
@@ -2220,7 +2258,7 @@ const ServicesManager = ({ businessId, ensureBusinessRecord, onBusinessLinked, i
 
       <AnimatePresence>
         {importModalOpen ? (
-          <motion.div className="fixed inset-0 z-[1300] flex items-center justify-center bg-black/70 px-5 backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onMouseDown={() => !importing && setImportModalOpen(false)}>
+          <ResponsiveDialog className="responsive-dialog settings-dialog fixed inset-0 z-[1300] flex items-center justify-center bg-black/70 px-5 backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onMouseDown={() => !importing && setImportModalOpen(false)}>
             <motion.div className="w-full max-w-[620px] overflow-hidden rounded-[28px] border border-white/[0.08] bg-[#070707] shadow-[0_28px_90px_rgba(0,0,0,0.62)]" initial={{ opacity: 0, y: 16, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 16, scale: 0.98 }} onMouseDown={(event) => event.stopPropagation()}>
               <div className="flex items-start justify-between gap-4 border-b border-white/[0.05] px-6 py-5">
                 <div><p className="mb-2 text-[10px] font-bold uppercase tracking-[0.22em] text-zinc-600">Services & Pricing</p><h2 className="text-xl font-semibold tracking-[-0.04em] text-white">Import services</h2><p className="mt-2 text-sm leading-6 text-zinc-500">Paste a JSON array of services to add them to this business.</p></div>
@@ -2232,7 +2270,7 @@ const ServicesManager = ({ businessId, ensureBusinessRecord, onBusinessLinked, i
               </div>
               <div className="flex items-center justify-end gap-3 border-t border-white/[0.05] px-6 py-5"><button type="button" onClick={() => setImportModalOpen(false)} disabled={importing} className="h-10 rounded-full px-5 text-sm text-zinc-500 transition hover:text-white disabled:opacity-40">Cancel</button><button type="button" onClick={() => { setImporting(true); importServices(); }} disabled={importing || !importText.trim()} className="h-10 rounded-full bg-white px-6 text-sm font-bold text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-40">{importing ? 'Importing...' : 'Import services'}</button></div>
             </motion.div>
-          </motion.div>
+          </ResponsiveDialog>
         ) : null}
       </AnimatePresence>
 
@@ -2249,14 +2287,14 @@ const ServicesManager = ({ businessId, ensureBusinessRecord, onBusinessLinked, i
           </div>
         ) : (
           <div className="overflow-hidden rounded-[22px] border border-white/[0.05] bg-black/10">
-            <div className="grid grid-cols-[minmax(0,1fr)_130px_72px] items-center gap-5 border-b border-white/[0.04] px-5 py-3 text-[10px] font-medium uppercase tracking-[0.18em] text-zinc-700 max-sm:hidden">
+            <div className="settings-service-heading grid grid-cols-[minmax(0,1fr)_130px_72px] items-center gap-5 border-b border-white/[0.04] px-5 py-3 text-[10px] font-medium uppercase tracking-[0.18em] text-zinc-700 max-sm:hidden">
               <div>Service</div>
               <div>Price</div>
               <div className="text-right">Actions</div>
             </div>
             <div className="custom-scrollbar max-h-[360px] divide-y divide-white/[0.035] overflow-y-auto">
               {services.map((service) => (
-                <div key={service.id} className="grid cursor-pointer grid-cols-[minmax(0,1fr)_130px_72px] items-center gap-5 px-5 py-2.5 transition hover:bg-white/[0.018] max-sm:grid-cols-[minmax(0,1fr)_64px] max-sm:gap-3" onClick={() => setAddForm(service)}>
+                <div key={service.id} className="settings-service-row grid cursor-pointer grid-cols-[minmax(0,1fr)_130px_72px] items-center gap-5 px-5 py-2.5 transition hover:bg-white/[0.018] max-sm:grid-cols-[minmax(0,1fr)_64px] max-sm:gap-3" onClick={() => setAddForm(service)}>
                   <div className="flex min-w-0 items-center gap-3 leading-none">
                     <span className="flex shrink-0 items-center truncate text-sm font-medium leading-none text-zinc-100">{service.name || 'Untitled service'}</span>
                     {service.description ? <span className="flex min-w-0 items-center truncate text-[11px] leading-none text-zinc-700">{service.description}</span> : null}
@@ -2740,11 +2778,11 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
 
       <AnimatePresence>
         {deleteStaffTarget && (
-          <motion.div
+          <ResponsiveDialog
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[1250] flex items-center justify-center p-8 bg-black/80 backdrop-blur-md"
+            className="responsive-dialog settings-dialog fixed inset-0 z-[1250] flex items-center justify-center p-8 bg-black/80 backdrop-blur-md"
             onClick={() => setDeleteStaffTarget(null)}
           >
             <motion.div
@@ -2788,17 +2826,17 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
                 </div>
               </div>
             </motion.div>
-          </motion.div>
+          </ResponsiveDialog>
         )}
       </AnimatePresence>
 
       <AnimatePresence>
         {isModalOpen && (
-          <motion.div
+          <ResponsiveDialog
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[1200] flex items-center justify-center bg-black/80 p-6 backdrop-blur-xl"
+            className="responsive-dialog settings-dialog fixed inset-0 z-[1200] flex items-center justify-center bg-black/80 p-6 backdrop-blur-xl"
             onClick={closeModal}
           >
             <motion.section
@@ -3016,7 +3054,7 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
                 </motion.div>
               )}
             </AnimatePresence>
-          </motion.div>
+          </ResponsiveDialog>
         )}
       </AnimatePresence>
     </div>
@@ -3255,7 +3293,7 @@ const KnowledgeBaseEditor = ({ value, onChange, industry }) => {
 
   return (
     <div className="border border-white/[0.04] rounded-2xl bg-gradient-to-b from-zinc-950/40 to-transparent overflow-hidden">
-      <div className="flex items-center gap-1 px-4 py-3 border-b border-white/[0.03] overflow-x-auto">
+      <div className="settings-knowledge-tabs flex items-center gap-1 px-4 py-3 border-b border-white/[0.03] overflow-x-auto">
         {tabs.map((tab) => {
           const TabIcon = tab.icon;
           const isActive = activeTab === tab.key;
@@ -3364,7 +3402,7 @@ const KNOWLEDGE_TIPS = {
 const KnowledgeTipsModal = ({ activeTab, onClose }) => {
   const tips = KNOWLEDGE_TIPS[activeTab] || KNOWLEDGE_TIPS.about;
   return (
-    <motion.div className="fixed inset-0 z-[220] flex items-center justify-center bg-black/70 px-5 backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onMouseDown={onClose}>
+    <ResponsiveDialog className="responsive-dialog settings-dialog fixed inset-0 z-[220] flex items-center justify-center bg-black/70 px-5 backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onMouseDown={onClose}>
         <motion.div initial={{ opacity: 0, y: 16, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 16, scale: 0.98 }} transition={{ duration: 0.18 }} className="relative w-full max-w-[620px] overflow-hidden rounded-[30px] border border-white/[0.08] bg-[#070707] shadow-[0_28px_90px_rgba(0,0,0,0.62)]" onMouseDown={(event) => event.stopPropagation()}>
         <ModalSpectrumLine variant="tips" />
         <div className="pointer-events-none absolute right-[-140px] top-[-180px] h-72 w-72 rounded-full bg-white/[0.035] blur-[72px]" />
@@ -3388,7 +3426,7 @@ const KnowledgeTipsModal = ({ activeTab, onClose }) => {
           <p className="mt-7 border-t border-white/[0.06] pt-5 text-sm leading-6 text-zinc-400">{tips.footer}</p>
         </div>
       </motion.div>
-    </motion.div>
+    </ResponsiveDialog>
   );
 };
 
@@ -3473,7 +3511,7 @@ const BusinessForwardingSettings = ({ authSession }) => {
     <>
       <div className="space-y-4">
         <div className="rounded-[24px] border border-white/[0.05] bg-zinc-950/40 p-5">
-          <div className="flex items-start justify-between gap-5">
+          <div className="settings-action-card-header flex items-start justify-between gap-5">
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <PhoneCall size={15} className="settings-icon" />
@@ -3553,7 +3591,7 @@ const BillingSettings = ({ profile }) => {
   return (
     <div className="space-y-4">
       <div className="rounded-[24px] border border-white/[0.05] bg-zinc-950/40 p-5">
-        <div className="flex items-start justify-between gap-5">
+        <div className="settings-action-card-header flex items-start justify-between gap-5">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <CreditCard size={15} className="settings-icon" />
@@ -3593,7 +3631,7 @@ const BillingSettings = ({ profile }) => {
   );
 };
 
-const SettingsPage = () => {
+const SettingsPage = ({ mobileUsage, onMobileUpgrade }) => {
   const { session: authSession, profile, refreshProfile, workforce } = useAuth();
   const { previewNotification } = useNest();
   const [settings, setSettings] = useState(defaultSettings);
@@ -3606,6 +3644,31 @@ const SettingsPage = () => {
   const [scheduleHelpOpen, setScheduleHelpOpen] = useState(false);
   const [openNestNotificationGroups, setOpenNestNotificationGroups] = useState({});
   const [activeSection, setActiveSection] = useState('business');
+  const { isPhone } = useDashboardViewport();
+  const mobileSectionRef = useRef(null);
+  useEffect(() => { if (isPhone) mobileSectionRef.current?.scrollTo({ top: 0 }); }, [activeSection, isPhone]);
+  const [savedSnapshot, setSavedSnapshot] = useState(null);
+  const [pendingMobileNavigation, setPendingMobileNavigation] = useState(null);
+  const settingsSnapshot = JSON.stringify({ ...settings, id: undefined, _business_id: undefined });
+  const mobileDirty = isPhone && savedSnapshot !== null && settingsSnapshot !== savedSnapshot;
+  useEffect(() => { if (!loading && savedSnapshot === null) setSavedSnapshot(settingsSnapshot); }, [loading, savedSnapshot, settingsSnapshot]);
+  useEffect(() => {
+    const select = (event) => {
+      const section = event?.detail || sessionStorage.getItem('sonar-settings-section');
+      if (['account', 'billing'].includes(section)) setActiveSection(section);
+      sessionStorage.removeItem('sonar-settings-section');
+    };
+    select(); window.addEventListener('sonar:settings-section', select);
+    return () => window.removeEventListener('sonar:settings-section', select);
+  }, []);
+  useEffect(() => {
+    if (!mobileDirty) return;
+    const unload = (event) => { event.preventDefault(); event.returnValue = ''; };
+    const navigate = (event) => { event.preventDefault(); setPendingMobileNavigation(() => event.detail?.resume || null); };
+    window.addEventListener('beforeunload', unload);
+    window.addEventListener('sonar:before-navigate', navigate);
+    return () => { window.removeEventListener('beforeunload', unload); window.removeEventListener('sonar:before-navigate', navigate); };
+  }, [mobileDirty, savedSnapshot]);
   const [businessAvatarUploading, setBusinessAvatarUploading] = useState(false);
   const businessAvatarInputRef = useRef(null);
   const outboundLateHoursAccepted = hasAcceptedOutboundLateHoursTerms(profile);
@@ -3851,6 +3914,7 @@ const SettingsPage = () => {
       }));
 
       setSavedFlash(true);
+      setSavedSnapshot(settingsSnapshot);
       setTimeout(() => setSavedFlash(false), 2000);
     } catch (err) {
       console.error("SettingsPage.jsx:event_3505");
@@ -4045,7 +4109,7 @@ const SettingsPage = () => {
       case 'forwarding':
         return <BusinessForwardingSettings authSession={authSession} />;
       case 'billing':
-        return <BillingSettings profile={profile} />;
+        return <>{isPhone && <MobileUsageSummary usage={mobileUsage} onUpgrade={onMobileUpgrade} />}<BillingSettings profile={profile} /></>;
       case 'account':
         return (
           <AccountLifecycleSection
@@ -4279,7 +4343,8 @@ const SettingsPage = () => {
 
       {/* ─── Header ─────────────────────────────────────────────────────── */}
       <header className="shrink-0 flex items-center justify-end px-8 pb-2 pt-8">
-        <button
+        {isPhone && <label className="settings-mobile-section"><span className="sr-only">Settings section</span><select aria-label="Settings section" value={activeSection} onChange={(event) => setActiveSection(event.target.value)}>{settingsSections.map((section) => <option value={section.id} key={section.id}>{section.title}</option>)}</select></label>}
+        {!isPhone && <button
           onClick={handleSave}
           disabled={saving}
           className="settings-neutral-button relative flex min-w-[72px] items-center justify-center px-5 py-2.5 rounded-xl text-[11px] font-bold uppercase tracking-wider transition-all active:scale-95"
@@ -4308,7 +4373,7 @@ const SettingsPage = () => {
               </motion.span>
             )}
           </AnimatePresence>
-        </button>
+        </button>}
       </header>
 
       {/* ─── Error Banner ───────────────────────────────────────────────── */}
@@ -4320,6 +4385,11 @@ const SettingsPage = () => {
       )}
 
       {/* ─── Content ────────────────────────────────────────────────────── */}
+      {isPhone && pendingMobileNavigation && <MobileSheet title="Unsaved changes" onClose={() => setPendingMobileNavigation(null)} footer={<><button type="button" className="dashboard-mobile-outline" onClick={() => setPendingMobileNavigation(null)}>Keep editing</button><button type="button" className="dashboard-mobile-primary" onClick={() => { setSettings(current => ({ ...current, ...JSON.parse(savedSnapshot) })); setPendingMobileNavigation(null); pendingMobileNavigation(); }}>Discard changes</button></>}><p className="text-sm text-zinc-400">Leave without saving your settings?</p></MobileSheet>}
+      {isPhone && <AnimatePresence>{mobileDirty && <motion.div className="mobile-settings-save" style={{ order: 3 }} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 12 }} transition={{ duration: .18 }}>
+        {error && <p role="alert">{error}</p>}
+        <button type="button" className="dashboard-mobile-primary" disabled={saving} onClick={handleSave}>{saving ? 'Saving…' : 'Save changes'}</button>
+      </motion.div>}</AnimatePresence>}
       <div className="flex-1 overflow-hidden px-8 pb-6 pt-3">
         <div className="mx-auto grid h-full max-w-6xl grid-cols-[260px_minmax(0,1fr)] gap-5">
           <aside className="rounded-[28px] border border-white/[0.05] bg-zinc-950/30 p-3">
@@ -4351,7 +4421,7 @@ const SettingsPage = () => {
             </nav>
           </aside>
 
-          <section className="min-h-0 overflow-auto custom-scrollbar rounded-[28px] border border-white/[0.05] bg-gradient-to-b from-zinc-950/40 to-transparent p-6">
+          <section ref={mobileSectionRef} className="min-h-0 overflow-auto custom-scrollbar rounded-[28px] border border-white/[0.05] bg-gradient-to-b from-zinc-950/40 to-transparent p-6">
             <div className="mb-6 flex items-center justify-between gap-4 border-b border-white/[0.04] pb-5">
               <div className="flex min-w-0 items-center gap-3">
                 <div>

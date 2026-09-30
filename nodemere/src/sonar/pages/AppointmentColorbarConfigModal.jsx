@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
+import ResponsiveDialog from '../components/ResponsiveDialog';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   X, Plus, Trash2, Play, Palette, Sparkles, Check, GripVertical,
@@ -236,7 +237,7 @@ const ConditionRow = ({ condition, index, onChange, onRemove, canRemove, fields 
   ];
 
   return (
-    <div className="flex items-center gap-2 bg-white/[0.02] border border-white/[0.04] rounded-xl px-3 py-2 group/cond">
+    <div className="colorbar-condition flex items-center gap-2 bg-white/[0.02] border border-white/[0.04] rounded-xl px-3 py-2 group/cond">
       {/* Field */}
       <StudioSelect
         value={fieldKey}
@@ -324,13 +325,13 @@ const RuleEditor = ({ rule, onChange, onRemove, fields }) => {
         </div>
 
         {/* Toggle enabled */}
-        <button onClick={e => { e.stopPropagation(); updateRule({ enabled: !rule.enabled }); }}
+        <button role="switch" aria-label="Enable colorbar rule" aria-checked={rule.enabled} onClick={e => { e.stopPropagation(); updateRule({ enabled: !rule.enabled }); }}
           className={`w-8 h-5 rounded-full transition-all relative ${rule.enabled ? 'dashboard-toggle-active' : 'bg-zinc-800'}`}>
           <div className={`absolute top-0.5 w-4 h-4 rounded-full transition-all ${rule.enabled ? 'left-3.5 bg-white' : 'left-0.5 bg-zinc-600'}`} />
         </button>
 
         {/* Expand / Delete */}
-        <button onClick={e => { e.stopPropagation(); onRemove(); }} className="p-1.5 rounded-lg text-zinc-700 hover:text-rose-400 hover:bg-rose-500/10 transition-all">
+        <button aria-label="Remove colorbar rule" onClick={e => { e.stopPropagation(); onRemove(); }} className="p-1.5 rounded-lg text-zinc-700 hover:text-rose-400 hover:bg-rose-500/10 transition-all">
           <Trash2 size={12} />
         </button>
         {expanded ? <ChevronUp size={12} className="text-zinc-700" /> : <ChevronDown size={12} className="text-zinc-700" />}
@@ -498,9 +499,9 @@ const AppointmentColorbarConfigModal = ({ onClose, onRulesChange, columns = [], 
   };
 
   return createPortal(
-    <motion.div
+    <ResponsiveDialog phoneOnly aria-label="Appointment Colorbar Studio"
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70"
+      className="responsive-dialog colorbar-dialog fixed inset-0 z-[200] flex items-center justify-center bg-black/70"
       onClick={onClose}
     >
       <motion.div
@@ -570,7 +571,7 @@ const AppointmentColorbarConfigModal = ({ onClose, onRulesChange, columns = [], 
           </div>
         </div>
       </motion.div>
-    </motion.div>,
+    </ResponsiveDialog>,
     document.body
   );
 };

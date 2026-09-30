@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { AudioLines, Pause, Play, X } from 'lucide-react';
+import useDashboardViewport from '../hooks/useDashboardViewport';
+import IntercomVoiceLine from '../nest/IntercomVoiceLine';
 
 const AudioPlayerContext = createContext(null);
 
@@ -120,13 +122,14 @@ export const useAudioPlayer = () => {
 };
 
 export const PersistentAudioPlayer = () => {
+  const { isPhone } = useDashboardViewport();
   const { track, isPlaying, currentTime, duration, toggleTrack, seek, stop } = useAudioPlayer();
   if (!track) return null;
 
   const progress = duration > 0 ? Math.min(1, currentTime / duration) : 0;
 
   return (
-    <div className="fixed bottom-5 left-4 right-4 z-[80] rounded-2xl border border-white/[0.08] bg-[#080808]/95 px-4 py-3 shadow-[0_20px_70px_rgba(0,0,0,0.65)] backdrop-blur-xl xl:left-[264px] xl:right-[344px]">
+    <div className="dashboard-persistent-player fixed bottom-5 left-4 right-4 z-[80] rounded-2xl border border-white/[0.08] bg-[#080808]/95 px-4 py-3 shadow-[0_20px_70px_rgba(0,0,0,0.65)] backdrop-blur-xl xl:left-[264px] xl:right-[344px]">
       <div className="flex items-center gap-3">
         <button
           type="button"
@@ -148,7 +151,7 @@ export const PersistentAudioPlayer = () => {
                   </linearGradient>
                 </defs>
               </svg>
-              <AudioLines size={14} style={{ stroke: 'url(#audioPlayerBrandGradient)' }} />
+              {isPhone ? <span className="mobile-persistent-audio-lines"><IntercomVoiceLine enabled={isPlaying} level={isPlaying ? .06 : 0} /></span> : <AudioLines size={14} style={{ stroke: 'url(#audioPlayerBrandGradient)' }} />}
             </span>
             <span className="truncate text-[12px] font-bold text-white">{track.title || 'Call recording'}</span>
             {track.subtitle && <span className="hidden truncate text-[11px] font-medium text-zinc-500 sm:block">{track.subtitle}</span>}

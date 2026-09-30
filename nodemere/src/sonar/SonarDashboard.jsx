@@ -82,6 +82,11 @@ import { NestProvider } from './nest/NestRuntime';
 import NestDock from './nest/NestDock';
 import { useAuth } from '../contexts/AuthContext';
 import logoImage from '../assets/logo.png';
+import useDashboardViewport from './hooks/useDashboardViewport';
+import MobileNavigation from './components/MobileNavigation';
+import MobileTeamCarousel from './components/MobileTeamCarousel';
+import './dashboard-responsive.css';
+import './dashboard-phone.css';
 
 const DASHBOARD_ROUTE_STORAGE_KEY = 'sonar-dashboard-route';
 
@@ -707,6 +712,8 @@ const CallHandlingIcon = ({ direction }) => {
   );
 };
 
+const TeamCards = ({ phone, children }) => phone ? <MobileTeamCarousel>{children}</MobileTeamCarousel> : <motion.div className="grid grid-cols-[repeat(auto-fill,340px)] items-start justify-start gap-6" variants={teamGridVariants}>{children}</motion.div>;
+
 const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = null, onOpenMarketplace, onOpenScenarios, onUpdateDirection, onTerminate, compact = false, slim = false }) => {
   const borderClass = isActive ? 'border-[color-mix(in_srgb,var(--brandGradientStart)_14%,transparent)] shadow-[0_0_10px_color-mix(in_srgb,var(--brandGradientStart)_1.5%,transparent)]' : 'border-white/[0.04]';
   const pending = pendingModel?.agentId === agent.id ? pendingModel.model : null;
@@ -735,7 +742,7 @@ const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = nul
     <motion.div
       initial={{ opacity: 0, scale: 0.98 }}
       animate={{ opacity: 1, scale: 1 }}
-      className={`box-border shrink-0 bg-[#0A0A0A] border ${borderClass} rounded-[28px] ${cardWidthClass} flex flex-col hover:border-white/10 transition-colors duration-300 relative group overflow-hidden`}
+      className={`team-receptionist-card box-border shrink-0 bg-[#0A0A0A] border ${borderClass} rounded-[28px] ${cardWidthClass} flex flex-col hover:border-white/10 transition-colors duration-300 relative group overflow-hidden`}
     >
       <div className={`relative ${imageHeightClass} overflow-hidden rounded-t-[28px]`}>
         <img
@@ -1148,7 +1155,7 @@ const PopupModal = ({ popup, profile, onClose }) => {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[1400] flex items-center justify-center bg-black/55 p-6 backdrop-blur-[2px]"
+          className="responsive-dialog fixed inset-0 z-[1400] flex items-center justify-center bg-black/55 p-6 backdrop-blur-[2px]"
           onClick={onClose}
         >
             <motion.section
@@ -1298,7 +1305,7 @@ const TasklistWidget = ({ tasklistState = null, onOpenIntro = null, onHide = nul
           </linearGradient>
         </defs>
       </svg>
-      <div className="fixed bottom-6 right-6 z-[1100] flex w-[min(328px,calc(100vw-48px))] flex-col items-end">
+      <div className="dashboard-setup-widget fixed bottom-6 right-6 z-[1100] flex w-[min(328px,calc(100vw-48px))] flex-col items-end">
         <AnimatePresence mode="wait" initial={false}>
           {open ? (
             <motion.div
@@ -1625,7 +1632,7 @@ const AccountDropdown = ({ profile, usage, isOpen, onToggle, onClose, onOpenSett
             exit={{ opacity: 0, y: -6, scale: 0.98 }}
             transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
             style={{ top: menuPosition.top, right: menuPosition.right }}
-            className="fixed z-[2147483647] w-[276px] overflow-hidden rounded-2xl border border-white/[0.075] bg-[#080808]/95 shadow-[0_24px_80px_rgba(0,0,0,0.85)] backdrop-blur-xl"
+            className="responsive-account-menu fixed z-[2147483647] w-[276px] overflow-hidden rounded-2xl border border-white/[0.075] bg-[#080808]/95 shadow-[0_24px_80px_rgba(0,0,0,0.85)] backdrop-blur-xl"
           >
             <div className="relative border-b border-white/[0.06] px-4 py-4">
               <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
@@ -1752,8 +1759,15 @@ const AccountDropdown = ({ profile, usage, isOpen, onToggle, onClose, onOpenSett
 };
 
 const SonarDashboard = () => {
+  const { isPhone, isCompact } = useDashboardViewport();
   const { session: authSession, profile, refreshProfile, workforce } = useAuth();
   const [currentRoute, setCurrentRoute] = useState(getInitialDashboardRoute);
+  const responsiveEnabled = currentRoute !== 'scenarios';
+  useEffect(() => {
+    if (responsiveEnabled && isCompact) document.body.dataset.nodemereResponsive = 'true';
+    else delete document.body.dataset.nodemereResponsive;
+    return () => { delete document.body.dataset.nodemereResponsive; };
+  }, [responsiveEnabled, isCompact]);
   const [mountedRoutes, setMountedRoutes] = useState([currentRoute]);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [marketplaceAgent, setMarketplaceAgent] = useState(null);
@@ -1782,7 +1796,9 @@ const SonarDashboard = () => {
   }, []);
   const leaveStudio = useCallback(() => requestStudioExit(() => { studioDirty.current = false; setTeamExperience('team'); }), [requestStudioExit]);
   const navigateDashboard = route => {
-    requestStudioExit(() => { studioDirty.current = false; setTeamExperience('team'); setCurrentRoute(route); });
+    const resume = () => requestStudioExit(() => { studioDirty.current = false; setTeamExperience('team'); setCurrentRoute(route); });
+    if (isPhone && route !== currentRoute && !window.dispatchEvent(new CustomEvent('sonar:before-navigate', { cancelable: true, detail: { resume } }))) return;
+    resume();
   };
   useEffect(() => {
     if (teamExperience !== 'studio') return;
@@ -1815,8 +1831,10 @@ const SonarDashboard = () => {
   const [terminateAgent, setTerminateAgent] = useState(null);
   const [teamActionError, setTeamActionError] = useState('');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
+  const railCollapsed = sidebarCollapsed || (responsiveEnabled && isCompact);
   const [staffBusinessId, setStaffBusinessId] = useState(null);
   const [businessUsage, setBusinessUsage] = useState(null);
+  const [mobileBusiness, setMobileBusiness] = useState(null);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [reportProblemOpen, setReportProblemOpen] = useState(false);
   const [teamView, setTeamView] = useState('receptionists');
@@ -2015,6 +2033,13 @@ const SonarDashboard = () => {
       if (data) setBusinessUsage((current) => ({ ...(current || {}), ...data }));
     });
   }, [userId]);
+
+  useEffect(() => {
+    if (!isPhone || !userId) return;
+    let active = true;
+    api.getBusinessProfile().then((data) => { if (active) setMobileBusiness(data); }).catch(() => {});
+    return () => { active = false; };
+  }, [isPhone, userId]);
 
   useEffect(() => {
     if (!staffBusinessId) return undefined;
@@ -2350,7 +2375,7 @@ const SonarDashboard = () => {
                 <CubePreloader />
               </div>
             ) : null}
-            <div className="shrink-0 px-10 pb-3 pt-8 flex items-center justify-between">
+            <div className="team-toolbar shrink-0 px-10 pb-3 pt-8 flex items-center justify-between">
               <div className="flex items-center gap-5">
                 <div className="flex rounded-xl border border-white/[0.08] bg-white/[0.02] p-1">
                   <button
@@ -2376,10 +2401,10 @@ const SonarDashboard = () => {
               <div className="flex items-center gap-3">
                 {teamView === 'receptionists' ? (
                   <>
-                    <button onClick={() => setShowReceptionistChoice(true)} className="dashboard-neutral-button flex items-center gap-2 px-5 py-2.5 rounded-xl text-[11px] font-bold tracking-wider transition-all active:scale-95">New Receptionist</button>
+                    <button aria-label="New Receptionist" onClick={() => setShowReceptionistChoice(true)} className={isPhone ? 'mobile-floating-add' : 'dashboard-neutral-button flex items-center gap-2 px-5 py-2.5 rounded-xl text-[11px] font-bold tracking-wider transition-all active:scale-95'}>{isPhone ? <Plus size={24} /> : 'New Receptionist'}</button>
                   </>
                 ) : teamView === 'staff' ? (
-                  <button onClick={() => window.dispatchEvent(new CustomEvent('team:open-staff-modal'))} className="dashboard-neutral-button flex items-center gap-2 px-5 py-2.5 rounded-xl text-[11px] font-bold tracking-wider transition-all active:scale-95">New Staff Member</button>
+                  <button aria-label="New Staff Member" onClick={() => window.dispatchEvent(new CustomEvent('team:open-staff-modal'))} className={isPhone ? 'mobile-floating-add' : 'dashboard-neutral-button flex items-center gap-2 px-5 py-2.5 rounded-xl text-[11px] font-bold tracking-wider transition-all active:scale-95'}>{isPhone ? <Plus size={24} /> : 'New Staff Member'}</button>
                 ) : null}
               </div>
             </div>
@@ -2412,7 +2437,7 @@ const SonarDashboard = () => {
                     </div>
                   </div>
                 ) : (
-                  <motion.div className="grid grid-cols-[repeat(auto-fill,340px)] items-start justify-start gap-6" variants={teamGridVariants}>
+                  <TeamCards phone={isPhone}>
                     {[...enrichedAgents].sort((a, b) => new Date(b.hired_at) - new Date(a.hired_at)).map(agent => {
                       const reactionsMap = {};
                       for (const r of (reactions || [])) reactionsMap[r.agent_name] = r;
@@ -2432,7 +2457,7 @@ const SonarDashboard = () => {
                         </motion.div>
                       );
                     })}
-                  </motion.div>
+                  </TeamCards>
                 )}
               </motion.div>
               <motion.div
@@ -2572,7 +2597,7 @@ const SonarDashboard = () => {
       case 'live-monitoring':
         return <BusinessIntelligenceReport />;
       case 'settings':
-        return <SettingsPage />;
+        return <SettingsPage mobileUsage={businessUsage} onMobileUpgrade={() => { window.location.href = '/pricing'; }} />;
       case 'calendar':
         return <CalendarPage onToolbarMetaChange={setCalendarToolbarMeta} />;
       case 'call-logs':
@@ -2593,7 +2618,7 @@ const SonarDashboard = () => {
       businessId={staffBusinessId || businessUsage?.business_id || profile?.business_id}
       tasklistState={backendTasklistState}
     >
-    <div className="sonar-dashboard-shell flex flex-col h-screen bg-[#020202] text-zinc-100 font-sans selection:bg-cyan-500/30 overflow-hidden">
+    <div data-responsive={responsiveEnabled} data-studio={currentRoute === 'receptionists' && teamExperience !== 'team'} className="sonar-dashboard-shell flex flex-col h-screen bg-[#020202] text-zinc-100 font-sans selection:bg-cyan-500/30 overflow-hidden">
       <style>{`
         .snap-x { scroll-snap-type: x proximity; }
         body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; letter-spacing: -0.015em; }
@@ -2655,8 +2680,8 @@ const SonarDashboard = () => {
           description="Source-aware project report"
         />
 
-        <NestDock businessAvatar={businessUsage?.avatar || ''} onStageChange={setNestStageExpanded} />
-        <div className="ml-auto flex items-center">
+        <NestDock mobile={isPhone && responsiveEnabled} businessAvatar={businessUsage?.avatar || ''} onStageChange={setNestStageExpanded} />
+        <div className="dashboard-account-controls ml-auto flex items-center">
           <button
             type="button"
             onClick={() => {
@@ -2696,9 +2721,9 @@ const SonarDashboard = () => {
       {/* Layout */}
       <div className="flex flex-1 min-h-0">
         <aside
-          onMouseEnter={() => setSidebarCollapsed(false)}
+          onMouseEnter={() => { if (!isCompact || !responsiveEnabled) setSidebarCollapsed(false); }}
           onMouseLeave={() => setSidebarCollapsed(true)}
-          className={`sonar-dashboard-chrome ${teamExperience !== 'team' ? 'nodemere-studio-sidebar' : ''} group/sidebar flex flex-col border-r border-white/5 bg-[#020202] transition-[width] duration-200 ease-out ${sidebarCollapsed ? 'w-[76px]' : 'w-[240px]'}`}
+          className={`sonar-dashboard-chrome ${teamExperience !== 'team' ? 'nodemere-studio-sidebar' : ''} group/sidebar flex flex-col border-r border-white/5 bg-[#020202] transition-[width] duration-200 ease-out ${railCollapsed ? 'w-[76px]' : 'w-[240px]'}`}
         >
           <div className="px-3 pt-10">
             <nav className="space-y-1">
@@ -2711,7 +2736,7 @@ const SonarDashboard = () => {
                     setSidebarCollapsed(true);
                     navigateDashboard(item.id);
                   }}
-                  collapsed={sidebarCollapsed}
+                  collapsed={railCollapsed}
                 />
               ))}
             </nav>
@@ -2727,7 +2752,7 @@ const SonarDashboard = () => {
               className="no-drag group mb-1 flex w-full items-center gap-3.5 rounded-xl px-3 py-2.5 text-[13px] text-zinc-500 transition-colors hover:bg-white/5 hover:text-white lg:hidden"
             >
               <CircleQuestionMark size={15} className="shrink-0 text-zinc-600 transition-colors duration-300 group-hover:text-white" />
-              <span className={`overflow-hidden font-bold tracking-tight whitespace-nowrap transition-[max-width,opacity,transform,margin] duration-180 ease-out ${sidebarCollapsed ? 'ml-0 max-w-0 opacity-0 translate-x-[-4px]' : 'ml-0.5 max-w-[140px] opacity-100 translate-x-0'}`}>
+              <span className={`overflow-hidden font-bold tracking-tight whitespace-nowrap transition-[max-width,opacity,transform,margin] duration-180 ease-out ${railCollapsed ? 'ml-0 max-w-0 opacity-0 translate-x-[-4px]' : 'ml-0.5 max-w-[140px] opacity-100 translate-x-0'}`}>
                 Report a problem
               </span>
             </button>
@@ -2737,11 +2762,11 @@ const SonarDashboard = () => {
                 setSidebarCollapsed(true);
                 navigateDashboard('settings');
               }}
-              title={sidebarCollapsed ? 'Settings' : undefined}
+              title={railCollapsed ? 'Settings' : undefined}
               className="no-drag group flex w-full items-center gap-3.5 rounded-xl px-3 py-2.5 text-[13px] text-zinc-500 transition-colors hover:bg-white/5 hover:text-white"
             >
               <Settings size={15} className="shrink-0 text-zinc-600 transition-colors duration-300 group-hover:text-white" />
-              <span className={`overflow-hidden font-bold tracking-tight whitespace-nowrap transition-[max-width,opacity,transform,margin] duration-180 ease-out ${sidebarCollapsed ? 'ml-0 max-w-0 opacity-0 translate-x-[-4px]' : 'ml-0.5 max-w-[140px] opacity-100 translate-x-0'}`}>
+              <span className={`overflow-hidden font-bold tracking-tight whitespace-nowrap transition-[max-width,opacity,transform,margin] duration-180 ease-out ${railCollapsed ? 'ml-0 max-w-0 opacity-0 translate-x-[-4px]' : 'ml-0.5 max-w-[140px] opacity-100 translate-x-0'}`}>
                 Settings
               </span>
             </button>
@@ -2779,6 +2804,7 @@ const SonarDashboard = () => {
           </div>
         </main>
       </div>
+      {isPhone && responsiveEnabled && teamExperience === 'team' && <MobileNavigation currentRoute={currentRoute} profile={profile} usage={businessUsage} business={mobileBusiness} onNavigate={navigateDashboard} onReportProblem={() => setReportProblemOpen(true)} onAccount={() => { navigateDashboard('settings'); window.dispatchEvent(new CustomEvent('sonar:settings-section', { detail: 'account' })); }} onUsage={() => { navigateDashboard('settings'); window.dispatchEvent(new CustomEvent('sonar:settings-section', { detail: 'billing' })); }} />}
       {showStudioExit && <Suspense fallback={null}><StudioExitDialog onCancel={cancelStudioExit} onDiscard={() => {
         const action = pendingStudioExit.current;
         pendingStudioExit.current = null;

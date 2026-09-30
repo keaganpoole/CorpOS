@@ -63,6 +63,9 @@ const AppointmentsPageBody = ({ data, className = '', defaultAppointmentDate = n
       )}
 
       <AppointmentsTable
+        onCreateRecord={createAppointment}
+        onSaveRecord={updateAppointment}
+        defaultAppointmentDate={defaultAppointmentDate}
         appointments={appointments}
         loading={loading}
         selectedId={selectedId}

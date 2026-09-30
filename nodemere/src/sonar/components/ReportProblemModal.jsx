@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Bug, Check, X } from 'lucide-react';
 import ModalSpectrumLine from '../../components/ModalSpectrumLine';
 import { api } from '../lib/api';
+import useDashboardViewport from '../hooks/useDashboardViewport';
 
 const IMPACT_LEVELS = [
   { value: 1, label: 'Minor', description: 'A small inconvenience' },
@@ -14,12 +15,30 @@ const IMPACT_LEVELS = [
 ];
 
 const ReportProblemModal = ({ onClose, currentPage }) => {
+  const { isPhone } = useDashboardViewport();
+  const dialog = useRef(null);
   const [description, setDescription] = useState('');
   const [severity, setSeverity] = useState(3);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
   const selectedImpact = IMPACT_LEVELS[severity - 1];
+  useEffect(() => {
+    if (!isPhone) return;
+    const root = document.getElementById('root');
+    const prevInert = root?.inert, previous = document.activeElement, overflow = document.body.style.overflow;
+    if (root) root.inert = true;
+    document.body.style.overflow = 'hidden';
+    const frame = requestAnimationFrame(() => dialog.current?.focus());
+    const trap = (e) => {
+      if (e.key !== 'Tab') return;
+      const items = [...(dialog.current?.querySelectorAll('button:not(:disabled), input, textarea') || [])];
+      if (e.shiftKey && (document.activeElement === items[0] || document.activeElement === dialog.current)) { e.preventDefault(); items.at(-1)?.focus(); }
+      else if (!e.shiftKey && document.activeElement === items.at(-1)) { e.preventDefault(); items[0]?.focus(); }
+    };
+    document.addEventListener('keydown', trap);
+    return () => { cancelAnimationFrame(frame); document.removeEventListener('keydown', trap); if (root) root.inert = prevInert; document.body.style.overflow = overflow; if (previous?.isConnected) previous.focus({ preventScroll: true }); };
+  }, [isPhone]);
 
   useEffect(() => {
     const closeOnEscape = (event) => {
@@ -56,10 +75,12 @@ const ReportProblemModal = ({ onClose, currentPage }) => {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[230] flex items-center justify-center bg-black/70 px-5 backdrop-blur-sm"
+        className="responsive-dialog report-problem-modal fixed inset-0 z-[230] flex items-center justify-center bg-black/70 px-5 backdrop-blur-sm"
         onMouseDown={() => !submitting && onClose()}
       >
         <motion.section
+          ref={dialog}
+          tabIndex={isPhone ? -1 : undefined}
           initial={{ opacity: 0, y: 16, scale: 0.98 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 16, scale: 0.98 }}
@@ -115,7 +136,7 @@ const ReportProblemModal = ({ onClose, currentPage }) => {
                   <label htmlFor="problem-description" className="mb-2 block text-[11px] font-bold uppercase tracking-[0.16em] text-zinc-600">What went wrong?</label>
                   <textarea
                     id="problem-description"
-                    autoFocus
+                    autoFocus={!isPhone}
                     value={description}
                     onChange={(event) => setDescription(event.target.value)}
                     maxLength={10000}

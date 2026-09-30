@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import CalendarMonthView from './CalendarMonthView';
 import AppointmentsPage from './AppointmentsPage';
 import { useAppointments } from '../hooks/useAppointments';
+import useDashboardViewport from '../hooks/useDashboardViewport';
 
 const CALENDAR_BASE_MIN_WIDTH = 34 * 16;
 const CALENDAR_MIN_WIDTH = Math.round(CALENDAR_BASE_MIN_WIDTH * 1.15);
@@ -11,6 +12,7 @@ const SPLIT_HANDLE_WIDTH = 12;
 const DESKTOP_SPLIT_QUERY = '(min-width: 1536px)';
 
 export default function CalendarPage({ onToolbarMetaChange = null }) {
+  const { isCompact } = useDashboardViewport();
   const appointmentsData = useAppointments();
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [mobilePanel, setMobilePanel] = useState('appointments');
@@ -101,7 +103,7 @@ export default function CalendarPage({ onToolbarMetaChange = null }) {
   }, [appointmentsData.allAppointments, appointmentsData.loading, onToolbarMetaChange]);
 
   return (
-    <div className="h-full overflow-hidden bg-[#020202] px-4 pb-5 pt-8 md:px-5 md:pb-5 md:pt-8">
+    <div className="calendar-page h-full overflow-hidden bg-[#020202] px-4 pb-5 pt-8 md:px-5 md:pb-5 md:pt-8">
       <div
         ref={splitContainerRef}
         className="flex h-full min-h-0 flex-col overflow-hidden rounded-[28px] border border-white/[0.06] bg-[#020202] shadow-[0_32px_100px_-36px_rgba(0,0,0,0.92)] 2xl:flex-row"
@@ -140,7 +142,7 @@ export default function CalendarPage({ onToolbarMetaChange = null }) {
           </button>
         </div>
 
-        <div className={`min-w-0 overflow-hidden border-b border-white/[0.04] transition-[flex-basis,opacity] duration-300 ease-out 2xl:min-h-0 2xl:min-w-[32rem] 2xl:flex-1 2xl:border-b-0 ${
+        <div aria-hidden={isCompact && mobilePanel !== 'appointments' ? true : undefined} inert={isCompact && mobilePanel !== 'appointments' ? '' : undefined} className={`min-w-0 overflow-hidden border-b border-white/[0.04] transition-[flex-basis,opacity] duration-300 ease-out 2xl:min-h-0 2xl:min-w-[32rem] 2xl:flex-1 2xl:border-b-0 ${
           mobilePanel === 'appointments' ? 'min-h-0 flex-[1_1_auto] opacity-100' : 'flex-[0_0_0px] opacity-0 2xl:opacity-100'
         }`}>
           <AppointmentsPage data={appointmentsData} defaultAppointmentDate={selectedDate} hideTitle />
@@ -172,14 +174,14 @@ export default function CalendarPage({ onToolbarMetaChange = null }) {
           </span>
         </div>
 
-        <div className={`min-w-0 overflow-hidden bg-[#020202] transition-[flex-basis,opacity] duration-300 ease-out 2xl:min-h-0 2xl:w-[var(--calendar-panel-width)] 2xl:flex-none 2xl:opacity-100 ${
+        <div aria-hidden={isCompact && mobilePanel !== 'calendar' ? true : undefined} inert={isCompact && mobilePanel !== 'calendar' ? '' : undefined} className={`min-w-0 overflow-hidden bg-[#020202] transition-[flex-basis,opacity] duration-300 ease-out 2xl:min-h-0 2xl:w-[var(--calendar-panel-width)] 2xl:flex-none 2xl:opacity-100 ${
           mobilePanel === 'calendar' ? 'min-h-0 flex-[1_1_auto] opacity-100' : 'flex-[0_0_0px] opacity-0'
         }`}>
           <CalendarMonthView
             data={appointmentsData}
             selectedDate={selectedDate}
             onSelectedDateChange={setSelectedDate}
-            className="mx-auto max-w-[760px] 2xl:max-w-none"
+            className="calendar-month-mobile mx-auto max-w-[760px] 2xl:max-w-none"
           />
         </div>
       </div>

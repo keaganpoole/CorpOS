@@ -62,6 +62,9 @@ const PeoplePage = ({ hideTitle = false, onToolbarMetaChange = null }) => {
 
       {/* Table */}
       <LeadsTable
+        responsive
+        onCreateRecord={createLead}
+        onSaveRecord={updateLead}
         leads={leads} loading={loading} selectedId={selectedId}
         justAddedLeadIds={justAddedLeadIds}
         searchQuery={searchQuery} onSearchChange={setSearchQuery}

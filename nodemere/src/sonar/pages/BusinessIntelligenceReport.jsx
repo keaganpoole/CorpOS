@@ -72,7 +72,7 @@ function Panel({ children, className = '' }) {
 
 function HeroMetric({ item, icon: Icon }) {
   return (
-    <div className="rounded-2xl border border-white/[0.07] bg-white/[0.025] p-4">
+    <div className="report-hero-metric rounded-2xl border border-white/[0.07] bg-white/[0.025] p-4">
       <div className="flex items-center justify-between gap-3 text-zinc-600"><span className="text-[10px] font-bold uppercase tracking-[0.14em]">{item.label}</span><Icon size={14} /></div>
       <p className="mt-4 text-[24px] font-semibold tracking-[-0.04em] text-white">{item.value}</p>
       <p className="mt-1 text-[11px] leading-4 text-zinc-600">{item.explanation}</p>
@@ -236,7 +236,7 @@ export default function BusinessIntelligenceReport() {
     <div id="business-report-top" className="business-intelligence-report h-full overflow-y-auto bg-[#020202] text-zinc-100 custom-scrollbar">
       <LiveRouteStyles />
       <div className="mx-auto max-w-[1500px] px-5 pb-24 pt-8 sm:px-8 lg:px-12">
-        <div className="mb-5 flex flex-col justify-between gap-5 xl:flex-row xl:items-end">
+        <div className="report-page-heading mb-5 flex flex-col justify-between gap-5 xl:flex-row xl:items-end">
           <div>
             <div className="mb-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500"><Brain size={13} className="brand-icon" /> Nodemere intelligence</div>
             <h1 className="text-[34px] font-semibold tracking-[-0.055em] text-white sm:text-[48px]">Business Intelligence Report</h1>
@@ -250,7 +250,7 @@ export default function BusinessIntelligenceReport() {
 
         {(error || status) && <div className={`mb-5 flex items-center gap-2 rounded-xl border px-4 py-3 text-[11px] ${error ? 'border-amber-300/20 bg-amber-300/[0.06] text-amber-200' : 'border-emerald-300/20 bg-emerald-300/[0.06] text-emerald-200'}`}><Info size={14} /> {error || status}</div>}
 
-        <Panel className="overflow-hidden p-5 sm:p-7">
+        <Panel className="report-hero overflow-hidden p-5 sm:p-7">
           <div className="mb-5 flex items-center justify-between gap-5"><div><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-600">Executive read</p><p className="mt-2 text-[11px] text-zinc-600">Slide {activeSlide + 1} of 2</p></div><HeroSlideControls activeSlide={activeSlide} onChange={setActiveSlide} /></div>
           {activeSlide === 0 ? (
             <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-center">

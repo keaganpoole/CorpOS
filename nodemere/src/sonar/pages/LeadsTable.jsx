@@ -1,4 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import MobileRecords from '../components/MobileRecords';
+import useDashboardViewport from '../hooks/useDashboardViewport';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -994,7 +996,7 @@ const IntakeFieldsPopover = ({ columns, fieldConfig, onToggleField, onEnableAll,
     <div>
       <ControlPopoverHeader title="Intake" caption="Choose which fields the inbound agent should prioritize." />
       <div className="border-b border-white/[0.05] p-3">
-        <div className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-white/[0.06] bg-white/[0.025] px-3 py-2.5">
+        <div className="intake-count-summary mb-3 flex items-center justify-between gap-3 rounded-xl border border-white/[0.06] bg-white/[0.025] px-3 py-2.5">
           <div>
             <div className="text-[10px] font-semibold tracking-[-0.02em] text-zinc-500">Enabled for intake</div>
             <div className={`mt-1 text-[18px] font-semibold tracking-[-0.04em] ${tone.text}`}>{enabledCount}</div>
@@ -1117,7 +1119,12 @@ const LeadsTable = ({
   searchPlaceholder = 'Search people...',
   searchFieldClassName = '',
   onRefresh,
+  responsive = false,
+  onCreateRecord,
+  onSaveRecord,
 }) => {
+  const { isPhone } = useDashboardViewport();
+  const phoneView = responsive && !demoMode && isPhone;
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [viewSettings, setViewSettings] = useState(() => ({
     rowHeight: 3,
@@ -2227,7 +2234,26 @@ const LeadsTable = ({
   );
 
   return (
-    <div className={`flex-1 flex flex-col min-w-0 h-full ${demoEntrance ? 'crm-demo-entrance-table' : ''}`}>
+    <div className={`dashboard-crm-table flex-1 flex flex-col min-w-0 h-full ${demoEntrance ? 'crm-demo-entrance-table' : ''}`}>
+      {responsive && !demoMode && <MobileRecords active={phoneView}
+        records={sortedLeads} loading={loading} totalCount={totalCount}
+        fields={[...TABLE_COLUMNS, ...customFields.map((field) => ({ ...field, custom: true }))]}
+        visibleFields={columns.map((column) => column.id)} config={fieldConfig}
+        search={searchQuery} onSearch={onSearchChange} onRefresh={onRefresh}
+        sourceFilter={sourceFilter} onSourceFilter={onSourceFilterChange} sourceOptions={SOURCE_OPTIONS}
+        onCreate={onCreateRecord} onUpdate={onSaveRecord} onDelete={onDeleteMany}
+        renderColorbar={renderColorbar} onColorbar={() => setShowColorbarStudio(true)}
+        renderDocuments={(person) => <button type="button" onClick={() => setDocumentViewer({ person, initialDocument: personDocumentsById.get(String(person.id))?.[0] })} className="mobile-documents-link">{personDocumentsById.get(String(person.id))?.[0]?.file_name || 'View documents'}{(personDocumentsById.get(String(person.id))?.length || 0) > 1 ? ` +${personDocumentsById.get(String(person.id)).length - 1}` : ''}</button>}
+        sortContent={<SortBuilderPopover columns={columns} fieldConfig={fieldConfig} rules={viewSettings.sortRules || []} onChange={(sortRules) => updateViewSettings({ sortRules })} />}
+        tools={<div className="mobile-crm-tools">
+          <details><summary>Intake fields</summary><IntakeFieldsPopover columns={allDataColumns} fieldConfig={fieldConfig} onToggleField={setFieldIntakeEnabled} onEnableAll={() => setAllFieldsIntakeEnabled(true)} onDisableAll={() => setAllFieldsIntakeEnabled(false)} /></details>
+          <details><summary>Visible fields</summary><ColumnsVisibilityPopover columns={allDataColumns} fieldConfig={fieldConfig} onSetHidden={setColumnHidden} onShowAll={() => setAllColumnsHidden(false)} onHideAll={() => setAllColumnsHidden(true)} /></details>
+          <details><summary>Field settings</summary>{allDataColumns.map((column) => <button type="button" key={column.id} onClick={() => setSettingsField(column.id)}>{getColumnLabel(column, fieldConfig)}<Settings2 size={16} /></button>)}</details>
+          <details><summary>Add custom field</summary>{[...column_options, ...specialColumnOptions].map((option) => <button type="button" key={option.type} onClick={() => handleCreateColumn(option.type)}>{option.label}<Plus size={16} /></button>)}</details>
+          <p>Column order, frozen columns, zones, and row height remain available in the tablet and desktop table.</p>
+        </div>}
+      />}
+      {!phoneView && <>
       <div className={`shrink-0 flex items-center gap-3 ${hideTitle ? 'px-6 pb-3 pt-5' : 'px-10 py-8'} ${demoEntrance ? 'crm-demo-entrance-topbar' : ''}`}>
         <div className="flex items-center gap-3">
           {!hideTitle && (
@@ -2294,7 +2320,8 @@ const LeadsTable = ({
         </div>
       </div>
 
-      <FloatingPopover anchorRef={sortButtonRef} open={activeControl === 'sort'} onClose={() => setActiveControl(null)} width={390}>
+      </>}
+      <FloatingPopover anchorRef={sortButtonRef} open={!phoneView && activeControl === 'sort'} onClose={() => setActiveControl(null)} width={390}>
         <SortBuilderPopover
           columns={columns}
           fieldConfig={fieldConfig}

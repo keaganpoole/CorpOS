@@ -81,7 +81,7 @@ function PrivacyNotice({ open, busy, onCancel, onAccept }) {
   );
 }
 
-function NestIntercomInner({ open, onClose }) {
+function NestIntercomInner({ open, onClose, mobile = false }) {
   const { start: startMicrophone, stop: stopMicrophone, sample: sampleMicrophone, setMuted: setMicrophoneMuted } = useIntercomMicrophone();
   const { queueLength, setVoiceActive, nestSoundsMuted } = useNest();
   const [bootstrap, setBootstrap] = useState(null);
@@ -516,7 +516,7 @@ function NestIntercomInner({ open, onClose }) {
                   </span>
                   <span>Calling {selectedReceptionist.name}...</span>
                 </motion.div>
-              ) : phase === 'selecting' && selectedReceptionist && (
+              ) : phase === 'selecting' && selectedReceptionist && !mobile && (
                 <div className="intercom-action no-drag">
                   <span className="intercom-action-label">
                     <span>Talk with</span>
@@ -544,9 +544,9 @@ function NestIntercomInner({ open, onClose }) {
                         key={item.id}
                         layout
                         className={`intercom-receptionist ${isSelected ? 'is-selected' : ''}`}
-                        onClick={() => selectReceptionist(String(item.id))}
+                        onClick={() => { selectReceptionist(String(item.id)); if (mobile) requestStart(String(item.id)); }}
                         disabled={loading || unavailable}
-                        aria-label={`Select ${item.name}`}
+                        aria-label={`${mobile ? 'Talk with' : 'Select'} ${item.name}`}
                         aria-pressed={isSelected}
                         title={item.name}
                       >
@@ -612,6 +612,7 @@ function NestIntercomInner({ open, onClose }) {
             )}
 
             {idleWarning && <span className="intercom-idle-warning">Still there?</span>}
+            {mobile && !bootstrap && !error && <span className="intercom-error" role="status">Loading receptionists…</span>}
             {error && <span className="intercom-error">{error}</span>}
             {unavailable && <span className="intercom-error">Add an eligible receptionist and configure the voice agent.</span>}
           </motion.div>

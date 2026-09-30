@@ -1,9 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import useDashboardViewport from '../hooks/useDashboardViewport';
 import { motion } from 'framer-motion';
 import {
   AlertCircle,
   AudioLines,
   ArrowDownLeft,
+  ArrowLeft,
   ArrowUpRight,
   Check,
   CheckCircle2,
@@ -26,6 +28,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useAudioPlayer } from '../contexts/AudioPlayerContext';
 import { useCallLogs } from '../contexts/CallLogsContext';
 import CubePreloader from '../components/CubePreloader';
+import IntercomVoiceLine from '../nest/IntercomVoiceLine';
 
 const API_BASE_URL = window.sonar?.apiUrl || import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
 const AVATAR_BASE = 'https://jspksetkrprvomilgtyj.supabase.co/storage/v1/object/public/Employee%20Badges';
@@ -382,7 +385,7 @@ function CallCard({ call, selected, checked, onClick, onToggleSelect, onToggleFa
       role="button"
       tabIndex={0}
       className={cn(
-        'group relative w-full rounded-2xl py-3 pl-11 pr-11 text-left transition duration-200',
+        'call-record-card group relative w-full rounded-2xl py-3 pl-11 pr-11 text-left transition duration-200',
         selected
           ? 'bg-transparent'
           : 'bg-transparent hover:bg-white/[0.025]'
@@ -538,6 +541,7 @@ function TranscriptBubble({ entry, receptionistAvatar, receptionistName, custome
 }
 
 function AudioStrip({ call, now }) {
+  const { isPhone } = useDashboardViewport();
   const hasAudio = Boolean(call.hasAudio);
   const { session } = useAuth();
   const [playbackError, setPlaybackError] = useState('');
@@ -589,6 +593,7 @@ function AudioStrip({ call, now }) {
             {isPlaying ? <Pause size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" className="ml-0.5" />}
           </button>
           <div className="min-w-0 flex-1">
+            {isPhone && <div className="mobile-call-audio-lines"><IntercomVoiceLine enabled={isPlaying} level={isPlaying ? .06 : 0} /></div>}
             <div className="flex items-center gap-3">
               <button
                 type="button"
@@ -629,6 +634,9 @@ function AudioStrip({ call, now }) {
 }
 
 export default function CallLogsPage({ onToolbarMetaChange = null }) {
+  const { isPhone } = useDashboardViewport();
+  const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
   const { session } = useAuth();
   const {
     calls,
@@ -768,12 +776,12 @@ export default function CallLogsPage({ onToolbarMetaChange = null }) {
     return calls.filter((call) => {
       const matchesSearch = !query || [call.name, call.phone, call.summary, call.purpose, call.status, call.receptionist, call.raw?.notes, call.raw?.agent_name]
         .some((value) => normalized(value).includes(query));
-      return matchesSearch;
+      return matchesSearch && (!isPhone || !favoritesOnly || call.isFavorited);
     }).sort((a, b) => {
       if (a.isFavorited !== b.isFavorited) return a.isFavorited ? -1 : 1;
       return new Date(b.time || 0).getTime() - new Date(a.time || 0).getTime();
     });
-  }, [calls, searchQuery]);
+  }, [calls, searchQuery, favoritesOnly, isPhone]);
 
   const selectedBaseCall = filteredCalls.find((call) => call.id === selectedId) || filteredCalls[0] || null;
   const selectedCallId = selectedBaseCall?.id || null;
@@ -840,7 +848,6 @@ export default function CallLogsPage({ onToolbarMetaChange = null }) {
     }).then(async response => { if (!response.ok) throw new Error('Could not load call details'); return response.json(); })
       .then((details) => {
         setCallDetailsById((current) => ({ ...current, [selectedCallId]: details }));
-        setHasPresentedConversation(true);
       })
       .catch((error) => {
         if (error.name === 'AbortError') return;
@@ -868,7 +875,7 @@ export default function CallLogsPage({ onToolbarMetaChange = null }) {
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-[#020202] text-zinc-100">
+    <div data-mobile-detail={mobileDetailOpen} className="call-logs-page flex h-full min-h-0 flex-col bg-[#020202] text-zinc-100">
       <svg width="0" height="0" className="pointer-events-none absolute" aria-hidden="true" focusable="false">
         <defs>
           <linearGradient id="callLogsArrowGradient" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -918,6 +925,7 @@ export default function CallLogsPage({ onToolbarMetaChange = null }) {
                 </button>
               </div>
             </label>
+            {isPhone && <div className="call-mobile-tabs" aria-label="Filter call logs"><button type="button" aria-pressed={!favoritesOnly} onClick={() => setFavoritesOnly(false)}>All calls</button><button type="button" aria-pressed={favoritesOnly} onClick={() => setFavoritesOnly(true)}><Star size={15} />Favorites</button></div>}
             {selectedDeleteCount > 0 && (
               <div className="flex items-center justify-between rounded-xl bg-white/[0.035] px-3 py-2">
                 <span className="text-[12px] font-medium text-zinc-400">{selectedDeleteCount} selected</span>
@@ -951,6 +959,7 @@ export default function CallLogsPage({ onToolbarMetaChange = null }) {
                       return;
                     }
                     setSelectedId(call.id);
+                    if (isPhone) setMobileDetailOpen(true);
                   }}
                   onToggleSelect={toggleSelectCall}
                   onToggleFavorite={handleToggleFavorite}
@@ -974,11 +983,12 @@ export default function CallLogsPage({ onToolbarMetaChange = null }) {
         </aside>
 
         <section className="relative flex min-h-0 flex-col after:pointer-events-none after:absolute after:bottom-0 after:left-0 after:right-0 after:h-px after:bg-white/[0.05]">
+          {isPhone && <button type="button" className="call-mobile-back" onClick={() => setMobileDetailOpen(false)}><ArrowLeft size={18} />All calls</button>}
           {transcriptLoading ? (
             <CallLogsLoader />
           ) : selectedCall ? (
             <>
-          <div className="shrink-0 px-5 pb-5 pt-8 sm:px-6 sm:pb-6 sm:pt-8">
+          <div className="call-detail-header shrink-0 px-5 pb-5 pt-8 sm:px-6 sm:pb-6 sm:pt-8">
             <div className="flex flex-col gap-5">
               <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                 <div className="min-w-0 flex-1">
@@ -1016,7 +1026,7 @@ export default function CallLogsPage({ onToolbarMetaChange = null }) {
             </div>
           </div>
 
-          <div className="min-h-0 flex-1 px-4 pb-6 sm:px-7">
+          <div className="call-detail-transcript min-h-0 flex-1 px-4 pb-6 sm:px-7">
             <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[28px] border border-white/[0.05] bg-white/[0.02]">
               <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto px-5 py-6 sm:px-6">
                 <motion.div

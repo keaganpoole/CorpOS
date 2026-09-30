@@ -1,4 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import MobileRecords from '../components/MobileRecords';
+import useDashboardViewport from '../hooks/useDashboardViewport';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -7,7 +9,7 @@ import {
   Users, MapPin, Map as MapIcon, Shield, DollarSign, Target, Navigation, Trash2,
 } from 'lucide-react';
 import {
-  TABLE_COLUMNS, formatDate, formatTime, formatTimestamp, normalizeOptionValue, getFieldDef,
+  TABLE_COLUMNS, APPOINTMENT_FIELDS, SOURCE_OPTIONS, formatDate, formatTime, formatTimestamp, normalizeOptionValue, getFieldDef,
 } from '../lib/appointmentSchema';
 import {
   DEFAULT_FIELD_CONFIG, fetchBusinessFieldConfig, loadFieldConfig, migrateLegacyFieldConfig,
@@ -1140,7 +1142,8 @@ const RowHeightPopover = ({ value, onChange }) => {
   );
 };
 
-const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = [], selectedId, onSelect, searchQuery, onSearchChange, sourceFilter, onSourceFilterChange, sortBy, sortDir, onSort, onCreateInline, creating = false, onDeleteMany, totalCount, onUpdateAppointment, onSchemaChange, people = [], services = [], receptionists = [], hideTitle = false, onRefresh }) => {
+const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = [], selectedId, onSelect, searchQuery, onSearchChange, sourceFilter, onSourceFilterChange, sortBy, sortDir, onSort, onCreateInline, creating = false, onDeleteMany, totalCount, onUpdateAppointment, onSchemaChange, people = [], services = [], receptionists = [], hideTitle = false, onRefresh, onCreateRecord, onSaveRecord, defaultAppointmentDate }) => {
+  const { isPhone } = useDashboardViewport();
   const [viewSettings, setViewSettings] = useState(() => ({
     rowHeight: 3,
     sortRules: [],
@@ -2010,7 +2013,22 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
   );
 
   return (
-    <div className="flex-1 flex flex-col min-w-0 h-full">
+    <div className="dashboard-crm-table flex-1 flex flex-col min-w-0 h-full">
+      <MobileRecords active={isPhone} kind="appointment"
+        records={sortedAppointments} loading={loading} totalCount={totalCount}
+        fields={APPOINTMENT_FIELDS} visibleFields={columns.map((column) => column.id)} config={fieldConfig}
+        lookups={{ person_id: lookupOptions.people, service_id: lookupOptions.services, receptionist_id: lookupOptions.receptionists }}
+        titleFor={(record) => lookupOptions.people.find((person) => person.value === String(record.person_id))?.label || 'Unassigned appointment'}
+        subtitleFor={(record) => `${formatDate(record.date)} · ${formatTime(record.time)}`}
+        search={searchQuery} onSearch={onSearchChange} onRefresh={onRefresh}
+        sourceFilter={sourceFilter} onSourceFilter={onSourceFilterChange} sourceOptions={SOURCE_OPTIONS}
+        onCreate={onCreateRecord} onUpdate={onSaveRecord} onDelete={onDeleteMany}
+        newRecord={{ date: defaultAppointmentDate || new Date().toLocaleDateString('en-CA'), time: '09:00', duration: 30, status: 'Pending', source: 'Manual' }}
+        renderColorbar={renderColorbar} onColorbar={() => setShowColorbarStudio(true)}
+        sortContent={<SortBuilderPopover columns={columns} fieldConfig={fieldConfig} rules={viewSettings.sortRules || []} onChange={(sortRules) => updateViewSettings({ sortRules })} />}
+        tools={<div className="mobile-crm-tools"><details><summary>Visible fields</summary><ColumnsVisibilityPopover columns={allDataColumns} fieldConfig={fieldConfig} onSetHidden={setColumnHidden} onShowAll={() => setAllColumnsHidden(false)} onHideAll={() => setAllColumnsHidden(true)} /></details><details><summary>Field settings</summary>{allDataColumns.map((column) => <button type="button" key={column.id} onClick={() => setSettingsField(column.id)}>{getColumnLabel(column, fieldConfig)}<Settings2 size={16} /></button>)}</details><p>Column order, frozen columns, zones, and row height remain available in the tablet and desktop table.</p></div>}
+      />
+      {!isPhone && <>
       <div className={`shrink-0 flex items-center gap-3 ${hideTitle ? 'px-6 pb-3 pt-8' : 'px-10 py-8'}`}>
         <div className="flex items-center gap-3">
           {!hideTitle && (
@@ -2074,7 +2092,8 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
         </div>
       </div>
 
-      <FloatingPopover anchorRef={sortButtonRef} open={activeControl === 'sort'} onClose={() => setActiveControl(null)} width={390}>
+      </>}
+      <FloatingPopover anchorRef={sortButtonRef} open={!isPhone && activeControl === 'sort'} onClose={() => setActiveControl(null)} width={390}>
         <SortBuilderPopover
           columns={columns}
           fieldConfig={fieldConfig}

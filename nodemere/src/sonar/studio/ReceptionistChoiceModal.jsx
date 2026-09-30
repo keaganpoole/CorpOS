@@ -38,7 +38,7 @@ export default function ReceptionistChoiceModal({ onClose, onCreate, onHire }) {
   }, []);
   return createPortal(<motion.div
     initial={false}
-    className="fixed inset-0 z-[1000] flex items-center justify-center overflow-y-auto p-8"
+    className="responsive-choice-dialog fixed inset-0 z-[1000] flex items-center justify-center overflow-y-auto p-8"
     style={{ isolation: 'isolate' }}
     onClick={onClose}
   >

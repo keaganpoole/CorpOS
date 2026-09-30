@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useId, useRef } from 'react';
 import { useAnimationFrame, useReducedMotion } from 'framer-motion';
 
 // Vibey's line motion: four phase-offset sine waves, a centered Gaussian
@@ -31,6 +31,8 @@ function wavePath(amplitude, phase, layerIndex) {
 }
 
 export default function IntercomVoiceLine({ sampleMicrophone, enabled, level }) {
+  const gradientId = useId();
+  const stroke = (color) => color.replace('url(#', `url(#${gradientId}-`);
   const reducedMotion = useReducedMotion();
   const pathsRef = useRef([]);
   const glowsRef = useRef([]);
@@ -84,26 +86,26 @@ export default function IntercomVoiceLine({ sampleMicrophone, enabled, level }) 
   return (
     <svg className="intercom-voice-line" viewBox="0 0 96 44" preserveAspectRatio="none" aria-hidden="true">
       <defs>
-        <linearGradient id="intercom-purple-pink-gradient" x1="0" x2="1" y1="0" y2="0">
+        <linearGradient id={`${gradientId}-intercom-purple-pink-gradient`} x1="0" x2="1" y1="0" y2="0">
           <stop offset="42%" stopColor="#7c3aed" />
           <stop offset="58%" stopColor="#f45fd2" />
         </linearGradient>
-        <linearGradient id="intercom-pink-purple-gradient" x1="0" x2="1" y1="0" y2="0">
+        <linearGradient id={`${gradientId}-intercom-pink-purple-gradient`} x1="0" x2="1" y1="0" y2="0">
           <stop offset="42%" stopColor="#f45fd2" />
           <stop offset="58%" stopColor="#7c3aed" />
         </linearGradient>
-        <linearGradient id="intercom-pink-purple-gradient-reverse" x1="0" x2="1" y1="0" y2="0">
+        <linearGradient id={`${gradientId}-intercom-pink-purple-gradient-reverse`} x1="0" x2="1" y1="0" y2="0">
           <stop offset="42%" stopColor="#7c3aed" />
           <stop offset="58%" stopColor="#f45fd2" />
         </linearGradient>
       </defs>
       {[...LAYERS].reverse().map((layer, index) => (
         <path key={`glow-${index}`} ref={(element) => { glowsRef.current[LAYERS.length - 1 - index] = element; }}
-          className="intercom-voice-line-glow" d={FLAT_PATH} stroke={layer.color} />
+          className="intercom-voice-line-glow" d={FLAT_PATH} stroke={stroke(layer.color)} />
       ))}
       {[...LAYERS].reverse().map((layer, index) => (
         <path key={`line-${index}`} ref={(element) => { pathsRef.current[LAYERS.length - 1 - index] = element; }}
-          d={FLAT_PATH} stroke={layer.color} />
+          d={FLAT_PATH} stroke={stroke(layer.color)} />
       ))}
     </svg>
   );
