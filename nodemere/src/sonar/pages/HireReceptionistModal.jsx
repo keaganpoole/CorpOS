@@ -4,7 +4,7 @@ import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import {
   X, Play, Pause, Sparkles,
   User, ChevronLeft, ChevronRight, Loader2,
-  CalendarDays,
+  CalendarDays, Volume2,
 } from 'lucide-react';
 import { api } from '../lib/api';
 import CubePreloader from '../components/CubePreloader';
@@ -37,6 +37,7 @@ const HireReceptionistModal = ({
   catalogRows,
   autoPlayOnOpen = false,
   hideVoiceButton = false,
+  compactVoicePreview = false,
   allowGalleryWheelZoom = true,
   showGalleryZoomControls = true,
   galleryDefaultZoom,
@@ -63,6 +64,7 @@ const HireReceptionistModal = ({
   const levelFrameRef = useRef(0);
   const detailRef = useRef(null);
   const [selectedIndex, setSelectedIndex] = useState(null);
+  const [descriptionExpanded, setDescriptionExpanded] = useState(false);
   const [loadError, setLoadError] = useState('');
   const reducedMotion = useReducedMotion();
   const carouselTransitionMs = 620;
@@ -123,6 +125,7 @@ const HireReceptionistModal = ({
     setPlayingVoice(null);
     setVoiceLevel(0);
     setSelectedIndex(null);
+    setDescriptionExpanded(false);
     setHireError('');
   };
 
@@ -175,7 +178,7 @@ const HireReceptionistModal = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [embedded, isAnimating, receptionists.length]);
 
-  const playVoice = (voiceUrl, receptionistId) => {
+  const playVoice = (voiceUrl, receptionistId, { nativePlayback = false } = {}) => {
     cancelAnimationFrame(levelFrameRef.current);
     if (audioRef.current) {
       audioRef.current.pause();
@@ -189,11 +192,11 @@ const HireReceptionistModal = ({
     }
 
     const audio = new Audio();
-    audio.crossOrigin = 'anonymous';
+    if (!nativePlayback) audio.crossOrigin = 'anonymous';
     audio.src = voiceUrl;
     audioRef.current = audio;
     const AudioContext = window.AudioContext || window.webkitAudioContext;
-    if (AudioContext) {
+    if (AudioContext && !nativePlayback) {
       try {
         audioContextRef.current ||= new AudioContext();
         const context = audioContextRef.current;
@@ -214,10 +217,14 @@ const HireReceptionistModal = ({
     audio.onerror = stop;
     const start = async () => {
       try {
-        const resumePromise = audioContextRef.current?.resume();
+        const resumePromise = nativePlayback ? undefined : audioContextRef.current?.resume();
         const playPromise = audio.play();
         await Promise.all([resumePromise, playPromise]);
         setPlayingVoice(receptionistId);
+        if (nativePlayback) {
+          setVoiceLevel(0.08);
+          return;
+        }
         const samples = new Uint8Array(analyserRef.current?.frequencyBinCount || 0);
         const sample = () => {
           if (audioRef.current !== audio) return;
@@ -244,6 +251,7 @@ const HireReceptionistModal = ({
     if (embedded && autoPlayOnOpen && receptionist?.voice) {
       playVoice(receptionist.voice, receptionist.id);
     }
+    setDescriptionExpanded(false);
     setSelectedIndex(index);
   };
 
@@ -326,19 +334,22 @@ const HireReceptionistModal = ({
         ) : (
           <>
             {/* Card Carousel — 3D perspective */}
-            {embedded ? receptionists.filter((_, index) => index === selectedIndex).map(person => (
+            {embedded ? receptionists.filter((_, index) => index === selectedIndex).map(person => {
+              const description = person.description || getMbtiProfileSummary(person.personality?.mbti || person.personality_type, person.first_name || person.full_name);
+              const expandableDescription = isCreatedReceptionist(person) && typeof description === 'string' && description.length > 130;
+              return (
               <section className={`ns-receptionist-preview-card ns-catalog-review ${person.avatar_video ? 'ns-catalog-video-review' : ''}`} key={person.id || person.full_name}>
                 <div className="ns-receptionist-preview-image">
                   {person.avatar_video ? <video src={avatarVideoUrl(person.avatar_video)} poster={person.avatar || undefined} autoPlay muted loop playsInline preload="metadata" aria-label={`${person.full_name || 'Receptionist'} video portrait`} /> : person.avatar ? <img src={person.avatar} alt={person.full_name || 'Receptionist'} style={person.source === 'created_receptionist' || person.created_receptionist_id != null ? { objectPosition: 'center top' } : undefined} /> : <div className="ns-gallery-placeholder"><User size={64}/></div>}
                   <div className="ns-receptionist-preview-image-wash" />
                 </div>
                 <div className="ns-receptionist-preview-body">
-                  <div className={`ns-catalog-status-row${hideVoiceButton ? ' is-autoplay' : ''}`}>
-                    <span className="ns-eyebrow">{person.source === 'created_receptionist' ? 'YOUR CREATION' : 'AVAILABLE'}</span>
+                  <div className={`ns-catalog-status-row${hideVoiceButton ? ' is-autoplay' : ''}${compactVoicePreview ? ' is-compact-preview' : ''}`}>
+                    {compactVoicePreview && person.voice ? <button type="button" className="ns-catalog-preview-button" onClick={event => { playVoice(person.voice, person.id, { nativePlayback: true }); if (event.detail > 0) event.currentTarget.blur(); }}><span>{playingVoice === person.id ? 'Playing' : 'Preview'}</span>{playingVoice === person.id ? <Pause size={13}/> : <Volume2 size={13}/>}</button> : <span className="ns-eyebrow">{person.source === 'created_receptionist' ? 'YOUR CREATION' : 'AVAILABLE'}</span>}
                     {hideVoiceButton && person.voice && <IntercomVoiceLine enabled={playingVoice === person.id} level={voiceLevel}/>} 
                   </div>
                   <h2>{person.full_name || 'Receptionist'}</h2>
-                  {(person.description || getMbtiProfileSummary(person.personality?.mbti || person.personality_type, person.first_name || person.full_name)) && <p className="ns-receptionist-preview-copy">{person.description || getMbtiProfileSummary(person.personality?.mbti || person.personality_type, person.first_name || person.full_name)}</p>}
+                  {description && (expandableDescription ? <div className="ns-catalog-description"><p className={`ns-receptionist-preview-copy${descriptionExpanded ? '' : ' is-collapsed'}`}>{description}</p><button type="button" aria-expanded={descriptionExpanded} onClick={() => setDescriptionExpanded(expanded => !expanded)}>{descriptionExpanded ? 'Show less' : 'Show more'}</button></div> : <p className="ns-receptionist-preview-copy">{description}</p>)}
                   <dl className={`ns-catalog-review-meta${isCreatedReceptionist(person) ? ' ns-catalog-review-meta-created' : ''}`}>
                     {person.age && <div><dt>Age</dt><dd>{String(person.age).match(/^\d+$/) ? `${person.age} years old` : person.age}</dd></div>}
                     {catalogMbti(person) && <div><dt>Personality</dt><dd><button type="button" onClick={() => setPersonalityPerson(person)}>{catalogMbti(person)}</button></dd></div>}
@@ -354,7 +365,8 @@ const HireReceptionistModal = ({
                   </div>
                 </div>
               </section>
-            )) : <div className="relative w-full aspect-[2/3] mb-6" style={{ perspective: '1500px' }}>
+            );
+            }) : <div className="relative w-full aspect-[2/3] mb-6" style={{ perspective: '1500px' }}>
               {receptionists.map((person, index) => {
                 if (embedded && index !== selectedIndex) return null;
                 const hasNeighbors = receptionists.length > 1;

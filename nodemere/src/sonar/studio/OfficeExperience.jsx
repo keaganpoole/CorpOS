@@ -36,6 +36,10 @@ export default function OfficeExperience({ initialDestination = 'entry', onRetur
         initialCreatedId={createdCatalogId}
         hiredCatalogIds={hiredCatalogIds}
         hiredVoiceIds={hiredVoiceIds}
+        hideVoiceButton
+        compactVoicePreview
+        galleryIntroReveal
+        portalDetail
         onClose={()=>setDestination('entry')}
         onHire={async receptionist => {
           await onHire?.(receptionist);

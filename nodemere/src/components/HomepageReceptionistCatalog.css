@@ -117,10 +117,18 @@
   gap: 18px;
 }
 
+.ns-gallery-detail-portal .ns-catalog-status-row.is-compact-preview {
+  gap: 6px;
+}
+
 @media (min-width: 761px) {
   .ns-gallery-detail-portal .ns-catalog-status-row.is-autoplay .intercom-voice-line {
     width: min(90px, 16vw);
     height: 26px;
+  }
+
+  .ns-gallery-detail-portal .ns-catalog-status-row.is-compact-preview .intercom-voice-line {
+    width: min(104px, 18vw);
   }
 }
 
@@ -128,6 +136,10 @@
   .ns-gallery-detail-portal .ns-catalog-status-row.is-autoplay .intercom-voice-line {
     width: min(75px, 21vw);
     height: 22px;
+  }
+
+  .ns-gallery-detail-portal .ns-catalog-status-row.is-compact-preview .intercom-voice-line {
+    width: min(86px, 24vw);
   }
 }
 

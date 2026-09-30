@@ -33,6 +33,12 @@
 .ns-catalog-review .ns-receptionist-preview-image video{display:block;width:100%;height:100%;object-fit:contain;background:#09090a}
 .ns-catalog-review .ns-receptionist-preview-body{min-width:0;padding:40px}
 .ns-catalog-review.ns-catalog-video-review .ns-receptionist-preview-copy{max-width:none}
+.ns-catalog-description{margin-bottom:30px}
+.ns-catalog-description .ns-receptionist-preview-copy{max-width:100%;margin-bottom:8px}
+.ns-catalog-description .ns-receptionist-preview-copy.is-collapsed{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;line-clamp:3;overflow:hidden}
+.ns-catalog-description button{padding:0;border:0;background:none;color:#ebebee;font:inherit;font-size:11px;font-weight:600;cursor:pointer}
+.ns-catalog-description button:hover{color:#fff}
+.ns-catalog-description button:focus-visible{outline:2px solid #dab6fa;outline-offset:4px}
 .ns-catalog-review h2{font-size:clamp(32px,3.5vw,48px);line-height:1.05;letter-spacing:-.045em;margin:18px 0 22px;color:#f3f3f5;font-weight:500}
 .ns-catalog-review-meta{margin:0;display:grid;grid-template-columns:1fr 1fr;gap:20px;padding:18px 0}
 .ns-catalog-review-meta.ns-catalog-review-meta-created{grid-template-columns:max-content minmax(0,1fr);column-gap:28px}
@@ -60,6 +66,14 @@
 .ns-catalog-review.ns-catalog-video-review .ns-catalog-review-traits>div{gap:6px;margin-top:0}
 .ns-catalog-review.ns-catalog-video-review .ns-catalog-review-traits>div>span{padding:5px 9px}
 .ns-catalog-review.ns-catalog-video-review .ns-receptionist-preview-actions{margin-top:18px}
+.ns-catalog-status-row.is-autoplay{display:flex;align-items:center;gap:18px}
+.ns-catalog-status-row.is-compact-preview{gap:6px}
+.ns-catalog-preview-button{display:inline-flex;align-items:center;gap:5px;padding:0;border:0;background:none;color:#c7c7cf;font:inherit;font-size:10px;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;transition:color .2s}
+.ns-catalog-preview-button:hover{color:#fff}
+.ns-catalog-preview-button:focus:not(:focus-visible){outline:none;box-shadow:none}
+.ns-catalog-preview-button:focus-visible{outline:2px solid #dab6fa;outline-offset:4px}
+@media (min-width:761px){.ns-catalog-status-row.is-autoplay .intercom-voice-line{width:min(90px,16vw);height:26px}}
+@media (max-width:760px){.ns-catalog-status-row.is-autoplay .intercom-voice-line{width:min(75px,21vw);height:22px}}
 @media(max-width:760px){.ns-catalog-review{grid-template-columns:1fr}.ns-catalog-review .ns-receptionist-preview-image{min-height:0;height:340px}.ns-catalog-review .ns-receptionist-preview-image-wash{background:linear-gradient(0deg,#09090a,transparent 45%)}.ns-catalog-review .ns-receptionist-preview-body{padding:28px}}
 @media(max-width:760px){.ns-catalog-video-review .ns-receptionist-preview-image{height:auto;aspect-ratio:16/9;min-height:0}.ns-catalog-video-review .ns-receptionist-preview-body{padding:24px}}
 .ns-gallery-detail-close{position:sticky;top:0;display:flex;align-items:center;gap:8px;margin:0 0 12px auto;color:#e1dce6;background:#17131bea;border:1px solid #ffffff20;border-radius:30px;padding:9px 14px;font-size:11px;cursor:pointer;z-index:2}
