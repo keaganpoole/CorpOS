@@ -688,8 +688,8 @@ function CalendarMonthViewBody({ data, className = '', selectedDate: selectedDat
                         <span className="inline-flex h-4 items-center truncate text-xs font-semibold leading-none text-zinc-200">{title}</span>
                         <span className="inline-flex h-4 items-center text-[10px] font-medium italic leading-none text-zinc-500">with</span>
                         <span className="inline-flex h-4 items-center truncate text-[10px] font-medium leading-none text-zinc-400">{getCustomerName(appointment)}</span>
-                        <span className="inline-flex h-4 items-center text-[10px] font-medium italic leading-none text-zinc-500">via</span>
-                        <span className="inline-flex h-4 items-center truncate text-[10px] font-medium leading-none text-zinc-400">{appointment._receptionistName || 'Receptionist'}</span>
+                        <span className="appointment-record-detail-via inline-flex h-4 items-center text-[10px] font-medium italic leading-none text-zinc-500">via</span>
+                        <span className="appointment-record-detail-receptionist inline-flex h-4 items-center truncate text-[10px] font-medium leading-none text-zinc-400">{appointment._receptionistName || 'Receptionist'}</span>
                       </>}
                       actions={<AnimatePresence mode="wait" initial={false}>
                         {activePromptAction ? <motion.div key="action-prompt" initial={{ opacity: 0, x: -14, scale: .96 }} animate={{ opacity: 1, x: 0, scale: 1 }} exit={{ opacity: 0, x: -12, scale: .97 }} transition={{ type: 'spring', stiffness: 440, damping: 28, mass: .7 }} className="flex min-w-0 flex-1">
@@ -994,6 +994,14 @@ function CalendarMonthViewBody({ data, className = '', selectedDate: selectedDat
         .real-calendar-appointment-record > * {
           position: relative;
           z-index: 1;
+        }
+
+        @media (max-width: 767px) {
+          .real-calendar-appointment-record .appointment-record-category,
+          .real-calendar-appointment-record .appointment-record-detail-via,
+          .real-calendar-appointment-record .appointment-record-detail-receptionist {
+            display: none;
+          }
         }
 
         .demo-calendar-avatar-trigger {
