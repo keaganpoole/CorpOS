@@ -1,4 +1,4 @@
-import { STATUS_OPTIONS, SOURCE_OPTIONS } from './appointmentSchema';
+import { APPOINTMENT_STATUS_COLORS, STATUS_OPTIONS, SOURCE_OPTIONS } from './appointmentSchema';
 import { supabase } from './supabase';
 import { readTransient, writeTransient } from '../../lib/browserPrivacy';
 import { getCurrentBusinessId } from './customFields';
@@ -16,13 +16,7 @@ export const DEFAULT_FIELD_CONFIG = {
   status: {
     name: 'Status',
     icon: 'activity',
-    optionColors: {
-      Pending: '#f59e0b',
-      Confirmed: '#06b6d4',
-      Completed: '#10b981',
-      Missed: '#f43f5e',
-      Cancelled: '#d946ef',
-    },
+    optionColors: APPOINTMENT_STATUS_COLORS,
   },
   source: {
     name: 'Source',

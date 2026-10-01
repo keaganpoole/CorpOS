@@ -4,7 +4,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { ArrowLeft, Plus, X, Search, Sparkles, Phone, PhoneCall, CalendarDays, Bell, Heart, MessageCircle, Repeat2, Receipt, Check, Pencil, Trash2, Loader2, Lightbulb } from 'lucide-react';
 import { FcGoogle } from 'react-icons/fc';
 import { api } from '../lib/api';
-import { STATUS_OPTIONS } from '../lib/appointmentSchema';
+import { APPOINTMENT_STATUS_COLORS, STATUS_OPTIONS } from '../lib/appointmentSchema';
 import DropInAppointmentPreview from './DropInAppointmentPreview';
 import ModalSpectrumLine from '../../components/ModalSpectrumLine';
 import './dropIns.css';
@@ -16,7 +16,9 @@ const statusCopy = {
   pending: 'Before the appointment is confirmed.', confirmed: 'Help customers get ready for their visit.',
   completed: 'Keep the conversation going after a visit.', missed: 'A thoughtful way to reconnect.', cancelled: 'Leave the door open for another visit.',
 };
-const STATUS_COLORS = { pending: '#fbbf24', confirmed: '#34d399', completed: '#22c55e', missed: '#fb7185', cancelled: '#f43f5e' };
+const STATUS_COLORS = Object.fromEntries(
+  Object.entries(APPOINTMENT_STATUS_COLORS).map(([name, color]) => [name.toLowerCase(), color]),
+);
 const blank = (status) => ({ name: '', purpose: '', prompt: '', is_active: true, available_on_status: status });
 const manual = (a, b) => a.sort_order - b.sort_order || a.id.localeCompare(b.id);
 

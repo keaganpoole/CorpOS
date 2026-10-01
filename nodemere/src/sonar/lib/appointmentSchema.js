@@ -23,6 +23,14 @@ export const STATUS_OPTIONS = [
   { value: 'Cancelled', color: 'fuchsia' },
 ];
 
+export const APPOINTMENT_STATUS_COLORS = {
+  Pending: '#f59e0b',
+  Confirmed: '#06b6d4',
+  Completed: '#10b981',
+  Missed: '#f43f5e',
+  Cancelled: '#d946ef',
+};
+
 export const SOURCE_OPTIONS = [
   { value: 'Phone', color: 'cyan' },
   { value: 'Text', color: 'emerald' },

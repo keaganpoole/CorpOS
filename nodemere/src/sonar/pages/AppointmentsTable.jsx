@@ -502,7 +502,7 @@ const InlineSelect = ({ value, options, onSave, type = 'select', optionColors = 
                       handleSave(event, val);
                     }}
                     className={`w-full text-left px-3 py-2 text-[11px] font-semibold tracking-[-0.02em] flex items-center gap-2 hover:bg-white/[0.06] ${isActive ? 'text-white' : 'text-zinc-400'}`}>
-                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: styleFor(val).dot }} />
+                    <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: styleFor(val).dot }} />
                     {val}
                     {isActive && <Check size={11} className="ml-auto text-white" />}
                   </motion.button>

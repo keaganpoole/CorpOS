@@ -17,6 +17,7 @@ import {
   Workflow,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { APPOINTMENT_STATUS_COLORS } from '../sonar/lib/appointmentSchema';
 import HomepageScenariosDemo from '../sonar/pages/Scenarios/HomepageScenariosDemo';
 import HomepagePeopleCrmDemo, { DEMO_CUSTOM_FIELDS } from '../sonar/pages/HomepagePeopleCrmDemo';
 import CallLayerBorderOverlay from '../sonar/components/CallLayerBorderOverlay';
@@ -32,10 +33,10 @@ const TAG_COLORS = {
   Blowout: HERO_COLORS[5],
 };
 const DEMO_APPOINTMENT_STATUS_COLORS = {
-  Completed: '#38bdf8',
-  Cancelled: '#fb3b71',
-  Confirmed: '#22c55e',
-  Booked: '#ffb84d',
+  Completed: APPOINTMENT_STATUS_COLORS.Completed,
+  Cancelled: APPOINTMENT_STATUS_COLORS.Cancelled,
+  Confirmed: APPOINTMENT_STATUS_COLORS.Confirmed,
+  Booked: APPOINTMENT_STATUS_COLORS.Pending,
 };
 
 const getDemoAppointmentActions = (status) => {

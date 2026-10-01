@@ -10,7 +10,7 @@ import {
   Search,
 } from 'lucide-react';
 import { useAppointments } from '../hooks/useAppointments';
-import { APPOINTMENT_FIELDS, formatDate, formatTime, formatTimestampFull, titleCase } from '../lib/appointmentSchema';
+import { APPOINTMENT_FIELDS, APPOINTMENT_STATUS_COLORS, formatDate, formatTime, formatTimestampFull, titleCase } from '../lib/appointmentSchema';
 import { supabase } from '../lib/supabase';
 import { api } from '../lib/api';
 import { useDropIns } from '../hooks/useDropIns';
@@ -27,13 +27,6 @@ const HOMEPAGE_TAG_COLORS = {
   Styling: '#a78bfa',
   Haircut: '#f472b6',
   Blowout: '#fbbf24',
-};
-const STATUS_COLORS = {
-  Confirmed: '#22c55e',
-  Pending: '#ffb84d',
-  Completed: '#38bdf8',
-  Missed: '#fb3b71',
-  Cancelled: '#fb3b71',
 };
 const MAGGIE_PREVIEW_RECEPTIONIST = {
   name: 'Maggie',
@@ -98,8 +91,10 @@ function getAppointmentCategory(appointment, servicesById) {
 }
 
 function getAppointmentColor(appointment, servicesById) {
+  const status = APPOINTMENT_STATUS_COLORS[titleCase(appointment.status)];
+  if (status) return status;
   const category = getAppointmentCategory(appointment, servicesById);
-  return HOMEPAGE_TAG_COLORS[category] || STATUS_COLORS[titleCase(appointment.status)] || '#818cf8';
+  return HOMEPAGE_TAG_COLORS[category] || '#818cf8';
 }
 
 function getAppointmentTitle(appointment, servicesById) {
@@ -585,7 +580,7 @@ function CalendarMonthViewBody({ data, className = '', selectedDate: selectedDat
                 onClick={() => setSelectedDate(dateStr)}
                 className={`relative flex aspect-square flex-col justify-between overflow-hidden border transition-all duration-300 ${
                   isSelected
-                    ? 'z-10 border-transparent bg-gradient-to-tr from-violet-600 via-purple-600 to-fuchsia-600 text-white shadow-[0_0_18px_rgba(139,92,246,0.3)]'
+                    ? 'z-10 border-transparent bg-gradient-to-tr from-zinc-300 via-zinc-100 to-white text-zinc-900 shadow-[0_0_18px_rgba(255,255,255,0.18)]'
                     : 'border-white/5 bg-zinc-950/60 text-zinc-400 hover:border-white/20'
                 } rounded-xl p-2`}
               >
@@ -599,7 +594,7 @@ function CalendarMonthViewBody({ data, className = '', selectedDate: selectedDat
                       key={appointment.id}
                       className="dot-item h-1 w-1 rounded-full"
                       style={{
-                        backgroundColor: isSelected ? '#ffffff' : getAppointmentColor(appointment, servicesById),
+                        backgroundColor: isSelected ? '#52525b' : getAppointmentColor(appointment, servicesById),
                         animationDelay: hasAnimatedDots ? `${day * 24 + dotIndex * 80 + appointmentIndexSeed(appointment.id)}ms` : '0ms',
                         animationDuration: '720ms',
                       }}
@@ -634,6 +629,7 @@ function CalendarMonthViewBody({ data, className = '', selectedDate: selectedDat
                 const category = getAppointmentCategory(appointment, servicesById);
                 const title = getAppointmentTitle(appointment, servicesById);
                 const receptionistRow = receptionistsById.get(String(appointment.receptionist_id || '')) || null;
+                const assignedReceptionistName = appointment._receptionistName || receptionistRow?.full_name || '';
                 const receptionistCatalogRow = receptionistRow?.catalog_id ? receptionistCatalogById.get(String(receptionistRow.catalog_id)) : null;
                 const avatarLabel = getAvatarLabel(appointment);
                 const avatarSrc = appointment._receptionistAvatar
@@ -688,8 +684,10 @@ function CalendarMonthViewBody({ data, className = '', selectedDate: selectedDat
                         <span className="inline-flex h-4 items-center truncate text-xs font-semibold leading-none text-zinc-200">{title}</span>
                         <span className="inline-flex h-4 items-center text-[10px] font-medium italic leading-none text-zinc-500">with</span>
                         <span className="inline-flex h-4 items-center truncate text-[10px] font-medium leading-none text-zinc-400">{getCustomerName(appointment)}</span>
-                        <span className="appointment-record-detail-via inline-flex h-4 items-center text-[10px] font-medium italic leading-none text-zinc-500">via</span>
-                        <span className="appointment-record-detail-receptionist inline-flex h-4 items-center truncate text-[10px] font-medium leading-none text-zinc-400">{appointment._receptionistName || 'Receptionist'}</span>
+                        {assignedReceptionistName && <>
+                          <span className="appointment-record-detail-via inline-flex h-4 items-center text-[10px] font-medium italic leading-none text-zinc-500">via</span>
+                          <span className="appointment-record-detail-receptionist inline-flex h-4 items-center truncate text-[10px] font-medium leading-none text-zinc-400">{assignedReceptionistName}</span>
+                        </>}
                       </>}
                       actions={<AnimatePresence mode="wait" initial={false}>
                         {activePromptAction ? <motion.div key="action-prompt" initial={{ opacity: 0, x: -14, scale: .96 }} animate={{ opacity: 1, x: 0, scale: 1 }} exit={{ opacity: 0, x: -12, scale: .97 }} transition={{ type: 'spring', stiffness: 440, damping: 28, mass: .7 }} className="flex min-w-0 flex-1">

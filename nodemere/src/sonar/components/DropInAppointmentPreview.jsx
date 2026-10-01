@@ -6,9 +6,12 @@ import CallLayerBorderOverlay from './CallLayerBorderOverlay';
 import DropInStrip from './DropInStrip';
 import DropInHierarchyStrip from './DropInHierarchyStrip';
 import { ancestry } from '../lib/dropInGraph';
+import { APPOINTMENT_STATUS_COLORS } from '../lib/appointmentSchema';
 import './dropInPreview.css';
 
-const COLORS = { pending: '#fbbf24', confirmed: '#34d399', completed: '#22c55e', missed: '#fb7185', cancelled: '#f43f5e' };
+const COLORS = Object.fromEntries(
+  Object.entries(APPOINTMENT_STATUS_COLORS).map(([name, color]) => [name.toLowerCase(), color]),
+);
 const ADD_DROP_IN_ITEM = { id: '__add_drop_in__', name: 'Add drop-in', isAdd: true };
 
 export default function DropInAppointmentPreview({ items, status, draft, showCallLayer = false, receptionist, onAdd, onDelete, canManage, studioNavigation = false }) {
