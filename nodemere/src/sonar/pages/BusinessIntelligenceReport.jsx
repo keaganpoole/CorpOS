@@ -225,7 +225,7 @@ export default function BusinessIntelligenceReport() {
   const sectionLinks = useMemo(() => Object.entries(SECTION_META).filter(([key]) => (sections[key] || []).length), [sections]);
 
   if (loading) {
-    return <div className="flex h-full items-center justify-center bg-[#020202]"><CubePreloader size={28} /></div>;
+    return <div className="dashboard-mobile-viewport-loader flex h-full items-center justify-center bg-[#020202]"><CubePreloader size={22} /></div>;
   }
 
   if (!report) {

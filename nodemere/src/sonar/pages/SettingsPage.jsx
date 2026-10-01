@@ -4332,7 +4332,7 @@ const SettingsPage = ({ mobileUsage, onMobileUpgrade }) => {
 
   if (loading) {
     return (
-      <div className="h-full flex items-center justify-center bg-[#020202]">
+      <div className="dashboard-mobile-viewport-loader h-full flex items-center justify-center bg-[#020202]">
         <CubePreloader size={22} />
       </div>
     );

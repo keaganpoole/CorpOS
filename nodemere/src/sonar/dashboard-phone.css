@@ -1,6 +1,19 @@
 /* Second responsive pass: all overrides are confined to phones and dashboard opt-in.
    No public page, Scenarios, tablet, or desktop selectors are changed here. */
 @media (max-width: 767px) {
+  /* Page loaders use the physical viewport so their center never shifts with page chrome or content height. */
+  .sonar-dashboard-shell[data-responsive="true"] .dashboard-mobile-viewport-loader {
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 40;
+    display: flex;
+    min-height: 100dvh !important;
+    align-items: center;
+    justify-content: center;
+    padding: 0 !important;
+    pointer-events: none;
+  }
+
   .sonar-dashboard-shell[data-responsive="true"] *,
   .sonar-dashboard-shell[data-responsive="true"] *::before,
   .sonar-dashboard-shell[data-responsive="true"] *::after,

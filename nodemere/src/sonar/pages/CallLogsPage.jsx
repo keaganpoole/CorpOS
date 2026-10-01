@@ -366,8 +366,8 @@ function DeleteConfirmModal({ count, onCancel, onConfirm, deleting }) {
 
 function CallLogsLoader() {
   return (
-    <div className="flex min-h-[320px] items-center justify-center px-4 py-6">
-      <CubePreloader size={28} />
+    <div className="dashboard-mobile-viewport-loader flex min-h-[320px] items-center justify-center px-4 py-6">
+      <CubePreloader size={22} />
     </div>
   );
 }

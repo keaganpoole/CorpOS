@@ -1780,7 +1780,7 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
   );
 
   const renderAppointmentsLoader = () => (
-    <div className="appointments-loader absolute inset-0 z-30 flex items-center justify-center px-6">
+    <div className="appointments-loader dashboard-mobile-viewport-loader absolute inset-0 z-30 flex items-center justify-center px-6">
       <CubePreloader size={22} />
     </div>
   );

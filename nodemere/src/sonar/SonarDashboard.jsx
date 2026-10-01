@@ -2367,7 +2367,7 @@ const SonarDashboard = () => {
     }
     switch (route) {
       case 'receptionists':
-        if (teamExperience !== 'team') return <Suspense fallback={<div className="h-full grid place-items-center"><CubePreloader /></div>}><OfficeExperience initialDestination={studioLaunchDestination} onReturn={leaveStudio} onCreateStarted={() => setTeamExperience('studio')} hiredCatalogIds={enrichedAgents.map((agent) => agent.catalog_id).filter(Boolean)} hiredVoiceIds={enrichedAgents.map((agent) => agent.elevenlabs_voice_id).filter(Boolean)} onHire={async (receptionist) => {
+        if (teamExperience !== 'team') return <Suspense fallback={<div className="dashboard-mobile-viewport-loader h-full grid place-items-center"><CubePreloader /></div>}><OfficeExperience initialDestination={studioLaunchDestination} onReturn={leaveStudio} onCreateStarted={() => setTeamExperience('studio')} hiredCatalogIds={enrichedAgents.map((agent) => agent.catalog_id).filter(Boolean)} hiredVoiceIds={enrichedAgents.map((agent) => agent.elevenlabs_voice_id).filter(Boolean)} onHire={async (receptionist) => {
           const result = await api.hireReceptionist(receptionist);
           if (!result) throw new Error('Failed to hire receptionist');
           await refresh();
@@ -2378,7 +2378,7 @@ const SonarDashboard = () => {
         return (
           <div className={`receptionists-page-scope relative h-full ${marketplaceAgent ? 'overflow-hidden' : 'overflow-auto'} custom-scrollbar bg-[#020202] flex flex-col`}>
             {teamInitialLoading ? (
-              <div className="absolute inset-0 z-30 flex items-center justify-center bg-[#020202]">
+              <div className="dashboard-mobile-viewport-loader absolute inset-0 z-30 flex items-center justify-center bg-[#020202]">
                 <CubePreloader />
               </div>
             ) : null}
@@ -2417,11 +2417,6 @@ const SonarDashboard = () => {
             </div>
 
             <div className="relative min-h-0 flex-1">
-              {teamInitialLoading ? (
-                <div className="absolute inset-0 z-10 flex items-center justify-center pb-20">
-                  <CubePreloader />
-                </div>
-              ) : null}
               <motion.div
                 className="custom-scrollbar absolute inset-0 overflow-auto px-12 pb-8 pt-5"
                 initial="hidden"
@@ -2431,8 +2426,8 @@ const SonarDashboard = () => {
                 aria-hidden={teamView !== 'receptionists' || teamInitialLoading}
               >
                 {
-                agentsLoading ? (
-                  <div className="flex min-h-full items-center justify-center pb-20">
+                !teamInitialLoading && teamView === 'receptionists' && agentsLoading ? (
+                  <div className="dashboard-mobile-viewport-loader flex min-h-full items-center justify-center pb-20">
                     <CubePreloader />
                   </div>
                 ) : enrichedAgents.length === 0 ? (
@@ -2477,8 +2472,8 @@ const SonarDashboard = () => {
               >
                 {teamActionError && <p role="alert" className="mb-4 text-xs text-rose-300">{teamActionError}</p>}
                 {
-                archivedAgentsLoading ? (
-                  <div className="flex min-h-full items-center justify-center pb-20">
+                !teamInitialLoading && teamView === 'archived' && archivedAgentsLoading ? (
+                  <div className="dashboard-mobile-viewport-loader flex min-h-full items-center justify-center pb-20">
                     <CubePreloader />
                   </div>
                 ) : archivedAgents.length > 0 ? (
@@ -2546,11 +2541,11 @@ const SonarDashboard = () => {
                   hideIntro
                   hideToolbar
                   cardGridClassName="grid grid-cols-[repeat(auto-fill,380px)] items-start justify-start gap-8"
-                  loadingFallback={(
-                    <div className="flex min-h-full items-center justify-center pb-20">
+                  loadingFallback={teamView === 'staff' && !teamInitialLoading ? (
+                    <div className="dashboard-mobile-viewport-loader flex min-h-full items-center justify-center pb-20">
                       <CubePreloader />
                     </div>
-                  )}
+                  ) : <></>}
                 />
               </motion.div>
             </div>
