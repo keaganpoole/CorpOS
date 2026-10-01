@@ -179,6 +179,89 @@
   .drop-ins-modal .drop-in-preview { flex-basis: 180px; }
   .drop-ins-modal .drop-ins-header { padding-top: 16px; }
 }
+/* Phone layout: one vertical scroll surface, with the preview and controls sized
+   for the available width rather than retaining their desktop proportions. */
+@media (max-width: 767px) {
+  .drop-ins-backdrop { padding: 0; }
+  .drop-ins-modal {
+    width: 100%;
+    height: 100dvh;
+    max-height: 100dvh;
+    border-radius: 0;
+    border-inline: 0;
+  }
+  .drop-ins-modal .drop-ins-header {
+    padding: max(10px, env(safe-area-inset-top)) 16px 9px;
+    border-bottom: 1px solid #ffffff0b;
+  }
+  .drop-ins-modal .drop-ins-heading { gap: 9px; min-width: 0; }
+  .drop-ins-modal .drop-ins-heading-icon { width: 32px; height: 32px; border-radius: 10px; }
+  .drop-ins-modal .drop-ins-heading-icon svg { width: 17px; height: 17px; }
+  .drop-ins-modal .drop-ins-heading h2 { font-size: 21px; }
+  .drop-ins-modal .drop-ins-heading .drop-ins-eyebrow { display: none; }
+  .drop-ins-modal .drop-ins-header-status { height: 25px; padding-inline: 7px; font-size: 9px; }
+  .drop-ins-modal .drop-ins-icon-button { width: 30px; height: 30px; }
+  .drop-ins-modal .drop-ins-body {
+    min-width: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: none;
+  }
+  .drop-ins-modal .drop-ins-body::-webkit-scrollbar { display: none; }
+  .drop-ins-modal .drop-in-preview { flex: 0 0 136px; }
+  .drop-ins-modal .drop-in-preview-stage { min-height: 0; overflow: hidden; }
+  .drop-ins-modal .drop-ins-controls { flex: none; overflow: visible; min-width: 0; }
+  .drop-ins-modal .drop-ins-statuses {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0 10px;
+    padding: 3px 16px;
+    overflow: visible;
+  }
+  .drop-ins-modal .drop-ins-statuses > button {
+    justify-content: center;
+    gap: 5px;
+    min-width: 0;
+    padding: 9px 0;
+    font-size: 10px;
+  }
+  .drop-ins-modal .drop-ins-statuses > button.is-current:after { display: block; }
+  .drop-ins-modal .drop-ins-status-indicator { display: none; }
+  .drop-ins-modal .drop-ins-tab-count { font-size: 9px; padding-inline: 3px; }
+  .drop-ins-modal .drop-ins-workspace {
+    flex: none;
+    min-width: 0;
+    padding: 15px 16px max(22px, env(safe-area-inset-bottom));
+    overflow: visible;
+  }
+  .drop-ins-modal .drop-ins-section-heading { align-items: flex-start; gap: 10px; margin-bottom: 14px; }
+  .drop-ins-modal .drop-ins-section-heading h3 { font-size: 19px; }
+  .drop-ins-modal .drop-ins-section-heading p:not(.drop-ins-eyebrow) { line-height: 1.45; }
+  .drop-ins-modal .drop-ins-heading-actions { width: auto; gap: 6px; }
+  .drop-ins-modal .drop-ins-primary,
+  .drop-ins-modal .drop-ins-secondary { height: 34px; padding-inline: 11px; font-size: 10px!important; }
+  .drop-ins-modal .drop-ins-list { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .drop-ins-modal .drop-ins-list-row { min-height: 0; padding: 11px; }
+  .drop-ins-modal .drop-ins-list-text { padding-left: 18px; }
+  .drop-ins-modal .drop-ins-order-number { top: 12px; left: 11px; }
+  .drop-ins-modal .drop-ins-gallery-heading { gap: 9px; }
+  .drop-ins-modal .drop-ins-gallery-search { width: 100%; padding: 8px 10px; }
+  .drop-ins-modal .drop-ins-categories { gap: 8px 15px; margin: 10px 0 12px; }
+  .drop-ins-modal .drop-ins-categories button { padding-block: 5px; }
+  .drop-ins-modal .drop-ins-gallery { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .drop-ins-modal .drop-ins-template { min-height: 0; padding: 12px; }
+  .drop-ins-modal .drop-ins-template-top { margin-bottom: 7px; }
+  .drop-ins-modal .drop-ins-template p { margin-bottom: 9px; }
+  .drop-ins-modal .drop-ins-editor { gap: 13px; }
+  .drop-ins-modal .drop-ins-editor-identity { gap: 13px; }
+  .drop-ins-modal .drop-ins-field > label { margin-bottom: 6px; }
+  .drop-ins-modal .drop-ins-field > label span { margin-top: 2px; }
+  .drop-ins-modal .drop-ins-editor input,
+  .drop-ins-modal .drop-ins-editor textarea { padding: 9px 11px; font-size: 13px; line-height: 1.5; }
+  .drop-ins-modal .drop-ins-editor textarea { min-height: 120px; }
+  .drop-ins-modal .drop-ins-editor-footer { padding-top: 12px; }
+}
 /* Keep the button layer on the same 20px centerline as the preview avatar. */
 .drop-ins-modal .drop-in-preview-record .drop-in-strip,
 .drop-ins-modal .drop-in-preview-record .drop-in-strip-page { height: 20px; }

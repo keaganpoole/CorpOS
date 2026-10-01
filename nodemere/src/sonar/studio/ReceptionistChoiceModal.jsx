@@ -52,7 +52,7 @@ export default function ReceptionistChoiceModal({ onClose, onCreate, onHire }) {
     >
       <div className="ns-entry ns-choice-modal-content">
         <motion.div className="ns-choice-modal-header" initial={false} exit={{ opacity: 0 }} transition={{ duration: reducedMotion ? 0 : .12 }}><button type="button" onClick={onClose} aria-label="Close receptionist choices"><X size={18}/></button></motion.div>
-        <ReceptionistChoiceCards cascade onCreate={onCreate} onHire={onHire} createTitle="Create" catalogTitle="Hire" createBackground={<AuditionChoiceBackground/>} catalogBackground={<CatalogChoiceBackground/>}/>
+        <ReceptionistChoiceCards cascade onCreate={onCreate} onHire={onHire} createEyebrow={<><span>NODEMERE </span><span className="ns-choice-eyebrow-accent">AUDITION</span></>} catalogEyebrow={<><span>THE RECEPTIONIST </span><span className="ns-choice-eyebrow-accent">COLLECTION</span></>} createTitle="Create" catalogTitle="Hire" createBackground={<AuditionChoiceBackground/>} catalogBackground={<CatalogChoiceBackground/>}/>
       </div>
     </motion.section>
   </motion.div>, document.body);

@@ -1049,6 +1049,7 @@ const NavButton = ({ item, isActive, onClick, collapsed = false }) => {
   return (
     <button
       onClick={handleClick}
+      aria-label={item.label}
       className={`no-drag w-full flex items-center gap-3.5 rounded-xl px-3 py-2.5 text-[13px] relative group overflow-hidden ${isActive ? 'text-zinc-100 bg-white/5' : 'text-zinc-500 hover:bg-white/5 hover:text-white'}`}
       title={collapsed ? item.label : undefined}
     >
@@ -2401,10 +2402,10 @@ const SonarDashboard = () => {
               <div className="flex items-center gap-3">
                 {teamView === 'receptionists' ? (
                   <>
-                    <button aria-label="New Receptionist" onClick={() => setShowReceptionistChoice(true)} className={isPhone ? 'mobile-floating-add' : 'dashboard-neutral-button flex items-center gap-2 px-5 py-2.5 rounded-xl text-[11px] font-bold tracking-wider transition-all active:scale-95'}>{isPhone ? <Plus size={24} /> : 'New Receptionist'}</button>
+                    <button aria-label="New Receptionist" onClick={() => setShowReceptionistChoice(true)} className={isPhone ? 'mobile-floating-add' : 'dashboard-neutral-button flex items-center gap-2 px-5 py-2.5 rounded-xl text-[11px] font-bold tracking-wider transition-all active:scale-95'}>{'New Receptionist'}</button>
                   </>
                 ) : teamView === 'staff' ? (
-                  <button aria-label="New Staff Member" onClick={() => window.dispatchEvent(new CustomEvent('team:open-staff-modal'))} className={isPhone ? 'mobile-floating-add' : 'dashboard-neutral-button flex items-center gap-2 px-5 py-2.5 rounded-xl text-[11px] font-bold tracking-wider transition-all active:scale-95'}>{isPhone ? <Plus size={24} /> : 'New Staff Member'}</button>
+                  <button aria-label="New Staff Member" onClick={() => window.dispatchEvent(new CustomEvent('team:open-staff-modal'))} className={isPhone ? 'mobile-floating-add' : 'dashboard-neutral-button flex items-center gap-2 px-5 py-2.5 rounded-xl text-[11px] font-bold tracking-wider transition-all active:scale-95'}>{'New Staff Member'}</button>
                 ) : null}
               </div>
             </div>

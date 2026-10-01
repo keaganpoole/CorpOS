@@ -43,14 +43,14 @@ function ChoiceCard({ primary = false, icon: Icon, eyebrow, title, copy, action,
   >{button}</motion.div>;
 }
 
-export function ReceptionistChoiceCards({ onCreate, onHire, createBackground, catalogBackground, createTitle, catalogTitle, cascade = false }) {
+export function ReceptionistChoiceCards({ onCreate, onHire, createBackground, catalogBackground, createTitle, catalogTitle, createEyebrow = 'NODEMERE AUDITION', catalogEyebrow = 'THE RECEPTIONIST COLLECTION', cascade = false }) {
   return <div className="ns-choice-cards">
       <ChoiceCard
         primary
         cascadeIndex={cascade ? 0 : undefined}
         background={createBackground}
         icon={Sparkles}
-        eyebrow="NODEMERE AUDITION"
+        eyebrow={createEyebrow}
         title={createTitle ?? <>Create a<br/>receptionist.</>}
         copy={<>Shape a voice, a personality, and a presence made entirely for your business.</>}
         action="Start from scratch"
@@ -60,7 +60,7 @@ export function ReceptionistChoiceCards({ onCreate, onHire, createBackground, ca
         icon={BookOpen}
         cascadeIndex={cascade ? 1 : undefined}
         background={catalogBackground}
-        eyebrow="THE RECEPTIONIST COLLECTION"
+        eyebrow={catalogEyebrow}
         title={catalogTitle ?? <>Choose from<br/>the catalog.</>}
         copy={<>Explore ready-to-hire receptionists with their own voice, look, and point of view.</>}
         action="Explore the collection"

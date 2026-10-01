@@ -7,6 +7,8 @@ const destinations = [
   { id: 'calendar', label: 'Calendar', icon: CalendarFold },
   { id: 'pipeline', label: 'People', icon: BookUser },
   { id: 'live-monitoring', label: 'Reports', icon: BarChart3 },
+  { id: 'call-logs', label: 'Calls', icon: Phone },
+  { id: 'settings', label: 'Settings', icon: Settings },
 ];
 
 export default function MobileNavigation({ currentRoute, onNavigate, onReportProblem, profile, usage, business, onUsage, onAccount }) {

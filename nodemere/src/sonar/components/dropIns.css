@@ -26,6 +26,29 @@
 @media(prefers-reduced-motion:reduce){.drop-ins-modal *,.drop-in-strip *{animation:none!important;transition:none!important}}
 
 .drop-ins-modal{color-scheme:dark}
+
+@media (max-width: 767px) {
+  body .drop-ins-tips-backdrop { padding: 12px; }
+  body .drop-ins-tips-modal {
+    width: 100%;
+    max-height: calc(100dvh - 24px);
+    border-radius: 20px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    scrollbar-width: none;
+  }
+  body .drop-ins-tips-modal::-webkit-scrollbar { display: none; }
+  body .drop-ins-tips-content { padding: 19px 20px 20px; }
+  body .drop-ins-tips-kicker { margin-bottom: 7px; font-size: 10px; }
+  body .drop-ins-tips-top h3 { font-size: 19px; }
+  body .drop-ins-tips-top p { margin-top: 7px; font-size: 11px; line-height: 1.5; }
+  body .drop-ins-tips-points { gap: 13px; margin-top: 18px; }
+  body .drop-ins-tips-point { gap: 10px; }
+  body .drop-ins-tips-point strong,
+  body .drop-ins-tips-point p { font-size: 11px; line-height: 1.5; }
+  body .drop-ins-tips-point p { margin-top: 2px; }
+  body .drop-ins-tips-footer { margin-top: 17px; padding-top: 11px; font-size: 11px; line-height: 1.5; }
+}
 .drop-in-strip .drop-in-chip{font-size:9px;font-weight:700;letter-spacing:-.02em;line-height:16px}
 
 .drop-ins-title-row{display:flex;align-items:center;gap:9px}.drop-ins-tips-button{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;padding:0;border:0;background:transparent;color:#71717a;transition:color .2s,transform .2s}.drop-ins-tips-button:hover{color:#e4e4e7;transform:translateY(-1px)}
