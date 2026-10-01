@@ -117,6 +117,8 @@ const teamCardVariants = {
 const DEFAULT_DASHBOARD_ROUTE = 'receptionists';
 const DASHBOARD_ROUTES = ['live-monitoring', 'receptionists', 'scenarios', 'calendar', 'call-logs', 'pipeline', 'stats', 'settings'];
 const POPUP_DISMISS_PERSISTS_SHOWN = false;
+// Temporarily suppress every automatic dashboard popup without removing its definition.
+const SHOW_AUTOMATIC_DASHBOARD_POPUPS = false;
 
 const formatPlanName = (plan) => {
   const rawPlanName = String(plan || 'Free').trim() || 'Free';
@@ -1872,6 +1874,10 @@ const SonarDashboard = () => {
   }, []);
 
   useEffect(() => {
+    if (!SHOW_AUTOMATIC_DASHBOARD_POPUPS) {
+      setShowPlanChangePopup(false);
+      return;
+    }
     const welcomePopupDismissed = profile?.popups?.plan_change_popup?.shown === true;
     setShowPlanChangePopup(Boolean(profile?.plan) && !welcomePopupDismissed);
   }, [profile?.plan, profile?.popups]);
@@ -2325,13 +2331,13 @@ const SonarDashboard = () => {
     if (popupState.shown !== false || popupState.hide !== false) return null;
     return manualPopup;
   })();
-  const activePopup = activeManualPopup || POPUP_DEFINITIONS.find((popup) => {
+  const activePopup = activeManualPopup || (SHOW_AUTOMATIC_DASHBOARD_POPUPS ? POPUP_DEFINITIONS.find((popup) => {
     if (popup.manualOnly) return false;
     if (popup.placement !== 'dashboard' || dismissedPopupIds.includes(popup.id)) return false;
     const popupState = getPopupState(profile?.popups, popup.id);
     if (popupState.shown !== false || popupState.hide !== false) return false;
     return typeof popup.shouldShow === 'function' ? popup.shouldShow(popupContext) : true;
-  });
+  }) : null);
 
   useEffect(() => {
     if (!pendingModel || !agents) return;

@@ -22,6 +22,9 @@ import VisitorTracking from './components/VisitorTracking';
 import { WorkforceGate } from './components/WorkforceSecurity';
 import CustomerExperienceFeedback from './components/CustomerExperienceFeedback';
 
+// Temporarily hide the automatic "Help us make Nodemere better" dashboard prompt.
+const SHOW_CUSTOMER_EXPERIENCE_FEEDBACK = false;
+
 // Sonar Dashboard
 import SonarDashboard from './sonar/SonarDashboard';
 import ProjectIntelligenceReport from './sonar/pages/ProjectIntelligenceReport';
@@ -185,7 +188,7 @@ function AppContent() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       <CookieNotice />
-      {location.pathname.startsWith('/dashboard') && <CustomerExperienceFeedback />}
+      {SHOW_CUSTOMER_EXPERIENCE_FEEDBACK && location.pathname.startsWith('/dashboard') && <CustomerExperienceFeedback />}
     </>
   );
 }
