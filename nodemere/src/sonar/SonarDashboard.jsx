@@ -2049,6 +2049,19 @@ const SonarDashboard = () => {
   }, [isPhone, userId]);
 
   useEffect(() => {
+    if (!isPhone) return undefined;
+    const refreshMobileBusiness = (event) => {
+      if (event.detail?.business) {
+        setMobileBusiness(event.detail.business);
+        return;
+      }
+      api.getBusinessProfile().then((data) => setMobileBusiness(data)).catch(() => {});
+    };
+    window.addEventListener('sonar:business-profile-updated', refreshMobileBusiness);
+    return () => window.removeEventListener('sonar:business-profile-updated', refreshMobileBusiness);
+  }, [isPhone]);
+
+  useEffect(() => {
     if (!staffBusinessId) return undefined;
     const channel = supabase
       .channel(`business-usage-${staffBusinessId}`)
@@ -2387,21 +2400,24 @@ const SonarDashboard = () => {
                 <div className="flex rounded-xl border border-white/[0.08] bg-white/[0.02] p-1">
                   <button
                     onClick={() => setTeamView('receptionists')}
-                    className={`px-4 py-2 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all ${teamView === 'receptionists' ? 'bg-white/[0.08] text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                    className={`relative px-4 py-2 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all ${teamView === 'receptionists' ? 'bg-white/[0.08] text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
                   >
                     Receptionists
+                    {isPhone && teamView === 'receptionists' && <motion.span layoutId="mobile-team-tab-indicator" className="mobile-team-tab-indicator" transition={{ type: 'spring', stiffness: 520, damping: 38 }} />}
                   </button>
                   <button
                     onClick={() => setTeamView('staff')}
-                    className={`px-4 py-2 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all ${teamView === 'staff' ? 'bg-white/[0.08] text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                    className={`relative px-4 py-2 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all ${teamView === 'staff' ? 'bg-white/[0.08] text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
                   >
                     Staff
+                    {isPhone && teamView === 'staff' && <motion.span layoutId="mobile-team-tab-indicator" className="mobile-team-tab-indicator" transition={{ type: 'spring', stiffness: 520, damping: 38 }} />}
                   </button>
                   <button
                     onClick={() => setTeamView('archived')}
-                    className={`px-4 py-2 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all ${teamView === 'archived' ? 'bg-white/[0.08] text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                    className={`relative px-4 py-2 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all ${teamView === 'archived' ? 'bg-white/[0.08] text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
                   >
                     Archived
+                    {isPhone && teamView === 'archived' && <motion.span layoutId="mobile-team-tab-indicator" className="mobile-team-tab-indicator" transition={{ type: 'spring', stiffness: 520, damping: 38 }} />}
                   </button>
                 </div>
               </div>
@@ -2788,7 +2804,7 @@ const SonarDashboard = () => {
                     key={`${userId || 'anonymous'}:${route}`}
                     initial={false}
                     animate={{ opacity: isActive ? 1 : 0, y: isActive ? 0 : 10 }}
-                    transition={{ duration: 0.3 }}
+                    transition={isPhone ? { duration: 0.22, ease: [0.22, 1, 0.36, 1] } : { duration: 0.3 }}
                     aria-hidden={!isActive}
                     className={`absolute inset-0 h-full ${isActive ? 'z-10' : 'z-0'}`}
                     style={{

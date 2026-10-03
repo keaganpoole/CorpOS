@@ -2243,6 +2243,7 @@ const LeadsTable = ({
         sourceFilter={sourceFilter} onSourceFilter={onSourceFilterChange} sourceOptions={SOURCE_OPTIONS}
         onCreate={onCreateRecord} onUpdate={onSaveRecord} onDelete={onDeleteMany}
         renderColorbar={renderColorbar} onColorbar={() => setShowColorbarStudio(true)}
+        addFieldContent={<div className="mobile-crm-tools"><p>Add a custom field to People.</p>{[...column_options, ...specialColumnOptions].map((option) => <button type="button" key={option.type} onClick={() => handleCreateColumn(option.type)}>{option.label}<Plus size={16} /></button>)}</div>}
         renderDocuments={(person) => <button type="button" onClick={() => setDocumentViewer({ person, initialDocument: personDocumentsById.get(String(person.id))?.[0] })} className="mobile-documents-link">{personDocumentsById.get(String(person.id))?.[0]?.file_name || 'View documents'}{(personDocumentsById.get(String(person.id))?.length || 0) > 1 ? ` +${personDocumentsById.get(String(person.id)).length - 1}` : ''}</button>}
         sortContent={<SortBuilderPopover columns={columns} fieldConfig={fieldConfig} rules={viewSettings.sortRules || []} onChange={(sortRules) => updateViewSettings({ sortRules })} />}
         tools={<div className="mobile-crm-tools">

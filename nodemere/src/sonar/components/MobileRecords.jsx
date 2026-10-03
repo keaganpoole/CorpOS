@@ -1,8 +1,10 @@
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { ArrowUpDown, Check, ChevronDown, ChevronUp, Filter, Plus, RefreshCw, Search, Settings2, Trash2, Wand2, X } from 'lucide-react';
+import { ArrowUpDown, Check, ChevronDown, ChevronUp, Filter, RefreshCw, Search, Settings2, Trash2, Wand2, X } from 'lucide-react';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import MobileSheet from './MobileSheet';
 import CubePreloader from './CubePreloader';
 import MobileInlineRecord from './MobileInlineRecord';
+import MobileDeleteConfirmModal from './MobileDeleteConfirmModal';
 import { getCustomValue, setCustomFieldValue } from '../lib/customFields';
 import { optionFor, isEmpty, formatValue, localDateTime, matchesRecordFilter } from '../lib/mobileRecords';
 
@@ -67,17 +69,18 @@ function RecordEditor({ record, fields, kind, config, lookups, onSave, onDelete,
       </fieldset>
     </form>
     {confirmClose && <div className="mobile-inline-confirm" role="alert"><p>Discard your unsaved changes?</p><button type="button" onClick={() => setConfirmClose(false)}>Keep editing</button><button type="button" onClick={onClose}>Discard changes</button></div>}
-    {confirmDelete && <div className="mobile-inline-confirm" role="alert"><p>Delete this {kind}? This cannot be undone.</p><button type="button" disabled={busy} onClick={() => setConfirmDelete(false)}>Cancel</button><button type="button" disabled={busy} onClick={async () => { setBusy(true); try { await onDelete(); onClose(); } catch (err) { setError(err.message); setConfirmDelete(false); } finally { setBusy(false); } }}>Delete {kind}</button></div>}
+    {confirmDelete && <MobileDeleteConfirmModal kind={kind} deleting={busy} onCancel={() => setConfirmDelete(false)} onConfirm={async () => { setBusy(true); try { await onDelete(); onClose(); } catch (err) { setError(err.message); setConfirmDelete(false); } finally { setBusy(false); } }} />}
   </MobileSheet>;
 }
 
-export default function MobileRecords({ active = true, records, loading, totalCount, kind = 'person', fields, visibleFields, config = {}, search, onSearch, onRefresh, onCreate, onUpdate, onDelete, renderColorbar, renderDocuments, onColorbar, tools, sortContent, sourceFilter, onSourceFilter, sourceOptions = [], lookups = {}, newRecord = {}, titleFor, subtitleFor }) {
+export default function MobileRecords({ active = true, records, loading, totalCount, kind = 'person', fields, visibleFields, config = {}, search, onSearch, onRefresh, onCreate, onUpdate, onDelete, renderColorbar, renderDocuments, onColorbar, tools, addFieldContent, sortContent, sourceFilter, onSourceFilter, sourceOptions = [], lookups = {}, newRecord = {}, titleFor, subtitleFor }) {
   const [expandedId, setExpandedId] = useState(null);
   const [editor, setEditor] = useState(null);
   const [panel, setPanel] = useState(null);
   const [stateFilter, setStateFilter] = useState('all');
   const root = useRef(null);
   const searchInput = useRef(null);
+  const reduceMotion = useReducedMotion();
   useEffect(() => { if (active && kind === 'person') searchInput.current?.focus({ preventScroll: true }); }, [active, kind]);
   useEffect(() => {
     if (!active || !expandedId) return;
@@ -87,25 +90,39 @@ export default function MobileRecords({ active = true, records, loading, totalCo
   }, [expandedId, active]);
   const filtered = useMemo(() => records.filter((record) => matchesRecordFilter(record, kind, stateFilter)), [records, stateFilter, kind]);
   const title = (record) => titleFor?.(record) || `${record.first_name || ''} ${record.last_name || ''}`.trim() || 'Untitled person';
-  return <div ref={root} className="mobile-records" style={active ? undefined : { display: 'none' }}>
+  return <div ref={root} className="mobile-records" data-kind={kind} style={active ? undefined : { display: 'none' }}>
     <div className="mobile-records-toolbar">
       <div className="mobile-records-heading"><span>{totalCount} {kind === 'person' ? totalCount === 1 ? 'person' : 'people' : totalCount === 1 ? 'appointment' : 'appointments'}</span></div>
       <div className="mobile-records-search"><Search size={17} /><input ref={searchInput} aria-label={`Search ${kind === 'person' ? 'people' : 'appointments'}`} placeholder={`Search ${kind === 'person' ? 'people' : 'appointments'}…`} value={search} onChange={(e) => onSearch(e.target.value)} />{search && <button type="button" aria-label="Clear search" onClick={() => onSearch('')}><X size={16} /></button>}<button type="button" aria-label={`Refresh ${kind === 'person' ? 'people' : 'appointments'}`} disabled={loading} onClick={onRefresh}><RefreshCw size={16} className={loading ? 'animate-spin' : ''} /></button></div>
       <div className="mobile-records-controls"><button type="button" aria-pressed={stateFilter !== 'all' || sourceFilter !== 'All'} onClick={() => setPanel('Filter')}><Filter size={15} />Filter</button><button type="button" onClick={() => setPanel('Sort')}><ArrowUpDown size={15} />Sort</button><button type="button" onClick={onColorbar}><Wand2 size={15} />Colorbar</button><button type="button" aria-label="CRM tools" onClick={() => setPanel('CRM tools')}><Settings2 size={17} /></button></div>
     </div>
+    <div className={`mobile-records-add-actions ${addFieldContent ? 'has-field-action' : ''}`}>
+      {addFieldContent && <button type="button" aria-label="Add custom field" onClick={() => setPanel('Add field')}>Add field</button>}
+      <button type="button" className={addFieldContent ? 'mobile-records-add-person' : ''} aria-label={`Add ${kind}`} onClick={() => setEditor({ ...newRecord })}>Add {kind}</button>
+    </div>
     <div className="mobile-records-list">
       {loading && !records.length ? <div className="mobile-records-empty dashboard-mobile-viewport-loader"><CubePreloader /></div> : !filtered.length ? <div className="mobile-records-empty"><p>{totalCount ? 'No matching records' : `No ${kind === 'person' ? 'people' : 'appointments'} yet`}</p><span>{totalCount ? 'Try another search or clear your filters.' : `Add your first ${kind} to get started.`}</span>{totalCount > 0 && <button type="button" onClick={() => { onSearch(''); onSourceFilter('All'); setStateFilter('all'); }}>Clear filters</button>}</div> : filtered.map((record) => {
         const expanded = expandedId === record.id;
         return <article key={record.id} data-record-id={record.id} className="mobile-record-card">
-          {renderColorbar?.(record)}
-          <button type="button" className="mobile-record-summary" onClick={() => setExpandedId(expanded ? null : record.id)} aria-expanded={expanded} aria-controls={`mobile-record-${kind}-${record.id}`}><span className="mobile-record-avatar">{title(record).charAt(0)}</span><span><strong>{title(record)}</strong><small>{subtitleFor?.(record) || record.phone || record.email || 'No contact details'}</small></span>{expanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}</button>
-          {expanded && <div id={`mobile-record-${kind}-${record.id}`} className="mobile-record-expanded"><MobileInlineRecord record={record} fields={fields.filter((field) => !visibleFields || visibleFields.includes(field.key))} config={config} lookups={lookups} onUpdate={onUpdate} onDelete={onDelete} renderDocuments={renderDocuments} kind={kind} /></div>}
+          <div className="mobile-record-summary-row">
+            {renderColorbar?.(record)}
+            <button type="button" className="mobile-record-summary" onClick={() => setExpandedId(expanded ? null : record.id)} aria-expanded={expanded} aria-controls={`mobile-record-${kind}-${record.id}`}><span className="mobile-record-avatar">{title(record).charAt(0)}</span><span><strong>{title(record)}</strong><small>{subtitleFor?.(record) || record.phone || record.email || 'No contact details'}</small></span>{expanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}</button>
+          </div>
+          <AnimatePresence initial={false}>
+            {expanded && <motion.div
+              id={`mobile-record-${kind}-${record.id}`}
+              className="mobile-record-expanded"
+              initial={reduceMotion ? false : { height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={reduceMotion ? { opacity: 0 } : { height: 0, opacity: 0 }}
+              transition={reduceMotion ? { duration: 0 } : { duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+            ><MobileInlineRecord record={record} fields={fields.filter((field) => !visibleFields || visibleFields.includes(field.key))} config={config} lookups={lookups} onUpdate={onUpdate} onDelete={onDelete} renderDocuments={renderDocuments} kind={kind} animateReveal={!reduceMotion} /></motion.div>}
+          </AnimatePresence>
         </article>;
       })}
     </div>
-    <button type="button" className="mobile-floating-add" aria-label={`Add ${kind}`} onClick={() => setEditor({ ...newRecord })}><Plus size={24} /></button>
     {panel && <MobileSheet title={panel} onClose={() => setPanel(null)}>
-      {panel === 'Sort' ? sortContent : panel === 'CRM tools' ? tools : <div className="mobile-record-form"><label>Source<select aria-label="Filter by source" value={sourceFilter} onChange={(e) => onSourceFilter(e.target.value)}><option value="All">All sources</option>{sourceOptions.map(optionFor).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label><label>{kind === 'person' ? 'Contact preference' : 'Status'}<select aria-label={kind === 'person' ? 'Contact preference' : 'Appointment status filter'} value={stateFilter} onChange={(e) => setStateFilter(e.target.value)}>{(kind === 'person' ? [['all','All people'],['do-not-call','Do not call'],['callable','Can be called']] : [['all','All statuses'],['pending','Pending'],['confirmed','Confirmed'],['completed','Completed'],['missed','Missed'],['cancelled','Cancelled']]).map(([key, text]) => <option key={key} value={key}>{text}</option>)}</select></label><button type="button" onClick={() => { onSourceFilter('All'); setStateFilter('all'); }}>Clear filters</button><button type="button" className="dashboard-mobile-primary" onClick={() => setPanel(null)}>Show results</button></div>}
+      {panel === 'Sort' ? sortContent : panel === 'CRM tools' ? tools : panel === 'Add field' ? <div onClick={(event) => { if (event.target.closest('button')) setPanel(null); }}>{addFieldContent}</div> : <div className="mobile-record-form"><label>Source<select aria-label="Filter by source" value={sourceFilter} onChange={(e) => onSourceFilter(e.target.value)}><option value="All">All sources</option>{sourceOptions.map(optionFor).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label><label>{kind === 'person' ? 'Contact preference' : 'Status'}<select aria-label={kind === 'person' ? 'Contact preference' : 'Appointment status filter'} value={stateFilter} onChange={(e) => setStateFilter(e.target.value)}>{(kind === 'person' ? [['all','All people'],['do-not-call','Do not call'],['callable','Can be called']] : [['all','All statuses'],['pending','Pending'],['confirmed','Confirmed'],['completed','Completed'],['missed','Missed'],['cancelled','Cancelled']]).map(([key, text]) => <option key={key} value={key}>{text}</option>)}</select></label><button type="button" onClick={() => { onSearch(''); onSourceFilter('All'); setStateFilter('all'); }}>Clear filters</button><button type="button" className="dashboard-mobile-primary" onClick={() => setPanel(null)}>Show results</button></div>}
     </MobileSheet>}
     {editor && <RecordEditor key={editor.id || 'new'} record={editor} fields={fields} kind={kind} config={config} lookups={lookups} renderDocuments={renderDocuments} onClose={() => setEditor(null)} onSave={(changes) => editor.id ? onUpdate(editor.id, changes) : onCreate(changes)} onDelete={() => onDelete([editor.id])} />}
   </div>;

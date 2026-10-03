@@ -1,10 +1,12 @@
 import React, { useEffect, useId, useState } from 'react';
 import { Check, ChevronDown, Trash2 } from 'lucide-react';
+import { motion } from 'framer-motion';
 import MobileSheet from './MobileSheet';
+import MobileDeleteConfirmModal from './MobileDeleteConfirmModal';
 import { getCustomValue, setCustomFieldValue } from '../lib/customFields';
 import { optionFor, formatValue, localDateTime } from '../lib/mobileRecords';
 
-function InlineField({ field, record, config, lookups, onCommit, renderDocuments }) {
+function InlineField({ field, record, config, lookups, onCommit, renderDocuments, revealIndex, animateReveal }) {
   const id = useId();
   const value = field.custom ? getCustomValue(record.custom_fields, field.key) : record[field.key];
   const label = config[field.key]?.name || field.label;
@@ -41,10 +43,15 @@ function InlineField({ field, record, config, lookups, onCommit, renderDocuments
     const props = { id, value: type === 'datetime-local' && draft ? localDateTime(draft) : draft, placeholder: 'Not provided', onChange: (e) => setDraft(e.target.value), onBlur: saveInput, required: field.required, onKeyDown: (e) => { if (e.key === 'Enter' && field.type !== 'textarea') e.currentTarget.blur(); } };
     editor = field.type === 'textarea' ? <textarea {...props} rows={3} /> : <input {...props} type={type} min={field.min} max={field.max} step={field.type === 'currency' ? '0.01' : type === 'number' ? 'any' : undefined} inputMode={type === 'number' ? 'decimal' : type === 'tel' ? 'tel' : type === 'email' ? 'email' : undefined} />;
   }
-  return <div className="mobile-record-value"><label htmlFor={id}>{label}</label><div>{editor}</div></div>;
+  return <motion.div
+    className="mobile-record-value"
+    initial={animateReveal ? { opacity: 0, y: 5 } : false}
+    animate={{ opacity: 1, y: 0 }}
+    transition={animateReveal ? { duration: 0.16, delay: Math.min(revealIndex * 0.035, 0.21), ease: 'easeOut' } : { duration: 0 }}
+  ><label htmlFor={id}>{label}</label><div>{editor}</div></motion.div>;
 }
 
-export default function MobileInlineRecord({ record, fields, config, lookups, onUpdate, onDelete, renderDocuments, kind }) {
+export default function MobileInlineRecord({ record, fields, config, lookups, onUpdate, onDelete, renderDocuments, kind, animateReveal = false }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
@@ -59,10 +66,10 @@ export default function MobileInlineRecord({ record, fields, config, lookups, on
     finally { setSaving(false); }
   };
   return <>
-    <fieldset className="mobile-inline-fields" disabled={saving}>{fields.map((field) => <InlineField key={field.key} field={field} record={record} config={config} lookups={lookups} onCommit={commit} renderDocuments={renderDocuments} />)}</fieldset>
+    <fieldset className="mobile-inline-fields" disabled={saving}>{fields.map((field, index) => <InlineField key={field.key} field={field} record={record} config={config} lookups={lookups} onCommit={commit} renderDocuments={renderDocuments} revealIndex={index} animateReveal={animateReveal} />)}</fieldset>
     {error && <p className="mobile-record-error" role="alert">{error}</p>}
     <div className="mobile-record-save-state" role="status">{saving ? 'Saving…' : saved ? <><Check size={12} className="inline" /> Saved</> : null}</div>
     <button type="button" className="mobile-record-delete" disabled={saving} onClick={() => setConfirmDelete(true)}><Trash2 size={14} />Delete {kind}</button>
-    {confirmDelete && <div className="mobile-inline-confirm" role="alert"><p>Delete this {kind}? This cannot be undone.</p><button type="button" onClick={() => setConfirmDelete(false)}>Cancel</button><button type="button" disabled={saving} onClick={async () => { setSaving(true); try { await onDelete([record.id]); } catch (err) { setError(err.message); } finally { setSaving(false); setConfirmDelete(false); } }}>Delete</button></div>}
+    {confirmDelete && <MobileDeleteConfirmModal kind={kind} deleting={saving} onCancel={() => setConfirmDelete(false)} onConfirm={async () => { setSaving(true); try { await onDelete([record.id]); } catch (err) { setError(err.message); } finally { setSaving(false); setConfirmDelete(false); } }} />}
   </>;
 }

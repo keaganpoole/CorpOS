@@ -18,6 +18,7 @@ import DropInsModal from '../components/DropInsModal';
 import DropInStrip from '../components/DropInStrip';
 import AppointmentRecord from '../components/AppointmentRecord';
 import CallLayerBorderOverlay from '../components/CallLayerBorderOverlay';
+import useDashboardViewport from '../hooks/useDashboardViewport';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const HOMEPAGE_TAG_COLORS = {
@@ -209,6 +210,7 @@ function getCurrentMonthInitialDate(appointmentsByDate, fallbackDate) {
 }
 
 function CalendarMonthViewBody({ data, className = '', selectedDate: selectedDateProp = null, onSelectedDateChange }) {
+  const { isPhone } = useDashboardViewport();
   const {
     allAppointments,
     services,
@@ -581,10 +583,10 @@ function CalendarMonthViewBody({ data, className = '', selectedDate: selectedDat
                 className={`relative flex aspect-square flex-col justify-between overflow-hidden border transition-all duration-300 ${
                   isSelected
                     ? 'z-10 border-transparent bg-gradient-to-tr from-zinc-300 via-zinc-100 to-white text-zinc-900 shadow-[0_0_18px_rgba(255,255,255,0.18)]'
-                    : 'border-white/5 bg-zinc-950/60 text-zinc-400 hover:border-white/20'
+                    : `border-white/5 ${isPhone ? 'bg-black/45' : 'bg-zinc-950/60'} text-zinc-400 hover:border-white/20`
                 } rounded-xl p-2`}
               >
-                <span className={`text-[10px] font-bold ${isSelected ? 'text-white' : 'text-zinc-500'}`}>
+                <span className={`text-[10px] font-bold ${isSelected ? isPhone ? 'text-zinc-700' : 'text-white' : 'text-zinc-500'}`}>
                   {day}
                 </span>
 

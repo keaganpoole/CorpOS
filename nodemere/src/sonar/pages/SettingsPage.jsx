@@ -668,7 +668,7 @@ const Section = ({ title, icon: Icon, color, children, defaultOpen = false }) =>
 
 // ─── Input Field ────────────────────────────────────────────────────────────
 const Field = ({ label, children }) => (
-  <div className="flex flex-col gap-1.5 mb-5 last:mb-0">
+  <div className="settings-field flex flex-col gap-1.5 mb-5 last:mb-0">
     <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">{label}</label>
     {children}
   </div>
@@ -3911,6 +3911,9 @@ const SettingsPage = ({ mobileUsage, onMobileUpgrade }) => {
 
       window.dispatchEvent(new CustomEvent('sonar:preferences-updated', {
         detail: { preferences: scopedAppConfig.preferences || {} },
+      }));
+      window.dispatchEvent(new CustomEvent('sonar:business-profile-updated', {
+        detail: { business },
       }));
 
       setSavedFlash(true);

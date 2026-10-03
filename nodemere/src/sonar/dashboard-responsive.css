@@ -46,8 +46,6 @@
   body[data-nodemere-responsive="true"] .responsive-dialog > div { max-width: 100%; max-height: calc(100dvh - 32px); }
   body[data-nodemere-responsive="true"] .responsive-dialog :is(input:not([type="checkbox"]):not([type="color"]), textarea, select) { font-size: 16px; min-width: 0; }
   body[data-nodemere-responsive="true"] .responsive-dialog button { min-height: 40px; }
-  body[data-nodemere-responsive="true"] .responsive-dialog button[role="switch"] { min-height: 24px; height: 24px; width: 38px; flex-shrink: 0; }
-  body[data-nodemere-responsive="true"] .responsive-dialog button[role="switch"] > div { top: 4px; }
   body[data-nodemere-responsive="true"] .responsive-dialog .crm-modal-scrollbar { min-height: 0; overscroll-behavior: contain; }
   body[data-nodemere-responsive="true"] .responsive-dialog > :is(div, section) { max-width: 100%; max-height: calc(100dvh - 32px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: #28282d transparent; }
   body[data-nodemere-responsive="true"] .account-deletion-dialog > section { min-height: 0; height: calc(100dvh - 32px); }
