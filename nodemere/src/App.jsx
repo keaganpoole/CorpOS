@@ -22,8 +22,7 @@ import VisitorTracking from './components/VisitorTracking';
 import { WorkforceGate } from './components/WorkforceSecurity';
 import CustomerExperienceFeedback from './components/CustomerExperienceFeedback';
 
-// Temporarily hide the automatic "Help us make Nodemere better" dashboard prompt.
-const SHOW_CUSTOMER_EXPERIENCE_FEEDBACK = false;
+const SHOW_CUSTOMER_EXPERIENCE_FEEDBACK = true;
 
 // Sonar Dashboard
 import SonarDashboard from './sonar/SonarDashboard';

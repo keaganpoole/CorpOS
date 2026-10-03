@@ -86,6 +86,48 @@
 @media (min-width: 768px) and (max-width: 1023px) {
   body[data-nodemere-responsive="true"] .responsive-dialog > div { width: min(720px, calc(100vw - 48px)); }
   body[data-nodemere-responsive="true"] .responsive-dialog > section[class*="max-w-[520px]"] { width: min(520px, calc(100vw - 48px)); }
+  /* Colorbar Studio uses the same neutral switch as Settings: zinc track with
+     a white thumb when off, then a soft-white track with a zinc thumb when on.
+     This is deliberately scoped to the tablet Colorbar dialog so the desktop
+     and other responsive controls keep their existing presentation. */
+  body[data-nodemere-responsive="true"] .responsive-dialog.colorbar-dialog button[role="switch"] {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    width: 36px;
+    min-width: 36px;
+    height: 20px;
+    min-height: 20px;
+    padding: 2px;
+    border: 1px solid rgb(255 255 255 / .06);
+    border-radius: 999px;
+    background: #27272a !important;
+    box-shadow: none !important;
+  }
+  body[data-nodemere-responsive="true"] .responsive-dialog.colorbar-dialog button[role="switch"].dashboard-toggle-active {
+    border-color: transparent;
+    background: rgb(244 244 245 / .9) !important;
+    box-shadow: 0 0 10px rgb(244 244 245 / .16) !important;
+  }
+  body[data-nodemere-responsive="true"] .responsive-dialog.colorbar-dialog button[role="switch"] > div {
+    position: absolute;
+    top: 1px;
+    left: 1px;
+    width: 16px;
+    height: 16px;
+    border-radius: 999px;
+    background: #fff !important;
+    box-shadow: none !important;
+    transition: transform 180ms ease, background-color 180ms ease;
+  }
+  body[data-nodemere-responsive="true"] .responsive-dialog.colorbar-dialog button[role="switch"][aria-checked="true"] > div {
+    transform: translateX(16px);
+    background: #18181b !important;
+  }
+  body[data-nodemere-responsive="true"] .responsive-dialog.colorbar-dialog button[role="switch"]:focus-visible {
+    outline: 2px solid var(--brandGradientEnd);
+    outline-offset: 3px;
+  }
   .responsive-choice-dialog > .fixed.inset-0 { background: rgba(0,0,0,.9) !important; }
   .responsive-choice-dialog .ns-choice-eyebrow-accent {
     color: transparent;

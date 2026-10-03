@@ -116,9 +116,7 @@ const teamCardVariants = {
 };
 const DEFAULT_DASHBOARD_ROUTE = 'receptionists';
 const DASHBOARD_ROUTES = ['live-monitoring', 'receptionists', 'scenarios', 'calendar', 'call-logs', 'pipeline', 'stats', 'settings'];
-const POPUP_DISMISS_PERSISTS_SHOWN = false;
-// Temporarily suppress every automatic dashboard popup without removing its definition.
-const SHOW_AUTOMATIC_DASHBOARD_POPUPS = false;
+const SHOW_AUTOMATIC_DASHBOARD_POPUPS = true;
 
 const formatPlanName = (plan) => {
   const rawPlanName = String(plan || 'Free').trim() || 'Free';
@@ -185,7 +183,7 @@ const POPUP_DEFINITIONS = [
     type: 'general',
     placement: 'dashboard',
     title: 'Calendar',
-    getDescription: () => 'This is where appointments live across your business. As your receptionists book, reschedule, or update appointments, the calendar becomes the operational source of truth for your front desk.',
+    getDescription: () => 'Your entire schedule, in one place. Add appointments yourself or let your receptionists book, reschedule, and manage them for you.',
     primaryActionLabel: 'Got it',
     showDontRemindMe: true,
     shouldShow: ({ currentRoute }) => currentRoute === 'calendar',
@@ -195,7 +193,7 @@ const POPUP_DEFINITIONS = [
     type: 'general',
     placement: 'dashboard',
     title: 'People CRM',
-    getDescription: () => 'People is where customer history lives, giving your AI receptionists the context to recognize people and handle every conversation with more confidence.',
+    getDescription: () => 'More than a contact list. Build a complete history around every customer, giving you a clear record and your receptionists the context to know them better.',
     primaryActionLabel: 'Got it',
     showDontRemindMe: true,
     shouldShow: ({ currentRoute }) => currentRoute === 'pipeline',
@@ -232,8 +230,8 @@ const POPUP_DEFINITIONS = [
     id: 'live_monitoring_intro',
     type: 'general',
     placement: 'dashboard',
-    title: 'Live Monitoring',
-    getDescription: () => 'See your front desk in motion. Follow active calls as they unfold and see how your receptionists are handling conversations in real time.',
+    title: 'Live Reports',
+    getDescription: () => 'See your business from the front desk out. Live reports turn calls, appointments, revenue, customers, and activity into a clear picture of how your business is running.',
     primaryActionLabel: 'Got it',
     showDontRemindMe: true,
     shouldShow: ({ currentRoute }) => currentRoute === 'live-monitoring',
@@ -1143,6 +1141,8 @@ const PlaceholderView = ({ title, body }) => (
 );
 
 const PopupModal = ({ popup, profile, onClose }) => {
+  const [dontRemindMe, setDontRemindMe] = useState(false);
+  useEffect(() => setDontRemindMe(false), [popup?.id]);
   if (typeof document === 'undefined') return null;
   const isScenariosIntro = popup?.id === 'scenarios_intro';
   const popupState = getPopupState(profile?.popups, popup?.id);
@@ -1181,7 +1181,7 @@ const PopupModal = ({ popup, profile, onClose }) => {
                   </p>
                 )}
               </div>
-              <button type="button" onClick={onClose} className={`${isScenariosIntro ? 'absolute right-0 top-0' : 'shrink-0'} rounded-full p-2 text-zinc-500 transition hover:bg-white/[0.04] hover:text-white`}>
+              <button type="button" onClick={() => onClose(dontRemindMe)} className={`${isScenariosIntro ? 'absolute right-0 top-0' : 'shrink-0'} rounded-full p-2 text-zinc-500 transition hover:bg-white/[0.04] hover:text-white`}>
                 <X size={16} />
               </button>
             </div>
@@ -1194,14 +1194,15 @@ const PopupModal = ({ popup, profile, onClose }) => {
                   <input
                     type="checkbox"
                     className="h-3.5 w-3.5 rounded border-white/[0.12] bg-white/[0.035] accent-white"
+                    checked={dontRemindMe}
                     onClick={(event) => event.stopPropagation()}
-                    onChange={() => {}}
+                    onChange={(event) => setDontRemindMe(event.target.checked)}
                   />
                   <span>Don't remind me again</span>
                 </label>
               )}
               <div className={`${popup.showDontRemindMe ? (isScenariosIntro ? 'mt-4' : 'mt-4') : 'mt-8'} flex justify-center`}>
-                <button type="button" onClick={onClose} className="h-12 rounded-full bg-white px-10 text-sm font-bold text-black transition hover:bg-zinc-200">
+                <button type="button" onClick={() => onClose(dontRemindMe)} className="h-12 rounded-full bg-white px-10 text-sm font-bold text-black transition hover:bg-zinc-200">
                   {popup.primaryActionLabel || 'Got it'}
                 </button>
               </div>
@@ -1907,7 +1908,7 @@ const SonarDashboard = () => {
     refreshProfile?.();
   }, [profile?.popups, refreshProfile, userId]);
 
-  const dismissPopup = useCallback(async (popup) => {
+  const dismissPopup = useCallback(async (popup, dontRemindMe = false) => {
     if (!popup) return;
     setManualPopupId((currentId) => (currentId === popup.id ? null : currentId));
     const nextDismissedPopupIds = dismissedPopupIds.includes(popup.id)
@@ -1915,21 +1916,19 @@ const SonarDashboard = () => {
       : [...dismissedPopupIds, popup.id];
     setDismissedPopupIds(nextDismissedPopupIds);
 
-    if (!POPUP_DISMISS_PERSISTS_SHOWN || !userId) return;
+    if (!dontRemindMe || !userId) return;
 
     const currentPopups = profile?.popups && typeof profile.popups === 'object' ? profile.popups : {};
-    const nextPopups = nextDismissedPopupIds.reduce((popups, popupId) => {
-      const definition = POPUP_DEFINITIONS.find((candidate) => candidate.id === popupId);
-      const currentPopupState = getPopupState(popups, popupId);
-      return {
-        ...popups,
-        [popupId]: {
-          ...currentPopupState,
-          type: definition?.type || currentPopupState.type,
-          shown: true,
-        },
-      };
-    }, currentPopups);
+    const currentPopupState = getPopupState(currentPopups, popup.id);
+    const nextPopups = {
+      ...currentPopups,
+      [popup.id]: {
+        ...currentPopupState,
+        type: popup.type || currentPopupState.type,
+        shown: true,
+        hide: true,
+      },
+    };
 
     const { error } = await supabase
       .from('users')
@@ -1943,6 +1942,10 @@ const SonarDashboard = () => {
 
     refreshProfile?.();
   }, [dismissedPopupIds, profile?.popups, refreshProfile, userId]);
+
+  useEffect(() => {
+    setDismissedPopupIds([]);
+  }, [currentRoute]);
 
   useEffect(() => {
     setDismissedPopupIds([]);
@@ -2833,7 +2836,7 @@ const SonarDashboard = () => {
       <PopupModal
         popup={currentRoute === 'receptionists' && teamExperience !== 'team' ? null : activePopup}
         profile={profile}
-        onClose={() => dismissPopup(activePopup)}
+        onClose={(dontRemindMe) => dismissPopup(activePopup, dontRemindMe)}
       />
       <PlanChangePopupModal
         isOpen={showPlanChangePopup}
