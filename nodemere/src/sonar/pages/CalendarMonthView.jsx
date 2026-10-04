@@ -583,10 +583,10 @@ function CalendarMonthViewBody({ data, className = '', selectedDate: selectedDat
                 className={`relative flex aspect-square flex-col justify-between overflow-hidden border transition-all duration-300 ${
                   isSelected
                     ? 'z-10 border-transparent bg-gradient-to-tr from-zinc-300 via-zinc-100 to-white text-zinc-900 shadow-[0_0_18px_rgba(255,255,255,0.18)]'
-                    : `border-white/5 ${isPhone ? 'bg-black/45' : 'bg-zinc-950/60'} text-zinc-400 hover:border-white/20`
+                    : 'border-white/5 bg-zinc-950/60 text-zinc-400 hover:border-white/20'
                 } rounded-xl p-2`}
               >
-                <span className={`text-[10px] font-bold ${isSelected ? isPhone ? 'text-zinc-700' : 'text-white' : 'text-zinc-500'}`}>
+                <span className={`text-[10px] font-bold ${isSelected ? 'text-zinc-700' : 'text-zinc-500'}`}>
                   {day}
                 </span>
 
