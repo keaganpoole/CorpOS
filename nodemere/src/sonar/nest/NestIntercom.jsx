@@ -7,6 +7,7 @@ import { api } from '../lib/api';
 import { useNest } from './NestRuntime';
 import IntercomVoiceLine from './IntercomVoiceLine';
 import useIntercomMicrophone from './useIntercomMicrophone';
+import CubePreloader from '../components/CubePreloader';
 import ringingSound from '../../assets/ringing.mp3';
 import pickupSound from '../../assets/pickup.mp3';
 
@@ -499,7 +500,11 @@ function NestIntercomInner({ open, onClose, mobile = false }) {
             {queueLength > 0 && <span className="intercom-queue" title={`${queueLength} NEST events waiting`}>{queueLength}</span>}
 
             <div className="intercom-main">
-              {phase === 'mic-permission' && selectedReceptionist ? (
+              {!bootstrap && !error ? (
+                <span className="intercom-loading-indicator" role="status" aria-label="Loading intercom">
+                  <CubePreloader size={10} />
+                </span>
+              ) : phase === 'mic-permission' && selectedReceptionist ? (
                 <motion.div className="intercom-mic-permission no-drag" role="status" aria-live="polite" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
                   <span>{micPermissionState === 'denied' ? 'Allow microphone access to talk' : 'Please allow microphone access'}</span>
                   <button type="button" onClick={() => beginSession({ force: true, receptionistId: selectedId, requestPermission: true })} disabled={loading}>
@@ -558,7 +563,9 @@ function NestIntercomInner({ open, onClose, mobile = false }) {
                           />
                         )}
                         <span className="intercom-receptionist-shade" aria-hidden="true" />
-                        <span className="intercom-receptionist-name">{item.name.split(' ')[0]}</span>
+                        <span className="intercom-receptionist-name">
+                          {mobile ? <><span className="intercom-receptionist-prefix">Call</span><strong>{item.name.split(' ')[0]}</strong></> : item.name.split(' ')[0]}
+                        </span>
                       </motion.button>
                     );
                   })}
@@ -612,7 +619,6 @@ function NestIntercomInner({ open, onClose, mobile = false }) {
             )}
 
             {idleWarning && <span className="intercom-idle-warning">Still there?</span>}
-            {mobile && !bootstrap && !error && <span className="intercom-error" role="status">Loading receptionists…</span>}
             {error && <span className="intercom-error">{error}</span>}
             {unavailable && <span className="intercom-error">Add an eligible receptionist and configure the voice agent.</span>}
           </motion.div>

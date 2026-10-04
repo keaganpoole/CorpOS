@@ -87,6 +87,7 @@
   body[data-nodemere-responsive="true"] .responsive-dialog button[role="switch"][aria-checked="true"] > div { left: 1px; transform: translateX(16px); background: #18181b !important; box-shadow: none !important; }
   body[data-nodemere-responsive="true"] .responsive-dialog button[role="switch"]:focus-visible { outline: 2px solid var(--brandGradientEnd); outline-offset: 3px; }
   .sonar-dashboard-shell[data-responsive="true"] .intercom-main { width: calc(100% - 94px); margin-left: -26px; gap: 8px; }
+  .sonar-dashboard-shell[data-responsive="true"] .intercom-main .intercom-loading-indicator { left: calc(50% + 13px); }
   .sonar-dashboard-shell[data-responsive="true"] .phase-selecting .intercom-main { width: calc(100% - 54px); margin-left: -30px; }
   .sonar-dashboard-shell[data-responsive="true"] .intercom-picker.is-selecting { width: 100%; max-width: 310px; }
   .sonar-dashboard-shell[data-responsive="true"] .intercom-picker.is-selecting .intercom-receptionist { min-width: 48px; }

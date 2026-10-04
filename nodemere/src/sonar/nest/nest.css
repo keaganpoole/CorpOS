@@ -251,6 +251,7 @@
 .intercom-scrim { position: absolute; inset: 0; z-index: -2; background: linear-gradient(90deg, rgba(2,2,2,.9), rgba(2,2,2,.56) 48%, rgba(2,2,2,.9)); }
 .intercom-surface:not(.phase-selecting) .intercom-scrim { background: linear-gradient(90deg, rgba(3,3,4,.3), rgba(7,6,8,.48) 38%, rgba(5,5,6,.76) 68%, rgba(2,2,3,.94)); box-shadow: inset 0 1px rgba(255,255,255,.035), inset 0 -1px rgba(255,255,255,.025); }
 .intercom-main { position: relative; z-index: 2; display: flex; align-items: center; justify-content: center; gap: 16px; width: min(700px, calc(100% - 150px)); min-width: 0; height: 100%; transition: justify-content 360ms cubic-bezier(.16,1,.3,1); }
+.intercom-loading-indicator { position: absolute; top: 50%; left: 50%; z-index: 3; display: flex; width: 16px; height: 16px; align-items: center; justify-content: center; margin: 0; transform: translate(-50%, -50%); }
 .intercom-surface.has-transcript .intercom-main { justify-content: center; }
 .intercom-action { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; gap: 14px; min-width: 118px; }
 .intercom-action-label { display: inline-flex; align-items: baseline; gap: 5px; white-space: nowrap; color: rgba(255,255,255,.46); font-size: 12px; font-weight: 450; letter-spacing: -.02em; }
@@ -286,6 +287,9 @@
 .intercom-picker.is-selecting .intercom-receptionist.is-selected::after { position: absolute; inset: -4px; z-index: 2; border-radius: 12px; background: linear-gradient(90deg, rgba(255,255,255,.08), rgba(255,255,255,.04) 24%, rgba(255,255,255,.012) 52%, transparent 76%); content: ''; filter: blur(6px); opacity: .62; pointer-events: none; }
 .intercom-picker.is-selecting .intercom-active-effects { display: none; }
 .intercom-receptionist-name { position: absolute; right: 12%; z-index: 3; color: rgba(190,195,202,.72); font-size: 11px; font-weight: 450; line-height: 1; letter-spacing: .08em; text-align: left; text-shadow: 0 1px 8px rgba(0,0,0,.42); transition: color 300ms ease, text-shadow 300ms ease; }
+.intercom-receptionist-name:has(.intercom-receptionist-prefix) { display: inline-flex; align-items: baseline; gap: 5px; color: rgba(255,255,255,.46); font-size: 12px; font-weight: 450; letter-spacing: -.02em; white-space: nowrap; }
+.intercom-receptionist-name .intercom-receptionist-prefix { color: rgba(255,255,255,.46); font-size: 12px; font-weight: 450; }
+.intercom-receptionist-name strong { color: rgba(255,255,255,.86); font-size: 13px; font-weight: 560; }
 .intercom-picker.is-selecting .intercom-receptionist.is-selected .intercom-receptionist-name { color: rgba(202,207,214,.8); text-shadow: 0 1px 10px rgba(0,0,0,.48); }
 .intercom-picker:not(.is-selecting) .intercom-receptionist:not(.is-selected) { flex-basis: 0; width: 0; margin: 0 -3px; padding: 0; opacity: 0; filter: blur(7px) brightness(.35); transform: scale(.62); pointer-events: none; }
 .intercom-picker:not(.is-selecting) .intercom-receptionist.is-selected { cursor: default; }
