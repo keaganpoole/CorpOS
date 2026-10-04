@@ -160,7 +160,7 @@ const defaultOperatorForField = (field) => {
 const DATE_OPERATORS = new Set(['before', 'after', 'on_or_before', 'on_or_after']);
 
 // Value field is always a plain text input — never a dropdown.
-const getValueComponent = ({ field, rule, onUpdateRule, onFieldFocus }) => {
+const getValueComponent = ({ field, rule, onUpdateRule, onFieldFocus, mobile }) => {
   const valStr = String(rule.value || '');
   const hasChips = valStr.includes('{{');
   const isDisabled = rule.operator === 'is_empty' || rule.operator === 'is_not_empty';
@@ -171,6 +171,8 @@ const getValueComponent = ({ field, rule, onUpdateRule, onFieldFocus }) => {
       <input
         className="sb-input-field"
         type={inputType}
+        aria-label="Condition value"
+        placeholder={mobile ? 'Value' : undefined}
         value={rule.value ?? ''}
         onChange={(event) => onUpdateRule(rule.id, 'value', event.target.value)}
         onFocus={(event) => onFieldFocus?.(rule.id, 'value', event.target)}
@@ -209,6 +211,8 @@ const AetherEdgeLogic = ({
   onFallbackChange,
   isFallback = false,
   onToggleFallback,
+  draggable = true,
+  mobile = false,
 }) => {
   const dragRef = useRef({ dragging: false, startX: 0, startY: 0, startPosTop: 0, startPosLeft: 0 });
   const valueInputRefs = useRef(new Map());
@@ -229,6 +233,7 @@ const AetherEdgeLogic = ({
 
   // Drag handlers
   const handleHeaderPointerDown = useCallback((e) => {
+    if (!draggable) return;
     if (e.target.closest('button')) return; // don't drag when clicking buttons
     e.preventDefault();
     e.stopPropagation();
@@ -240,7 +245,7 @@ const AetherEdgeLogic = ({
       startPosLeft: position.left,
     };
     document.body.style.userSelect = 'none';
-  }, [position.top, position.left]);
+  }, [draggable, position.top, position.left]);
 
   useEffect(() => {
     const handlePointerMove = (e) => {
@@ -290,7 +295,7 @@ const AetherEdgeLogic = ({
   return (
     <div className="aether-logic-wrapper" style={position}>
       <div className="aether-condition-panel">
-        <div className="aether-panel-header" onPointerDown={handleHeaderPointerDown} style={{ cursor: 'move', userSelect: 'none' }}>
+        <div className="aether-panel-header" onPointerDown={handleHeaderPointerDown} style={{ cursor: draggable ? 'move' : 'default', userSelect: 'none' }}>
           <span className="condition-label">
             <Zap size={14} /> Condition
           </span>
@@ -312,6 +317,8 @@ const AetherEdgeLogic = ({
                   <input
                     className="aether-rule-select"
                     type="text"
+                    aria-label="Condition variable"
+                    placeholder={mobile ? 'Variable or {{field}}' : undefined}
                     value={rule.variable}
                     onChange={(event) => {
                       const nextField = getField(event.target.value, selectableFields);
@@ -368,6 +375,7 @@ const AetherEdgeLogic = ({
                       field,
                       rule,
                       onUpdateRule,
+                      mobile,
                       onFieldFocus: (ruleId, fieldKey, inputEl) => {
                         if (fieldKey === 'value') {
                           valueInputRefs.current.set(ruleId, inputEl);

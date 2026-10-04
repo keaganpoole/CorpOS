@@ -1285,7 +1285,7 @@ const PreviousNodeVars = ({ currentNodeId, nodes, edges, onInsertVariable, onTab
 };
 
 
-const VariablesPane = ({ visible, fieldLabel, onInsertVariable, onTableHover, onClose, style = {}, nodes = [], edges = [], currentNodeId = '' }) => {
+const VariablesPane = ({ visible, fieldLabel, onInsertVariable, onTableHover, onClose, style = {}, className = '', showClose = false, nodes = [], edges = [], currentNodeId = '' }) => {
   const [records, setRecords] = useState({});
   const [activeIndex, setActiveIndex] = useState({});
   const [expanded, setExpanded] = useState({});
@@ -1769,7 +1769,7 @@ const VariablesPane = ({ visible, fieldLabel, onInsertVariable, onTableHover, on
 
   return (
     <div
-      className="sb-variables-pane"
+      className={`sb-variables-pane ${className || ''}`}
       ref={paneRef}
       style={style}
       onMouseDown={(e) => e.stopPropagation()}
@@ -1781,6 +1781,7 @@ const VariablesPane = ({ visible, fieldLabel, onInsertVariable, onTableHover, on
       <div className="sb-vars-header">
         <span className="sb-vars-title">Variables</span>
         {fieldLabel && <span className="sb-vars-field-label">for {fieldLabel}</span>}
+        {showClose && <button type="button" className="sb-vars-close" aria-label="Close variables" onClick={onClose}><X size={17} /></button>}
       </div>
 
       <div className="sb-vars-scroll">

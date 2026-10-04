@@ -5555,3 +5555,141 @@
   padding: 14px 16px;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
+
+.sb-phone-list-title { display: none; }
+
+/* Scenarios uses the dashboard phone breakpoint. The graph data and all
+   configuration forms are shared; only their phone presentation changes. */
+@media (max-width: 767px) {
+  .scenarios-container { min-width: 0; min-height: 0; }
+  .scenario-list-page, .scenario-builder-page { min-width: 0; min-height: 0; }
+  .scenario-list-header { padding: 14px 14px 8px; gap: 8px; }
+  .scenario-list-title-group { width: 100%; }
+  .sb-phone-list-title { display: block; margin: 0; font-size: 16px; font-weight: 600; letter-spacing: -.02em; }
+  .scenario-list-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%; }
+  .scenario-list-actions > :only-child { grid-column: 1 / -1; }
+  .scenario-list-actions :is(.sb-integrations-btn--inline, .create-scenario-btn) { width: 100%; min-width: 0; min-height: 36px; padding: 8px; font-size: 11px; font-weight: 600; }
+  .scenario-list-content { padding: 10px 14px 24px; }
+  .scenario-grid { grid-template-columns: 1fr; gap: 9px; }
+  .scenario-card { padding: 14px; }
+  .scenario-card-title { font-size: 13px; padding-right: 66px; }
+  .scenario-card-description { font-size: 11px; }
+  .scenario-card-actions { opacity: 1; }
+  .scenario-action-btn { width: 30px; height: 30px; }
+  .scenario-empty-state { padding: 22px; }
+
+  .scenario-builder-page { overflow: hidden; }
+  .sb-canvas-wrapper { display: flex; flex-direction: column; min-height: 0; }
+  .sb-builder-topbar { position: relative; order: -1; top: auto; left: auto; right: auto; z-index: 2; display: grid; grid-template-columns: auto 1fr; gap: 8px; padding: 12px 14px 8px; border-bottom: 1px solid rgba(255,255,255,.06); }
+  .sb-builder-topbar-group, .sb-builder-topbar-actions { width: auto; flex-direction: row; align-items: center; min-width: 0; gap: 6px; }
+  .sb-builder-topbar-actions { justify-content: flex-end; }
+  .sb-builder-topbar :is(.back-to-list-btn, .scenario-help-btn, .save-scenario-btn) { width: auto; min-width: 0; min-height: 34px; padding: 7px 9px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+  .sb-builder-topbar .scenario-help-btn { font-size: 0; gap: 0; }
+  .sb-builder-topbar .scenario-help-btn svg { width: 16px; height: 16px; }
+  .sb-builder-topbar .save-scenario-btn svg { display: none; }
+  .sb-canvas { flex: 1; min-height: 0; height: auto; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; scrollbar-width: none; }
+  .sb-canvas::-webkit-scrollbar { display: none; }
+  .sb-mobile-workflow { display: flex; flex-direction: column; gap: 10px; padding: 14px 14px 24px; }
+  .sb-mobile-workflow-intro { padding: 2px 2px 4px; }
+  .sb-mobile-eyebrow { display: block; font-size: 9px; font-weight: 700; letter-spacing: .12em; color: rgba(255,255,255,.48); }
+  .sb-mobile-workflow-intro p { margin: 5px 0 0; color: rgba(255,255,255,.52); font-size: 11px; line-height: 1.4; }
+  .sb-mobile-step { min-width: 0; padding: 12px; background: rgba(255,255,255,.035); border: 1px solid rgba(255,255,255,.09); border-radius: 15px; }
+  .sb-mobile-step-heading { display: flex; align-items: center; gap: 7px; margin-bottom: 7px; }
+  .sb-mobile-step-number { color: rgba(255,255,255,.38); font-size: 10px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .sb-mobile-step-kind { color: rgba(255,255,255,.62); font-size: 10px; font-weight: 600; }
+  .sb-mobile-icon-action { margin-left: auto; border: 0; background: transparent; color: rgba(255,255,255,.48); width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; }
+  .sb-mobile-step-main { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-height: 42px; padding: 0; text-align: left; background: transparent; border: 0; color: #f4f4f5; }
+  .sb-mobile-step-copy { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .sb-mobile-step-copy strong { font-size: 13px; font-weight: 600; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sb-mobile-step-copy small { color: rgba(255,255,255,.48); font-size: 10px; font-weight: 400; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sb-mobile-step-main > svg { flex: none; color: rgba(255,255,255,.42); }
+  .sb-mobile-connections { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+  .sb-mobile-connection { padding: 8px; border-radius: 10px; background: rgba(0,0,0,.24); border: 1px solid rgba(255,255,255,.055); }
+  .sb-mobile-connection-top { display: flex; align-items: center; gap: 5px; color: rgba(255,255,255,.5); font-size: 10px; min-width: 0; }
+  .sb-mobile-connection-destination { flex: 1; min-width: 0; margin-left: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #ededed; font-size: 11px; }
+  .sb-mobile-connection-actions { display: flex; align-items: center; justify-content: space-between; margin-top: 5px; }
+  .sb-mobile-connection-actions button, .sb-mobile-step-actions button, .sb-mobile-add-next-action { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 32px; padding: 6px 9px; background: transparent; border: 1px solid rgba(255,255,255,.1); border-radius: 8px; color: rgba(255,255,255,.7); font-size: 10px; font-weight: 500; }
+  .sb-mobile-connection-actions button:last-child { border: 0; padding: 5px; color: rgba(255,255,255,.45); }
+  .sb-mobile-step-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .sb-mobile-step-actions select { min-height: 32px; max-width: 100%; padding: 5px 7px; color: rgba(255,255,255,.7); background: #151516; border: 1px solid rgba(255,255,255,.1); border-radius: 8px; font-size: 10px; }
+  .sb-mobile-add-next-action { width: 100%; min-height: 36px; border-style: dashed; }
+  .sb-mobile-workflow :is(button, select):focus-visible { outline: 2px solid var(--brandGradientEnd); outline-offset: 2px; }
+
+  .sb-bottom-toolbar { position: relative; bottom: auto; left: auto; transform: none; flex: none; width: 100%; padding: 8px 12px 10px; background: #020202; border-top: 1px solid rgba(255,255,255,.06); }
+  .sb-toolbar-inner { justify-content: center; flex-wrap: nowrap; gap: 4px; padding: 6px; max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+  .sb-toolbar-inner::-webkit-scrollbar { display: none; }
+  .sb-toolbar-mode-btn { padding: 6px; font-size: 10px; }
+  .sb-toolbar-icon-btn { flex: none; width: 28px; height: 30px; }
+  .sb-toolbar-run-btn { flex: none; min-height: 30px; max-width: 100%; padding: 5px 8px; font-size: 10px; }
+  .sb-execution-feed { position: fixed; left: 14px; right: 14px; bottom: calc(90px + env(safe-area-inset-bottom)); width: auto; max-height: 180px; overflow-y: auto; }
+
+  .sb-selection-panel { position: fixed !important; inset: calc(60px + max(8px, env(safe-area-inset-top))) 8px max(8px, env(safe-area-inset-bottom)) !important; width: auto; max-width: none; height: auto; max-height: none; z-index: 1000; border-radius: 18px; animation: sbPhoneSheetIn .2s ease-out; }
+  .sb-panel-inner { padding: 14px; }
+  .sb-panel-header { flex: none; cursor: default !important; }
+  .sb-panel-actions { flex: 1; min-height: 0; overflow-y: auto; }
+  .sb-panel-tabs { gap: 15px; overflow-x: auto; flex: none; }
+  .sb-panel-tab { font-size: 11px; }
+  .sb-panel-action-card { padding: 9px; }
+  .sb-panel-action-label { font-size: 12px; }
+  .sb-panel-action-detail { font-size: 10px; }
+  .sb-selection-panel :is(input, select, textarea) { max-width: 100%; }
+  .sb-selection-panel .sb-panel-header-controls button { min-width: 28px; min-height: 28px; }
+  .sb-mobile-insert-variable { display: inline-flex; align-items: center; justify-content: center; gap: 7px; flex: none; width: 100%; min-height: 36px; margin-top: 8px; padding: 7px 10px; border: 1px solid rgba(255,255,255,.12); border-radius: 9px; background: rgba(255,255,255,.045); color: #e4e4e7; font-size: 11px; font-weight: 600; }
+  .sb-action-config-form { padding: 8px 2px 12px; }
+  .save-scenario-modal { height: auto; }
+  .save-scenario-modal-body { flex: none; }
+  .sb-action-config-header { margin-bottom: 9px; }
+  .sb-action-config-fields { gap: 9px; }
+  .sb-record-fields-section { margin-top: 8px; }
+  .sb-record-fields-grid { gap: 10px; }
+  .sb-record-field { gap: 3px; }
+  .sb-record-label, .sb-action-field-label { font-size: 10px; font-weight: 500; }
+  .sb-record-field > div:first-child { margin-bottom: 2px !important; }
+  .sb-trigger-filter-form { padding: 8px 2px 12px; gap: 8px; }
+
+  .sb-variables-pane { position: fixed !important; inset: calc(60px + max(8px, env(safe-area-inset-top))) 8px max(8px, env(safe-area-inset-bottom)) !important; width: auto; height: auto !important; max-width: none; z-index: 1200; border-radius: 18px; border-left-width: 1px; transform: none !important; animation: sbPhoneSheetIn .2s ease-out; }
+  .sb-vars-header { padding: 12px 14px; }
+  .sb-vars-title { font-size: 11px; }
+  .sb-vars-field-label { font-size: 10px; }
+  .sb-vars-scroll { min-height: 0; }
+  .sb-vars-field { min-height: 34px; }
+
+  .sb-mobile-logic-tabs { position: fixed; top: calc(60px + max(8px, env(safe-area-inset-top))); left: 8px; right: 8px; height: 48px; z-index: 1300; display: flex; gap: 4px; padding: 6px; border: 1px solid rgba(255,255,255,.1); border-bottom: 0; border-radius: 18px 18px 0 0; background: #151516; }
+  .sb-mobile-logic-tabs button { flex: 1; border: 0; background: transparent; color: rgba(255,255,255,.56); border-radius: 8px; font-size: 11px; font-weight: 600; }
+  .sb-mobile-logic-tabs button.active { color: #fff; background: rgba(255,255,255,.1); }
+  .sb-mobile-logic-tabs button:last-child { flex: none; width: 36px; display: inline-flex; align-items: center; justify-content: center; }
+  .aether-logic-wrapper, .sb-variables-pane--logic { position: fixed !important; top: calc(60px + max(8px, env(safe-area-inset-top)) + 48px) !important; left: 8px !important; right: 8px !important; bottom: max(8px, env(safe-area-inset-bottom)) !important; width: auto; max-width: none; height: auto !important; border-radius: 0 0 18px 18px; }
+  .aether-logic-wrapper { z-index: 1250; }
+  .aether-condition-panel { display: flex; flex-direction: column; width: 100%; height: 100%; min-height: 0; padding: 14px; border-radius: 0 0 18px 18px; }
+  .aether-panel-header { flex: none; margin-bottom: 10px; cursor: default !important; }
+  .aether-close { display: none; }
+  .aether-rule-group { flex: 1; min-height: 0; max-height: none; overflow-y: auto; }
+  .aether-rule-row { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr) 28px; gap: 6px; padding: 9px; }
+  .aether-rule-row > input.aether-rule-select { grid-column: 1 / -1; }
+  .aether-rule-select--op { grid-column: 1; width: 100%; min-width: 0; }
+  .aether-rule-value { grid-column: 2; min-width: 0; }
+  .aether-rule-remove { grid-column: 3; }
+  .sb-action-links { flex: none; flex-wrap: wrap; }
+  .scenario-builder-page[data-mobile-logic-tab="rules"] .sb-variables-pane--logic { display: none; }
+  .scenario-builder-page[data-mobile-logic-tab="variables"] .aether-logic-wrapper { display: none; }
+  .sb-variables-pane--logic { z-index: 1260; border-radius: 0 0 18px 18px; }
+
+  :is(.sb-schedule-modal-overlay, .sb-notes-modal-overlay, .sb-json-modal-overlay, .save-scenario-modal-overlay, .sb-integrations-overlay) { padding: 8px; }
+  :is(.sb-schedule-modal, .sb-notes-modal, .sb-json-modal, .save-scenario-modal, .sb-integrations-modal) { width: min(100%, 500px); max-width: 100%; max-height: calc(100dvh - 16px); overflow-y: auto; }
+  .sb-json-modal:has(.sb-json-import-body) { height: auto; }
+  .sb-json-modal:has(.sb-json-import-body) .sb-json-modal-body { flex: none; }
+  .sb-json-import-textarea { min-height: 180px; }
+  .sb-integrations-sidebar-inner, .sb-integrations-main { padding: 14px; }
+  .sb-integrations-title, .sb-integrations-panel-title, .sb-integrations-finish-title { font-size: 20px; }
+  .sonar-dashboard-shell[data-responsive="true"]:has(.scenario-builder-page :is(.sb-selection-panel, .aether-logic-wrapper, .sb-variables-pane, .sb-mobile-logic-tabs)) .dashboard-mobile-nav,
+  .sonar-dashboard-shell[data-responsive="true"]:has(.scenarios-container :is(.save-scenario-modal-overlay, .sb-schedule-modal-overlay, .sb-notes-modal-overlay, .sb-json-modal-overlay, .sb-integrations-overlay, .delete-confirm-overlay)) .dashboard-mobile-nav { visibility: hidden; }
+}
+
+@keyframes sbPhoneSheetIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sb-selection-panel, .sb-variables-pane { animation: none; }
+}

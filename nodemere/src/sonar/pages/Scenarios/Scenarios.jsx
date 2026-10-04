@@ -40,6 +40,7 @@ import {
   LockKeyhole,
 } from 'lucide-react';
 import './Scenarios.css';
+import useDashboardViewport from '../../hooks/useDashboardViewport';
 import ScenarioIntroNode from '../../../components/ScenarioIntroNode';
 import AetherEdgeLogic from './AetherEdgeLogic';
 import VariablesPane, { getFieldDisplayLabel, getTableFields, getVariableRef, parseVariables, renderVarChipsHTML, setPeopleCustomVariableFields } from './VariablesPane';
@@ -771,6 +772,7 @@ const sbModeToggleActiveStyle = {
 };
 
 export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialIntroNode = false } = {}) {
+  const { isPhone } = useDashboardViewport();
   const [viewMode, setViewMode] = useState('list'); // 'list' or 'builder'
   const { session, profile, refreshProfile } = useAuth();
   const userId = session?.user?.id || null;
@@ -805,6 +807,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
   const [initialFocusSet, setInitialFocusSet] = useState(false);
   const [initialNodeShifted, setInitialNodeShifted] = useState(false);
   const [logicPanel, setLogicPanel] = useState(null);
+  const [mobileLogicTab, setMobileLogicTab] = useState('rules');
   const [logicPanelDragPos, setLogicPanelDragPos] = useState(null);
   const [logicContextType, setLogicContextType] = useState('default');
   const [logicAvailableVars, setLogicAvailableVars] = useState([]);
@@ -818,6 +821,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
   const [triggerConfig, setTriggerConfig] = useState(null);
   const triggerFilterSourceNodeRef = useRef(null);
   const [varsPane, setVarsPane] = useState({ visible: false, active: false, fieldKey: '', fieldLabel: '', fieldType: 'text' });
+  const [mobileVariablesOpen, setMobileVariablesOpen] = useState(false);
   const [hoveredTableColor, setHoveredTableColor] = useState('');
   const [actionConfig, setActionConfig] = useState(null);
   const [recordFieldMenu, setRecordFieldMenu] = useState(null);
@@ -1073,7 +1077,11 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
           if (node?.actionConfig?._key) return prev;
           return 'options';
         }
-        if (['appointmentConfig', 'scheduleConfig'].includes(prev)) return prev;
+        if (['appointmentConfig', 'scheduleConfig'].includes(prev)) {
+          if (!isPhone) return prev;
+          return node?.[prev]?.key ? prev : 'options';
+        }
+        if (isPhone && prev === 'triggerConfig') return node?.triggerConfig?.key ? prev : 'options';
         if (prev === 'triggerFilter') {
           if (node?.triggerFilter?.key === 'appointment_soon') return prev;
           return 'options';
@@ -1093,7 +1101,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
     setActiveOption(null);
     setPanelSearch('');
     setPanelCategory(defaultCategory);
-  }, [selectedNodeId, selectedNode?.categoryType, isPrimaryNode]);
+  }, [selectedNodeId, selectedNode?.categoryType, isPrimaryNode, isPhone]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -1475,11 +1483,13 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
 
     if (panelStage === 'appointmentConfig') {
       applyInsert(setAppointmentConfig);
+      if (isPhone) setMobileVariablesOpen(false);
       return;
     }
 
     if (panelStage === 'scheduleConfig') {
       applyInsert(setScheduleConfig);
+      if (isPhone) setMobileVariablesOpen(false);
       return;
     }
 
@@ -1491,10 +1501,12 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
           [varsPane.fieldKey]: prev?.fields?.[varsPane.fieldKey] ? `${prev.fields[varsPane.fieldKey]} ${varRef}` : varRef,
         },
       }));
+      if (isPhone) setMobileVariablesOpen(false);
       return;
     }
 
     applyInsert(setActionConfig);
+    if (isPhone) setMobileVariablesOpen(false);
   };
 
   // Find the trigger key from parent node for smart actions
@@ -1669,6 +1681,10 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
       setPanelIntent(false);
       return;
     }
+    if (isPhone) {
+      setIsPanelVisible(panelIntent);
+      return;
+    }
     const nodeEl = nodeRefs.current[selectedNodeId];
     const pageRect = builderRef.current?.getBoundingClientRect();
     if (!nodeEl || !pageRect) {
@@ -1696,7 +1712,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
     } else {
       setIsPanelVisible(false);
     }
-  }, [selectedNodeId, panelIntent]);
+  }, [selectedNodeId, panelIntent, isPhone]);
 
   useLayoutEffect(() => {
     repositionPanel();
@@ -1834,10 +1850,14 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
   const openSelectionPanel = useCallback(
     (nodeId) => {
       setPanelIntent(true);
+      if (isPhone) {
+        setMobileVariablesOpen(false);
+        setVarsPane(prev => ({ ...prev, visible: false, active: false }));
+      }
       // If this is the initial node and it's still unconfigured (in CSS overlay),
       // use the intro circle element's center for positioning — not the full wrapper
       // which includes arrow + CTA text
-      if (nodeId === INITIAL_NODE.id && !nodeMap[nodeId]?.configured) {
+      if (!isPhone && nodeId === INITIAL_NODE.id && !nodeMap[nodeId]?.configured) {
         let circleCenterX, circleCenterY;
         if (introCircleRef.current) {
           const circleRect = introCircleRef.current.getBoundingClientRect();
@@ -1899,7 +1919,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
         setPanelStage('actionConfig');
       }
     },
-    [initialNodeShifted, nodeMap, view.x, view.y]
+    [initialNodeShifted, isPhone, nodeMap, view.x, view.y]
   );
 
   useEffect(() => {
@@ -2157,6 +2177,14 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
     setEdges((prev) => [...prev, { id: nextEdgeId, from: nodeId, to: nextId, filter: null }]);
     setSelectedNodeId(nextId);
     setLogicPanel(null);
+    if (isPhone) {
+      setPanelIntent(true);
+      setPanelStage('options');
+      setPanelCategory('ACTIONS');
+      setActiveOption(null);
+      setPanelSearch('');
+      setVarsPane(prev => ({ ...prev, visible: false }));
+    }
   };
 
   const handleSpawnCanvasNode = useCallback((canvasX, canvasY) => {
@@ -2586,6 +2614,8 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
     setEdgeRules(newRules);
     
     setLogicPanel({ edgeId: edge.id, top, left });
+    setMobileLogicTab('rules');
+    setMobileVariablesOpen(false);
     setLogicPanelDragPos(null);
   };
 
@@ -5076,11 +5106,102 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
     }
   };
 
+  // Keep the saved graph intact on phones. This is only its reading order, so
+  // branches and imported nodes remain available without canvas dragging.
+  const mobileOrderedNodes = !isPhone ? [] : (() => {
+    const ordered = [];
+    const visited = new Set();
+    const queue = [INITIAL_NODE.id];
+    while (queue.length) {
+      const id = queue.shift();
+      if (visited.has(id) || !nodeMap[id]) continue;
+      visited.add(id);
+      ordered.push(nodeMap[id]);
+      edges.filter(edge => edge.from === id).forEach(edge => queue.push(edge.to));
+    }
+    nodes.forEach(node => { if (!visited.has(node.id)) ordered.push(node); });
+    return ordered;
+  })();
+  // Extend only the connected chain from the trigger on phones. Existing
+  // desktop branches remain visible, but cannot be expanded here.
+  const mobileNextStepParent = !isPhone ? null : (() => {
+    let current = nodeMap[INITIAL_NODE.id];
+    const visited = new Set();
+    while (current && !visited.has(current.id)) {
+      visited.add(current.id);
+      const outgoing = edges.filter(edge => edge.from === current.id);
+      if (outgoing.length === 0) return current.configured ? current : null;
+      if (outgoing.length !== 1) return null;
+      current = nodeMap[outgoing[0].to];
+    }
+    return null;
+  })();
+
+  const renderMobileWorkflow = () => (
+    <div className="sb-mobile-workflow">
+      <div className="sb-mobile-workflow-intro">
+        <span className="sb-mobile-eyebrow">SCENARIO FLOW</span>
+        <p>Tap a step to edit it. Add conditions to connections between steps.</p>
+      </div>
+      {mobileOrderedNodes.map((node, index) => {
+        const outgoing = edges.filter(edge => edge.from === node.id);
+        const isLocked = !hasPaymentAccess && isPaymentScenarioNode(node);
+        const canRun = node.configured && ['search_records', 'search_appointments', 'create_customer', 'update_customer', 'create_payment', 'send_payment_link', 'create_invoice', 'send_invoice', 'refund_payment', 'cancel_subscription', 'send_email'].includes(node.actionConfig?._key);
+        return (
+          <section className="sb-mobile-step" key={node.id}>
+            <div className="sb-mobile-step-heading">
+              <span className="sb-mobile-step-number">{String(index + 1).padStart(2, '0')}</span>
+              <span className="sb-mobile-step-kind">{node.categoryType === 'TRIGGERS' || node.id === INITIAL_NODE.id ? 'Trigger' : 'Action'}</span>
+              {node.id !== INITIAL_NODE.id && outgoing.length === 0 && (
+                <button type="button" className="sb-mobile-icon-action" aria-label={`Remove ${node.label || 'step'}`} onClick={() => handleDeleteNode(node.id)}><Trash2 size={15} /></button>
+              )}
+            </div>
+            <button type="button" className="sb-mobile-step-main" onClick={() => {
+              if (isLocked) { goToPaymentUpgrade(); return; }
+              if (node.id === INITIAL_NODE.id && !node.configured) emitScenarioPopupEvent('sonar:scenario-intro-clicked');
+              openSelectionPanel(node.id);
+            }}>
+              <span className="sb-mobile-step-copy">
+                <strong>{node.configured ? node.label : node.id === INITIAL_NODE.id ? 'Choose a trigger' : 'Choose an action'}</strong>
+                <small>{node.configured ? (node.detail || 'Tap to edit settings') : 'Tap to configure this step'}</small>
+              </span>
+              <ChevronRight size={17} />
+            </button>
+            {outgoing.length > 0 && (
+              <div className="sb-mobile-connections">
+                {outgoing.map(edge => (
+                  <div className="sb-mobile-connection" key={edge.id}>
+                    <div className="sb-mobile-connection-top">
+                      <GitBranch size={13} />
+                      <span>Connects to</span>
+                      <span className="sb-mobile-connection-destination">{nodeMap[edge.to]?.label || 'New step'}</span>
+                    </div>
+                    <div className="sb-mobile-connection-actions">
+                      <button type="button" onClick={event => handleEdgeLogicClick(edge, event)}>
+                        <Filter size={13} /> {edge.filter?.type === 'fallback' ? 'Fallback' : edge.filter ? 'Edit condition' : 'Add condition'}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {node.configured && !isLocked && (
+              <div className="sb-mobile-step-actions">
+                {canRun && <button type="button" onClick={() => handleRunNodeRequest(node.id)}><Zap size={14} /> Run step</button>}
+              </div>
+            )}
+          </section>
+        );
+      })}
+      {mobileNextStepParent && <button type="button" className="sb-mobile-add-next-action" onClick={() => handleAddNode(mobileNextStepParent.id)}><Plus size={14} /> Add next step</button>}
+    </div>
+  );
+
   // List View Component
   const renderListView = () => (
     <div className="scenario-list-page">
       <div className="scenario-list-header">
-        <div className="scenario-list-title-group" aria-hidden="true" />
+        <div className="scenario-list-title-group"><h1 className="sb-phone-list-title">Scenarios</h1></div>
         {scenarios.length > 0 && (
           <div className="scenario-list-actions">
             <button className="create-scenario-btn" onClick={handleCreateScenario}>
@@ -5164,15 +5285,16 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
   );
 
   const renderBuilderView = () => (
-    <div className="scenario-builder-page" ref={builderRef} onPointerDown={handlePagePointerDown}>
+    <div className="scenario-builder-page" ref={builderRef} onPointerDown={isPhone ? undefined : handlePagePointerDown} data-mobile-logic-tab={isPhone ? mobileLogicTab : undefined}>
       <div className="sb-canvas-wrapper">
         <div
           className="sb-canvas"
           ref={canvasRef}
-          onPointerDown={handleCanvasPointerDown}
-          onContextMenu={handleCanvasContextMenu}
-          onWheel={handleWheel}
+          onPointerDown={isPhone ? undefined : handleCanvasPointerDown}
+          onContextMenu={isPhone ? undefined : handleCanvasContextMenu}
+          onWheel={isPhone ? undefined : handleWheel}
         >
+          {isPhone ? renderMobileWorkflow() : <>
           <div className="sb-canvas-grid" />
           
           {/* Quantum Reveal label — shown when initial node is unconfigured */}
@@ -5478,6 +5600,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
               onPointerDown={(event) => handleNodePointerDown(nodes[0].id, event)}
             />
           )}
+          </>}
         </div>
 
         {isPanelVisible && selectedNodeId && (
@@ -5510,8 +5633,8 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
                       event.stopPropagation();
                       handleDeleteNode();
                     }}
-                    disabled={selectedNodeId === INITIAL_NODE.id}
-                    style={selectedNodeId === INITIAL_NODE.id ? { opacity: 0.35, cursor: 'not-allowed', pointerEvents: 'none' } : undefined}
+                    disabled={selectedNodeId === INITIAL_NODE.id || (isPhone && edges.some(edge => edge.from === selectedNodeId))}
+                    style={selectedNodeId === INITIAL_NODE.id || (isPhone && edges.some(edge => edge.from === selectedNodeId)) ? { opacity: 0.35, cursor: 'not-allowed', pointerEvents: 'none' } : undefined}
                   >
                     <Trash2 size={16} />
                   </button>
@@ -5524,6 +5647,10 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
                       setSelectedNodeId(null);
                       setIsPanelVisible(false);
                       setPanelIntent(false);
+                      if (isPhone) {
+                        setMobileVariablesOpen(false);
+                        setVarsPane(prev => ({ ...prev, visible: false, active: false }));
+                      }
                     }}
                   >
                     <X size={18} />
@@ -6602,21 +6729,27 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
                   })
                 )}
               </div>
+              {isPhone && varsPane.active && ['actionConfig', 'appointmentConfig', 'scheduleConfig', 'triggerConfig'].includes(panelStage) && (
+                <button type="button" className="sb-mobile-insert-variable" onClick={() => setMobileVariablesOpen(true)}>
+                  <Database size={14} /> Insert variable for {varsPane.fieldLabel || 'selected field'}
+                </button>
+              )}
             </div>
           </div>
         )}
 
         {/* Variables pane — rendered outside selection panel (overflow: hidden clips it otherwise) */}
-        {['actionConfig', 'appointmentConfig', 'scheduleConfig'].includes(panelStage) && (
+        {(['actionConfig', 'appointmentConfig', 'scheduleConfig'].includes(panelStage) || (isPhone && panelStage === 'triggerConfig')) && (
           <VariablesPane
-            visible={varsPane.visible}
+            showClose={isPhone}
+            visible={varsPane.visible && (!isPhone || mobileVariablesOpen)}
             targetFieldKey={varsPane.fieldKey}
             fieldLabel={varsPane.fieldLabel}
             onInsertVariable={handleInsertVariable}
             onInsertSmartAction={handleInsertSmartAction}
             smartActions={getSmartActions(findParentTriggerKey(selectedNodeId), currentActionKey)}
             onTableHover={(color) => setHoveredTableColor(color)}
-            onClose={() => { setVarsPane({ visible: false, active: false, fieldKey: '', fieldLabel: '', fieldType: 'text' }); setHoveredTableColor(''); }}
+            onClose={() => { setMobileVariablesOpen(false); if (!isPhone) setVarsPane({ visible: false, active: false, fieldKey: '', fieldLabel: '', fieldType: 'text' }); setHoveredTableColor(''); }}
             nodes={nodes}
             edges={edges}
             currentNodeId={selectedNodeId}
@@ -6631,8 +6764,17 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
 
         {logicPanel && (
           <>
+            {isPhone && (
+              <div className="sb-mobile-logic-tabs" role="tablist" aria-label="Condition editor">
+                <button type="button" role="tab" aria-selected={mobileLogicTab === 'rules'} className={mobileLogicTab === 'rules' ? 'active' : ''} onClick={() => setMobileLogicTab('rules')}>Rules</button>
+                <button type="button" role="tab" aria-selected={mobileLogicTab === 'variables'} className={mobileLogicTab === 'variables' ? 'active' : ''} onClick={() => setMobileLogicTab('variables')}>Variables</button>
+                <button type="button" aria-label="Close condition editor" onClick={closeLogicPanel}><X size={16} /></button>
+              </div>
+            )}
             <VariablesPane
-              visible={true}
+              className="sb-variables-pane--logic"
+              showClose={isPhone}
+              visible={!isPhone || mobileLogicTab === 'variables'}
               targetFieldKey={activeConditionField?.ruleId || ''}
               fieldLabel="Condition"
               onInsertVariable={(varRef, label, color) => {
@@ -6645,6 +6787,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
                   const pos = inputEl?.selectionStart ?? currentVal.length;
                   const newVal = currentVal.slice(0, pos) + varRef + currentVal.slice(pos);
                   updateEdgeRule(ruleId, field, newVal);
+                  if (isPhone) setMobileLogicTab('rules');
                   return;
                 }
 
@@ -6656,11 +6799,12 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
                 if (lastRule) {
                   updateEdgeRule(lastRule.id, 'variable', varRef);
                 }
+                if (isPhone) setMobileLogicTab('rules');
               }}
               onInsertSmartAction={null}
               smartActions={[]}
               onTableHover={(color) => setHoveredTableColor(color)}
-              onClose={() => setVarsPane({ visible: false, active: false, fieldKey: '', fieldLabel: '', fieldType: 'text' })}
+              onClose={() => isPhone ? setMobileLogicTab('rules') : setVarsPane({ visible: false, active: false, fieldKey: '', fieldLabel: '', fieldType: 'text' })}
               nodes={nodes}
               edges={edges}
               currentNodeId={(() => {
@@ -6675,6 +6819,8 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
               }}
             />
             <AetherEdgeLogic
+              draggable={!isPhone}
+              mobile={isPhone}
               onPositionChange={(top, left) => setLogicPanelDragPos({ top, left })}
               style={{ top: logicPanel.top, left: Math.max(10, (logicPanel.left || 0) - 272 - 8) + 272 + 8 }}
               conditions={edgeRules}
@@ -6814,7 +6960,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
                 title="Run scenario in builder"
               >
                 <Zap size={13} />
-                <span>{isRunning ? (runProgress || 'Running scenario...') : (runProgress || 'Run Scenario')}</span>
+                <span>{isRunning ? (runProgress || 'Running scenario...') : (runProgress || (isPhone ? 'Run' : 'Run Scenario'))}</span>
               </button>
             )}
 

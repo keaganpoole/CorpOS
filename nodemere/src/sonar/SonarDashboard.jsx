@@ -1766,7 +1766,7 @@ const SonarDashboard = () => {
   const { isPhone, isCompact } = useDashboardViewport();
   const { session: authSession, profile, refreshProfile, workforce } = useAuth();
   const [currentRoute, setCurrentRoute] = useState(getInitialDashboardRoute);
-  const responsiveEnabled = currentRoute !== 'scenarios';
+  const responsiveEnabled = currentRoute !== 'scenarios' || isPhone;
   useEffect(() => {
     if (responsiveEnabled && isCompact) document.body.dataset.nodemereResponsive = 'true';
     else delete document.body.dataset.nodemereResponsive;
