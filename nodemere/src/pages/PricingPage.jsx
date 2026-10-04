@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Lightbulb, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Lightbulb, X } from 'lucide-react';
 import { createPortal } from 'react-dom';
 
 import { Link, useNavigate, useLocation } from 'react-router-dom';
@@ -65,7 +65,6 @@ const plansConfig = [
     {
         name: "Essentials",
         description: "A focused AI receptionist for ordinary front-desk work, general questions, and routine scheduling.",
-        scopeNote: "Routine scheduling where permitted and where restricted information is not involved. Sensitive, confidential, regulated, protected, account-specific, or identity-dependent requests must be routed to an authorized person unless separately approved.",
         prices: {
             Standard: { monthly: 100, annually: 90 },
             Sales: { monthly: 100, annually: 90 },
@@ -446,6 +445,8 @@ const PricingPage = () => {
     const [plansError, setPlansError] = useState('');
     const [plansLoading, setPlansLoading] = useState(true);
     const [isTestMode, setIsTestMode] = useState(false);
+    const [activeMobilePlan, setActiveMobilePlan] = useState(0);
+    const mobilePlanTrackRef = useRef(null);
     const pillBgRef = useRef(null);
     const annualBtnRef = useRef(null);
     const monthlyBtnRef = useRef(null);
@@ -531,7 +532,7 @@ const PricingPage = () => {
             ...fallbackPlan,
             name: databasePlan.name,
             description: display.description || '',
-            scopeNote: display.scope_note || fallbackPlan.scopeNote || '',
+            scopeNote: databasePlan.name.toLowerCase() === 'essentials' ? '' : (display.scope_note || fallbackPlan.scopeNote || ''),
             features: Array.isArray(databasePlan.features) ? databasePlan.features : [],
             isRecommended: Boolean(databasePlan.is_recommended),
             entitlements: databasePlan.entitlements || {},
@@ -574,6 +575,32 @@ const PricingPage = () => {
         };
     });
 
+    const updateActiveMobilePlan = () => {
+        const track = mobilePlanTrackRef.current;
+        if (!track) return;
+        const cards = Array.from(track.children);
+        const trackCenter = track.getBoundingClientRect().left + track.clientWidth / 2;
+        const closestIndex = cards.reduce((closest, card, index) => {
+            const bounds = card.getBoundingClientRect();
+            const distance = Math.abs(bounds.left + bounds.width / 2 - trackCenter);
+            return distance < closest.distance ? { index, distance } : closest;
+        }, { index: 0, distance: Infinity }).index;
+        setActiveMobilePlan(closestIndex);
+    };
+
+    const showMobilePlan = (index) => {
+        const track = mobilePlanTrackRef.current;
+        const card = track?.children[index];
+        if (!track || !card) return;
+        const trackBounds = track.getBoundingClientRect();
+        const cardBounds = card.getBoundingClientRect();
+        track.scrollTo({
+            left: track.scrollLeft + cardBounds.left + cardBounds.width / 2 - trackBounds.left - track.clientWidth / 2,
+            behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+        });
+        setActiveMobilePlan(index);
+    };
+
     return (
         <div className="pricing-page-bg text-gray-300 antialiased min-h-screen flex flex-col">
             <svg width="0" height="0" style={{ position: 'absolute' }}><defs>
@@ -587,14 +614,14 @@ const PricingPage = () => {
                 </div>
             </div>
             <div className="container mx-auto px-3 py-12 sm:py-20 flex-1">
-                <div className="text-center max-w-3xl mx-auto mb-12">
-                    <h1 className="text-4xl md:text-5xl font-extrabold text-white mb-4">Choose your plan</h1>
+                <div className="text-center max-w-3xl mx-auto mb-12 max-sm:mb-7">
+                    <h1 className="text-4xl max-sm:text-3xl md:text-5xl font-extrabold text-white mb-4 max-sm:mb-2">Choose your plan</h1>
                     {subscriptionStatus === 'failed' && subscriptionLog && (
                         <p className="text-red-500 text-lg mb-4">{subscriptionLog}</p>
                     )}
-                    <p className="text-lg text-gray-400">Choose a plan that's right for your business.</p>
+                    <p className="text-lg max-sm:text-sm text-gray-400">Choose a plan that's right for your business.</p>
                 </div>
-                <div className="flex justify-center items-center mb-12">
+                <div className="flex justify-center items-center mb-12 max-sm:mb-5">
                     <div className="relative flex items-center bg-[#1a1a1a] p-1 rounded-full border border-gray-800">
                         <div ref={pillBgRef} className="absolute h-[85%] rounded-full gradient-bg transition-all duration-300 ease-in-out"></div>
                         <button ref={annualBtnRef} onClick={() => setCycle('annually')} className={`toggle-button relative z-10 text-sm font-semibold px-6 py-2 transition-colors duration-300 ${cycle === 'annually' ? 'text-[var(--buttonText)]' : 'text-gray-400'}`}>Annually</button>
@@ -609,9 +636,23 @@ const PricingPage = () => {
                     ) : plansError ? (
                         <div className="py-10 text-sm text-gray-500">{plansError}</div>
                     ) : (
-                        <div className="inline-grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 py-4">
-                           {plansToDisplay.map((plan, index) => <PlanCard key={plan.name} plan={plan} cycle={cycle} isInitialLoad={isInitialLoad} index={index} currentUserPlan={currentUserPlan} subscriptionStatus={subscriptionStatus} isTestMode={isTestMode} />)}
-                        </div>
+                        <>
+                            <div className="pricing-mobile-carousel-nav sm:hidden" aria-label="Pricing plan navigation">
+                                <button type="button" onClick={() => showMobilePlan(activeMobilePlan - 1)} disabled={activeMobilePlan === 0} aria-label="Previous plan" className="pricing-mobile-carousel-arrow">
+                                    <ChevronLeft size={19} aria-hidden="true" />
+                                </button>
+                                <span className="pricing-mobile-carousel-position" aria-live="polite">
+                                    {plansToDisplay[activeMobilePlan]?.name || 'Plan'} <span className="text-zinc-500">{activeMobilePlan + 1} / {plansToDisplay.length}</span>
+                                </span>
+                                <button type="button" onClick={() => showMobilePlan(activeMobilePlan + 1)} disabled={activeMobilePlan >= plansToDisplay.length - 1} aria-label="Next plan" className="pricing-mobile-carousel-arrow">
+                                    <ChevronRight size={19} aria-hidden="true" />
+                                </button>
+                            </div>
+                            <p className="pricing-mobile-swipe-hint sm:hidden">Swipe left or right to compare</p>
+                            <div ref={mobilePlanTrackRef} onScroll={updateActiveMobilePlan} className="pricing-plan-track inline-grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 py-4" aria-label="Pricing plans">
+                                {plansToDisplay.map((plan, index) => <PlanCard key={plan.name} plan={plan} cycle={cycle} isInitialLoad={isInitialLoad} index={index} currentUserPlan={currentUserPlan} subscriptionStatus={subscriptionStatus} isTestMode={isTestMode} />)}
+                            </div>
+                        </>
                     )}
                 </div>
                 {!plansLoading && (

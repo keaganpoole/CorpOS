@@ -257,6 +257,51 @@ p:not(.comparison-human-statement):not(.comparison-ai-statement) {
 .plan-card:hover::before { opacity: 1; }
 .current-plan-glow { box-shadow: 0 0 30px var(--color1); transform: translateY(-5px); }
 .current-plan-glow::before { opacity: 1; animation: pulse-glow 3s infinite ease-in-out; }
+@media (max-width: 639px) {
+  .pricing-mobile-carousel-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    max-width: 300px;
+    margin: 0 auto;
+  }
+  .pricing-mobile-carousel-arrow {
+    display: grid;
+    place-items: center;
+    width: 42px;
+    height: 42px;
+    border: 1px solid #52525b;
+    border-radius: 9999px;
+    color: #f4f4f5;
+    background: #18181b;
+    transition: background-color 160ms ease, opacity 160ms ease;
+  }
+  .pricing-mobile-carousel-arrow:disabled { opacity: 0.3; }
+  .pricing-mobile-carousel-arrow:not(:disabled):active { background: #3f3f46; }
+  .pricing-mobile-carousel-position { color: #f4f4f5; font-size: 13px; font-weight: 600; }
+  .pricing-mobile-carousel-position span { margin-left: 6px; font-size: 11px; font-weight: 400; }
+  .pricing-mobile-swipe-hint { margin: 2px 0 0 !important; color: #a1a1aa; font-size: 11px; }
+  .pricing-plan-track {
+    display: flex;
+    width: 100%;
+    max-width: 100%;
+    gap: 14px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-inline: max(16px, calc((100% - 300px) / 2));
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    overscroll-behavior-inline: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+  .pricing-plan-track::-webkit-scrollbar { display: none; }
+  .pricing-plan-track > .plan-card {
+    flex: 0 0 min(300px, calc(100vw - 72px));
+    width: min(300px, calc(100vw - 72px));
+    scroll-snap-align: center;
+    scroll-snap-stop: always;
+  }
+}
 @keyframes pulse-glow { 0%, 100% { box-shadow: 0 0 30px var(--color1); } 50% { box-shadow: 0 0 45px var(--color2); } 100% { box-shadow: 0 0 30px var(--color1); } }
 .btn-shine { position: relative; overflow: hidden; }
 .btn-shine::after { content: ''; position: absolute; top: -50%; left: -50%; width: 20px; height: 200%; background: rgba(255, 255, 255, 0.2); transform: rotate(25deg); transition: left 0.32s ease; }

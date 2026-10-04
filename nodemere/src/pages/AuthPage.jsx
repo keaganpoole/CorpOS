@@ -233,21 +233,21 @@ const AuthPage = () => {
 
     // ... your existing JSX for the form ...
     const inputGroupClasses = "relative";
-    const inputClasses = "relative w-full px-5 py-3 bg-[#1c1c1c] border border-zinc-700 rounded-full text-white placeholder-gray-500 outline-none ring-0 transition-colors peer focus:border-zinc-300 focus:outline-none focus:ring-0";
-    const labelClasses = "absolute left-4 -top-2 text-xs text-gray-400 bg-[#1c1c1c] px-2 rounded-md transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-sm peer-focus:-top-2 peer-focus:text-xs";
+    const inputClasses = "relative w-full px-5 py-3 max-sm:px-4 max-sm:py-2.5 max-sm:text-base bg-[#1c1c1c] border border-zinc-700 rounded-full text-white placeholder-gray-500 outline-none ring-0 transition-colors peer focus:border-zinc-300 focus:outline-none focus:ring-0";
+    const labelClasses = "absolute left-4 -top-2 text-xs text-gray-400 bg-[#1c1c1c] px-2 rounded-md transition-all peer-placeholder-shown:top-3.5 max-sm:peer-placeholder-shown:top-3 peer-placeholder-shown:text-sm peer-focus:-top-2 peer-focus:text-xs";
     const isSubmitDisabled = isLoading || (isSignUp && !hasAcceptedLegal);
 
     return (
-        <div className="auth-page min-h-[var(--app-height)] bg-black text-gray-300 flex items-center justify-center px-6 py-4 font-inter antialiased">
+        <div className="auth-page min-h-[var(--app-height)] bg-black text-gray-300 flex items-center justify-center px-6 py-4 max-sm:px-5 max-sm:py-6 font-inter antialiased">
             <div className={`w-full max-w-sm mx-auto transition-all duration-700 ease-in-out ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
                 <div className="flex flex-col items-center text-center">
-                    <div className="mb-4 flex h-24 items-center justify-center">
-                        <img src={NODEMERE_LOGO_SRC} alt="Nodemere logo" className="h-28 w-auto object-contain" />
+                    <div className="mb-4 flex h-24 max-sm:mb-2 max-sm:h-16 items-center justify-center">
+                        <img src={NODEMERE_LOGO_SRC} alt="Nodemere logo" className="h-28 max-sm:h-20 w-auto object-contain" />
                     </div>
-                    <h1 className="text-2xl font-bold text-white mb-10">{isSignUp ? 'Create an account' : 'Welcome back'}</h1>
+                    <h1 className="text-2xl max-sm:text-xl font-bold text-white mb-10 max-sm:mb-6">{isSignUp ? 'Create an account' : 'Welcome back'}</h1>
                 </div>
 
-                <form onSubmit={handleSubmit} className="space-y-5">
+                <form onSubmit={handleSubmit} className="space-y-5 max-sm:space-y-3.5">
                     <div className={inputGroupClasses}>
                         <input id="email" type="email" name="email" placeholder=" " value={formData.email} onChange={handleChange} className={inputClasses} required disabled={isLoading} />
                         <label htmlFor="email" className={labelClasses}>Email</label>
@@ -265,7 +265,7 @@ const AuthPage = () => {
                         </div>
                     )}
 
-                    {isSignUp && <label className="flex items-start gap-3 px-1 text-left text-xs leading-5 text-gray-400">
+                    {isSignUp && <label className="flex items-start gap-3 px-1 text-left text-xs leading-5 max-sm:leading-[1.35rem] text-gray-400">
                         <input
                             type="checkbox"
                             checked={hasAcceptedLegal}
@@ -276,7 +276,7 @@ const AuthPage = () => {
                         <span>I am authorized to create this business account, agree to the <Link to="/terms" target="_blank" className="text-white underline underline-offset-2">Terms</Link>, <Link to="/privacy-policy" target="_blank" className="text-white underline underline-offset-2">Privacy Policy</Link>, <Link to="/acceptable-use-policy" target="_blank" className="text-white underline underline-offset-2">Acceptable Use Policy</Link>, <Link to="/communications-notice" target="_blank" className="text-white underline underline-offset-2">AI & Recording Notice</Link>, and <Link to="/data-processing-addendum" target="_blank" className="text-white underline underline-offset-2">DPA</Link>. I certify this account will be used only for permitted ordinary business workflows; restricted automated workflows require separate approval.</span>
                     </label>}
 
-                    <button type="submit" className="w-full py-3 mt-6 text-sm font-semibold text-black bg-gradient-to-r from-[#f7f7f8] to-[#b5b6c4] rounded-full hover:opacity-90 transition-all duration-300 shadow-lg shadow-[#b5b6c4]/10 disabled:opacity-35 disabled:cursor-not-allowed" disabled={isSubmitDisabled}>
+                    <button type="submit" className="w-full py-3 max-sm:py-2.5 max-sm:min-h-11 mt-6 max-sm:mt-4 text-sm font-semibold text-black bg-gradient-to-r from-[#f7f7f8] to-[#b5b6c4] rounded-full hover:opacity-90 transition-all duration-300 shadow-lg shadow-[#b5b6c4]/10 disabled:opacity-35 disabled:cursor-not-allowed" disabled={isSubmitDisabled}>
                         {isLoading ? 'Processing...' : (isSignUp ? 'Sign Up' : 'Log In')}
                     </button>
 
@@ -299,22 +299,22 @@ const AuthPage = () => {
                     )}
                 </form>
 
-                <div className="mt-8 space-y-4">
-                    <button onClick={handleGoogleSignIn} className="w-full flex items-center justify-center px-4 py-3 bg-transparent border border-gray-700 rounded-full hover:bg-[#1c1c1c] transition-colors disabled:opacity-50" disabled={isLoading || (isSignUp && !hasAcceptedLegal)}>
+                <div className="mt-8 max-sm:mt-5 space-y-4">
+                    <button onClick={handleGoogleSignIn} className="w-full flex items-center justify-center px-4 py-3 max-sm:py-2.5 max-sm:min-h-11 bg-transparent border border-gray-700 rounded-full hover:bg-[#1c1c1c] transition-colors disabled:opacity-50" disabled={isLoading || (isSignUp && !hasAcceptedLegal)}>
                         <img src={googleIcon} alt="Google icon" className="w-5 h-5 mr-3" style={{ backgroundColor: 'transparent' }} />
                         <span className="font-semibold text-xs text-white">Continue with Google</span>
                     </button>
                     
                 </div>
 
-                <div className="mt-10 text-center text-xs">
+                <div className="mt-10 max-sm:mt-6 text-center text-xs">
                     <p className="text-gray-500">
                         {isSignUp ? 'Already have an account?' : "Don't have an account?"}
                         <button onClick={toggleAuthMode} className="font-semibold text-white hover:text-[#f7f7f8] hover:underline ml-1 focus:outline-none transition-colors" disabled={isLoading}>
                             {isSignUp ? 'Log in' : 'Sign up'}
                         </button>
                     </p>
-                    <p className="mt-4">
+                    <p className="mt-4 max-sm:mt-3">
                         <button onClick={handlePasswordReset} className="font-semibold text-white hover:text-[#f7f7f8] hover:underline focus:outline-none transition-colors" disabled={isLoading}>
                             Forgot password?
                         </button>
