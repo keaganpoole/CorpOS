@@ -45,18 +45,17 @@ export default function LegalAcceptanceGate({ children }) {
   return (
     <main className="legal-document-page">
       <section className="legal-acceptance-card">
-        <p className="legal-eyebrow">Updated legal terms</p>
-        <h1>Review and accept</h1>
-        <p>Before continuing, confirm that your business will use Nodemere only for permitted ordinary business workflows.</p>
+        <p className="legal-eyebrow">Welcome to Nodemere</p>
+        <h1>Let’s get started</h1>
+        <p className="legal-acceptance-intro">Nodemere puts unprecedented power behind your front desk. Your receptionists can answer, call, take action, and automate the work that keeps your business moving. Use that power responsibly.</p>
         <form className="legal-acceptance-form" onSubmit={acceptCurrentTerms}>
           <label className="legal-checkbox-row">
             <input type="checkbox" checked={accepted} onChange={(event) => setAccepted(event.target.checked)} disabled={busy} />
-            <span>I am authorized to accept the <Link to="/terms" target="_blank">Terms</Link>, <Link to="/privacy-policy" target="_blank">Privacy Policy</Link>, <Link to="/acceptable-use-policy" target="_blank">Acceptable Use Policy</Link>, <Link to="/communications-notice" target="_blank">AI &amp; Recording Notice</Link>, and <Link to="/data-processing-addendum" target="_blank">DPA</Link>. I certify that this account will be used only for permitted ordinary business workflows; restricted automated workflows require separate approval.</span>
+            <span>I’m authorized to accept the <Link to="/terms" target="_blank">Terms</Link>, <Link to="/privacy-policy" target="_blank">Privacy Policy</Link>, <Link to="/acceptable-use-policy" target="_blank">Acceptable Use Policy</Link>, <Link to="/communications-notice" target="_blank">AI &amp; Recording Notice</Link>, and <Link to="/data-processing-addendum" target="_blank">DPA</Link>. I’ll use Nodemere only for permitted business workflows.</span>
           </label>
           {error && <p className="legal-form-error" role="alert">{error}</p>}
-          <button className="legal-primary-button" disabled={busy || !accepted}>{busy ? 'Saving…' : 'Accept and continue'}</button>
+          <button className="legal-primary-button" disabled={busy || !accepted}>{busy ? 'Saving…' : 'Continue to setup'}</button>
         </form>
-        <p className="legal-small-copy"><button type="button" onClick={logout}>Sign out</button> if you are not authorized to accept these terms.</p>
       </section>
     </main>
   );

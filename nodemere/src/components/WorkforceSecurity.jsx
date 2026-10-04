@@ -171,7 +171,7 @@ export function WorkforceGate({ children }) {
       <button className="mx-auto mt-5 block text-xs font-medium text-white/35 transition hover:text-white/70" onClick={logout}>Sign out</button>
     </div>
   </main>;
-  if (!workforce.tenant && !pendingChecked) return <div className="p-8 text-white">Checking invitations…</div>;
+  if (!workforce.tenant && !pendingChecked) return <div className="min-h-screen" aria-busy="true" aria-label="Loading" />;
   if (!workforce.tenant && pending.length) return <div className="mx-auto max-w-xl p-8 text-white"><h1>Business invitations</h1>{error && <p role="alert">{error}</p>}{pending.map(i => <div key={i.id} className="py-3">Join as {i.role}<button className="ml-4" onClick={async () => { try { await workforceRequest(`/invitations/${i.id}/accept`,'POST',{}); await refreshWorkforce(); } catch (e) { setError(e.message); } }}>Accept invitation</button></div>)}</div>;
   return children;
 }
