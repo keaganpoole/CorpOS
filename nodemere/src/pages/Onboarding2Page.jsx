@@ -1223,6 +1223,9 @@ const isEmailComplete = (value) => {
 const fieldClass =
   'h-12 w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 text-sm text-white !outline-none ring-0 transition placeholder:text-zinc-700 focus:border-white/[0.16] focus:!outline-none focus:ring-0 focus-visible:!outline-none focus-visible:ring-0 [color-scheme:dark]';
 
+const shouldAutoFocusOnboardingField = () => typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches;
+const usesOnboardingScheduleTimeline = () => typeof window !== 'undefined' && window.matchMedia('(min-width: 640px)').matches;
+
 const smallFieldClass =
   'h-10 w-full rounded-xl border border-white/[0.06] bg-[#070707]/85 px-3 text-[12px] text-zinc-300 !outline-none ring-0 transition placeholder:text-zinc-700 focus:border-white/[0.14] focus:!outline-none focus:ring-0 focus-visible:!outline-none focus-visible:ring-0 [color-scheme:dark]';
 
@@ -1459,14 +1462,14 @@ const LateHoursTermsModal = ({ isSaving = false, onAccept, onClose }) => {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[80] flex items-center justify-center bg-black/75 px-4 backdrop-blur-sm"
+      className="onboarding-modal-backdrop fixed inset-0 z-[80] flex items-center justify-center bg-black/75 px-4 backdrop-blur-sm"
     >
       <motion.section
         initial={{ opacity: 0, y: 18, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 18, scale: 0.98 }}
         transition={{ duration: 0.2 }}
-        className="w-full max-w-[560px] overflow-hidden rounded-[28px] border border-white/[0.08] bg-[#0a0a0a] shadow-[0_28px_90px_rgba(0,0,0,0.6)]"
+        className="onboarding-modal-panel w-full max-w-[560px] overflow-hidden rounded-[28px] border border-white/[0.08] bg-[#0a0a0a] shadow-[0_28px_90px_rgba(0,0,0,0.6)]"
       >
         <div className="border-b border-white/[0.06] px-7 py-6">
           <div className="flex items-start justify-between gap-5">
@@ -1486,7 +1489,7 @@ const LateHoursTermsModal = ({ isSaving = false, onAccept, onClose }) => {
             Calling customers outside normal business hours may lead to complaints, lower answer rates, and could be subject to local telemarketing or consumer protection regulations. Only enable overnight calling if it fits your business, you have appropriate customer consent, and you're confident it complies with applicable laws.
           </p>
         </div>
-        <div className="flex items-center justify-end gap-3 border-t border-white/[0.06] px-7 py-5">
+        <div className="onboarding-late-footer flex items-center justify-end gap-3 border-t border-white/[0.06] px-7 py-5">
           <button type="button" onClick={onClose} className="h-10 rounded-full px-6 text-sm font-medium text-zinc-500 transition hover:text-white">
             Review schedule
           </button>
@@ -1521,6 +1524,7 @@ const ScheduleTimeline = ({ value, onChange, colorblindMode, onColorblindModeCha
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [importText, setImportText] = useState('');
   const [notice, setNotice] = useState('');
+  const [expandedDay, setExpandedDay] = useState('Monday');
 
   const schedule = scheduleIsValid(value) ? value : createDefaultSchedule();
   const timelineHours = schedule.timeline?.end - schedule.timeline?.start || 24;
@@ -1614,6 +1618,15 @@ const ScheduleTimeline = ({ value, onChange, colorblindMode, onColorblindModeCha
     });
   }, [updateSchedule]);
 
+  const changeLayerTime = (day, layerId, boundary, nextValue) => {
+    const layer = schedule.days[day].layers[layerId];
+    const nextLayer = { ...layer, [boundary]: Number(nextValue) };
+    updateLayer(day, layerId, nextLayer);
+    if (layerId === 'outbound' && !outboundLateHoursAccepted && isOutboundLateHoursLayer(nextLayer)) {
+      onOutboundLateHours?.();
+    }
+  };
+
   const handlePointerDown = (event, day, layerId, handle) => {
     const layer = schedule.days[day].layers[layerId];
     if (!schedule.days[day].enabled || !layer.enabled) return;
@@ -1679,6 +1692,7 @@ const ScheduleTimeline = ({ value, onChange, colorblindMode, onColorblindModeCha
       ...current,
       days: Object.fromEntries(days.map((day) => [day, {
         ...current.days[day],
+        enabled: source.enabled,
         layers: Object.fromEntries(activeLayerTypes.map(({ id }) => [id, { ...source.layers[id] }]))
       }])),
     }));
@@ -1724,7 +1738,7 @@ const ScheduleTimeline = ({ value, onChange, colorblindMode, onColorblindModeCha
               <span className={`h-2.5 w-2.5 rounded-full bg-gradient-to-r ${layer.gradient} ${days.some((day) => schedule.days[day]?.layers?.[layer.id]?.enabled) ? '' : 'opacity-30'}`} />{layer.label}
             </button>
           ))}
-          <div className="flex items-center gap-2 text-[11px] text-zinc-500">
+          <div className="onboarding-snap-control flex items-center gap-2 text-[11px] text-zinc-500">
             <span>Snap</span>
             <SnapDropdown value={snapMinutes} onChange={setSnapMinutes} />
           </div>
@@ -1749,13 +1763,13 @@ const ScheduleTimeline = ({ value, onChange, colorblindMode, onColorblindModeCha
       <AnimatePresence>
         {importModalOpen ? (
           <motion.div
-            className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm"
+            className="onboarding-modal-backdrop fixed inset-0 z-[70] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
             <motion.div
-              className="w-full max-w-xl rounded-2xl border border-white/[0.08] bg-[#080808] p-5 shadow-2xl"
+              className="onboarding-modal-panel w-full max-w-xl rounded-2xl border border-white/[0.08] bg-[#080808] p-5 shadow-2xl"
               initial={{ y: 18, scale: 0.98, opacity: 0 }}
               animate={{ y: 0, scale: 1, opacity: 1 }}
               exit={{ y: 18, scale: 0.98, opacity: 0 }}
@@ -1784,7 +1798,62 @@ const ScheduleTimeline = ({ value, onChange, colorblindMode, onColorblindModeCha
         ) : null}
       </AnimatePresence>
 
-      <div className="space-y-4 rounded-[22px] border border-white/[0.06] bg-black/20 p-4 sm:p-5">
+      <div className="onboarding-schedule-responsive">
+        {days.map((day) => {
+          const dayValue = schedule.days[day];
+          const isExpanded = expandedDay === day;
+          const activeCount = activeLayerTypes.filter(({ id }) => dayValue.layers[id].enabled).length;
+          return (
+            <div key={day} className="onboarding-day-card">
+              <button type="button" className="onboarding-day-heading" aria-expanded={isExpanded} onClick={() => setExpandedDay(isExpanded ? null : day)}>
+                <span className="onboarding-day-title">{day}</span>
+                <span className="onboarding-day-summary">{dayValue.enabled ? `${activeCount} schedule${activeCount === 1 ? '' : 's'} active` : 'Closed'}</span>
+                <ChevronDown className={`h-4 w-4 text-zinc-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+              </button>
+              {isExpanded ? (
+                <div className="onboarding-day-content">
+                  <div className="onboarding-day-tools">
+                    <button type="button" onClick={() => toggleDay(day)} aria-pressed={dayValue.enabled} className="onboarding-day-toggle">
+                      <span className={`onboarding-day-toggle-track ${dayValue.enabled ? 'is-on' : ''}`}><span /></span>
+                      {dayValue.enabled ? 'Open' : 'Closed'}
+                    </button>
+                    <button type="button" onClick={() => copyDay(day)} className="onboarding-day-copy"><Copy className="h-3.5 w-3.5" /> Copy to all days</button>
+                  </div>
+                  {activeLayerTypes.map((layerType) => {
+                    const layer = dayValue.layers[layerType.id];
+                    const choices = Array.from({ length: 97 }, (_, index) => index / 4);
+                    return (
+                      <div key={layerType.id} className="onboarding-layer-card">
+                        <button type="button" onClick={() => toggleLayer(day, layerType.id)} aria-pressed={layer.enabled} className="onboarding-layer-toggle">
+                          <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: layerType.color, opacity: layer.enabled ? 1 : 0.35 }} />
+                          <span>{layerType.label}</span>
+                          <span className={`onboarding-day-toggle-track ${layer.enabled ? 'is-on' : ''}`}><span /></span>
+                        </button>
+                        {layer.enabled ? (
+                          <div className="onboarding-layer-times">
+                            <label>Start
+                              <select value={layer.start} onChange={(event) => changeLayerTime(day, layerType.id, 'start', event.target.value)} aria-label={`${day} ${layerType.label} start time`}>
+                                {choices.filter(time => time < layer.end || time === layer.start).map(time => <option key={time} value={time}>{formatScheduleTime(time)}</option>)}
+                              </select>
+                            </label>
+                            <label>End
+                              <select value={layer.end} onChange={(event) => changeLayerTime(day, layerType.id, 'end', event.target.value)} aria-label={`${day} ${layerType.label} end time`}>
+                                {choices.filter(time => time > layer.start || time === layer.end).map(time => <option key={time} value={time}>{time === 24 ? '12:00 AM (next day)' : formatScheduleTime(time)}</option>)}
+                              </select>
+                            </label>
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="onboarding-schedule-desktop space-y-4 rounded-[22px] border border-white/[0.06] bg-black/20 p-4 sm:p-5">
 
       <div className="flex pl-32 pr-12 text-[11px] font-mono text-zinc-600">
         <div className="relative h-5 flex-1 select-none">{[0, 4, 8, 12, 16, 20, 24].map((hour) => <span key={hour} className="absolute -translate-x-1/2" style={{ left: `${((hour - schedule.timeline.start) / timelineHours) * 100}%` }}>{formatScheduleTime(hour)}</span>)}</div>
@@ -1799,7 +1868,7 @@ const ScheduleTimeline = ({ value, onChange, colorblindMode, onColorblindModeCha
                 <button type="button" onClick={() => toggleDay(day)} className={`flex h-4 w-7 items-center rounded-full p-0.5 transition-colors duration-200 ${dayValue.enabled ? 'bg-zinc-100/90 shadow-[0_0_10px_rgba(244,244,245,0.16)]' : 'bg-zinc-800'}`} aria-label={`Toggle all schedules for ${day}`}><span className={`h-3 w-3 rounded-full shadow-md transition-transform duration-200 ${dayValue.enabled ? 'translate-x-3 bg-zinc-900' : 'translate-x-0 bg-white'}`} /></button>
                 <span className={`text-xs font-semibold uppercase tracking-wider ${dayValue.enabled ? 'text-zinc-200' : 'text-zinc-500'}`}>{day.slice(0, 3)}</span>
               </div>
-              <div data-schedule-track={day} className="relative mx-2 flex h-14 min-w-0 flex-1 items-center">
+              <div data-schedule-track={day} className="onboarding-schedule-track relative mx-2 flex h-14 min-w-0 flex-1 items-center">
                 <div className="pointer-events-none absolute inset-0 flex justify-between opacity-10">{Array.from({ length: timelineHours + 1 }).map((_, index) => <span key={index} className="h-full w-px bg-white/40" />)}</div>
                 <div className="relative flex w-full flex-col gap-1.5 py-1">
                   {activeLayerTypes.map((layerType) => {
@@ -1811,23 +1880,23 @@ const ScheduleTimeline = ({ value, onChange, colorblindMode, onColorblindModeCha
                     const isHovered = hoveredBar === barKey;
                     const isDimmed = drag && !isActiveBar;
                     return (
-                      <div key={layerType.id} className="group/bar relative h-2.5 w-full" onMouseEnter={() => setHoveredBar(barKey)} onMouseLeave={() => setHoveredBar(null)}>
+                      <div key={layerType.id} className="onboarding-timeline-row group/bar relative h-2.5 w-full" onMouseEnter={() => setHoveredBar(barKey)} onMouseLeave={() => setHoveredBar(null)}>
                         <button type="button" onClick={() => toggleLayer(day, layerType.id)} aria-pressed={layer.enabled} aria-label={`${layer.enabled ? 'Disable' : 'Enable'} ${layerType.label} on ${day}`} title={`${layer.enabled ? 'Disable' : 'Enable'} ${layerType.label}`} className={`absolute inset-y-0 left-0 right-0 overflow-hidden rounded-full border text-left transition ${layer.enabled ? 'border-white/[0.05] bg-white/[0.05]' : 'border-white/[0.03] bg-white/[0.02] opacity-60 hover:opacity-100'}`} />
                         <div
-                            className={`absolute inset-y-0 select-none rounded-full bg-gradient-to-r ${layerType.gradient} transition-all duration-75 ${layer.enabled ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer grayscale'} ${
+                            className={`onboarding-timeline-bar absolute inset-y-0 select-none rounded-full bg-gradient-to-r ${layerType.gradient} transition-all duration-75 ${layer.enabled ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer grayscale'} ${
                               isActiveBar ? 'z-20 scale-y-110 ring-2 ring-white/50' : 'z-10'
                             } ${isDimmed ? 'opacity-30' : layer.enabled ? 'opacity-100' : 'opacity-25'} ${isHovered && layer.enabled ? 'brightness-125 shadow-lg' : ''}`}
                             style={{ left: `${left}%`, width: `${width}%`, boxShadow: isActiveBar || (isHovered && layer.enabled) ? layerType.glow : 'none' }}
                             onClick={() => { if (!layer.enabled) toggleLayer(day, layerType.id); }}
                             onPointerDown={(event) => handlePointerDown(event, day, layerType.id, 'center')}
                           >
-                            <button type="button" aria-label={`Move ${layerType.label} start`} onPointerDown={(event) => { event.stopPropagation(); handlePointerDown(event, day, layerType.id, 'left'); }} className="absolute left-0 top-1/2 z-30 flex h-4 w-3 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize items-center justify-center rounded-full bg-white opacity-0 shadow-md transition-all hover:scale-125 group-hover/bar:opacity-100">
+                            <button type="button" aria-label={`Move ${layerType.label} start`} onPointerDown={(event) => { event.stopPropagation(); handlePointerDown(event, day, layerType.id, 'left'); }} className="onboarding-timeline-handle absolute left-0 top-1/2 z-30 flex h-4 w-3 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize items-center justify-center rounded-full bg-white opacity-0 shadow-md transition-all hover:scale-125 group-hover/bar:opacity-100">
                               <span className="h-2 w-0.5 rounded-full bg-zinc-600" />
                             </button>
                             <div className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-30">
                               <span className="h-0.5 w-4 rounded-full bg-white/60" />
                             </div>
-                            <button type="button" aria-label={`Move ${layerType.label} end`} onPointerDown={(event) => { event.stopPropagation(); handlePointerDown(event, day, layerType.id, 'right'); }} className="absolute right-0 top-1/2 z-30 flex h-4 w-3 translate-x-1/2 -translate-y-1/2 cursor-ew-resize items-center justify-center rounded-full bg-white opacity-0 shadow-md transition-all hover:scale-125 group-hover/bar:opacity-100">
+                            <button type="button" aria-label={`Move ${layerType.label} end`} onPointerDown={(event) => { event.stopPropagation(); handlePointerDown(event, day, layerType.id, 'right'); }} className="onboarding-timeline-handle absolute right-0 top-1/2 z-30 flex h-4 w-3 translate-x-1/2 -translate-y-1/2 cursor-ew-resize items-center justify-center rounded-full bg-white opacity-0 shadow-md transition-all hover:scale-125 group-hover/bar:opacity-100">
                               <span className="h-2 w-0.5 rounded-full bg-zinc-600" />
                             </button>
                           </div>
@@ -1845,7 +1914,7 @@ const ScheduleTimeline = ({ value, onChange, colorblindMode, onColorblindModeCha
                   })}
                 </div>
               </div>
-              <div className="flex w-10 shrink-0 justify-end opacity-0 transition-opacity group-hover:opacity-100">
+              <div className="onboarding-schedule-copy flex w-10 shrink-0 justify-end opacity-0 transition-opacity group-hover:opacity-100">
                 <button type="button" onClick={() => copyDay(day)} className="flex h-7 w-7 items-center justify-center rounded-md text-zinc-500 transition hover:bg-white/10 hover:text-white" aria-label={`Copy ${day} schedule to all days`}><Copy className="h-3.5 w-3.5" /></button>
               </div>
             </div>
@@ -1871,7 +1940,7 @@ const ScheduleTimeline = ({ value, onChange, colorblindMode, onColorblindModeCha
 
 const InfoModal = ({ eyebrow = 'Tips', title, intro, points = [], footer, onClose, zIndexClass = 'z-[220]', dense = false, maxWidthClass = 'max-w-[620px]' }) => (
   <motion.div
-    className={`fixed inset-0 ${zIndexClass} flex items-center justify-center bg-black/70 px-5 backdrop-blur-sm`}
+    className={`onboarding-modal-backdrop fixed inset-0 ${zIndexClass} flex items-center justify-center bg-black/70 px-5 backdrop-blur-sm`}
     initial={{ opacity: 1 }}
     animate={{ opacity: 1 }}
     exit={{ opacity: 1 }}
@@ -1882,12 +1951,12 @@ const InfoModal = ({ eyebrow = 'Tips', title, intro, points = [], footer, onClos
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: 16, scale: 0.98 }}
       transition={{ duration: 0.18 }}
-      className={`relative w-full ${maxWidthClass} overflow-hidden rounded-[30px] border border-white/[0.08] bg-[#070707] shadow-[0_28px_90px_rgba(0,0,0,0.62)]`}
+      className={`onboarding-modal-panel relative w-full ${maxWidthClass} overflow-hidden rounded-[30px] border border-white/[0.08] bg-[#070707] shadow-[0_28px_90px_rgba(0,0,0,0.62)]`}
       onMouseDown={(event) => event.stopPropagation()}
     >
       <ModalSpectrumLine variant="tips" />
       <div className="pointer-events-none absolute right-[-140px] top-[-180px] h-72 w-72 rounded-full bg-white/[0.035] blur-[72px]" />
-      <div className="p-7 sm:p-8">
+      <div className="onboarding-help-content p-7 sm:p-8">
         <div className="flex items-start justify-between gap-4">
           <div className="relative">
             <div className="mb-3 flex items-center gap-1.5">
@@ -1963,13 +2032,13 @@ const ServiceModal = ({ initialService, industry, onClose, onSave }) => {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[1200] flex items-center justify-center bg-black/75 px-4 py-6 backdrop-blur-xl"
+      className="onboarding-modal-backdrop fixed inset-0 z-[1200] flex items-center justify-center bg-black/75 px-4 py-6 backdrop-blur-xl"
     >
       <motion.section
         initial={{ opacity: 0, y: 18, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 18, scale: 0.98 }}
-        className="w-full max-w-[720px] overflow-visible rounded-[30px] border border-white/[0.08] bg-[#070707] shadow-[0_28px_90px_rgba(0,0,0,0.62)]"
+        className="onboarding-modal-panel onboarding-service-panel w-full max-w-[720px] overflow-visible rounded-[30px] border border-white/[0.08] bg-[#070707] shadow-[0_28px_90px_rgba(0,0,0,0.62)]"
       >
         <div className="flex items-start justify-between gap-4 border-b border-white/[0.05] px-6 py-5">
           <div>
@@ -1983,7 +2052,7 @@ const ServiceModal = ({ initialService, industry, onClose, onSave }) => {
           </button>
         </div>
 
-        <div className="custom-scrollbar max-h-[calc(100vh-170px)] overflow-y-auto px-6 py-7 sm:px-8">
+        <div className="onboarding-service-body custom-scrollbar max-h-[calc(100vh-170px)] overflow-y-auto px-6 py-7 sm:px-8">
           <div className="space-y-6">
             <div className="border-b border-white/[0.05] pb-6">
               <div className="mb-1.5 flex items-baseline gap-1.5">
@@ -2021,7 +2090,7 @@ const ServiceModal = ({ initialService, industry, onClose, onSave }) => {
                 </div>
 
                 <Field label="Service name">
-                  <input type="text" value={draft.name} onChange={(e) => setDraftValue('name', e.target.value)} placeholder={`e.g., ${exampleService.serviceName}`} autoFocus className={fieldClass} />
+                  <input type="text" value={draft.name} onChange={(e) => setDraftValue('name', e.target.value)} placeholder={`e.g., ${exampleService.serviceName}`} autoFocus={shouldAutoFocusOnboardingField()} className={fieldClass} />
                 </Field>
 
                 <Field
@@ -2082,7 +2151,7 @@ const ServiceModal = ({ initialService, industry, onClose, onSave }) => {
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-3 border-t border-white/[0.05] px-6 py-5">
+        <div className="onboarding-service-footer flex items-center justify-end gap-3 border-t border-white/[0.05] px-6 py-5">
           <button type="button" onClick={onClose} className="h-11 rounded-full px-8 text-sm font-normal text-zinc-500 transition hover:text-white">
             Cancel
           </button>
@@ -2100,7 +2169,7 @@ const ServiceModal = ({ initialService, industry, onClose, onSave }) => {
       <AnimatePresence>
         {descriptionEditorOpen ? (
           <motion.div
-            className="fixed inset-0 z-[1300] flex items-center justify-center bg-black/70 px-5 backdrop-blur-sm"
+            className="onboarding-modal-backdrop fixed inset-0 z-[1300] flex items-center justify-center bg-black/70 px-5 backdrop-blur-sm"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -2111,7 +2180,7 @@ const ServiceModal = ({ initialService, industry, onClose, onSave }) => {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 16, scale: 0.98 }}
               transition={{ duration: 0.18 }}
-              className="w-full max-w-[760px] overflow-hidden rounded-[30px] border border-white/[0.08] bg-[#070707] shadow-[0_28px_90px_rgba(0,0,0,0.62)]"
+              className="onboarding-modal-panel w-full max-w-[760px] overflow-hidden rounded-[30px] border border-white/[0.08] bg-[#070707] shadow-[0_28px_90px_rgba(0,0,0,0.62)]"
               onMouseDown={(event) => event.stopPropagation()}
             >
               <div className="flex items-start justify-between gap-4 border-b border-white/[0.05] px-6 py-5">
@@ -2133,8 +2202,8 @@ const ServiceModal = ({ initialService, industry, onClose, onSave }) => {
                   value={draft.description}
                   onChange={(event) => setDraftValue('description', event.target.value)}
                   placeholder="Describe what this service includes and what customers should expect."
-                  autoFocus
-                  className={`${fieldClass} h-[420px] resize-none py-4 leading-6`}
+                  autoFocus={shouldAutoFocusOnboardingField()}
+                  className={`${fieldClass} onboarding-description-editor h-[420px] resize-none py-4 leading-6`}
                 />
               </div>
               <div className="flex items-center justify-end border-t border-white/[0.05] px-6 py-5">
@@ -2587,6 +2656,12 @@ const Onboarding2Page = () => {
     navigate('/dashboard/receptionists');
   };
 
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.matchMedia('(max-width: 1023px)').matches) {
+      window.scrollTo({ top: 0, behavior: 'auto' });
+    }
+  }, [step, complete]);
+
   const acceptOutboundLateHoursTerms = async () => {
     setLateHoursTermsSaving(true);
     const acceptedTerms = {
@@ -2665,22 +2740,89 @@ const Onboarding2Page = () => {
           color: #fff;
         }
 
+        .onboarding-schedule-responsive { display: none; }
+
+        @media (max-width: 1023px) {
+          .onboarding-viewport { min-height: 100dvh; align-items: flex-start; padding: 0; }
+          .onboarding-shell { min-height: 100dvh; max-height: none; overflow: visible; border: 0; border-radius: 0; }
+          .onboarding-main { min-height: 100dvh; max-height: none; overflow: visible; padding: 24px clamp(20px, 5vw, 48px) max(28px, env(safe-area-inset-bottom)); }
+          .onboarding-step { min-height: 0; }
+          .onboarding-progress { margin-bottom: 24px; }
+          .onboarding-step textarea, .onboarding-step [contenteditable] { height: clamp(250px, 45dvh, 420px) !important; }
+          .onboarding-schedule-desktop, .onboarding-snap-control { display: none !important; }
+          .onboarding-schedule-responsive { display: grid; gap: 10px; }
+          .onboarding-day-card { overflow: hidden; border: 1px solid rgba(255,255,255,.08); border-radius: 16px; background: rgba(255,255,255,.025); }
+          .onboarding-day-heading { display: flex; width: 100%; min-height: 56px; align-items: center; gap: 10px; padding: 12px 16px; text-align: left; }
+          .onboarding-day-title { flex: 1; font-size: 14px; font-weight: 600; color: #f4f4f5; }
+          .onboarding-day-summary { font-size: 11px; color: #a1a1aa; }
+          .onboarding-day-content { display: grid; gap: 10px; padding: 0 14px 14px; }
+          .onboarding-day-tools { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 2px 4px; border-top: 1px solid rgba(255,255,255,.06); }
+          .onboarding-day-toggle, .onboarding-day-copy { display: inline-flex; min-height: 36px; align-items: center; gap: 8px; color: #a1a1aa; font-size: 12px; }
+          .onboarding-day-toggle-track { display: inline-flex; width: 30px; height: 18px; align-items: center; padding: 2px; border-radius: 999px; background: #3f3f46; transition: background .2s; }
+          .onboarding-day-toggle-track > span { width: 14px; height: 14px; border-radius: 999px; background: #f4f4f5; transition: transform .2s; }
+          .onboarding-day-toggle-track.is-on { background: #d4d4d8; }
+          .onboarding-day-toggle-track.is-on > span { transform: translateX(12px); background: #18181b; }
+          .onboarding-layer-card { padding: 10px 12px; border: 1px solid rgba(255,255,255,.06); border-radius: 12px; background: rgba(0,0,0,.18); }
+          .onboarding-layer-toggle { display: flex; width: 100%; min-height: 28px; align-items: center; gap: 9px; text-align: left; color: #e4e4e7; font-size: 12px; }
+          .onboarding-layer-toggle > span:nth-child(2) { flex: 1; }
+          .onboarding-layer-times { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px; margin-top: 10px; }
+          .onboarding-layer-times label { display: grid; gap: 5px; color: #a1a1aa; font-size: 11px; }
+          .onboarding-layer-times select { width: 100%; min-width: 0; min-height: 42px; padding: 0 9px; border: 1px solid rgba(255,255,255,.1); border-radius: 10px; background: #151515; color: #f4f4f5; font-size: 14px; }
+          .onboarding-modal-backdrop { overflow-y: auto; align-items: center; padding: 16px; }
+          .onboarding-modal-panel { max-height: calc(100dvh - 32px); overflow-y: auto; border-radius: 20px; }
+          .onboarding-help-content { padding: 22px; }
+          .onboarding-description-editor { height: min(42dvh, 420px); }
+          .onboarding-service-panel { display: flex; flex-direction: column; overflow: hidden; }
+          .onboarding-service-body { min-height: 0; max-height: none; flex: 1; padding: 20px; }
+          .onboarding-service-footer { padding: 12px 20px max(12px, env(safe-area-inset-bottom)); }
+        }
+
+        @media (min-width: 640px) and (max-width: 1023px) {
+          .onboarding-schedule-responsive { display: none; }
+          .onboarding-schedule-desktop { display: block !important; }
+          .onboarding-snap-control { display: flex !important; }
+          .onboarding-schedule-track { height: 64px; }
+          .onboarding-timeline-row { height: 12px; }
+          .onboarding-timeline-bar, .onboarding-timeline-handle { touch-action: none; }
+          .onboarding-timeline-handle { width: 16px; height: 18px; opacity: 1; }
+          .onboarding-timeline-handle::before { content: ''; position: absolute; inset: -5px; }
+          .onboarding-schedule-copy { opacity: 1; }
+        }
+
+        @media (max-width: 639px) {
+          .onboarding-main { padding: 20px 18px max(24px, env(safe-area-inset-bottom)); }
+          .onboarding-progress { gap: 10px; }
+          .onboarding-progress-left { min-width: 0; flex: 1; gap: 9px; }
+          .onboarding-progress-left p { font-size: 11px; }
+          .onboarding-progress-bar { width: auto; min-width: 36px; flex: 1; }
+          .onboarding-step h1 { font-size: 27px; line-height: 1.12; }
+          .onboarding-step input:not([type='checkbox']), .onboarding-step textarea, .onboarding-step [contenteditable] { font-size: 16px; }
+          .onboarding-day-heading { padding-inline: 13px; }
+          .onboarding-modal-backdrop { align-items: flex-end; padding: 8px; padding-bottom: max(8px, env(safe-area-inset-bottom)); }
+          .onboarding-modal-panel { max-height: calc(100dvh - 16px - env(safe-area-inset-bottom)); border-radius: 18px; }
+          .onboarding-service-footer { justify-content: space-between; gap: 4px; }
+          .onboarding-service-footer button { min-width: 0; padding-inline: 18px; }
+          .onboarding-late-footer { flex-direction: column-reverse; align-items: stretch; padding: 14px 20px; }
+          .onboarding-late-footer button { width: 100%; }
+          .onboarding-layer-times select, .onboarding-modal-panel input, .onboarding-modal-panel textarea, .onboarding-modal-panel select { font-size: 16px; }
+        }
+
       `}</style>
 
-      <div className="mx-auto flex min-h-screen w-full items-center justify-center px-5 py-3 sm:px-8 lg:px-10">
+      <div className="onboarding-viewport mx-auto flex min-h-screen w-full items-center justify-center px-5 py-3 sm:px-8 lg:px-10">
         <section className={showFinalSplash
           ? 'relative w-full max-w-none bg-transparent shadow-none'
-          : `relative max-h-[calc(100vh-20px)] w-full ${step === 2 ? 'max-w-[1120px]' : 'max-w-[960px]'} overflow-hidden rounded-[34px] border border-white/[0.08] bg-[#070707]/95 shadow-[0_28px_90px_rgba(0,0,0,0.55)] backdrop-blur-xl`}>
+          : `onboarding-shell relative max-h-[calc(100vh-20px)] w-full ${step === 2 ? 'max-w-[1120px]' : 'max-w-[960px]'} overflow-hidden rounded-[34px] border border-white/[0.08] bg-[#070707]/95 shadow-[0_28px_90px_rgba(0,0,0,0.55)] backdrop-blur-xl`}>
           <div className="pointer-events-none absolute left-1/2 top-[-260px] h-[520px] w-[520px] -translate-x-1/2 rounded-full bg-white/[0.035] blur-[90px]" />
 
-          <main className="relative flex max-h-[calc(100vh-20px)] min-h-[740px] flex-col overflow-auto p-6 sm:p-8">
+          <main className="onboarding-main relative flex max-h-[calc(100vh-20px)] min-h-[740px] flex-col overflow-auto p-6 sm:p-8">
             {!showFinalSplash ? (
-              <div className="mb-6 flex items-center justify-between gap-5">
-                <div className="flex h-4 items-center gap-3">
+              <div className="onboarding-progress mb-6 flex items-center justify-between gap-5">
+                <div className="onboarding-progress-left flex h-4 items-center gap-3">
                   <p className="shrink-0 text-[13px] font-normal leading-4 text-zinc-300">
                     {stepLabel} · {step + 1} of {steps.length}
                   </p>
-                  <div className="h-1 w-[190px] shrink-0 translate-y-0 overflow-hidden rounded-full bg-white/[0.06]">
+                  <div className="onboarding-progress-bar h-1 w-[190px] shrink-0 translate-y-0 overflow-hidden rounded-full bg-white/[0.06]">
                     <div className="h-full rounded-full brand-gradient transition-all duration-500" style={{ width: `${progress}%` }} />
                   </div>
                 </div>
@@ -2760,7 +2902,7 @@ const Onboarding2Page = () => {
                       animate={{ opacity: 1, x: 0 }}
                       exit={{ opacity: 0, x: -18 }}
                       transition={{ duration: 0.18 }}
-                      className="mx-auto flex min-h-[620px] w-full flex-col"
+                      className="onboarding-step mx-auto flex min-h-[620px] w-full flex-col"
                     >
                       <div className="mb-6">
                         <div className="flex items-start gap-2.5">
@@ -2821,7 +2963,7 @@ const Onboarding2Page = () => {
                                     value={form.businessName}
                                     onChange={(e) => update('businessName', formatBusinessNameInput(e.target.value))}
                                     placeholder="e.g., Your business name"
-                                    autoFocus
+                                    autoFocus={shouldAutoFocusOnboardingField()}
                                     className={`${fieldClass} pl-12`}
                                   />
                                 </div>
@@ -2892,7 +3034,7 @@ const Onboarding2Page = () => {
                           <Field label="Business email">
                             <div className="relative">
                               <Mail className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-600" />
-                              <input type="email" value={form.email} onChange={(e) => update('email', e.target.value.trim())} placeholder="hello@business.com" autoFocus className={`${fieldClass} pl-12 ${form.email && !isEmailComplete(form.email) ? 'border-rose-400/40' : ''}`} />
+                              <input type="email" value={form.email} onChange={(e) => update('email', e.target.value.trim())} placeholder="hello@business.com" autoFocus={shouldAutoFocusOnboardingField()} className={`${fieldClass} pl-12 ${form.email && !isEmailComplete(form.email) ? 'border-rose-400/40' : ''}`} />
                             </div>
                           </Field>
 
@@ -2987,7 +3129,7 @@ const Onboarding2Page = () => {
                             placeholder={form.industry ? getIndustryExample(form.industry).policies : policiesPlaceholder}
                             maxLength={LONG_TEXT_LIMIT}
                             rows={9}
-                            autoFocus
+                            autoFocus={shouldAutoFocusOnboardingField()}
                             className={`${fieldClass} h-[499px] resize-none py-4 leading-6`}
                           />
                           <CharacterLimitNotice value={form.policies} />
@@ -3022,7 +3164,7 @@ const Onboarding2Page = () => {
                               placeholder={form.industry ? getIndustryExample(form.industry).faq : faqPlaceholder}
                               maxLength={LONG_TEXT_LIMIT}
                               rows={9}
-                              autoFocus
+                              autoFocus={shouldAutoFocusOnboardingField()}
                               className={`${fieldClass} h-[499px] resize-none py-4 leading-6`}
                             />
                             <CharacterLimitNotice value={form.faq} />
@@ -3062,11 +3204,12 @@ const Onboarding2Page = () => {
                               <div className="custom-scrollbar max-h-[228px] divide-y divide-white/[0.035] overflow-y-auto">
                                 {form.services.map((service) => (
                                   <div key={service.id} className="grid grid-cols-[minmax(0,1fr)_130px_72px] items-center gap-5 px-5 py-2.5 transition hover:bg-white/[0.018] max-sm:grid-cols-[minmax(0,1fr)_64px] max-sm:gap-3">
-                                    <div className="flex min-w-0 items-center gap-3 leading-none">
-                                      <span className="flex shrink-0 items-center truncate text-sm font-medium leading-none text-zinc-100">{service.name || 'Untitled service'}</span>
+                                    <div className="flex min-w-0 items-center gap-3 leading-none max-sm:flex-col max-sm:items-start max-sm:gap-1.5">
+                                      <span className="min-w-0 max-w-full truncate text-sm font-medium leading-none text-zinc-100">{service.name || 'Untitled service'}</span>
                                       {service.description ? (
-                                        <span className="flex min-w-0 items-center truncate text-[11px] leading-none text-zinc-700">{service.description}</span>
+                                        <span className="min-w-0 truncate text-[11px] leading-none text-zinc-700 max-sm:hidden">{service.description}</span>
                                       ) : null}
+                                      <span className="hidden text-[11px] text-zinc-500 max-sm:block">{formatServicePrice(service)}</span>
                                     </div>
                                     <div className="truncate text-xs text-zinc-500 max-sm:hidden">
                                       {formatServicePrice(service)}
@@ -3161,7 +3304,9 @@ const Onboarding2Page = () => {
                   ? 'Set when the receptionist should answer incoming calls.'
                   : 'Set when the receptionist can place follow-up or return calls.',
             }))}
-            footer="Click a schedule track to enable or disable only that schedule for a day. Drag an entire colored bar to move a schedule, or drag either end to adjust its start and end time."
+            footer={usesOnboardingScheduleTimeline()
+              ? 'Click a schedule track to enable or disable only that schedule for a day. Drag an entire colored bar to move a schedule, or drag either end to adjust its start and end time.'
+              : 'Open a day, switch each schedule on or off, and choose its start and end times. Use Copy to all days to apply one day’s hours across the week.'}
             onClose={() => setScheduleHelpOpen(false)}
           />
         ) : null}
