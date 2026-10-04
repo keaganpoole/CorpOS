@@ -83,6 +83,28 @@
   .sonar-dashboard-shell[data-responsive="true"] .ns-office :is(input:not([type="range"]):not([type="checkbox"]), textarea, select) { font-size: 16px; }
 }
 
+@media (min-width: 640px) and (max-width: 1023px) {
+  .sonar-dashboard-shell[data-responsive="true"] .settings-business-schedule .responsive-schedule-timeline { display: block; }
+  .sonar-dashboard-shell[data-responsive="true"] .settings-business-schedule .responsive-schedule-snap { display: flex; }
+  .settings-business-schedule-track { height: 64px; }
+  .settings-business-schedule-row { height: 12px; }
+  .settings-business-schedule-bar,
+  .settings-business-schedule-handle { touch-action: none; }
+  .settings-business-schedule-handle {
+    display: flex !important;
+    visibility: visible !important;
+    width: 16px;
+    height: 18px;
+    opacity: 1 !important;
+  }
+  .settings-business-schedule-handle::before { content: ''; position: absolute; inset: -5px; }
+  .settings-business-schedule-copy { opacity: 1; }
+}
+
+@media (min-width: 640px) and (max-width: 899px) {
+  .settings-business-schedule .responsive-schedule-timeline > div:first-child span:nth-child(even) { display: none; }
+}
+
 @media (min-width: 768px) and (max-width: 1023px) {
   body[data-nodemere-responsive="true"] .responsive-dialog > div { width: min(720px, calc(100vw - 48px)); }
   body[data-nodemere-responsive="true"] .responsive-dialog > section[class*="max-w-[520px]"] { width: min(520px, calc(100vw - 48px)); }

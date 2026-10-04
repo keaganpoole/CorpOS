@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import useDashboardViewport from '../hooks/useDashboardViewport';
+import useDashboardViewport, { useMediaQuery } from '../hooks/useDashboardViewport';
 import ResponsiveDialog from '../components/ResponsiveDialog';
 import MobileSchedule from '../components/MobileSchedule';
 import MobileUsageSummary from '../components/MobileUsageSummary';
@@ -794,7 +794,7 @@ const LateHoursTermsModal = ({ isSaving = false, onAccept, onClose }) => {
 };
 
 const SettingsScheduleBuilder = ({ value, onChange, outboundLateHoursAccepted, onOutboundLateHours }) => {
-  const { isCompact } = useDashboardViewport();
+  const showCompactSchedule = useMediaQuery('(max-width: 639px)');
   const dragPreviewRef = useRef(null);
   const [snapMinutes, setSnapMinutes] = useState(15);
   const [colorblindMode, setColorblindMode] = useState(false);
@@ -994,7 +994,7 @@ const SettingsScheduleBuilder = ({ value, onChange, outboundLateHoursAccepted, o
   };
 
   return (
-    <div className="space-y-2.5">
+    <div className="settings-business-schedule space-y-2.5">
       <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
         <div className="flex flex-wrap items-center gap-4">
           <span className="flex items-center gap-1.5 font-medium text-zinc-500"><Layers className="h-3.5 w-3.5" /> Layers:</span>
@@ -1055,7 +1055,7 @@ const SettingsScheduleBuilder = ({ value, onChange, outboundLateHoursAccepted, o
         ) : null}
       </AnimatePresence>
 
-      {isCompact && <MobileSchedule days={DAYS}
+      {showCompactSchedule && <MobileSchedule days={DAYS}
         tracksFor={(day) => activeLayerTypes.map((type) => ({ ...type, ...schedule.days[day].layers[type.id] }))}
         onToggleDay={toggleDay} onToggleTrack={toggleLayer} onCopy={copyDay}
         onRange={(day, id, start, end) => {
@@ -1079,7 +1079,7 @@ const SettingsScheduleBuilder = ({ value, onChange, outboundLateHoursAccepted, o
                   <button type="button" onClick={() => toggleDay(day)} className={`flex h-4 w-7 shrink-0 items-center rounded-full p-0.5 transition-colors duration-200 ${dayValue.enabled ? 'bg-zinc-100/90 shadow-[0_0_10px_rgba(244,244,245,0.16)]' : 'bg-zinc-800'}`} aria-label={`Toggle all schedules for ${day}`}><span className={`block h-3 w-3 rounded-full shadow-md transition-transform duration-200 ${dayValue.enabled ? 'translate-x-3 bg-zinc-900' : 'translate-x-0 bg-white'}`} /></button>
                   <span className={`text-xs font-semibold uppercase tracking-wider ${dayValue.enabled ? 'text-zinc-200' : 'text-zinc-500'}`}>{day.slice(0, 3)}</span>
                 </div>
-                <div data-settings-schedule-track={day} className="relative mx-2 flex h-14 min-w-0 flex-1 items-center">
+                <div data-settings-schedule-track={day} className="settings-business-schedule-track relative mx-2 flex h-14 min-w-0 flex-1 items-center">
                   <div className="pointer-events-none absolute inset-0 flex justify-between opacity-10">{Array.from({ length: timelineHours + 1 }).map((_, index) => <span key={index} className="h-full w-px bg-white/40" />)}</div>
                   <div className="relative flex w-full flex-col gap-1.5 py-1">
                     {activeLayerTypes.map((layerType) => {
@@ -1091,12 +1091,12 @@ const SettingsScheduleBuilder = ({ value, onChange, outboundLateHoursAccepted, o
                       const isHovered = hoveredBar === barKey;
                       const isDimmed = drag && !isActiveBar;
                       return (
-                        <div key={layerType.id} className="group/bar relative h-2.5 w-full" onMouseEnter={() => setHoveredBar(barKey)} onMouseLeave={() => setHoveredBar(null)}>
+                        <div key={layerType.id} className="settings-business-schedule-row group/bar relative h-2.5 w-full" onMouseEnter={() => setHoveredBar(barKey)} onMouseLeave={() => setHoveredBar(null)}>
                           <button type="button" onClick={() => toggleLayer(day, layerType.id)} aria-pressed={layer.enabled} aria-label={`${layer.enabled ? 'Disable' : 'Enable'} ${layerType.label} on ${day}`} title={`${layer.enabled ? 'Disable' : 'Enable'} ${layerType.label}`} className={`absolute inset-y-0 left-0 right-0 overflow-hidden rounded-full border text-left transition ${layer.enabled ? 'border-white/[0.05] bg-white/[0.05]' : 'border-white/[0.03] bg-white/[0.02] opacity-60 hover:opacity-100'}`} />
-                          <div className={`absolute inset-y-0 select-none rounded-full bg-gradient-to-r ${layerType.gradient} transition-all duration-75 ${layer.enabled ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer grayscale'} ${isActiveBar ? 'z-20 scale-y-110 ring-2 ring-white/50' : 'z-10'} ${isDimmed ? 'opacity-30' : layer.enabled ? 'opacity-100' : 'opacity-25'} ${isHovered && layer.enabled ? 'brightness-125 shadow-lg' : ''}`} style={{ left: `${left}%`, width: `${width}%`, boxShadow: isActiveBar || (isHovered && layer.enabled) ? layerType.glow : 'none' }} onClick={() => { if (!layer.enabled) toggleLayer(day, layerType.id); }} onPointerDown={(event) => handlePointerDown(event, day, layerType.id, 'center')}>
-                              <button type="button" aria-label={`Move ${layerType.label} start`} onPointerDown={(event) => { event.stopPropagation(); handlePointerDown(event, day, layerType.id, 'left'); }} className="absolute left-0 top-1/2 z-30 flex h-4 w-3 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize items-center justify-center rounded-full bg-white opacity-0 shadow-md transition-all hover:scale-125 group-hover/bar:opacity-100"><span className="h-2 w-0.5 rounded-full bg-zinc-600" /></button>
+                          <div className={`settings-business-schedule-bar absolute inset-y-0 select-none rounded-full bg-gradient-to-r ${layerType.gradient} transition-all duration-75 ${layer.enabled ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer grayscale'} ${isActiveBar ? 'z-20 scale-y-110 ring-2 ring-white/50' : 'z-10'} ${isDimmed ? 'opacity-30' : layer.enabled ? 'opacity-100' : 'opacity-25'} ${isHovered && layer.enabled ? 'brightness-125 shadow-lg' : ''}`} style={{ left: `${left}%`, width: `${width}%`, boxShadow: isActiveBar || (isHovered && layer.enabled) ? layerType.glow : 'none' }} onClick={() => { if (!layer.enabled) toggleLayer(day, layerType.id); }} onPointerDown={(event) => handlePointerDown(event, day, layerType.id, 'center')}>
+                              <button type="button" aria-label={`Move ${layerType.label} start`} onPointerDown={(event) => { event.stopPropagation(); handlePointerDown(event, day, layerType.id, 'left'); }} className="settings-business-schedule-handle absolute left-0 top-1/2 z-30 flex h-4 w-3 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize items-center justify-center rounded-full bg-white opacity-0 shadow-md transition-all hover:scale-125 group-hover/bar:opacity-100"><span className="h-2 w-0.5 rounded-full bg-zinc-600" /></button>
                               <div className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-30"><span className="h-0.5 w-4 rounded-full bg-white/60" /></div>
-                              <button type="button" aria-label={`Move ${layerType.label} end`} onPointerDown={(event) => { event.stopPropagation(); handlePointerDown(event, day, layerType.id, 'right'); }} className="absolute right-0 top-1/2 z-30 flex h-4 w-3 translate-x-1/2 -translate-y-1/2 cursor-ew-resize items-center justify-center rounded-full bg-white opacity-0 shadow-md transition-all hover:scale-125 group-hover/bar:opacity-100"><span className="h-2 w-0.5 rounded-full bg-zinc-600" /></button>
+                              <button type="button" aria-label={`Move ${layerType.label} end`} onPointerDown={(event) => { event.stopPropagation(); handlePointerDown(event, day, layerType.id, 'right'); }} className="settings-business-schedule-handle absolute right-0 top-1/2 z-30 flex h-4 w-3 translate-x-1/2 -translate-y-1/2 cursor-ew-resize items-center justify-center rounded-full bg-white opacity-0 shadow-md transition-all hover:scale-125 group-hover/bar:opacity-100"><span className="h-2 w-0.5 rounded-full bg-zinc-600" /></button>
                             </div>
                           {layer.enabled && (isHovered || isActiveBar) ? (
                             <div className="pointer-events-none absolute -top-7 z-30 -translate-x-1/2 whitespace-nowrap rounded-md border border-white/[0.08] bg-[#111] px-2 py-0.5 font-mono text-[11px] text-zinc-100 shadow-2xl" style={{ left: `${Math.min(92, Math.max(8, left + (width / 2)))}%` }}>
@@ -1112,7 +1112,7 @@ const SettingsScheduleBuilder = ({ value, onChange, outboundLateHoursAccepted, o
                     })}
                   </div>
                 </div>
-                <div className="flex w-10 shrink-0 justify-end opacity-0 transition-opacity group-hover:opacity-100">
+                <div className="settings-business-schedule-copy flex w-10 shrink-0 justify-end opacity-0 transition-opacity group-hover:opacity-100">
                   <button type="button" onClick={() => copyDay(day)} className="flex h-7 w-7 items-center justify-center rounded-md text-zinc-500 transition hover:bg-white/10 hover:text-white" aria-label={`Copy ${day} schedule to all days`}><Copy className="h-3.5 w-3.5" /></button>
                 </div>
               </div>
