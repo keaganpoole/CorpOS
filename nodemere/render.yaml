@@ -32,12 +32,10 @@ services:
       - key: BACKEND_PUBLIC_URL
       # Enables the reversible Twilio-controlled warm escalation path.
       - key: TWILIO_WARM_ESCALATIONS_ENABLED
-      # System Gmail sender for verification and document-upload links.
+      # Resend sender for verification, document-upload, and workforce invitation links.
       # This is separate from customer-managed scenario integrations.
-      - key: GOOGLE_CLIENT_ID
-      - key: GOOGLE_CLIENT_SECRET
-      - key: SYSTEM_GMAIL_SENDER_EMAIL
-      - key: SYSTEM_GMAIL_REFRESH_TOKEN
+      - key: RESEND_API_KEY
+      - key: RESEND_FROM_EMAIL
       # Stripe
       - key: STRIPE_SECRET_KEY
       - key: STRIPE_SECRET_TEST_KEY

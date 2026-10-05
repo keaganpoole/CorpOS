@@ -94,10 +94,10 @@ google_client_id = os.environ.get("GOOGLE_CLIENT_ID")
 google_client_secret = os.environ.get("GOOGLE_CLIENT_SECRET")
 google_oauth_redirect_uri = os.environ.get("GOOGLE_OAUTH_REDIRECT_URI")
 
-# System sender for secure verification and document-upload links. These are
+# System sender for secure verification and document-upload links. This is
 # intentionally separate from user-managed scenario email integrations.
-system_gmail_sender_email = os.environ.get("SYSTEM_GMAIL_SENDER_EMAIL")
-system_gmail_refresh_token = os.environ.get("SYSTEM_GMAIL_REFRESH_TOKEN")
+resend_from_email = os.environ.get("RESEND_FROM_EMAIL")
+resend_api_key = os.environ.get("RESEND_API_KEY")
 
 # --- Outlook / Microsoft Graph Integration Configuration ---
 outlook_client_id = os.environ.get("OUTLOOK_CLIENT_ID")

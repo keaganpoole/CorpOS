@@ -1,14 +1,11 @@
-import base64
 import unittest
-from email import policy
-from email.parser import BytesParser
 from types import SimpleNamespace
 from unittest.mock import patch
 
 from backend.document_service import create_document_request
 from backend.email_delivery_service import (
     EmailDeliveryError,
-    SystemGmailConfiguration,
+    SystemResendConfiguration,
     send_secure_link_email,
 )
 from backend.verification_service import create_verification_session
@@ -46,21 +43,16 @@ class FakeSupabase:
 
 
 class SecureLinkEmailTests(unittest.TestCase):
-    configuration = SystemGmailConfiguration(
-        sender_email="keeganpoole2@example.test",
-        refresh_token="test-value",
-        google_client_id="test-value",
-        google_client_secret="test-value",
+    configuration = SystemResendConfiguration(
+        sender_email="send@example.test",
+        api_key="test-value",
     )
     secure_link = "https://app.example.test/verify/test-token"
 
     def _sent_message(self, kind):
         with patch(
             "backend.email_delivery_service.requests.post",
-            side_effect=[
-                FakeResponse({"access_token": "test-value"}),
-                FakeResponse({"id": "gmail-message-id"}),
-            ],
+            return_value=FakeResponse({"id": "resend-message-id"}),
         ) as post:
             result = send_secure_link_email(
                 kind=kind,
@@ -70,46 +62,41 @@ class SecureLinkEmailTests(unittest.TestCase):
                 configuration=self.configuration,
             )
 
-        raw = post.call_args_list[1].kwargs["json"]["raw"]
-        message = BytesParser(policy=policy.default).parsebytes(base64.urlsafe_b64decode(raw))
-        return result, message
+        return result, post.call_args.kwargs["json"]
 
     def test_verification_email_has_business_sender_and_both_body_formats(self):
         result, message = self._sent_message("verification")
 
         self.assertEqual(result["status"], "sent")
-        self.assertEqual(message["From"], "Oak & Ivy Salon <keeganpoole2@example.test>")
-        self.assertEqual(message["To"], "customer@example.test")
-        self.assertEqual(message["Subject"], "Verify your identity with Oak & Ivy Salon")
-        body_parts = {part.get_content_type(): part.get_content() for part in message.walk() if not part.is_multipart()}
-        self.assertIn("Verify Identity", body_parts["text/plain"])
-        self.assertIn(self.secure_link, body_parts["text/plain"])
-        self.assertIn("Verify Identity", body_parts["text/html"])
-        self.assertIn("Securely delivered by Nodemere", body_parts["text/html"])
+        self.assertEqual(message["from"], "Oak & Ivy Salon <send@example.test>")
+        self.assertEqual(message["to"], ["customer@example.test"])
+        self.assertEqual(message["subject"], "Verify your identity with Oak & Ivy Salon")
+        self.assertIn("Verify Identity", message["text"])
+        self.assertIn(self.secure_link, message["text"])
+        self.assertIn("Securely delivered by Nodemere", message["html"])
 
     def test_document_email_uses_document_specific_copy(self):
         result, message = self._sent_message("document_upload")
 
         self.assertEqual(result["channel"], "email")
-        self.assertEqual(message["Subject"], "Upload your document for Oak & Ivy Salon")
-        body_parts = {part.get_content_type(): part.get_content() for part in message.walk() if not part.is_multipart()}
-        self.assertIn("Upload Document", body_parts["text/plain"])
-        self.assertIn("has requested a document", body_parts["text/html"])
+        self.assertEqual(message["subject"], "Upload your document for Oak & Ivy Salon")
+        self.assertIn("Upload Document", message["text"])
+        self.assertIn("has requested a document", message["html"])
 
-    def test_missing_system_gmail_configuration_returns_a_safe_error(self):
+    def test_missing_resend_configuration_returns_a_safe_error(self):
         with self.assertRaises(EmailDeliveryError) as raised:
             send_secure_link_email(
                 kind="verification",
                 recipient_email="customer@example.test",
                 business_name="Oak & Ivy Salon",
                 secure_link=self.secure_link,
-                configuration=SystemGmailConfiguration(None, None, "client-id", "client-secret"),
+                configuration=SystemResendConfiguration(None, None),
             )
 
-        self.assertEqual(raised.exception.code, "system_gmail_not_configured")
+        self.assertEqual(raised.exception.code, "resend_not_configured")
         self.assertEqual(
             raised.exception.missing_configuration,
-            ("SYSTEM_GMAIL_SENDER_EMAIL", "SYSTEM_GMAIL_REFRESH_TOKEN"),
+            ("RESEND_FROM_EMAIL", "RESEND_API_KEY"),
         )
 
     def test_existing_link_generators_keep_their_paths_without_logging_tokens(self):

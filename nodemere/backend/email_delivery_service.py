@@ -4,7 +4,6 @@ This module deliberately accepts an already-created URL.  It does not create,
 store, inspect, or alter verification and document-upload requests.
 """
 
-import base64
 import html
 import logging
 import re
@@ -17,8 +16,7 @@ from urllib.parse import urlsplit
 import requests
 
 
-GMAIL_TOKEN_URL = "https://oauth2.googleapis.com/token"
-GMAIL_SEND_URL = "https://gmail.googleapis.com/gmail/v1/users/me/messages/send"
+RESEND_SEND_URL = "https://api.resend.com/emails"
 EMAIL_KIND = Literal["verification", "document_upload", "workforce_invitation"]
 
 
@@ -33,18 +31,14 @@ class EmailDeliveryError(Exception):
 
 
 @dataclass(frozen=True)
-class SystemGmailConfiguration:
+class SystemResendConfiguration:
     sender_email: str | None
-    refresh_token: str | None
-    google_client_id: str | None
-    google_client_secret: str | None
+    api_key: str | None
 
     def missing_fields(self) -> tuple[str, ...]:
         fields = {
-            "SYSTEM_GMAIL_SENDER_EMAIL": self.sender_email,
-            "SYSTEM_GMAIL_REFRESH_TOKEN": self.refresh_token,
-            "GOOGLE_CLIENT_ID": self.google_client_id,
-            "GOOGLE_CLIENT_SECRET": self.google_client_secret,
+            "RESEND_FROM_EMAIL": self.sender_email,
+            "RESEND_API_KEY": self.api_key,
         }
         return tuple(name for name, value in fields.items() if not str(value or "").strip())
 
@@ -173,37 +167,15 @@ def build_secure_link_email(*, kind: EMAIL_KIND, business_name: str, secure_link
     return message
 
 
-def _get_gmail_access_token(configuration: SystemGmailConfiguration) -> str:
-    response = requests.post(
-        GMAIL_TOKEN_URL,
-        data={
-            "client_id": configuration.google_client_id,
-            "client_secret": configuration.google_client_secret,
-            "refresh_token": configuration.refresh_token,
-            "grant_type": "refresh_token",
-        },
-        timeout=30,
-    )
-    if not response.ok:
-        raise EmailDeliveryError("gmail_token_refresh_failed", "The email service could not authenticate with Gmail.")
-    try:
-        access_token = response.json().get("access_token")
-    except (TypeError, ValueError):
-        access_token = None
-    if not access_token:
-        raise EmailDeliveryError("gmail_token_refresh_failed", "The email service could not authenticate with Gmail.")
-    return str(access_token)
-
-
 def send_secure_link_email(
     *,
     kind: EMAIL_KIND,
     recipient_email: str,
     business_name: str,
     secure_link: str,
-    configuration: SystemGmailConfiguration,
+    configuration: SystemResendConfiguration,
 ) -> dict:
-    """Send one secure-link email through the configured Nodemere Gmail mailbox.
+    """Send one secure-link email through Resend.
 
     No provider retry occurs here: after an ambiguous provider failure, retrying
     automatically could send the same live link twice.
@@ -211,7 +183,7 @@ def send_secure_link_email(
     missing_configuration = configuration.missing_fields()
     if missing_configuration:
         raise EmailDeliveryError(
-            "system_gmail_not_configured",
+            "resend_not_configured",
             "Secure email delivery is not configured.",
             missing_configuration=missing_configuration,
         )
@@ -224,19 +196,31 @@ def send_secure_link_email(
         sender_email=str(configuration.sender_email),
     )
     message.replace_header("To", recipient)
-    encoded_message = base64.urlsafe_b64encode(message.as_bytes()).decode("ascii")
-    access_token = _get_gmail_access_token(configuration)
+    plain_part = message.get_body(preferencelist=("plain",))
+    html_part = message.get_body(preferencelist=("html",))
     response = requests.post(
-        GMAIL_SEND_URL,
+        RESEND_SEND_URL,
         headers={
-            "Authorization": f"Bearer {access_token}",
+            "Authorization": f"Bearer {configuration.api_key}",
             "Content-Type": "application/json",
         },
-        json={"raw": encoded_message},
+        json={
+            "from": message["From"],
+            "to": [recipient],
+            "subject": message["Subject"],
+            "text": plain_part.get_content() if plain_part else "",
+            "html": html_part.get_content() if html_part else "",
+        },
         timeout=30,
     )
     if not response.ok:
-        raise EmailDeliveryError("gmail_send_failed", "The email provider could not deliver the secure link.")
+        try:
+            provider_error = response.json()
+            provider_code = provider_error.get("name") or provider_error.get("statusCode")
+        except (TypeError, ValueError):
+            provider_code = None
+        logging.warning("Resend rejected secure email status=%s code=%s", response.status_code, provider_code)
+        raise EmailDeliveryError("resend_send_failed", "The email provider could not deliver the secure link.")
     try:
         provider_result = response.json()
     except (TypeError, ValueError):
@@ -246,7 +230,7 @@ def send_secure_link_email(
         "success": True,
         "status": "sent",
         "channel": "email",
-        "provider": "gmail",
+        "provider": "resend",
         "message_id": provider_result.get("id"),
     }
 

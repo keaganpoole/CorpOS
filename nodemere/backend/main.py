@@ -107,8 +107,8 @@ from .config import (
     google_client_id,
     google_client_secret,
     google_oauth_redirect_uri,
-    system_gmail_sender_email,
-    system_gmail_refresh_token,
+    resend_from_email,
+    resend_api_key,
     outlook_client_id,
     outlook_client_secret,
     outlook_authority,
@@ -147,7 +147,7 @@ from .verification_service import (
 from .document_service import DOCUMENT_BUCKET, create_document_request, get_document_request, get_document_request_status, store_document
 from .email_delivery_service import (
     EmailDeliveryError,
-    SystemGmailConfiguration,
+    SystemResendConfiguration,
     log_email_delivery_failure,
     send_secure_link_email,
 )
@@ -7018,12 +7018,10 @@ def build_verification_request_context(payload: dict) -> dict:
     }
 
 
-def _system_gmail_configuration() -> SystemGmailConfiguration:
-    return SystemGmailConfiguration(
-        sender_email=system_gmail_sender_email,
-        refresh_token=system_gmail_refresh_token,
-        google_client_id=google_client_id,
-        google_client_secret=google_client_secret,
+def _system_resend_configuration() -> SystemResendConfiguration:
+    return SystemResendConfiguration(
+        sender_email=resend_from_email,
+        api_key=resend_api_key,
     )
 
 

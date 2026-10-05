@@ -6,12 +6,11 @@ from typing import Literal
 from dataclasses import asdict, replace
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, EmailStr, ConfigDict, Field
-from .config import (supabase_admin, frontend_base_url, system_gmail_sender_email,
-    system_gmail_refresh_token, google_client_id, google_client_secret)
+from .config import (supabase_admin, frontend_base_url, resend_from_email, resend_api_key)
 from .dependencies import get_current_user, get_current_user_for_workforce_session
 from .authorization import resolve_tenant, resolve_session_tenant
 from .permissions import require_permission
-from .email_delivery_service import send_secure_link_email, SystemGmailConfiguration, EmailDeliveryError
+from .email_delivery_service import send_secure_link_email, SystemResendConfiguration, EmailDeliveryError
 
 router = APIRouter(prefix="/api/workforce", tags=["Workforce"])
 
@@ -168,7 +167,7 @@ async def invite(payload:InviteInput,user=Depends(get_current_user)):
     try:
         send_secure_link_email(kind='workforce_invitation',recipient_email=email,business_name='Nodemere',
             secure_link=(frontend_base_url or 'http://localhost:5173').rstrip('/')+'/dashboard',
-            configuration=SystemGmailConfiguration(sender_email=system_gmail_sender_email,refresh_token=system_gmail_refresh_token,google_client_id=google_client_id,google_client_secret=google_client_secret))
+            configuration=SystemResendConfiguration(sender_email=resend_from_email,api_key=resend_api_key))
     except EmailDeliveryError:
         delivered=False
     return {'id':row['id'],'role':row['role'],'expires_at':row['expires_at'],'email_delivered':delivered}
