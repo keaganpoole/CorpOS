@@ -47,6 +47,8 @@ def route_permission(path, method):
         return 'operations.read'
     if path.startswith('/api/workforce/'):
         return "security"
+    if '/forwarding' in path and read:
+        return 'operations.read'
     if '/integrations' in path or '/forwarding' in path:
         return "integrations"
     if any(s in path for s in ('/billing','checkout','refund-payment','cancel-subscription','payment-profile')):

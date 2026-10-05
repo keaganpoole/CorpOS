@@ -197,6 +197,26 @@ select:focus {
   box-shadow: none !important;
 }
 
+.settings-page-scope input:focus,
+.settings-page-scope textarea:focus,
+.settings-page-scope select:focus {
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+.settings-page-scope input,
+.settings-page-scope textarea,
+.settings-page-scope select,
+.settings-page-scope input:focus,
+.settings-page-scope textarea:focus,
+.settings-page-scope select:focus,
+.settings-page-scope input:focus-visible,
+.settings-page-scope textarea:focus-visible,
+.settings-page-scope select:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+  transition-property: background-color, border-color, color !important;
+}
+
 /* Auth fields use their own neutral focus states and never show a focus ring. */
 .auth-page input:not([type="checkbox"]),
 .auth-page input:not([type="checkbox"]):focus,

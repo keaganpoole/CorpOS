@@ -523,7 +523,7 @@ const maskStaffPhone = (value) => {
   return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
 };
 
-const staffInputClass = 'h-12 w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 text-sm text-white outline-none ring-0 transition placeholder:text-zinc-700 focus:border-white/[0.16] focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0';
+const staffInputClass = 'h-12 w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 text-sm text-white outline-none ring-0 transition placeholder:text-zinc-700 focus:border-white/[0.08] focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0';
 
 const createStaffFormState = (staff, baseHours = null) => {
   const rawEscalationHours = staff?.escalation_hours || baseHours;
@@ -1043,7 +1043,7 @@ const SettingsScheduleBuilder = ({ value, onChange, outboundLateHoursAccepted, o
               <textarea
                 value={importText}
                 onChange={(event) => setImportText(event.target.value)}
-                className="h-64 w-full resize-none rounded-xl border border-white/[0.08] bg-black/50 p-3 font-mono text-xs text-zinc-100 outline-none transition placeholder:text-zinc-700 focus:border-white/[0.18]"
+                className="h-64 w-full resize-none rounded-xl border border-white/[0.08] bg-black/50 p-3 font-mono text-xs text-zinc-100 outline-none transition placeholder:text-zinc-700 focus:border-white/[0.08]"
                 placeholder=""
               />
               <div className="mt-4 flex items-center justify-end gap-2">
@@ -1448,7 +1448,7 @@ const StaffScheduleBuilder = ({ value, onChange, businessHours, acknowledgements
               <textarea
                 value={importText}
                 onChange={(event) => setImportText(event.target.value)}
-                className="h-64 w-full resize-none rounded-xl border border-white/[0.08] bg-black/50 p-3 font-mono text-xs text-zinc-100 outline-none transition placeholder:text-zinc-700 focus:border-white/[0.18]"
+                className="h-64 w-full resize-none rounded-xl border border-white/[0.08] bg-black/50 p-3 font-mono text-xs text-zinc-100 outline-none transition placeholder:text-zinc-700 focus:border-white/[0.08]"
                 placeholder=""
               />
               <div className="mt-4 flex items-center justify-end gap-2">
@@ -2265,7 +2265,7 @@ const ServicesManager = ({ businessId, ensureBusinessRecord, onBusinessLinked, i
                 <button type="button" onClick={() => setImportModalOpen(false)} disabled={importing} className="flex h-8 w-8 shrink-0 items-center justify-center text-zinc-600 transition hover:text-white disabled:opacity-40" aria-label="Close import services"><X className="h-4 w-4" /></button>
               </div>
               <div className="p-6">
-                <textarea value={importText} onChange={(event) => setImportText(event.target.value)} disabled={importing} className="h-64 w-full resize-none rounded-2xl border border-white/[0.08] bg-black/40 p-4 font-mono text-xs leading-5 text-zinc-200 outline-none transition focus:border-white/[0.18]" placeholder={'[{\n  "name": "Consultation",\n  "price_type": "fixed",\n  "price_min": 100,\n  "unit": "session",\n  "category": "General"\n}]'} />
+                <textarea value={importText} onChange={(event) => setImportText(event.target.value)} disabled={importing} className="h-64 w-full resize-none rounded-2xl border border-white/[0.08] bg-black/40 p-4 font-mono text-xs leading-5 text-zinc-200 outline-none transition focus:border-white/[0.08]" placeholder={'[{\n  "name": "Consultation",\n  "price_type": "fixed",\n  "price_min": 100,\n  "unit": "session",\n  "category": "General"\n}]'} />
                 {importError ? <p className="mt-3 text-[11px] font-medium text-rose-400">{importError}</p> : null}
               </div>
               <div className="flex items-center justify-end gap-3 border-t border-white/[0.05] px-6 py-5"><button type="button" onClick={() => setImportModalOpen(false)} disabled={importing} className="h-10 rounded-full px-5 text-sm text-zinc-500 transition hover:text-white disabled:opacity-40">Cancel</button><button type="button" onClick={() => { setImporting(true); importServices(); }} disabled={importing || !importText.trim()} className="h-10 rounded-full bg-white px-6 text-sm font-bold text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-40">{importing ? 'Importing...' : 'Import services'}</button></div>
@@ -2678,7 +2678,7 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
 
     if (staffSlide === 2) {
       return (
-        <textarea value={form.knowledge} onChange={(e) => setForm((prev) => ({ ...prev, knowledge: e.target.value }))} className="custom-scrollbar h-[410px] w-full resize-none rounded-xl border border-white/[0.08] bg-white/[0.035] px-4 py-4 pr-5 text-sm leading-6 text-white outline-none ring-0 transition placeholder:text-zinc-700 focus:border-white/[0.16] focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0" />
+        <textarea value={form.knowledge} onChange={(e) => setForm((prev) => ({ ...prev, knowledge: e.target.value }))} className="custom-scrollbar h-[410px] w-full resize-none rounded-xl border border-white/[0.08] bg-white/[0.035] px-4 py-4 pr-5 text-sm leading-6 text-white outline-none ring-0 transition placeholder:text-zinc-700 focus:border-white/[0.08] focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0" />
       );
     }
 
@@ -3062,7 +3062,7 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
 };
 
 const SETTINGS_LONG_TEXT_LIMIT = LONG_TEXT_LIMIT_VALUE;
-const settingsFieldClass = 'h-12 w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 text-sm text-white !outline-none ring-0 transition placeholder:text-zinc-700 focus:border-white/[0.16] focus:!outline-none focus:ring-0 focus-visible:!outline-none focus-visible:ring-0 [color-scheme:dark]';
+const settingsFieldClass = 'h-12 w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 text-sm text-white !outline-none ring-0 transition placeholder:text-zinc-700 focus:border-white/[0.08] focus:!outline-none focus:ring-0 focus-visible:!outline-none focus-visible:ring-0 [color-scheme:dark]';
 
 const limitKnowledgeText = (value) => String(value || '').slice(0, SETTINGS_LONG_TEXT_LIMIT);
 const escapeKnowledgeRegExp = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
