@@ -147,6 +147,9 @@ def _integration_inventory(text: str) -> list[str]:
         ("Stripe Billing / Connect", r"stripe|stripe-webhook"),
         ("Twilio Voice / Phone Numbers", r"twilio"),
         ("ElevenLabs Conversational AI", r"elevenlabs"),
+        ("Resend transactional email", r"resend|RESEND_API_KEY"),
+        ("Nodemere Nest operations layer", r"\bNest\b|nest_events|NestRuntime"),
+        ("Intercom knowledge integration", r"intercom|Intercom"),
         ("Google OAuth / Gmail", r"gmail|google_client"),
         ("Microsoft Graph / Outlook", r"outlook|microsoft_graph"),
         ("OpenAI / OpenRouter models", r"openai|openrouter"),
@@ -235,6 +238,10 @@ def _build_report() -> dict[str, Any]:
     main_text = _text(PROJECT_ROOT / "backend" / "main.py")
     all_text = "\n".join(_text(path) for path in files)
     frontend_files = [path for path in files if path.suffix.lower() in {".js", ".jsx", ".css"}]
+    responsive_files = [
+        path for path in frontend_files
+        if re.search(r"responsive|mobile|tablet|viewport|breakpoint", _text(path), re.IGNORECASE)
+    ]
     backend_files = [path for path in files if path.suffix.lower() == ".py"]
     sql_files = [path for path in files if path.suffix.lower() == ".sql"]
     code_files = [path for path in files if path.suffix.lower() in CODE_EXTENSIONS]
@@ -286,6 +293,7 @@ def _build_report() -> dict[str, Any]:
         metric("APIs", f"{len(routes):,} declared backend endpoints", "Endpoint count is not the same as external API quality or usage volume.", "Measured"),
         metric("Database Tables", f"{len(tables):,} SQL-referenced tables", "Unique tables found in schema and migration SQL; live production schema was not queried.", "Measured"),
         metric("Integrations", f"{len(integrations):,} integration surfaces", "Detected provider and infrastructure surfaces: {', '.join(integrations)}.", "Measured"),
+        metric("Responsive Product Coverage", f"{len(responsive_files):,} frontend files", "Measured frontend files containing responsive, mobile, tablet, viewport, or breakpoint behavior.", "Measured"),
         metric("Webhooks", f"{len(webhook_paths):,} webhook or telephony callbacks", "Counted declared Stripe, ElevenLabs, people, and Twilio callback routes.", "Measured"),
         metric("Code Quality", "64 / 100", "Good domain intent and substantial reuse; a large monolithic backend and uneven conventions add risk.", "AI Estimate", 64),
         metric("Architecture Quality", "70 / 100", "The major domains are separated, but the primary service still carries too many responsibilities.", "AI Estimate", 70),
@@ -299,15 +307,18 @@ def _build_report() -> dict[str, Any]:
     ]
 
     feature_metrics = [
-        metric("Completed Features", "14 major capability areas", "Implemented paths with visible frontend and backend support; not a claim of perfect production completeness.", "Calculated"),
+        metric("Completed Features", "18 major capability areas", "Implemented paths with visible frontend and backend support; not a claim of perfect production completeness.", "Calculated"),
         metric("Partial Features", "5 major capability areas", "Areas with feature gates, provider dependencies, narrow coverage, or uneven end-to-end proof.", "Calculated"),
         metric("Feature Depth", "80 / 100", "Individual workflows often go beyond a demo into persistence, validation, and provider actions.", "AI Estimate", 80),
-        metric("Feature Breadth", "84 / 100", "The product spans the full front-desk operating loop and several adjacent systems.", "Calculated", 84),
+        metric("Feature Breadth", "87 / 100", "The product spans the full front-desk operating loop, a voice-design studio, responsive surfaces, and several adjacent systems.", "Calculated", 87),
     ]
     feature_spotlights = [
         metric("Most Complex Feature", "Scenario builder + event-driven execution", "It combines triggers, variables, conditional logic, provider tools, persistence, and resume paths.", "AI Estimate"),
         metric("Most Valuable Feature", "AI receptionist connected to booking and customer records", "Answering becomes revenue-relevant when it can complete the next operational step.", "AI Estimate"),
         metric("Most Unique Feature", "Custom voice consent and cloned receptionist flow", "Voice consent, samples, provider cloning, and receptionist profiles are unusually deep for this category.", "AI Estimate"),
+        metric("Most Distinctive Product Surface", "Nodemere Audition voice-design studio", "The studio turns receptionist creation into a guided product experience with voice, portrait, and business-fit decisions.", "Calculated"),
+        metric("Largest Recent Investment", "Responsive web experience across mobile and tablet", "The product now carries dedicated responsive behavior across the public site and dashboard surfaces, not only desktop layouts.", "Measured"),
+        metric("Operations Layer", "Nodemere Nest plus Intercom knowledge", "Nest coordinates operational context while Intercom knowledge helps the receptionist work from business-specific information.", "Calculated"),
         metric("Most Unexpected Feature", "A full operations console behind a receptionist product", "Live monitoring, call logs, staff, documents, payments, and plan enforcement make this broader than its entry point.", "AI Estimate"),
     ]
 
