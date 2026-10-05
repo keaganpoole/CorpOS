@@ -11,7 +11,7 @@ import {
   BookOpen, FileText, Shield, HelpCircle, Sparkles,
   Eye, EyeOff, Lightbulb, AlertTriangle, Zap, Star, Info,
   Copy, Download, Layers, Plus, Trash2, Tag, DollarSign,
-  ArrowRight, X, MessageSquareText, Users, Maximize2, Wand2,
+  ArrowRight, X, Users, Maximize2, Wand2,
   CalendarClock, Mail, PhoneCall, ListChecks, Upload, CalendarCheck, Pencil, Play, LogOut,
   ThumbsUp, ThumbsDown, Palette,
   Loader2, CreditCard, ExternalLink,
@@ -3430,36 +3430,6 @@ const KnowledgeTipsModal = ({ activeTab, onClose }) => {
   );
 };
 
-// ─── Intro Message Editor ──────────────────────────────────────────────────
-const IntroMessageEditor = ({ value, onChange }) => {
-  const textareaRef = React.useRef(null);
-
-  const wordCount = (value || '').trim() ? (value || '').trim().split(/\s+/).length : 0;
-
-  return (
-    <div className="border border-white/[0.04] rounded-2xl bg-gradient-to-b from-zinc-950/40 to-transparent overflow-hidden">
-      {/* Editor */}
-      <div className="p-5">
-        <textarea
-          id="intro-message-textarea"
-          ref={textareaRef}
-          value={value || ''}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder="Hey, thanks for calling. What can I do for you?"
-          className="min-h-[118px] w-full resize-none bg-black/30 border border-white/[0.04] rounded-xl px-5 py-4 text-[13px] text-zinc-300 placeholder:text-zinc-800 outline-none focus:outline-none focus-visible:outline-none transition-all leading-relaxed font-sans"
-        />
-      </div>
-
-      {/* Footer */}
-      <div className="flex items-center justify-between px-5 py-3 border-t border-white/[0.03] bg-white/[0.01]">
-        <div className="flex items-center gap-3">
-          <span className="text-[10px] text-zinc-700 tabular-nums">{wordCount} words · {(value || '').length} chars</span>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 // ─── Settings Page ──────────────────────────────────────────────────────────
 const formatForwardingPhoneNumber = (value) => {
   const digits = String(value || '').replace(/\D/g, '');
@@ -4095,7 +4065,6 @@ const SettingsPage = ({ mobileUsage, onMobileUpgrade }) => {
     { id: 'forwarding', title: 'Connections', icon: PhoneCall, iconClass: 'settings-icon', hint: 'Call routing' },
     { id: 'billing', title: 'Billing', icon: CreditCard, iconClass: 'settings-icon', hint: 'Plan, invoices, and payment' },
     { id: 'preferences', title: 'Preferences', icon: Shield, iconClass: 'settings-icon', hint: 'Permissions and controls' },
-    { id: 'intro', title: 'Intro Message', icon: MessageSquareText, iconClass: 'settings-icon', hint: 'Opening call greeting' },
     { id: 'appointments', title: 'Hours', icon: Calendar, iconClass: 'settings-icon', hint: 'Business availability' },
     { id: 'services', title: 'Services & Pricing', icon: Tag, iconClass: 'settings-icon', hint: 'Offer catalog and rates' },
     { id: 'knowledge', title: 'Knowledge Base', icon: BookOpen, iconClass: 'settings-icon', hint: 'Policies, FAQs, and context' },
@@ -4120,20 +4089,6 @@ const SettingsPage = ({ mobileUsage, onMobileUpgrade }) => {
             profile={profile}
             onManageBilling={() => setActiveSection('billing')}
           />
-        );
-      case 'intro':
-        return (
-          <>
-            <div className="mb-4">
-              <p className="text-[12px] text-zinc-500 leading-relaxed mb-1">
-                The first thing callers hear when your AI receptionist picks up.
-              </p>
-            </div>
-            <IntroMessageEditor
-              value={settings.intro_message_prompt}
-              onChange={(v) => update('intro_message_prompt', v)}
-            />
-          </>
         );
       case 'appointments':
         return (
@@ -4548,19 +4503,6 @@ const SettingsPage = ({ mobileUsage, onMobileUpgrade }) => {
                 <TextInput value={settings.business_zip} onChange={(v) => update('business_zip', v)} placeholder="04901" />
               </Field>
             </div>
-          </Section>
-
-          {/* ── Intro Message ─────────────────────────────────────────────── */}
-          <Section title="Intro Message" icon={MessageSquareText} color="bg-white/[0.04] text-white" defaultOpen={true}>
-            <div className="mb-4">
-              <p className="text-[12px] text-zinc-500 leading-relaxed mb-1">
-                The first thing callers hear when your AI receptionist picks up.
-              </p>
-            </div>
-            <IntroMessageEditor
-              value={settings.intro_message_prompt}
-              onChange={(v) => update('intro_message_prompt', v)}
-            />
           </Section>
 
           {/* ── Calendar & Appointments ──────────────────────────────────── */}

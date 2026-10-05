@@ -7,6 +7,7 @@ PERMISSIONS = {
     "operations.manage": {"OWNER", "MANAGER"},
     "sensitive.read": {"OWNER", "MANAGER"},
     "billing.read": {"OWNER"},
+    "billing.portal": {"OWNER"},
     "administration": {"OWNER"},
     "security": {"OWNER"},
     "integrations": {"OWNER"},
@@ -14,7 +15,7 @@ PERMISSIONS = {
     "export": {"OWNER"},
     "delete": {"OWNER"},
 }
-STEP_UP = {"administration", "security", "integrations", "billing.change", "export", "delete"}
+STEP_UP = {"billing.portal"}
 
 
 def contains_privileged_scenario_action(value):
@@ -27,7 +28,7 @@ def contains_privileged_scenario_action(value):
 def require_permission(tenant, permission):
     if not tenant or tenant.role not in PERMISSIONS.get(permission, set()):
         raise HTTPException(403, "Your business role does not permit this action")
-    if not tenant.service and (tenant.mfa_required or permission in STEP_UP) and tenant.aal != "aal2":
+    if not tenant.service and permission in STEP_UP and tenant.aal != "aal2":
         raise HTTPException(403, {"code": "mfa_required", "message": "Verify your authenticator to continue"})
 
 
@@ -51,6 +52,8 @@ def route_permission(path, method):
         return 'operations.read'
     if '/integrations' in path or '/forwarding' in path:
         return "integrations"
+    if path == '/api/sonar/billing/portal':
+        return 'billing.portal'
     if any(s in path for s in ('/billing','checkout','refund-payment','cancel-subscription','payment-profile')):
         return "billing.read" if read else "billing.change"
     if method == 'DELETE' or path.endswith('/delete'):
