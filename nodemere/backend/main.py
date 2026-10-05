@@ -3476,16 +3476,22 @@ async def require_authenticated_api_request(request: Request, call_next):
                 getattr(tenant, "mfa_required", None), getattr(user, "nodemere_mfa_enrolled", False),
             )
         if onboarding and tenant is None:
-            if raw_db.table('businesses').select('id').eq('user_id',str(user.id)).limit(1).execute().data:
-                logging.warning("onboarding.authorization.denied user_id=%s reason=active_business_membership_required", str(user.id))
-                raise HTTPException(403,'Active business membership required')
+            # A failed first save can leave the owner business row committed
+            # before membership repair runs. Let the owner re-enter onboarding
+            # so the endpoint can restore the missing membership safely.
+            owned_business = raw_db.table('businesses').select('id').eq('user_id',str(user.id)).limit(1).execute().data
+            if owned_business:
+                logging.info("onboarding.authorization.recovery user_id=%s business_id=%s", str(user.id), owned_business[0].get('id'))
         elif onboarding:
             profile=raw_db.table('users').select('onboarded').eq('id',str(user.id)).limit(1).execute().data or [{}]
             logging.info("onboarding.authorization.profile user_id=%s onboarded=%s", str(user.id), profile[0].get('onboarded'))
             if tenant.role != 'OWNER':
                 logging.warning("onboarding.authorization.denied user_id=%s reason=owner_required role=%s", str(user.id), tenant.role)
                 raise HTTPException(403,'Owner required for business setup')
-            if profile[0].get('onboarded') or tenant.mfa_required or getattr(user,'nodemere_mfa_enrolled',False):
+            # Onboarding remains an owner-scoped setup flow even when an
+            # earlier partial save marked the profile complete. MFA is still
+            # required when the business policy or user enrollment requires it.
+            if tenant.mfa_required or getattr(user,'nodemere_mfa_enrolled',False):
                 require_permission(tenant,'administration')
         if tenant and getattr(user,"nodemere_mfa_enrolled",False):
             tenant = replace(tenant,mfa_required=True)
@@ -3572,6 +3578,18 @@ async def capture_route_hits(request: Request, call_next):
             getattr(request.state, "authenticated_user_id", None),
         )
 
+    return response
+
+
+@app.middleware("http")
+async def ensure_cors_on_all_responses(request: Request, call_next):
+    """Keep CORS visible on responses returned by outer auth middleware."""
+    response = await call_next(request)
+    origin = request.headers.get("origin")
+    if origin and origin in origins:
+        response.headers.setdefault("Access-Control-Allow-Origin", origin)
+        response.headers.setdefault("Access-Control-Allow-Credentials", "true")
+        response.headers.setdefault("Vary", "Origin")
     return response
 
 
@@ -16417,6 +16435,19 @@ async def complete_onboarding(
                 "business_timezone": business_payload.get("business_timezone"),
                 "business_hours": business_payload.get("business_hours"),
                 "industry": business_payload.get("industry"),
+                # The database applies defaults to protected profile columns.
+                # Keep the bootstrap row explicitly null until its generated
+                # business ID exists and the follow-up ProtectedClient update
+                # can seal the real values.
+                "phone": None,
+                "email": None,
+                "address": None,
+                "city": None,
+                "state": None,
+                "zip": None,
+                "about_us": None,
+                "policies": None,
+                "faq": None,
             }).execute()
             created_business = (created_response.data or [None])[0]
             if not created_business:
@@ -16430,6 +16461,25 @@ async def complete_onboarding(
 
         business = business_response.data[0] if business_response.data else None
         business_id = business.get("id") if business else (existing_business or {}).get("id")
+
+        if business_id:
+            membership_db = getattr(supabase_admin, "raw", supabase_admin)
+            active_membership = (
+                membership_db.table("business_memberships")
+                .select("business_id")
+                .eq("business_id", business_id)
+                .eq("user_id", current_user_id)
+                .eq("status", "active")
+                .limit(1)
+                .execute()
+            )
+            if not active_membership.data:
+                membership_db.table("business_memberships").upsert({
+                    "business_id": business_id,
+                    "user_id": current_user_id,
+                    "role": "OWNER",
+                    "status": "active",
+                }, on_conflict="business_id,user_id").execute()
 
         brand_color = str(onboarding_data.brand_color or "").strip()
         if business_id and brand_color:

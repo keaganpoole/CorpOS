@@ -4259,7 +4259,7 @@ const SettingsPage = ({ mobileUsage, onMobileUpgrade }) => {
                                       <button
                                         type="button"
                                         onClick={() => previewNotification({ key: notification.key, label: notification.label, category: group.key })}
-                                        className="flex h-6 w-6 items-center justify-center rounded-full border border-white/[0.08] text-zinc-500 transition-colors hover:border-cyan-400/40 hover:text-cyan-300"
+                                        className="flex h-6 w-6 items-center justify-center rounded-full border border-white/[0.08] text-zinc-500 outline-none ring-0 transition-colors hover:border-white/[0.18] hover:text-zinc-200 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0"
                                         aria-label={`Preview ${notification.label}`}
                                         title="Preview notification"
                                       >

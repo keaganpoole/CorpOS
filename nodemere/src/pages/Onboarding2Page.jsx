@@ -836,7 +836,8 @@ Ask what the customer needs, when they need it, and the best way to follow up. I
 
 const getIndustryExample = (industry) => industryExamples[industry] || industryExamples['Other General Business'];
 const allIndustryExampleValues = (key) => Object.values(industryExamples).map((example) => example[key]);
-const allServiceDescriptionExamples = () => Object.values(industryExamples).map((example) => example.serviceDescription(example.serviceName));
+const removeRecommendedNextStep = (description) => String(description || '').split(/\n\nRecommended next step:/i)[0].trim();
+const allServiceDescriptionExamples = () => Object.values(industryExamples).map((example) => removeRecommendedNextStep(example.serviceDescription(example.serviceName)));
 const aboutTemplate = getIndustryExample('Home Services').about;
 
 const businessBriefSectionDefinitions = [
@@ -1138,6 +1139,13 @@ EXAMPLE:
 
 const faqTemplate = '';
 const faqPlaceholder = getIndustryExample('Home Services').faq;
+const getPolicyExamples = (industry) => [...new Set(
+  [getIndustryExample(industry)]
+    .flatMap((example) => String(example.policies || '')
+      .split(/\r?\n/)
+      .map((line) => line.replace(/^[-•]\s*/, '').trim()))
+    .filter(Boolean),
+)];
 const getFaqExamples = (industry) => String(getIndustryExample(industry).faq || '')
   .split(/\n\n(?=Q:)/)
   .map((example) => example.trim())
@@ -1172,7 +1180,7 @@ const blankService = () => ({
 const serviceDescriptionMagicTemplate = (serviceName, industry) => {
   const example = getIndustryExample(industry);
   const name = String(serviceName || '').trim() || example.serviceName;
-  return example.serviceDescription(name);
+  return removeRecommendedNextStep(example.serviceDescription(name));
 };
 
 const formatServicePrice = (service) => {
@@ -1469,12 +1477,13 @@ const LateHoursTermsModal = ({ isSaving = false, onAccept, onClose }) => {
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 18, scale: 0.98 }}
         transition={{ duration: 0.2 }}
-        className="onboarding-modal-panel w-full max-w-[560px] overflow-hidden rounded-[28px] border border-white/[0.08] bg-[#0a0a0a] shadow-[0_28px_90px_rgba(0,0,0,0.6)]"
+        className="onboarding-modal-panel w-full max-w-[560px] overflow-hidden rounded-[30px] border border-white/[0.08] bg-[#070707] shadow-[0_28px_90px_rgba(0,0,0,0.62)]"
       >
+        <ModalSpectrumLine variant="warning" />
         <div className="border-b border-white/[0.06] px-7 py-6">
           <div className="flex items-start justify-between gap-5">
             <div>
-              <p className="outbound-notice-gradient inline-block text-[11px] font-bold uppercase tracking-[0.18em]">
+              <p className="inline-block text-[11px] font-bold uppercase tracking-[0.18em] text-zinc-600">
                 Outbound calling notice
               </p>
               <h2 className="mt-2 text-[22px] font-black tracking-[-0.04em] text-white">Late-hours calling</h2>
@@ -2267,7 +2276,7 @@ const ServiceModal = ({ initialService, industry, onClose, onSave }) => {
               },
               {
                 title: 'Example:',
-                body: exampleService.serviceDescription(exampleService.serviceName).split('\n\n')[0].replace('Service overview:\n', ''),
+                body: removeRecommendedNextStep(exampleService.serviceDescription(exampleService.serviceName)).split('\n\n')[0].replace('Service overview:\n', ''),
               },
             ]}
             footer="Keep it practical: what it is, when it applies, and anything else your receptionist should know about it."
@@ -2303,6 +2312,8 @@ const Onboarding2Page = () => {
   const [scheduleColorblindMode, setScheduleColorblindMode] = useState(false);
   const [editingService, setEditingService] = useState(null);
   const [faqExampleIndex, setFaqExampleIndex] = useState(0);
+  const [policyExampleIndex, setPolicyExampleIndex] = useState(0);
+  const policiesEditorRef = useRef(null);
   const businessBriefEditorRef = useRef(null);
   const [form, setForm] = useState({
     businessName: '',
@@ -2386,7 +2397,10 @@ const Onboarding2Page = () => {
   }, [localLateHoursTerms, profile]);
 
   const update = (key, value) => {
-    if (key === 'industry') setFaqExampleIndex(0);
+    if (key === 'industry') {
+      setFaqExampleIndex(0);
+      setPolicyExampleIndex(0);
+    }
     setForm((prev) => {
       if (key === 'about' || key === 'policies' || key === 'faq') return { ...prev, [key]: limitLongText(value) };
       if (key !== 'industry') return { ...prev, [key]: value };
@@ -2400,7 +2414,7 @@ const Onboarding2Page = () => {
         return {
           ...service,
           name: service.name || example.serviceName,
-          description: example.serviceDescription(service.name || example.serviceName),
+          description: removeRecommendedNextStep(example.serviceDescription(service.name || example.serviceName)),
         };
       });
       return {
@@ -2450,6 +2464,29 @@ const Onboarding2Page = () => {
     const nextFaq = [form.faq.trim(), example].filter(Boolean).join('\n\n');
     update('faq', nextFaq);
     setFaqExampleIndex((currentIndex) => (currentIndex + 1) % faqExamples.length);
+  };
+
+  const addPolicyExample = () => {
+    const policyExamples = getPolicyExamples(form.industry || 'Home Services');
+    if (!policyExamples.length || form.policies.length >= LONG_TEXT_LIMIT) return;
+    const example = policyExamples[policyExampleIndex % policyExamples.length];
+    const editor = policiesEditorRef.current;
+    const value = form.policies;
+    const cursor = editor?.selectionStart ?? value.length;
+    const lineEnd = value.indexOf('\n', cursor);
+    const insertAt = lineEnd === -1 ? value.length : lineEnd;
+    const before = value.slice(0, insertAt);
+    const after = value.slice(insertAt);
+    const lineBreak = before && !before.endsWith('\n') ? '\n' : '';
+    const nextPolicies = `${before}${lineBreak}${example}${after}`;
+    update('policies', nextPolicies);
+    requestAnimationFrame(() => {
+      if (!policiesEditorRef.current) return;
+      const nextCursor = insertAt + lineBreak.length + example.length;
+      policiesEditorRef.current.focus();
+      policiesEditorRef.current.setSelectionRange(nextCursor, nextCursor);
+    });
+    setPolicyExampleIndex((currentIndex) => (currentIndex + 1) % policyExamples.length);
   };
 
   const removeService = (serviceId) => {
@@ -2572,7 +2609,9 @@ const Onboarding2Page = () => {
       return true;
     } catch (error) {
       console.error("Onboarding2Page.jsx:event_2502");
-      setSubmitError(error.response?.data?.detail || 'Could not save onboarding. Please try again.');
+      const detail = error.response?.data?.detail;
+      const readableDetail = typeof detail === 'string' ? detail : detail?.message;
+      setSubmitError(readableDetail || error.response?.data?.message || 'Could not save onboarding. Please try again.');
       return false;
     }
   };
@@ -2595,7 +2634,7 @@ const Onboarding2Page = () => {
 
     if (step < steps.length - 1) {
       setStep((prev) => prev + 1);
-      void queueSave(step === 0);
+      void queueSave(false);
       return;
     }
 
@@ -2623,7 +2662,7 @@ const Onboarding2Page = () => {
     } else {
       setFinalSaveStatus('saving');
       setShowFinalSplash(true);
-      void queueSave(false).then((saved) => {
+      void queueSave(true).then((saved) => {
         setFinalSaveStatus(saved ? 'ready' : 'error');
       });
     }
@@ -3122,17 +3161,30 @@ const Onboarding2Page = () => {
                         ) : null}
 
                         {step === 4 ? (
-                        <div className="relative">
-                          <textarea
-                            value={form.policies}
-                            onChange={(e) => update('policies', e.target.value)}
-                            placeholder={form.industry ? getIndustryExample(form.industry).policies : policiesPlaceholder}
-                            maxLength={LONG_TEXT_LIMIT}
-                            rows={9}
-                            autoFocus={shouldAutoFocusOnboardingField()}
-                            className={`${fieldClass} h-[499px] resize-none py-4 leading-6`}
-                          />
-                          <CharacterLimitNotice value={form.policies} />
+                        <div className="space-y-3">
+                          <div className="custom-scrollbar flex min-w-0 items-center overflow-x-auto pb-1" aria-label="Business policy actions">
+                            <button
+                              type="button"
+                              onClick={addPolicyExample}
+                              disabled={form.policies.length >= LONG_TEXT_LIMIT}
+                              className="shrink-0 bg-transparent pr-3 text-[10px] font-semibold leading-[1.7] whitespace-nowrap text-zinc-500 transition hover:text-zinc-200 disabled:cursor-not-allowed disabled:text-zinc-700"
+                            >
+                              Add example
+                            </button>
+                          </div>
+                          <div className="relative">
+                            <textarea
+                              ref={policiesEditorRef}
+                              value={form.policies}
+                              onChange={(e) => update('policies', e.target.value)}
+                              placeholder={form.industry ? getIndustryExample(form.industry).policies : policiesPlaceholder}
+                              maxLength={LONG_TEXT_LIMIT}
+                              rows={9}
+                              autoFocus={shouldAutoFocusOnboardingField()}
+                              className={`${fieldClass} h-[499px] resize-none py-4 leading-6`}
+                            />
+                            <CharacterLimitNotice value={form.policies} />
+                          </div>
                         </div>
                         ) : null}
 
@@ -3366,7 +3418,7 @@ const Onboarding2Page = () => {
         {servicesHelpOpen ? (
           <InfoModal
             title="Adding services"
-            intro="Use this section to list the specific services customers can ask about or book, along with the practical details your receptionist needs to explain each one accurately."
+            intro="Add the services customers can ask about or book, plus the key details your receptionist should know about each one."
             points={[
               {
                 title: 'Name services clearly.',

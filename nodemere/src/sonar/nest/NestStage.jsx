@@ -278,9 +278,9 @@ const ContentIcon = ({ Icon, mode, compact, partTwo = false, partOne = false }) 
   );
 };
 
-const ReelPart = ({ event, content, Icon, compact, part }) => (
+const ReelPart = ({ event, content, Icon, compact, part, hideIcon = false }) => (
   <div className={`nest-content nest-reel-content nest-layout-${part === 1 ? 'return' : 'pivot'} nest-density-spacious nest-footprint-${part === 1 ? 'full' : 'medium'} nest-placement-center${event?.event_type === 'call_completed' && part === 2 && event?.payload?.summary ? ' nest-call-summary' : ''}`}>
-      {!(event?.event_type === 'call_active' && event?.direction === 'inbound') && (
+      {!hideIcon && !(event?.event_type === 'call_active' && event?.direction === 'inbound') && (
         <ContentIcon Icon={part === 1 ? iconForPartOne(event) : Icon} mode="transform" compact={compact} partOne={part === 1} partTwo={part === 2} />
       )}
       <div className="nest-content-copy">
@@ -461,21 +461,40 @@ export default function NestStage({ event, concept, privacyMode = false, compact
             </motion.button>
           )
         ) : (
-          <motion.div key={`nest-reel:${event.id}`} className="nest-reel-viewport" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: reducedMotion ? 0.01 : 0.48 }}>
-            <motion.div
-              className="nest-reel-track"
-              initial={{ y: '50%' }}
-              animate={{ y: rolled ? '-50%' : '0%' }}
-              transition={reelTransition}
-            >
-              <div className="nest-reel-item">
-                <ReelPart event={event} content={subject} Icon={Icon} compact={compact} part={1} />
-              </div>
-              <motion.div className="nest-reel-item" animate={{ opacity: detailFaded ? 0 : 1 }} transition={{ duration: reducedMotion ? 0.01 : 0.62 }}>
-                <ReelPart event={event} content={detail} Icon={Icon} compact={compact} part={2} />
+          event.event_type === 'daily_quote' ? (
+            <motion.div key={`nest-quote:${event.id}`} className="nest-reel-viewport" initial={{ opacity: 0 }} animate={{ opacity: detailFaded ? 0 : 1 }} exit={{ opacity: 0 }} transition={{ duration: reducedMotion ? 0.01 : 0.48 }}>
+              <ReelPart
+                event={event}
+                content={{
+                  ...detail,
+                  eyebrow: '',
+                  primary: `“${String(detail?.primary || '').replace(/^[“”\"']|[“”\"']$/g, '')}”`,
+                  secondary: '',
+                  metric: '',
+                }}
+                Icon={Icon}
+                compact={compact}
+                part={1}
+                hideIcon
+              />
+            </motion.div>
+          ) : (
+            <motion.div key={`nest-reel:${event.id}`} className="nest-reel-viewport" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: reducedMotion ? 0.01 : 0.48 }}>
+              <motion.div
+                className="nest-reel-track"
+                initial={{ y: '50%' }}
+                animate={{ y: rolled ? '-50%' : '0%' }}
+                transition={reelTransition}
+              >
+                <div className="nest-reel-item">
+                  <ReelPart event={event} content={subject} Icon={Icon} compact={compact} part={1} />
+                </div>
+                <motion.div className="nest-reel-item" animate={{ opacity: detailFaded ? 0 : 1 }} transition={{ duration: reducedMotion ? 0.01 : 0.62 }}>
+                  <ReelPart event={event} content={detail} Icon={Icon} compact={compact} part={2} />
+                </motion.div>
               </motion.div>
             </motion.div>
-          </motion.div>
+          )
         )}
       </AnimatePresence>
     </div>
