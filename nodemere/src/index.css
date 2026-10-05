@@ -46,6 +46,7 @@
 html {
   height: 100%;
   box-sizing: border-box;
+  scrollbar-gutter: stable;
 }
 
 *, *::before, *::after {
@@ -61,6 +62,16 @@ body {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+.responsive-dialog,
+.responsive-dialog [class*="backdrop-blur"],
+.onboarding-modal-backdrop,
+.onboarding-modal-backdrop [class*="backdrop-blur"],
+.fixed.inset-0[class*="backdrop-blur"],
+.modal-backdrop[class*="backdrop-blur"] {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
 }
 
 /* Branding helpers. These intentionally affect accent utilities only. */
