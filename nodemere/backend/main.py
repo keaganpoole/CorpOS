@@ -7114,7 +7114,7 @@ def deliver_existing_secure_link_by_email(
             recipient_email=recipient_email,
             business_name=business_name,
             secure_link=str(secure_link),
-            configuration=_system_gmail_configuration(),
+            configuration=_system_resend_configuration(),
         )
     except EmailDeliveryError as exc:
         log_email_delivery_failure(
@@ -15191,7 +15191,14 @@ async def create_user(auth_data: AuthSignUpRequest, request: Request):
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Current Nodemere legal terms must be accepted to create an account.",
             )
-        auth_response = new_auth_client().auth.sign_up({"email": auth_data.email, "password": auth_data.password})
+        # Keep the confirmation flow inside the app. When no public frontend
+        # URL is configured, local development uses the Vite auth route.
+        signup_redirect = f"{(frontend_base_url or 'http://localhost:5173').rstrip('/')}/auth"
+        auth_response = new_auth_client().auth.sign_up({
+            "email": auth_data.email,
+            "password": auth_data.password,
+            "options": {"email_redirect_to": signup_redirect},
+        })
         if not auth_response.user:
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Supabase signup failed")
         
@@ -15214,11 +15221,18 @@ async def create_user(auth_data: AuthSignUpRequest, request: Request):
                 }
             },
         }
-        db_response = supabase_admin.table('users').insert(profile_data).execute()
-        
-        if not db_response.data:
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create user profile")
-        return db_response.data[0]
+        # Some Supabase projects provision public.users from an Auth trigger.
+        # Upsert keeps signup idempotent in both trigger and non-trigger setups.
+        # Auth has already succeeded at this point, so a profile persistence
+        # issue must not turn a delivered confirmation email into a false
+        # signup failure. The authenticated profile bootstrap path repairs a
+        # missing row after the user confirms the email.
+        try:
+            db_response = supabase_admin.table('users').upsert(profile_data, on_conflict='id').select().execute()
+            return db_response.data[0] if db_response.data else profile_data
+        except Exception:
+            logging.exception('main.create_user.profile_persistence_failed')
+            return profile_data
     except HTTPException:
         raise
     except AuthApiError as e:

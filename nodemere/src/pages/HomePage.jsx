@@ -821,7 +821,7 @@ const HomePage = () => {
             ) : (
               <>
                 <Link to="/auth" data-visitor-event="navigation_click" data-visitor-id="header-login" className="text-sm font-semibold text-white hover:text-gray-300">Login</Link>
-                <Link to="/auth" state={{ isSignUp: true }} data-visitor-event="cta_click" data-visitor-id="header-signup" className="text-sm font-semibold gradient-button btn-shine hover:opacity-90 transition-opacity">Sign Up</Link>
+                <Link to="/auth" state={{ isSignUp: true }} data-visitor-event="cta_click" data-visitor-id="header-signup" className="text-sm font-semibold gradient-button dashboard-gradient-button btn-shine hover:opacity-90 transition-opacity">Sign Up</Link>
               </>
             )}
           </div>
@@ -829,7 +829,7 @@ const HomePage = () => {
           {/* Mobile Navigation */}
           <div className="md:hidden flex items-center space-x-4 ml-auto">
             {!session && (
-              <Link to="/auth" state={{ isSignUp: true }} data-visitor-event="cta_click" data-visitor-id="mobile-signup" className="text-sm font-semibold gradient-button btn-shine hover:opacity-90 transition-opacity">Sign Up</Link>
+              <Link to="/auth" state={{ isSignUp: true }} data-visitor-event="cta_click" data-visitor-id="mobile-signup" className="text-sm font-semibold gradient-button dashboard-gradient-button btn-shine hover:opacity-90 transition-opacity">Sign Up</Link>
             )}
             <button onClick={toggleMenu} className="text-white hover:text-gray-300 focus:outline-none">
               {isMenuOpen ? <XIcon size={24} /> : <MenuIcon size={24} />}

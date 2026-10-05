@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowDown, Hand, MousePointer2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { api } from '../sonar/lib/api';
 import HireReceptionistModal from '../sonar/pages/HireReceptionistModal';
 import '../sonar/studio/studio.css';
 import '../sonar/studio/receptionistGallery.css';
@@ -33,12 +32,6 @@ export default function HomepageReceptionistCatalog({ active, onContinue }) {
         const data = await response.json();
         const rows = Array.isArray(data) ? data : [];
         let catalogRowsForHomepage = rows;
-        try {
-          const enrichedRows = await api.getReceptionistCatalog();
-          if (Array.isArray(enrichedRows) && enrichedRows.length > 0) catalogRowsForHomepage = enrichedRows;
-        } catch {
-          // Keep the public Supabase rows when the authenticated catalog route is unavailable.
-        }
         catalogRowsForHomepage = catalogRowsForHomepage.filter((person) => (
           person.source !== 'created_receptionist' && person.created_receptionist_id == null && person.is_custom !== true
         ));

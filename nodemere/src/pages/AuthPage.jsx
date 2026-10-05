@@ -233,9 +233,58 @@ const AuthPage = () => {
 
     // ... your existing JSX for the form ...
     const inputGroupClasses = "relative";
-    const inputClasses = "relative w-full px-5 py-3 max-sm:px-4 max-sm:py-2.5 max-sm:text-base bg-[#1c1c1c] border border-zinc-700 rounded-full text-white placeholder-gray-500 outline-none ring-0 transition-colors peer focus:border-zinc-300 focus:outline-none focus:ring-0";
+    const inputClasses = "relative w-full pl-6 pr-5 py-3 max-sm:pl-5 max-sm:pr-4 max-sm:py-2.5 max-sm:text-base placeholder:text-[15px] bg-[#1c1c1c] border border-zinc-700 rounded-full text-white placeholder-gray-500 outline-none ring-0 transition-colors peer focus:border-zinc-300 focus:outline-none focus:ring-0";
     const labelClasses = "absolute left-4 -top-2 text-xs text-gray-400 bg-[#1c1c1c] px-2 rounded-md transition-all peer-placeholder-shown:top-3.5 max-sm:peer-placeholder-shown:top-3 peer-placeholder-shown:text-sm peer-focus:-top-2 peer-focus:text-xs";
     const isSubmitDisabled = isLoading || (isSignUp && !hasAcceptedLegal);
+
+    const handleUseDifferentEmail = () => {
+        setIsConfirmationSent(false);
+        setSuccessMessage('');
+        setError('');
+        setFormData({ email: '', password: '', confirmPassword: '' });
+    };
+
+    if (isConfirmationSent && isSignUp) {
+        return (
+            <div className="auth-page min-h-[var(--app-height)] bg-black text-gray-300 flex items-center justify-center px-6 py-4 max-sm:px-5 max-sm:py-6 font-inter antialiased">
+                <div className={`w-full max-w-md mx-auto transition-all duration-700 ease-in-out ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+                    <div className="rounded-[2rem] border border-zinc-800 bg-[#101010] px-8 py-10 max-sm:px-6 max-sm:py-8 text-center shadow-2xl shadow-black/40">
+                        <div className="mx-auto mb-7 flex h-16 w-16 items-center justify-center rounded-full border border-zinc-700 bg-zinc-900 text-white">
+                            <svg viewBox="0 0 24 24" className="h-8 w-8" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75A2.25 2.25 0 0 1 6 4.5h12a2.25 2.25 0 0 1 2.25 2.25v10.5A2.25 2.25 0 0 1 18 19.5H6a2.25 2.25 0 0 1-2.25-2.25V6.75Z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 6 6.18 5.151a2.063 2.063 0 0 0 2.64 0L19.5 6" />
+                            </svg>
+                        </div>
+                        <h1 className="text-3xl max-sm:text-2xl font-bold text-white">Check your email</h1>
+                        <p className="mt-4 text-sm leading-6 text-gray-400">
+                            We sent a confirmation link to
+                            <span className="block mt-1 font-semibold text-white break-all">{formData.email}</span>
+                        </p>
+                        <p className="mt-5 text-sm leading-6 text-gray-500">
+                            Open the email and click the confirmation button to finish creating your Nodemere account. If you don’t see it, check your spam folder.
+                        </p>
+                        <button
+                            type="button"
+                            onClick={handleResendConfirmation}
+                            disabled={!canResend || isLoading}
+                            className="mt-8 w-full rounded-full border border-zinc-700 bg-transparent px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-zinc-900 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                            {isLoading ? 'Sending...' : 'Resend confirmation email'}
+                        </button>
+                        {!canResend && resendTimer > 0 && <p className="mt-3 text-xs text-gray-500">You can resend in {resendTimer} seconds.</p>}
+                        <button
+                            type="button"
+                            onClick={handleUseDifferentEmail}
+                            disabled={isLoading}
+                            className="mt-5 text-sm font-semibold text-gray-400 transition-colors hover:text-white disabled:opacity-40"
+                        >
+                            Use a different email
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="auth-page min-h-[var(--app-height)] bg-black text-gray-300 flex items-center justify-center px-6 py-4 max-sm:px-5 max-sm:py-6 font-inter antialiased">
@@ -249,19 +298,16 @@ const AuthPage = () => {
 
                 <form onSubmit={handleSubmit} className="space-y-5 max-sm:space-y-3.5">
                     <div className={inputGroupClasses}>
-                        <input id="email" type="email" name="email" placeholder=" " value={formData.email} onChange={handleChange} className={inputClasses} required disabled={isLoading} />
-                        <label htmlFor="email" className={labelClasses}>Email</label>
+                        <input id="email" type="email" name="email" placeholder="Email address" value={formData.email} onChange={handleChange} className={inputClasses} required disabled={isLoading} />
                     </div>
 
                     <div className={inputGroupClasses}>
-                        <input id="password" type="password" name="password" placeholder=" " value={formData.password} onChange={handleChange} className={inputClasses} required disabled={isLoading} />
-                        <label htmlFor="password" className={labelClasses}>Password</label>
+                        <input id="password" type="password" name="password" placeholder="Password" value={formData.password} onChange={handleChange} className={inputClasses} required disabled={isLoading} />
                     </div>
 
                     {isSignUp && (
                         <div className={inputGroupClasses}>
-                            <input id="confirmPassword" type="password" name="confirmPassword" placeholder=" " value={formData.confirmPassword} onChange={handleChange} className={inputClasses} required disabled={isLoading} />
-                            <label htmlFor="confirmPassword" className={labelClasses}>Confirm password</label>
+                            <input id="confirmPassword" type="password" name="confirmPassword" placeholder="Confirm password" value={formData.confirmPassword} onChange={handleChange} className={inputClasses} required disabled={isLoading} />
                         </div>
                     )}
 
@@ -276,7 +322,7 @@ const AuthPage = () => {
                         <span>I am authorized to create this business account, agree to the <Link to="/terms" target="_blank" className="text-white underline underline-offset-2">Terms</Link>, <Link to="/privacy-policy" target="_blank" className="text-white underline underline-offset-2">Privacy Policy</Link>, <Link to="/acceptable-use-policy" target="_blank" className="text-white underline underline-offset-2">Acceptable Use Policy</Link>, <Link to="/communications-notice" target="_blank" className="text-white underline underline-offset-2">AI & Recording Notice</Link>, and <Link to="/data-processing-addendum" target="_blank" className="text-white underline underline-offset-2">DPA</Link>. I certify this account will be used only for permitted ordinary business workflows; restricted automated workflows require separate approval.</span>
                     </label>}
 
-                    <button type="submit" className="w-full py-3 max-sm:py-2.5 max-sm:min-h-11 mt-6 max-sm:mt-4 text-sm font-semibold text-black bg-gradient-to-r from-[#f7f7f8] to-[#b5b6c4] rounded-full hover:opacity-90 transition-all duration-300 shadow-lg shadow-[#b5b6c4]/10 disabled:opacity-35 disabled:cursor-not-allowed" disabled={isSubmitDisabled}>
+                    <button type="submit" className="dashboard-gradient-button w-full py-3 max-sm:py-2.5 max-sm:min-h-11 mt-6 max-sm:mt-4 text-sm font-semibold rounded-full hover:opacity-90 transition-all duration-300 disabled:opacity-35 disabled:cursor-not-allowed" disabled={isSubmitDisabled}>
                         {isLoading ? 'Processing...' : (isSignUp ? 'Sign Up' : 'Log In')}
                     </button>
 
