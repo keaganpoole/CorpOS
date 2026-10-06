@@ -209,6 +209,9 @@ async def revoke(invitation_id:UUID,user=Depends(get_current_user)):
 @router.patch('/members/{member_id}')
 async def change_role(member_id:UUID,payload:MemberInput,user=Depends(get_current_user)):
     tenant=owner(user)
+    current=database().table('business_memberships').select('role,status').eq('business_id',tenant.business_id).eq('user_id',str(member_id)).limit(1).execute().data or []
+    if current and current[0].get('role') == 'OWNER':
+        require_permission(tenant, 'ownership.transfer')
     try:
         rows=database().table('business_memberships').update({'role':payload.role}).eq('business_id',tenant.business_id).eq('user_id',str(member_id)).eq('status','active').execute().data
     except Exception:
@@ -224,6 +227,7 @@ async def remove_member(member_id:UUID,user=Depends(get_current_user)):
     if not current or current[0].get('status') != 'active':
         raise HTTPException(404,'Member not found')
     if current[0].get('role') == 'OWNER':
+        require_permission(tenant, 'ownership.transfer')
         other_owners=database().table('business_memberships').select('user_id').eq('business_id',tenant.business_id).eq('role','OWNER').eq('status','active').neq('user_id',str(member_id)).limit(1).execute().data or []
         if not other_owners:
             raise HTTPException(409,'The last active Owner cannot be removed')
@@ -245,6 +249,7 @@ async def remove_member(member_id:UUID,user=Depends(get_current_user)):
 @router.post('/members/{member_id}/transfer-ownership')
 async def transfer(member_id:UUID,user=Depends(get_current_user)):
     tenant=owner(user)
+    require_permission(tenant, 'ownership.transfer')
     try:
         database().rpc('nodemere_transfer_ownership',{'business':tenant.business_id,'actor':tenant.actor_id,'target':str(member_id)}).execute()
     except Exception:

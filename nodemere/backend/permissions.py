@@ -8,12 +8,15 @@ PERMISSIONS = {
     "sensitive.read": {"OWNER", "MANAGER"},
     "billing.read": {"OWNER"},
     "billing.portal": {"OWNER"},
-    "administration": {"OWNER"},
-    "security": {"OWNER"},
-    "integrations": {"OWNER"},
+    "administration": {"OWNER", "MANAGER"},
+    "security": {"OWNER", "MANAGER"},
+    "integrations": {"OWNER", "MANAGER"},
     "billing.change": {"OWNER"},
-    "export": {"OWNER"},
-    "delete": {"OWNER"},
+    "export": {"OWNER", "MANAGER"},
+    "delete": {"OWNER", "MANAGER"},
+    "account.delete": {"OWNER"},
+    "business.delete": {"OWNER"},
+    "ownership.transfer": {"OWNER"},
 }
 STEP_UP = {"billing.portal"}
 
@@ -36,6 +39,10 @@ def require_permission(tenant, permission):
 
 def route_permission(path, method):
     read = method in {"GET", "HEAD"}
+    if path == '/users/me/account/delete':
+        return 'account.delete'
+    if path.startswith('/api/workforce/members/') and path.endswith('/transfer-ownership'):
+        return 'ownership.transfer'
     if path.startswith('/api/sonar/studio/'):
         return 'operations.read' if read else 'operations.manage'
     if path.startswith('/api/voice-catalog'):
@@ -50,16 +57,21 @@ def route_permission(path, method):
         return 'operations.read'
     if path.startswith('/api/workforce/'):
         return "security"
+    if path.endswith('/forwarding/claim-number'):
+        return 'billing.change'
     if '/forwarding' in path and read:
         return 'operations.read'
     if '/integrations' in path or '/forwarding' in path:
         return "integrations"
     if path == '/api/sonar/billing/portal':
         return 'billing.portal'
-    if any(s in path for s in ('/billing','checkout','refund-payment','cancel-subscription','payment-profile')):
+    if any(s in path for s in ('/billing','/payments','/invoices','/stripe','/overage',
+                               'checkout','refund-payment','cancel-subscription','payment-profile',
+                               'create-payment','send-payment-link','create-invoice','send-invoice',
+                               'create-customer','update-customer','update-payment')):
         return "billing.read" if read else "billing.change"
     if method == 'DELETE' or path.endswith('/delete'):
-        return "delete"
+        return 'business.delete' if path.startswith(('/businesses/', '/api/sonar/business/')) else 'delete'
     if 'export' in path or '/privacy-requests' in path:
         return "export"
     if '/documents' in path or '/call-logs' in path or '/scenarios/executions' in path:
@@ -72,6 +84,6 @@ def route_permission(path, method):
         return "operations.read" if read else "operations.write"
     if any(s in path for s in ('/business/','/businesses/')):
         return "operations.read" if read else "administration"
-    if any(s in path for s in ('create-payment','send-payment-link','create-invoice','send-invoice','create-customer','update-customer','update-payment','send-email','call-customer')):
+    if any(s in path for s in ('send-email','call-customer')):
         return "operations.manage"
     return "administration"

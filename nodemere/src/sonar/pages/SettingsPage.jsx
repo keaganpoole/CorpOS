@@ -3723,6 +3723,7 @@ const SettingsPage = ({ mobileUsage, onMobileUpgrade }) => {
       if (authError) throw authError;
       const userId = authData?.user?.id;
       if (!userId) throw new Error('User not found');
+      const settingsOwnerId = workforce?.tenant?.owner_id || userId;
 
       // Sensitive business profile fields are server-decrypted after tenant authorization.
       let bizData = null;
@@ -3733,7 +3734,7 @@ const SettingsPage = ({ mobileUsage, onMobileUpgrade }) => {
       const { data: settingsData, error: settingsErr } = await supabase
         .from('account_settings')
         .select('*')
-        .eq('user_id', userId)
+        .eq('user_id', settingsOwnerId)
         .limit(1)
         .maybeSingle();
 
@@ -3809,6 +3810,7 @@ const SettingsPage = ({ mobileUsage, onMobileUpgrade }) => {
       if (authError) throw authError;
       const userId = authData?.user?.id;
       if (!userId) throw new Error('User not found');
+      const settingsOwnerId = workforce?.tenant?.owner_id || userId;
 
       const business = await ensureBusinessRecord({ createIfMissing: true });
       const normalizedBusinessId = business?.id ?? null;
@@ -3827,7 +3829,7 @@ const SettingsPage = ({ mobileUsage, onMobileUpgrade }) => {
       });
       const scopedAppConfig = {
         ...normalizedAppConfig,
-        user_id: userId,
+        user_id: settingsOwnerId,
         business_id: normalizedBusinessId,
       };
 
@@ -3837,16 +3839,16 @@ const SettingsPage = ({ mobileUsage, onMobileUpgrade }) => {
           .from('account_settings')
           .update(scopedAppConfig)
           .eq('id', _id)
-          .eq('user_id', userId)
+          .eq('user_id', settingsOwnerId)
           .select('*')
           .single();
         if (error) throw error;
         savedSettings = data;
       } else {
         const { data: existingSettings, error: existingSettingsError } = await supabase
-          .from('account_settings')
-          .select('id')
-          .eq('user_id', userId)
+            .from('account_settings')
+            .select('id')
+            .eq('user_id', settingsOwnerId)
           .limit(1)
           .maybeSingle();
         if (existingSettingsError && existingSettingsError.code !== 'PGRST116') throw existingSettingsError;
@@ -3856,7 +3858,7 @@ const SettingsPage = ({ mobileUsage, onMobileUpgrade }) => {
             .from('account_settings')
             .update(scopedAppConfig)
             .eq('id', existingSettings.id)
-            .eq('user_id', userId)
+            .eq('user_id', settingsOwnerId)
             .select('*')
             .single();
           if (error) throw error;
@@ -4068,7 +4070,7 @@ const SettingsPage = ({ mobileUsage, onMobileUpgrade }) => {
     { id: 'services', title: 'Services & Pricing', icon: Tag, iconClass: 'settings-icon', hint: 'Offer catalog and rates' },
     { id: 'knowledge', title: 'Knowledge Base', icon: BookOpen, iconClass: 'settings-icon', hint: 'Policies, FAQs, and context' },
     { id: 'account', title: 'Account', icon: LogOut, iconClass: 'settings-icon', hint: 'Access and data controls' },
-  ].filter(section => workforce?.tenant?.role === 'OWNER' || section.id === 'security' || section.id === 'account' || (workforce?.tenant?.role === 'MANAGER' && section.id === 'services'));
+  ].filter(section => workforce?.tenant?.role === 'OWNER' || (workforce?.tenant?.role === 'MANAGER' && section.id !== 'billing') || section.id === 'security' || section.id === 'account');
 
   const activeSectionConfig = settingsSections.find(section => section.id === activeSection) || settingsSections[0];
   const ActiveSettingsIcon = activeSectionConfig.icon;
@@ -4086,6 +4088,7 @@ const SettingsPage = ({ mobileUsage, onMobileUpgrade }) => {
           <AccountLifecycleSection
             businessName={settings.business_name}
             profile={profile}
+            allowBusinessDeletion={workforce?.tenant?.role === 'OWNER'}
             onManageBilling={() => setActiveSection('billing')}
           />
         );

@@ -130,11 +130,11 @@ export default function WorkforceSecurity() {
   const tenant = workforce?.tenant;
   useEffect(() => { setAudit(null); }, [tenant?.actor_id, tenant?.business_id, tenant?.aal]);
   async function refreshMembers() { setMembers(await workforceRequest('/members')); }
-  useEffect(() => { if (tenant?.role === 'OWNER' && tenant.aal === 'aal2') refreshMembers().catch(e => setMessage(e.message)); }, [tenant?.role, tenant?.aal]);
+  useEffect(() => { if (['OWNER', 'MANAGER'].includes(tenant?.role)) refreshMembers().catch(e => setMessage(e.message)); }, [tenant?.role, tenant?.business_id]);
   async function run(action) { setBusy(true); setMessage(''); try { await action(); } catch (e) { setMessage(e.message); } finally { setBusy(false); } }
   return <div className="workforce-security">
     <MfaPanel onVerified={refreshWorkforce} />
-    {tenant?.role === 'OWNER' && <>
+    {['OWNER', 'MANAGER'].includes(tenant?.role) && <>
       <section className="workforce-security-card">
         <div className="workforce-card-heading">
           <div><h2>Team access</h2><p>Invite people and manage their permissions.</p></div>
@@ -146,27 +146,27 @@ export default function WorkforceSecurity() {
         }); }}>
           <label className="workforce-field-label">Email address<input aria-label="Invitee email" type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="name@company.com" /></label>
           <label className="workforce-field-label">Role<select aria-label="Invitation role" value={role} onChange={e => setRole(e.target.value)}><option value="STAFF">Staff</option><option value="MANAGER">Manager</option></select></label>
-          <button className="workforce-button is-primary" disabled={busy || tenant.aal !== 'aal2'}>Send invite</button>
+          <button className="workforce-button is-primary" disabled={busy}>Send invite</button>
         </form>
-        <p className="workforce-help" style={{ paddingTop: 14 }}>Verify your authenticator to manage access. Roles control dashboard permissions.</p>
+        <p className="workforce-help" style={{ paddingTop: 14 }}>Roles control dashboard permissions.</p>
         {members.filter(m => m.status === 'active').length > 0 && <div className="workforce-members">
           <h3>Members</h3>
           {members.filter(m => m.status === 'active').map(m => <div key={m.user_id} className="workforce-member-row">
             <div className="workforce-member-identity"><strong>{m.full_name || m.email || 'Member'}</strong>{m.full_name && m.email && <span>{m.email}</span>}</div>
             {m.user_id === tenant.actor_id ? <span className="workforce-status">{m.role.toLowerCase()}</span> : <div className="workforce-member-actions">
               <select aria-label={`Role for ${m.email || 'member'}`} disabled={busy || m.role === 'OWNER'} value={m.role} onChange={e => run(async () => { await workforceRequest(`/members/${m.user_id}`,'PATCH',{role:e.target.value}); await refreshMembers(); })}><option value="OWNER">Owner</option><option value="MANAGER">Manager</option><option value="STAFF">Staff</option></select>
-              <button type="button" className="workforce-text-button" disabled={busy || m.role === 'OWNER'} onClick={() => { if (window.confirm('Transfer ownership to this member? You will become a Manager. Billing account bindings remain unchanged.')) run(async () => { await workforceRequest(`/members/${m.user_id}/transfer-ownership`,'POST',{}); await refreshWorkforce(); }); }}>Transfer ownership</button>
-              <button type="button" className="workforce-text-button is-danger" disabled={busy} onClick={() => { if (window.confirm('Remove this member’s business access?')) run(async () => { await workforceRequest(`/members/${m.user_id}`,'DELETE'); await refreshMembers(); }); }}>Remove</button>
+              {tenant.role === 'OWNER' && <button type="button" className="workforce-text-button" disabled={busy || m.role === 'OWNER'} onClick={() => { if (window.confirm('Transfer ownership to this member? You will become a Manager. Billing account bindings remain unchanged.')) run(async () => { await workforceRequest(`/members/${m.user_id}/transfer-ownership`,'POST',{}); await refreshWorkforce(); }); }}>Transfer ownership</button>}
+              <button type="button" className="workforce-text-button is-danger" disabled={busy || m.role === 'OWNER'} onClick={() => { if (window.confirm('Remove this member’s business access?')) run(async () => { await workforceRequest(`/members/${m.user_id}`,'DELETE'); await refreshMembers(); }); }}>Remove</button>
             </div>}
           </div>)}
         </div>}
         <div className="workforce-inline-row">
           <div><h3>Team security policy</h3><p>Require an authenticator for everyone with workforce access.</p></div>
-          <label className="workforce-switch"><input type="checkbox" aria-label="Require MFA for all workforce users" disabled={busy || tenant.aal !== 'aal2'} checked={Boolean(workforce.policy_requires_mfa)} onChange={e => run(async () => { await workforceRequest('/mfa-policy','PUT',{ required:e.target.checked }); await refreshWorkforce(); })} /><span aria-hidden="true" /></label>
+          <label className="workforce-switch"><input type="checkbox" aria-label="Require MFA for all workforce users" disabled={busy} checked={Boolean(workforce.policy_requires_mfa)} onChange={e => run(async () => { await workforceRequest('/mfa-policy','PUT',{ required:e.target.checked }); await refreshWorkforce(); })} /><span aria-hidden="true" /></label>
         </div>
         <div className="workforce-inline-row">
           <div><h3>Security activity</h3><p>Review recent access events.</p></div>
-          <button type="button" className="workforce-text-button" disabled={busy || tenant.aal !== 'aal2'} onClick={() => run(async () => setAudit(await workforceRequest('/audit-events')))}>View activity</button>
+          <button type="button" className="workforce-text-button" disabled={busy} onClick={() => run(async () => setAudit(await workforceRequest('/audit-events')))}>View activity</button>
         </div>
         {audit && !audit.enabled && <p className="workforce-message">Application access auditing is not enabled in this environment.</p>}
         {audit?.events?.map(event => <div key={event.id} className="workforce-audit-row">
