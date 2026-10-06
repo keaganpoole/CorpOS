@@ -605,13 +605,13 @@ const DraggableHeader = ({
       style={{ width: col.width, minWidth: col.width }}
       className={`shrink-0 flex items-center gap-1 transition-all duration-200 ${canDrag ? 'cursor-grab active:cursor-grabbing' : ''} relative group/header ${isDragging ? 'opacity-30' : ''} ${dragOverIndex === index && !isDragging ? 'translate-x-1' : ''} ${isZoneCandidate ? 'text-white' : ''}`}>
       {col.id !== 'select' && (
-        <div className="w-0 overflow-hidden group-hover/header:w-3 transition-all duration-200 shrink-0 flex items-center">
+        <div className="pointer-events-none absolute -left-3 top-1/2 flex w-3 -translate-y-1/2 items-center opacity-0 transition-opacity duration-200 group-hover/header:opacity-100">
           <GripVertical size={10} className="text-zinc-800 group-hover/header:text-zinc-500 transition-colors shrink-0" />
         </div>
       )}
       {col.label ? (
         <button onClick={() => col.sortKey && onSort(col.sortKey)}
-          className="flex items-center gap-1.5 whitespace-nowrap text-[11px] font-semibold tracking-[-0.02em] text-zinc-500 hover:text-zinc-300 transition-colors">
+          className="ml-1 flex items-center gap-1.5 whitespace-nowrap text-[11px] font-semibold tracking-[-0.02em] text-zinc-500 hover:text-zinc-300 transition-colors">
           {IconComp && <IconComp size={10} className="text-zinc-700" />}
           {displayName}
           {sortBy === col.sortKey && (sortDir === 'asc' ? <ChevronUp size={9} /> : <ChevronDown size={9} />)}
@@ -1864,6 +1864,11 @@ const LeadsTable = ({
     />
   );
 
+  const columnValuePadding = (col) => {
+    if (col.id === 'avatar' || col.id === 'select') return 'shrink-0';
+    return ICONS[fieldConfig[col.id]?.icon] ? 'shrink-0 pl-5' : 'shrink-0 pl-1';
+  };
+
   const renderLeadColumn = (col, lead) => (
     <div
       key={col.id}
@@ -1872,7 +1877,7 @@ const LeadsTable = ({
         minWidth: col.width,
         ...(demoEntrance ? { '--crm-cell-index': columns.findIndex((column) => column.id === col.id) } : {}),
       }}
-      className={`${col.id === 'avatar' || col.id === 'select' ? 'shrink-0' : 'shrink-0 pl-4'} ${demoEntrance ? 'crm-demo-entrance-cell' : ''}`}
+      className={`${columnValuePadding(col)} ${demoEntrance ? 'crm-demo-entrance-cell' : ''}`}
     >
       <LeadCell colId={col.id} lead={lead} dc={dc} autoSave={autoSave} onSelect={onSelect} fieldConfig={fieldConfig} customFields={customFields} documents={personDocumentsById.get(String(lead.id)) || []} onOpenDocuments={(person, initialDocument) => setDocumentViewer({ person, initialDocument })} selection={{ anySelected, isSelected: selectedIds.includes(lead.id), toggle: toggleSelectedId }} />
     </div>
@@ -1881,7 +1886,7 @@ const LeadsTable = ({
     <div
       key={col.id}
       style={{ width: col.width, minWidth: col.width }}
-      className={`${col.id === 'avatar' || col.id === 'select' ? 'shrink-0' : 'shrink-0 pl-4'} ${index <= 1 ? 'flex items-center text-zinc-700' : ''}`}
+      className={`${columnValuePadding(col)} ${index <= 1 ? 'flex items-center text-zinc-700' : ''}`}
     >
       <span className="text-transparent select-none">.</span>
     </div>
