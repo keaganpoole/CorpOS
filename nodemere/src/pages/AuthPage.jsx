@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
-import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { useNavigate, useLocation, useParams, Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import googleIcon from '../assets/google.png'; // Import the local Google icon
 import { LEGAL_ACCEPTANCE_VERSION } from '../legal/legalDocuments';
@@ -18,10 +18,16 @@ console.debug("AuthPage.jsx:event_16");
 console.debug("AuthPage.jsx:event_17");
 
 const AuthPage = () => {
-    const { login, session, profile, refreshProfile, isLoading: isAuthLoading } = useAuth();
+    const { login, logout, session, profile, refreshProfile, isLoading: isAuthLoading } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
-    const [isSignUp, setIsSignUp] = useState(location.state?.isSignUp || false);
+    const { invitationId } = useParams();
+    const isInvitation = Boolean(invitationId);
+    const [isSignUp, setIsSignUp] = useState(isInvitation || location.state?.isSignUp || false);
+    const [invitation, setInvitation] = useState(null);
+    const invitationName = invitation?.business_name?.trim();
+    const [invitationError, setInvitationError] = useState('');
+    const [invitationLoading, setInvitationLoading] = useState(isInvitation);
     const [formData, setFormData] = useState({ email: '', password: '', confirmPassword: '' });
     const [error, setError] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
@@ -39,9 +45,30 @@ const AuthPage = () => {
     }, []);
 
     useEffect(() => {
+        if (!invitationId) return;
+        let cancelled = false;
+        setInvitationLoading(true);
+        axios.get(`${API_BASE_URL}/api/workforce/invitations/${invitationId}/preview`)
+            .then(({ data }) => {
+                if (cancelled) return;
+                setInvitation(data);
+                setFormData(prev => ({ ...prev, email: data.email }));
+            })
+            .catch((requestError) => { if (!cancelled) setInvitationError(requestError.response?.status === 404
+                ? 'This invitation has expired, was already used, or access was revoked. Ask the team owner for a new link.'
+                : 'We could not load this invitation right now. Please try again shortly.'); })
+            .finally(() => { if (!cancelled) setInvitationLoading(false); });
+        return () => { cancelled = true; };
+    }, [invitationId]);
+
+    useEffect(() => {
         let cancelled = false;
         const continueAfterAuthentication = async () => {
-            if (!session || isAuthLoading || oauthAcceptanceInFlight.current) return;
+            if (!session || isAuthLoading || oauthAcceptanceInFlight.current || (isInvitation && invitationLoading)) return;
+            if (isInvitation && (!invitation || session.user.email?.toLowerCase() !== invitation.email.toLowerCase())) {
+                if (invitation) setError(`This invitation is for ${invitation.email}. Sign out and use that account to continue.`);
+                return;
+            }
             const pendingOAuthAcceptance = sessionStorage.getItem(OAUTH_LEGAL_ACCEPTANCE_STORAGE_KEY);
             if (pendingOAuthAcceptance === LEGAL_ACCEPTANCE_VERSION) {
                 oauthAcceptanceInFlight.current = true;
@@ -67,6 +94,10 @@ const AuthPage = () => {
                 }
             }
             if (cancelled) return;
+            if (isInvitation) {
+                navigate(`/dashboard?invite=${invitationId}`, { replace: true });
+                return;
+            }
             if (!profile?.onboarded) {
                 navigate('/onboarding');
                 return;
@@ -95,7 +126,7 @@ const AuthPage = () => {
         };
         void continueAfterAuthentication();
         return () => { cancelled = true; };
-    }, [session, profile?.onboarded, isAuthLoading, navigate, refreshProfile]);
+    }, [session, profile?.onboarded, isAuthLoading, navigate, refreshProfile, isInvitation, invitation, invitationLoading, invitationId]);
 
     useEffect(() => {
         if (resendTimer > 0) {
@@ -118,6 +149,7 @@ const AuthPage = () => {
         setError('');
         setSuccessMessage('');
         setIsLoading(true);
+        let invitedAccountCreated = false;
 
         try {
             if (isSignUp) {
@@ -132,22 +164,40 @@ const AuthPage = () => {
                     return;
                 }
                 await axios.post(`${API_BASE_URL}/users`, {
-                    email: formData.email,
+                    email: invitation?.email || formData.email,
                     password: formData.password,
                     terms_accepted: true,
                     legal_version: LEGAL_ACCEPTANCE_VERSION,
                     certified_permitted_use: true,
+                    ...(invitationId ? { invitation_id: invitationId } : {}),
                 });
-                setSuccessMessage('Please check your email inbox and spam folder for a confirmation link. ');
-                setFormData(prev => ({ ...prev, password: '', confirmPassword: '' })); // Keep email, clear passwords
-                setIsConfirmationSent(true);
-                setResendTimer(60); // Start the 60-second timer
+                if (isInvitation) {
+                    invitedAccountCreated = true;
+                    await login(invitation.email, formData.password);
+                    setFormData(prev => ({ ...prev, password: '', confirmPassword: '' }));
+                    // The invitation route redirects to acceptance after sign-in.
+                } else {
+                    setSuccessMessage('Please check your email inbox and spam folder for a confirmation link. ');
+                    setFormData(prev => ({ ...prev, password: '', confirmPassword: '' })); // Keep email, clear passwords
+                    setIsConfirmationSent(true);
+                    setResendTimer(60); // Start the 60-second timer
+                }
             } else {
-                await login(formData.email, formData.password);
+                await login(invitation?.email || formData.email, formData.password);
                 // The useEffect below will handle redirection based on session and pendingPlan
             }
         } catch (apiError) {
+            if (invitedAccountCreated) {
+                setIsSignUp(false);
+                setError('Your account was created, but sign-in did not finish. Sign in with the password you just chose.');
+                return;
+            }
             const detail = apiError.response?.data?.detail || "An unexpected error occurred.";
+            if (isInvitation && isSignUp && apiError.response?.status === 409) {
+                setIsSignUp(false);
+                setError(detail);
+                return;
+            }
             setError(`${isSignUp ? 'Signup' : 'Login'} failed: ${detail}`);
         } finally {
             setIsLoading(false);
@@ -158,7 +208,7 @@ const AuthPage = () => {
         setIsSignUp(!isSignUp);
         setError('');
         setSuccessMessage('');
-        setFormData({ email: '', password: '', confirmPassword: '' });
+        setFormData({ email: invitation?.email || '', password: '', confirmPassword: '' });
         setHasAcceptedLegal(false);
     };
 
@@ -175,7 +225,7 @@ const AuthPage = () => {
             const { data, error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
                 options: {
-                    redirectTo: FRONTEND_PUBLIC_URL + (isSignUp ? '/auth' : '/onboarding'),
+                    redirectTo: FRONTEND_PUBLIC_URL + (invitationId ? `/invite/${invitationId}` : (isSignUp ? '/auth' : '/onboarding')),
                 },
             });
             if (error) throw error;
@@ -244,6 +294,17 @@ const AuthPage = () => {
         setFormData({ email: '', password: '', confirmPassword: '' });
     };
 
+    if (isInvitation && (invitationLoading || invitationError || (session && invitation && session.user.email?.toLowerCase() !== invitation.email.toLowerCase()))) {
+        return <main className="auth-page min-h-[var(--app-height)] bg-black text-gray-300 flex items-center justify-center px-6 font-inter">
+            <div className="w-full max-w-sm text-center">
+                <img src={NODEMERE_LOGO_SRC} alt="Nodemere" className="mx-auto mb-6 h-20 w-auto object-contain" />
+                <h1 className="text-xl font-bold text-white">{invitationLoading ? 'Opening invitation' : invitationError ? 'Invitation unavailable' : invitationName ? `Your invitation to ${invitationName}` : 'Your invitation'}</h1>
+                {!invitationLoading && <p className="mt-3 text-sm leading-6 text-zinc-400">{invitationError || `This invitation is for ${invitation.email}. Sign out and continue with that email.`}</p>}
+                {session && !invitationError && <button type="button" onClick={logout} className="dashboard-gradient-button mt-6 w-full rounded-full py-3 text-sm font-semibold">Sign out</button>}
+            </div>
+        </main>;
+    }
+
     if (isConfirmationSent && isSignUp) {
         return (
             <div className="auth-page min-h-[var(--app-height)] bg-black text-gray-300 flex items-center justify-center px-6 py-4 max-sm:px-5 max-sm:py-6 font-inter antialiased">
@@ -257,12 +318,12 @@ const AuthPage = () => {
                         </div>
                         <h1 className="text-3xl max-sm:text-2xl font-bold text-white">Check your email</h1>
                         <p className="mt-4 text-sm leading-6 text-gray-400">
-                            We sent a confirmation link to
+                            {isInvitation ? (invitationName ? `Confirm your email to join ${invitationName}.` : 'Confirm your email to accept the invitation.') : 'We sent a confirmation link to'}
                             <span className="block mt-1 font-semibold text-white break-all">{formData.email}</span>
                         </p>
-                        <p className="mt-5 text-sm leading-6 text-gray-500">
+                        {!isInvitation && <p className="mt-5 text-sm leading-6 text-gray-500">
                             Open the email and click the confirmation button to finish creating your Nodemere account. If you don’t see it, check your spam folder.
-                        </p>
+                        </p>}
                         <button
                             type="button"
                             onClick={handleResendConfirmation}
@@ -272,14 +333,14 @@ const AuthPage = () => {
                             {isLoading ? 'Sending...' : 'Resend confirmation email'}
                         </button>
                         {!canResend && resendTimer > 0 && <p className="mt-3 text-xs text-gray-500">You can resend in {resendTimer} seconds.</p>}
-                        <button
+                        {!isInvitation && <button
                             type="button"
                             onClick={handleUseDifferentEmail}
                             disabled={isLoading}
                             className="mt-5 text-sm font-semibold text-gray-400 transition-colors hover:text-white disabled:opacity-40"
                         >
                             Use a different email
-                        </button>
+                        </button>}
                     </div>
                 </div>
             </div>
@@ -293,13 +354,16 @@ const AuthPage = () => {
                     <div className="mb-4 flex h-24 max-sm:mb-2 max-sm:h-16 items-center justify-center">
                         <img src={NODEMERE_LOGO_SRC} alt="Nodemere logo" className="h-28 max-sm:h-20 w-auto object-contain" />
                     </div>
-                    <h1 className="text-2xl max-sm:text-xl font-bold text-white mb-10 max-sm:mb-6">{isSignUp ? 'Create an account' : 'Welcome back'}</h1>
+                    {isInvitation ? <div className="mb-8 max-sm:mb-6">
+                        <h1 className="max-w-md text-[28px] leading-tight max-sm:text-2xl font-bold tracking-tight text-white">{invitationName ? `Join ${invitationName}` : 'You’re invited'} <span aria-hidden="true">🎉</span></h1>
+                        <p className="mt-2 text-sm text-zinc-400">{invitationName ? 'on Nodemere' : 'to Nodemere'}</p>
+                    </div> : <h1 className="text-2xl max-sm:text-xl font-bold text-white mb-10 max-sm:mb-6">{isSignUp ? 'Create an account' : 'Welcome back'}</h1>}
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-5 max-sm:space-y-3.5">
-                    <div className={inputGroupClasses}>
+                    {!isInvitation && <div className={inputGroupClasses}>
                         <input id="email" type="email" name="email" placeholder="Email address" value={formData.email} onChange={handleChange} className={inputClasses} required disabled={isLoading} />
-                    </div>
+                    </div>}
 
                     <div className={inputGroupClasses}>
                         <input id="password" type="password" name="password" placeholder="Password" value={formData.password} onChange={handleChange} className={inputClasses} required disabled={isLoading} />
@@ -319,11 +383,11 @@ const AuthPage = () => {
                             className="mt-1 h-4 w-4 shrink-0 accent-white"
                             disabled={isLoading}
                         />
-                        <span>I am authorized to create this business account, agree to the <Link to="/terms" target="_blank" className="text-white underline underline-offset-2">Terms</Link>, <Link to="/privacy-policy" target="_blank" className="text-white underline underline-offset-2">Privacy Policy</Link>, <Link to="/acceptable-use-policy" target="_blank" className="text-white underline underline-offset-2">Acceptable Use Policy</Link>, <Link to="/communications-notice" target="_blank" className="text-white underline underline-offset-2">AI & Recording Notice</Link>, and <Link to="/data-processing-addendum" target="_blank" className="text-white underline underline-offset-2">DPA</Link>. I certify this account will be used only for permitted ordinary business workflows; restricted automated workflows require separate approval.</span>
+                        <span>{isInvitation ? 'I accept the ' : 'I am authorized to create this business account, agree to the '}<Link to="/terms" target="_blank" className="text-white underline underline-offset-2">Terms</Link>, <Link to="/privacy-policy" target="_blank" className="text-white underline underline-offset-2">Privacy Policy</Link>, <Link to="/acceptable-use-policy" target="_blank" className="text-white underline underline-offset-2">Acceptable Use Policy</Link>, <Link to="/communications-notice" target="_blank" className="text-white underline underline-offset-2">AI & Recording Notice</Link>, and <Link to="/data-processing-addendum" target="_blank" className="text-white underline underline-offset-2">DPA</Link>. {isInvitation ? 'I’ll use Nodemere only for permitted business workflows.' : 'I certify this account will be used only for permitted ordinary business workflows; restricted automated workflows require separate approval.'}</span>
                     </label>}
 
                     <button type="submit" className="dashboard-gradient-button w-full py-3 max-sm:py-2.5 max-sm:min-h-11 mt-6 max-sm:mt-4 text-sm font-semibold rounded-full hover:opacity-90 transition-all duration-300 disabled:opacity-35 disabled:cursor-not-allowed" disabled={isSubmitDisabled}>
-                        {isLoading ? 'Processing...' : (isSignUp ? 'Sign Up' : 'Log In')}
+                        {isLoading ? 'Processing...' : (isInvitation ? (isSignUp ? 'Create account' : 'Sign in') : (isSignUp ? 'Sign Up' : 'Log In'))}
                     </button>
 
                     {error && <p className="text-xs text-red-500 text-center pt-2">{error}</p>}
@@ -360,11 +424,11 @@ const AuthPage = () => {
                             {isSignUp ? 'Log in' : 'Sign up'}
                         </button>
                     </p>
-                    <p className="mt-4 max-sm:mt-3">
+                    {!isSignUp && <p className="mt-4 max-sm:mt-3">
                         <button onClick={handlePasswordReset} className="font-semibold text-white hover:text-[#f7f7f8] hover:underline focus:outline-none transition-colors" disabled={isLoading}>
                             Forgot password?
                         </button>
-                    </p>
+                    </p>}
                 </div>
             </div>
         </div>

@@ -70,6 +70,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 from starlette.requests import ClientDisconnect
 from gotrue.errors import AuthApiError
+from supabase_auth.errors import AuthApiError as SupabaseAuthApiError
 from collections import defaultdict
 from fastapi import BackgroundTasks
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -3379,6 +3380,8 @@ def is_public_api_route(request: Request) -> bool:
     # These bootstrap endpoints still require get_current_user themselves, but
     # must be reachable before membership/MFA enrollment has completed.
     if path in {"/api/workforce/session", "/api/workforce/invitations/pending"} or (path.startswith("/api/workforce/invitations/") and path.endswith("/accept")):
+        return True
+    if request.method == "GET" and path.startswith("/api/workforce/invitations/") and path.endswith("/preview"):
         return True
     # Visitor Intelligence performs its own explicit staff allowlist check.
     # It must remain reachable before business membership/MFA middleware so
@@ -15308,11 +15311,49 @@ async def create_user(auth_data: AuthSignUpRequest, request: Request):
         # Keep the confirmation flow inside the app. When no public frontend
         # URL is configured, local development uses the Vite auth route.
         signup_redirect = f"{(frontend_base_url or 'http://localhost:5173').rstrip('/')}/auth"
-        auth_response = new_auth_client().auth.sign_up({
-            "email": auth_data.email,
-            "password": auth_data.password,
-            "options": {"email_redirect_to": signup_redirect},
-        })
+        if auth_data.invitation_id:
+            invite_rows = supabase_admin.table('business_invitations').select('email,expires_at,accepted_at,revoked_at').eq('id',str(auth_data.invitation_id)).limit(1).execute().data or []
+            if not invite_rows:
+                raise HTTPException(400, 'Invitation is unavailable or expired')
+            invite_row = invite_rows[0]
+            invite_expires = datetime.fromisoformat(str(invite_row['expires_at']).replace('Z', '+00:00'))
+            if (invite_row['email'].strip().lower() != str(auth_data.email).strip().lower()
+                    or invite_row.get('accepted_at') or invite_row.get('revoked_at')
+                    or invite_expires <= datetime.now(timezone.utc)):
+                raise HTTPException(400, 'Invitation is unavailable or expired')
+        if auth_data.invitation_id:
+            # The unpredictable, expiring invitation link was delivered to this
+            # exact address. Confirm only this new invited account; ordinary
+            # signup still requires Supabase's email-confirmation flow.
+            try:
+                auth_response = supabase_admin.auth.admin.create_user({
+                    "email": auth_data.email,
+                    "password": auth_data.password,
+                    "email_confirm": True,
+                })
+            except (AuthApiError, SupabaseAuthApiError) as exc:
+                if getattr(exc, 'code', None) in {'email_exists', 'user_already_exists'}:
+                    existing_profiles = supabase_admin.table('users').select('id').eq('email',str(auth_data.email).strip().lower()).limit(1).execute().data or []
+                    existing_user = (supabase_admin.auth.admin.get_user_by_id(existing_profiles[0]['id']).user if existing_profiles else None)
+                    if (existing_user and str(existing_user.email or '').strip().lower() == str(auth_data.email).strip().lower()
+                            and not existing_user.email_confirmed_at):
+                        # Recover an account created by the earlier two-email
+                        # invite flow. The valid link proves control of the
+                        # invited address; never overwrite a confirmed account.
+                        auth_response = supabase_admin.auth.admin.update_user_by_id(str(existing_user.id), {
+                            'email_confirm': True,
+                            'password': auth_data.password,
+                        })
+                    else:
+                        raise HTTPException(409, 'An account already exists for this email. Sign in to accept the invitation.') from None
+                else:
+                    raise
+        else:
+            auth_response = new_auth_client().auth.sign_up({
+                "email": auth_data.email,
+                "password": auth_data.password,
+                "options": {"email_redirect_to": signup_redirect},
+            })
         if not auth_response.user:
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Supabase signup failed")
         

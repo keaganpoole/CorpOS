@@ -162,6 +162,7 @@ function AppContent() {
         <Route path="/" element={<><VisitorTracking /><HomePage /></>} />
         <Route path="/pricing" element={<PricingPage />} />
         <Route path="/auth" element={<AuthPage />} />
+        <Route path="/invite/:invitationId" element={<AuthPage />} />
         <Route path="/onboarding" element={<OnboardingGate />} />
         <Route path="/onboarding2" element={<Navigate to="/onboarding" replace />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />

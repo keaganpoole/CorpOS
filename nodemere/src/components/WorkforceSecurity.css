@@ -1,0 +1,237 @@
+.workforce-security {
+  display: grid;
+  gap: 10px;
+  color: #d4d4d8;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+}
+
+.workforce-security-card {
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid rgba(255, 255, 255, .055);
+  border-radius: 20px;
+  background: rgba(0, 0, 0, .22);
+}
+
+.workforce-card-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.workforce-card-heading h2 {
+  margin: 0;
+  color: #f4f4f5;
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: -.025em;
+  line-height: 1.35;
+}
+
+.workforce-card-heading p {
+  margin: 5px 0 0;
+  color: #71717a;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.workforce-card-body {
+  display: grid;
+  justify-items: start;
+  gap: 12px;
+  margin-top: 17px;
+}
+
+.workforce-status {
+  flex: none;
+  padding: 5px 9px;
+  border: 1px solid rgba(255, 255, 255, .07);
+  border-radius: 999px;
+  color: #a1a1aa;
+  background: rgba(255, 255, 255, .035);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.workforce-security .workforce-field-label {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  color: #71717a;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.workforce-security :is(input:not([type='checkbox']), select) {
+  box-sizing: border-box;
+  height: 37px;
+  min-width: 0;
+  padding: 0 11px;
+  border: 1px solid rgba(255, 255, 255, .075);
+  border-radius: 10px;
+  color: #e4e4e7;
+  background: rgba(255, 255, 255, .03);
+  font: 500 12px Inter, ui-sans-serif, system-ui, sans-serif;
+}
+
+.workforce-security :is(input:not([type='checkbox']), select):focus {
+  border-color: rgba(255, 255, 255, .18);
+  outline: none;
+}
+
+.workforce-security input::placeholder { color: #5c5c65; }
+.workforce-security select { padding-right: 24px; }
+.workforce-security option { background: #111; }
+
+.workforce-security .workforce-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, .1);
+  border-radius: 9px;
+  color: #c4c4cb;
+  background: rgba(255, 255, 255, .035);
+  font: 650 11px Inter, ui-sans-serif, system-ui, sans-serif;
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+
+.workforce-security .workforce-button:hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, .2);
+  color: #fff;
+  background: rgba(255, 255, 255, .07);
+}
+
+.workforce-security .workforce-button.is-primary {
+  border-color: #eeeef0;
+  color: #090909;
+  background: #eeeef0;
+}
+
+.workforce-security .workforce-button.is-primary:hover:not(:disabled) {
+  border-color: #fff;
+  color: #090909;
+  background: #fff;
+}
+
+.workforce-security button:disabled,
+.workforce-security select:disabled { cursor: not-allowed; opacity: .4; }
+
+.workforce-security .workforce-text-button {
+  min-height: 30px;
+  padding: 0 4px;
+  border: 0;
+  color: #8d8d96;
+  background: none;
+  font: 600 11px Inter, ui-sans-serif, system-ui, sans-serif;
+  text-align: left;
+}
+
+.workforce-security .workforce-text-button:hover:not(:disabled) { color: #f4f4f5; }
+.workforce-security .workforce-text-button.is-danger:hover:not(:disabled) { color: #fda4af; }
+.workforce-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.workforce-code-form { display: flex; flex-wrap: wrap; gap: 8px; }
+.workforce-code-form input { width: 126px; letter-spacing: .25em; }
+.workforce-help { margin: 0; color: #71717a; font-size: 11px; line-height: 1.5; }
+
+.workforce-message {
+  margin: 15px 0 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, .07);
+  border-radius: 10px;
+  color: #b6b6bf;
+  background: rgba(255, 255, 255, .025);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.workforce-message.is-error { color: #fecdd3; border-color: rgba(251, 113, 133, .2); }
+.workforce-card-body .workforce-message { margin: 0; }
+
+.workforce-invite-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 120px auto;
+  align-items: end;
+  gap: 9px;
+  margin-top: 18px;
+}
+
+.workforce-invite-form .workforce-button { height: 37px; }
+
+.workforce-members {
+  margin-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, .055);
+}
+
+.workforce-members h3 {
+  margin: 16px 0 5px;
+  color: #71717a;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.workforce-member-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 52px;
+  padding: 9px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, .045);
+}
+
+.workforce-member-row:last-child { border-bottom: 0; padding-bottom: 0; }
+.workforce-member-identity { display: grid; gap: 3px; min-width: 0; }
+.workforce-member-identity strong { overflow: hidden; color: #dedee2; font-size: 12px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.workforce-member-identity span { overflow: hidden; color: #71717a; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.workforce-member-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 4px 12px; }
+.workforce-member-actions select { max-width: 112px; height: 32px; font-size: 11px; }
+.workforce-audit-row { display: grid; gap: 4px; padding: 11px 0; border-top: 1px solid rgba(255, 255, 255, .055); color: #b4b4bc; font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }
+.workforce-audit-row:first-of-type { margin-top: 14px; }
+.workforce-audit-row small { color: #6f6f78; font-size: 10px; }
+
+.workforce-inline-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 55px;
+  padding: 11px 0 0;
+  margin-top: 11px;
+  border-top: 1px solid rgba(255, 255, 255, .055);
+}
+
+.workforce-inline-row + .workforce-inline-row { margin-top: 4px; }
+.workforce-inline-row h3 { margin: 0; color: #dedee2; font-size: 13px; font-weight: 650; }
+.workforce-inline-row p { margin: 4px 0 0; color: #71717a; font-size: 12px; line-height: 1.4; }
+.workforce-inline-row .workforce-text-button { flex: none; }
+
+.workforce-switch { position: relative; display: inline-flex; flex: none; align-items: center; cursor: pointer; }
+.workforce-switch input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.workforce-switch span { position: relative; display: block; width: 36px; height: 20px; border: 1px solid rgba(255, 255, 255, .15); border-radius: 999px; background: #252525; transition: background-color 180ms ease; }
+.workforce-switch span::after { position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #b4b4bb; content: ''; transition: transform 180ms ease, background-color 180ms ease; }
+.workforce-switch input:checked + span { background: #e4e4e7; }
+.workforce-switch input:checked + span::after { background: #111; transform: translateX(16px); }
+.workforce-switch input:focus-visible + span { outline: 2px solid #a1a1aa; outline-offset: 3px; }
+.workforce-switch input:disabled + span { opacity: .4; cursor: not-allowed; }
+
+@media (max-width: 720px) {
+  .workforce-invite-form { grid-template-columns: minmax(0, 1fr) 116px; }
+  .workforce-invite-form .workforce-field-label:first-child { grid-column: 1 / -1; }
+  .workforce-member-row { align-items: flex-start; flex-direction: column; }
+  .workforce-member-actions { justify-content: flex-start; }
+}
+
+@media (max-width: 480px) {
+  .workforce-security-card { padding: 16px; border-radius: 18px; }
+  .workforce-invite-form { grid-template-columns: minmax(0, 1fr) auto; }
+  .workforce-invite-form .workforce-button { padding: 0 10px; }
+  .workforce-code-form input { width: 100%; }
+  .workforce-code-form .workforce-button { width: 100%; }
+}

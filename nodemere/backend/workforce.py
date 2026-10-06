@@ -133,7 +133,28 @@ async def session(user=Depends(get_current_user_for_workforce_session)):
 async def pending(user=Depends(get_current_user)):
     email=confirmed_email(user)
     rows=database().table('business_invitations').select('id,role,expires_at,business_id').eq('email',email).is_('accepted_at','null').is_('revoked_at','null').gt('expires_at',datetime.now(timezone.utc).isoformat()).execute().data or []
-    return rows
+    available=[]
+    for row in rows:
+        businesses=database().table('businesses').select('name').eq('id',row['business_id']).limit(1).execute().data or []
+        business_name=(businesses[0].get('name') if businesses else None)
+        row['business_name']=(business_name or '').strip()
+        available.append(row)
+    return available
+
+
+@router.get('/invitations/{invitation_id}/preview')
+async def invitation_preview(invitation_id: UUID):
+    """Limited context for a recipient holding an invitation link."""
+    rows = database().table('business_invitations').select('email,role,business_id,expires_at,accepted_at,revoked_at').eq('id',str(invitation_id)).limit(1).execute().data or []
+    if not rows:
+        raise HTTPException(404, 'Invitation is unavailable or expired')
+    invitation = rows[0]
+    expires_at = datetime.fromisoformat(str(invitation['expires_at']).replace('Z', '+00:00'))
+    if invitation.get('accepted_at') or invitation.get('revoked_at') or expires_at <= datetime.now(timezone.utc):
+        raise HTTPException(404, 'Invitation is unavailable or expired')
+    businesses = database().table('businesses').select('name').eq('id',invitation['business_id']).limit(1).execute().data or []
+    business_name=(businesses[0].get('name') if businesses else None)
+    return {'email':invitation['email'],'role':invitation['role'], 'business_name':(business_name or '').strip()}
 
 
 @router.post('/invitations/{invitation_id}/accept')
@@ -166,7 +187,7 @@ async def invite(payload:InviteInput,user=Depends(get_current_user)):
     delivered=True
     try:
         send_secure_link_email(kind='workforce_invitation',recipient_email=email,business_name='Nodemere',
-            secure_link=(frontend_base_url or 'http://localhost:5173').rstrip('/')+'/dashboard',
+            secure_link=(frontend_base_url or 'http://localhost:5173').rstrip('/')+'/invite/'+str(row['id']),
             configuration=SystemResendConfiguration(sender_email=resend_from_email,api_key=resend_api_key))
     except EmailDeliveryError:
         delivered=False
@@ -194,8 +215,22 @@ async def change_role(member_id:UUID,payload:MemberInput,user=Depends(get_curren
 @router.delete('/members/{member_id}')
 async def remove_member(member_id:UUID,user=Depends(get_current_user)):
     tenant=owner(user)
+    current=database().table('business_memberships').select('role,status').eq('business_id',tenant.business_id).eq('user_id',str(member_id)).limit(1).execute().data or []
+    if not current or current[0].get('status') != 'active':
+        raise HTTPException(404,'Member not found')
+    if current[0].get('role') == 'OWNER':
+        other_owners=database().table('business_memberships').select('user_id').eq('business_id',tenant.business_id).eq('role','OWNER').eq('status','active').neq('user_id',str(member_id)).limit(1).execute().data or []
+        if not other_owners:
+            raise HTTPException(409,'The last active Owner cannot be removed')
+    profiles=database().table('users').select('email').eq('id',str(member_id)).limit(1).execute().data or []
+    member_email=str((profiles[0].get('email') if profiles else '') or '').strip().lower()
+    if not member_email:
+        raise HTTPException(409,'Member email is unavailable; access was not changed')
+    # Revoke unused links before removing membership so a partial failure cannot
+    # leave an invitation that can restore the revoked access.
+    database().table('business_invitations').update({'revoked_at':datetime.now(timezone.utc).isoformat()}).eq('business_id',tenant.business_id).eq('email',member_email).is_('accepted_at','null').is_('revoked_at','null').execute()
     try:
-        rows=database().table('business_memberships').update({'status':'removed'}).eq('business_id',tenant.business_id).eq('user_id',str(member_id)).execute().data
+        rows=database().table('business_memberships').update({'status':'removed'}).eq('business_id',tenant.business_id).eq('user_id',str(member_id)).eq('status','active').execute().data
     except Exception:
         raise HTTPException(409,'The last active Owner cannot be removed')
     if not rows: raise HTTPException(404,'Member not found')
