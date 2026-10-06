@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import useDashboardViewport from '../hooks/useDashboardViewport';
+import useDashboardViewport, { useMediaQuery } from '../hooks/useDashboardViewport';
 import { motion } from 'framer-motion';
 import {
   AlertCircle,
@@ -10,15 +10,12 @@ import {
   Check,
   CheckCircle2,
   Clock,
-  Frown,
-  Meh,
   Play,
   Pause,
   RefreshCw,
   Search,
   Star,
   Square,
-  Smile,
   Timer,
   Trash2,
   X,
@@ -97,21 +94,6 @@ const STATUS_STYLES = {
   },
 };
 
-const SENTIMENT_STYLES = {
-  positive: {
-    icon: Smile,
-    className: 'text-emerald-300 bg-emerald-400/8',
-  },
-  neutral: {
-    icon: Meh,
-    className: 'text-zinc-300 bg-white/[0.04]',
-  },
-  negative: {
-    icon: Frown,
-    className: 'text-rose-300 bg-rose-400/8',
-  },
-};
-
 const cn = (...classes) => classes.filter(Boolean).join(' ');
 
 function formatDuration(seconds) {
@@ -119,6 +101,10 @@ function formatDuration(seconds) {
   const minutes = Math.floor(safeSeconds / 60);
   const remaining = safeSeconds % 60;
   return `${minutes}:${String(remaining).padStart(2, '0')}`;
+}
+
+function formatCallDuration(seconds) {
+  return seconds == null ? 'Unavailable' : formatDuration(seconds);
 }
 
 function startOfLocalDay(date) {
@@ -178,18 +164,6 @@ function titleize(value, fallback = 'General') {
     .replace(/[_-]+/g, ' ')
     .replace(/\s+/g, ' ')
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
-
-function sentimentFromCall(call) {
-  const success = normalized(call.call_successful);
-  const status = normalized(call.status);
-  if (['true', 'yes', 'success', 'successful', 'completed', 'done'].includes(success) || ['completed', 'done', 'success', 'successful'].includes(status)) {
-    return 'Positive';
-  }
-  if (['false', 'no', 'failure', 'failed', 'unsuccessful'].includes(success) || ['failed', 'failure', 'error', 'unsuccessful'].includes(status)) {
-    return 'Negative';
-  }
-  return 'Neutral';
 }
 
 function directionFromCall(call) {
@@ -260,9 +234,8 @@ export function normalizeCall(row) {
     summary: displayText(row.summary || row.notes, 'No summary captured yet.'),
     purpose,
     status: titleize(row.status || row.call_successful || 'Unknown', 'Unknown'),
-    sentiment: sentimentFromCall(row),
     direction: directionFromCall(row),
-    duration: row.duration_seconds || 0,
+    duration: row.duration_seconds ?? null,
     time: row.started_at || row.event_timestamp || row.created_at,
     receptionist: displayText(receptionistName, 'Receptionist'),
     receptionistAvatar: row.receptionist_avatar || (avatarName && avatarName !== 'receptionist' ? `${AVATAR_BASE}/${avatarName}.jpg` : ''),
@@ -273,16 +246,6 @@ export function normalizeCall(row) {
     transcript: normalizeTranscript(row.transcript_jsonb, row.transcript_text),
     raw: row,
   };
-}
-
-function SentimentIcon({ sentiment, compact = false }) {
-  const config = SENTIMENT_STYLES[normalized(sentiment)] || SENTIMENT_STYLES.neutral;
-  const Icon = config.icon;
-  return (
-    <div className={cn('flex items-center justify-center rounded-full', compact ? 'h-8 w-8' : 'h-10 w-10', config.className)}>
-      <Icon size={compact ? 15 : 18} />
-    </div>
-  );
 }
 
 function DirectionIcon({ direction, compact = false, withLabel = false, gradient = false }) {
@@ -464,15 +427,12 @@ function CallCard({ call, selected, checked, onClick, onToggleSelect, onToggleFa
             <span className="font-medium text-zinc-400">{call.phone}</span>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <SentimentIcon sentiment={call.sentiment} compact />
-        </div>
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-zinc-500">
         <span className="inline-flex items-center gap-1 rounded-full bg-white/[0.03] px-2 py-1">
           <Timer size={11} />
-          {formatDuration(call.duration)}
+          {formatCallDuration(call.duration)}
         </span>
         <span className="inline-flex items-center gap-1 rounded-full bg-white/[0.03] px-2 py-1">
           <Clock size={11} />
@@ -625,7 +585,7 @@ function AudioStrip({ call, now }) {
           </div>
           <div className="h-1.5 min-w-0 flex-1 rounded-full bg-white/[0.06]" />
           <div className="w-[76px] text-right text-[11px] font-medium tabular-nums text-zinc-700">
-            {formatDuration(call.duration || 0)}
+            {formatCallDuration(call.duration)}
           </div>
         </div>
       )}
@@ -634,7 +594,7 @@ function AudioStrip({ call, now }) {
 }
 
 export default function CallLogsPage({ onToolbarMetaChange = null }) {
-  const { isPhone } = useDashboardViewport();
+  const isSinglePane = useMediaQuery('(max-width: 1279px)');
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const { session } = useAuth();
@@ -776,12 +736,12 @@ export default function CallLogsPage({ onToolbarMetaChange = null }) {
     return calls.filter((call) => {
       const matchesSearch = !query || [call.name, call.phone, call.summary, call.purpose, call.status, call.receptionist, call.raw?.notes, call.raw?.agent_name]
         .some((value) => normalized(value).includes(query));
-      return matchesSearch && (!isPhone || !favoritesOnly || call.isFavorited);
+      return matchesSearch && (!isSinglePane || !favoritesOnly || call.isFavorited);
     }).sort((a, b) => {
       if (a.isFavorited !== b.isFavorited) return a.isFavorited ? -1 : 1;
       return new Date(b.time || 0).getTime() - new Date(a.time || 0).getTime();
     });
-  }, [calls, searchQuery, favoritesOnly, isPhone]);
+  }, [calls, searchQuery, favoritesOnly, isSinglePane]);
 
   const selectedBaseCall = filteredCalls.find((call) => call.id === selectedId) || filteredCalls[0] || null;
   const selectedCallId = selectedBaseCall?.id || null;
@@ -925,7 +885,7 @@ export default function CallLogsPage({ onToolbarMetaChange = null }) {
                 </button>
               </div>
             </label>
-            {isPhone && <div className="call-mobile-tabs" aria-label="Filter call logs"><button type="button" aria-pressed={!favoritesOnly} onClick={() => setFavoritesOnly(false)}>All calls</button><button type="button" aria-pressed={favoritesOnly} onClick={() => setFavoritesOnly(true)}><Star size={15} />Favorites</button></div>}
+            {isSinglePane && <div className="call-mobile-tabs" aria-label="Filter call logs"><button type="button" aria-pressed={!favoritesOnly} onClick={() => setFavoritesOnly(false)}>All calls</button><button type="button" aria-pressed={favoritesOnly} onClick={() => setFavoritesOnly(true)}><Star size={15} />Favorites</button></div>}
             {selectedDeleteCount > 0 && (
               <div className="flex items-center justify-between rounded-xl bg-white/[0.035] px-3 py-2">
                 <span className="text-[12px] font-medium text-zinc-400">{selectedDeleteCount} selected</span>
@@ -959,7 +919,7 @@ export default function CallLogsPage({ onToolbarMetaChange = null }) {
                       return;
                     }
                     setSelectedId(call.id);
-                    if (isPhone) setMobileDetailOpen(true);
+                    if (isSinglePane) setMobileDetailOpen(true);
                   }}
                   onToggleSelect={toggleSelectCall}
                   onToggleFavorite={handleToggleFavorite}
@@ -983,7 +943,7 @@ export default function CallLogsPage({ onToolbarMetaChange = null }) {
         </aside>
 
         <section className="relative flex min-h-0 flex-col after:pointer-events-none after:absolute after:bottom-0 after:left-0 after:right-0 after:h-px after:bg-white/[0.05]">
-          {isPhone && <button type="button" className="call-mobile-back" onClick={() => setMobileDetailOpen(false)}><ArrowLeft size={18} />All calls</button>}
+          {isSinglePane && <button type="button" className="call-mobile-back" onClick={() => setMobileDetailOpen(false)}><ArrowLeft size={18} />All calls</button>}
           {transcriptLoading ? (
             <CallLogsLoader />
           ) : selectedCall ? (
@@ -995,7 +955,6 @@ export default function CallLogsPage({ onToolbarMetaChange = null }) {
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="text-[24px] font-black leading-none text-white">{selectedCall.name}</h3>
                     <span className="inline-flex items-center gap-1.5">
-                      <SentimentIcon sentiment={selectedCall.sentiment} compact />
                       <span className="rounded-full bg-white/[0.045] px-2 py-1 text-[11px] text-zinc-300">{selectedCall.purpose}</span>
                     </span>
                   </div>
@@ -1010,7 +969,7 @@ export default function CallLogsPage({ onToolbarMetaChange = null }) {
                     </span>
                     <span className="inline-flex items-center gap-1.5">
                       <Timer size={13} />
-                      {formatDuration(selectedCall.duration)}
+                      {formatCallDuration(selectedCall.duration)}
                     </span>
                   </div>
                 </div>

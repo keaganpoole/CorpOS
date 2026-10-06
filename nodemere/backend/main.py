@@ -67,7 +67,7 @@ from pydantic import BaseModel, Field, EmailStr
 from fastapi import FastAPI, HTTPException, status, Depends, Request, Header, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import HTMLResponse, JSONResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 from starlette.requests import ClientDisconnect
 from gotrue.errors import AuthApiError
 from collections import defaultdict
@@ -13127,6 +13127,44 @@ async def get_voice_catalog_voice(voice_id: str, current_user: dict = Depends(ge
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Voice availability could not be verified.")
     return {"voice": _voice_catalog_payload(payload), "checked_at": datetime.now(timezone.utc).isoformat()}
 
+def _refresh_incomplete_call_log(row: dict) -> dict:
+    """Recover a completed provider conversation whose post-call webhook was missed.
+
+    The row is already tenant-scoped by the caller. Never trust a conversation ID
+    supplied by the browser, and never persist the provider's unfiltered payload.
+    """
+    conversation_id = row.get("conversation_id")
+    started_at = parse_optional_datetime(row.get("started_at") or row.get("created_at"))
+    if (not elevenlabs_api_key or not conversation_id
+            or str(row.get("status") or "").lower() not in {"in-progress", "initiated", "processing"}
+            or (started_at and datetime.now(timezone.utc) - started_at < timedelta(minutes=1))):
+        return row
+    try:
+        response = requests.get(
+            f"https://api.elevenlabs.io/v1/convai/conversations/{conversation_id}",
+            headers={"xi-api-key": elevenlabs_api_key}, timeout=12,
+        )
+        response.raise_for_status()
+        data = response.json()
+        if (not isinstance(data, dict) or data.get("conversation_id") != conversation_id
+                or data.get("status") not in {"done", "failed"}):
+            return row
+        extracted = extract_call_log_from_elevenlabs_payload({"type": "post_call_transcription", "data": data})
+        allowed = (
+            "started_at", "ended_at", "duration_seconds", "status", "outcome", "summary",
+            "transcript_text", "transcript_jsonb", "has_audio", "has_user_audio",
+            "has_response_audio", "call_successful", "failure_reason", "agent_name",
+        )
+        updates = {key: extracted[key] for key in allowed if extracted.get(key) is not None}
+        if not updates:
+            return row
+        supabase.table("call_logs").update(updates).eq("id", row["id"]).eq("business_id", row["business_id"]).execute()
+        return {**row, **updates}
+    except Exception:
+        logging.warning("main.call_logs.provider_refresh_failed", exc_info=False)
+        return row
+
+
 @app.get("/api/sonar/call-logs", tags=["Sonar Calls"])
 async def list_call_logs(
     limit: int = 50,
@@ -13138,7 +13176,7 @@ async def list_call_logs(
     safe_offset = max(0, offset)
     query = (
         supabase.table("call_logs")
-        .select("id,business_id,user_id,caller_name,caller_phone,from_number,started_at,ended_at,event_timestamp,created_at,duration_seconds,status,outcome,summary,notes,call_successful,failure_reason,direction,receptionist_name,agent_name,hired_receptionist_id,is_favorited,has_audio")
+        .select("id,business_id,user_id,caller_name,caller_phone,from_number,to_number,started_at,ended_at,event_timestamp,created_at,duration_seconds,status,outcome,summary,notes,call_successful,failure_reason,direction,receptionist_name,agent_name,hired_receptionist_id,is_favorited,has_audio,audio_storage_path,conversation_id,transcript_text,transcript_jsonb")
         .eq("user_id", business_owner_id(current_user))
         .order("created_at", desc=True)
     )
@@ -13154,10 +13192,21 @@ async def list_call_logs(
         rows = rows[safe_offset:safe_offset + safe_limit]
     else:
         rows = query.range(safe_offset, safe_offset + safe_limit - 1).execute().data or []
+    # Only the displayed page is reconciled. A missing webhook must not leave
+    # completed calls permanently stuck at zero duration and no transcript.
+    semaphore = asyncio.Semaphore(4)
+    async def refresh_one(row):
+        async with semaphore:
+            return await asyncio.to_thread(_refresh_incomplete_call_log, row)
+    rows = await asyncio.gather(*(refresh_one(row) for row in rows))
     for row in rows:
+        # Older rows may have a recording path but a missing or stale flag.
+        # Keep the path private while exposing an accurate availability flag.
+        row["has_audio"] = bool(row.get("has_audio") or row.get("audio_storage_path"))
+        row.pop("audio_storage_path", None)
         enrich_call_log_with_person(
             row,
-            payload_data=row.get("raw_payload") if isinstance(row.get("raw_payload"), dict) else {},
+            payload_data={},
             business_id=row.get("business_id"),
             user_id=business_owner_id(current_user),
         )
@@ -13200,16 +13249,21 @@ async def search_call_logs(payload: dict, current_user=Depends(get_current_user)
 @app.get("/api/sonar/call-logs/{call_log_id}/details", tags=["Sonar Calls"])
 async def call_log_details(call_log_id: UUID, current_user=Depends(get_current_user)):
     business = require_business_for_user(business_owner_id(current_user))
-    row = supabase.table("call_logs").select("id,transcript_jsonb,transcript_text,call_report").eq("id",str(call_log_id)).eq("business_id",business["id"]).limit(1).execute().data
+    row = supabase.table("call_logs").select("id,business_id,conversation_id,status,started_at,created_at,transcript_jsonb,transcript_text,call_report").eq("id",str(call_log_id)).eq("business_id",business["id"]).limit(1).execute().data
     if not row: raise HTTPException(404,"Call not found")
-    return remove_secrets(row[0])
+    result = await asyncio.to_thread(_refresh_incomplete_call_log, dict(row[0]))
+    for field in ("business_id", "conversation_id", "status", "started_at", "created_at"):
+        result.pop(field, None)
+    return remove_secrets(result)
 
 
 @app.post("/api/sonar/call-logs/{call_log_id}/playback", tags=["Sonar Calls"])
 async def call_log_playback(call_log_id: UUID, current_user=Depends(get_current_user)):
     business = require_business_for_user(business_owner_id(current_user))
-    rows = supabase.table("call_logs").select("id,audio_storage_path").eq("id",str(call_log_id)).eq("business_id",business["id"]).limit(1).execute().data
-    if not rows or not rows[0].get("audio_storage_path"): raise HTTPException(404,"Recording unavailable")
+    rows = supabase.table("call_logs").select("id,audio_storage_path,conversation_id,has_audio").eq("id",str(call_log_id)).eq("business_id",business["id"]).limit(1).execute().data
+    if not rows or not (rows[0].get("audio_storage_path") or (rows[0].get("conversation_id") and rows[0].get("has_audio"))): raise HTTPException(404,"Recording unavailable")
+    if not rows[0].get("audio_storage_path"):
+        return {'url': f'/api/sonar/call-logs/{call_log_id}/audio', 'requires_authorization': True}
     if rows[0]['audio_storage_path'].endswith('.ndmenc'):
         return {'url': f'/api/sonar/call-logs/{call_log_id}/audio', 'requires_authorization': True}
     url = storage_signed_url(rows[0]["audio_storage_path"], expires_in=60)
@@ -13220,9 +13274,32 @@ async def call_log_playback(call_log_id: UUID, current_user=Depends(get_current_
 @app.get('/api/sonar/call-logs/{call_log_id}/audio', tags=['Sonar Calls'])
 async def call_log_audio(call_log_id: UUID, current_user=Depends(get_current_user)):
     business = require_business_for_user(business_owner_id(current_user))
-    rows = supabase.table('call_logs').select('id,audio_storage_path').eq('id',str(call_log_id)).eq('business_id',business['id']).limit(1).execute().data
-    if not rows or not rows[0].get('audio_storage_path'): raise HTTPException(404,'Recording unavailable')
-    path = rows[0]['audio_storage_path']
+    rows = supabase.table('call_logs').select('id,audio_storage_path,conversation_id,has_audio').eq('id',str(call_log_id)).eq('business_id',business['id']).limit(1).execute().data
+    if not rows: raise HTTPException(404,'Recording unavailable')
+    path = rows[0].get('audio_storage_path')
+    if not path:
+        if not (rows[0].get('conversation_id') and rows[0].get('has_audio') and elevenlabs_api_key):
+            raise HTTPException(404,'Recording unavailable')
+        try:
+            provider = await asyncio.to_thread(
+                requests.get,
+                f"https://api.elevenlabs.io/v1/convai/conversations/{rows[0]['conversation_id']}/audio",
+                headers={'xi-api-key': elevenlabs_api_key}, timeout=30, stream=True,
+            )
+            provider.raise_for_status()
+        except requests.RequestException as exc:
+            raise HTTPException(503, 'Recording temporarily unavailable') from exc
+        def audio_chunks():
+            total = 0
+            try:
+                for chunk in provider.iter_content(64 * 1024):
+                    total += len(chunk)
+                    if total > 128 * 1024 * 1024:
+                        break
+                    yield chunk
+            finally:
+                provider.close()
+        return StreamingResponse(audio_chunks(), media_type='audio/mpeg', headers={'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'})
     content = supabase_admin.storage.from_('call_recordings').download(path)
     from .envelope import open_file, MAGIC, KeyUnavailable
     if len(content) > 180*1024*1024: raise HTTPException(413,'Recording too large')
