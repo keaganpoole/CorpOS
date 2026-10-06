@@ -1,9 +1,13 @@
+// Keep the perimeter shoulders on the straight edges of the diamond
+// defined by top (65, 17), sides (23/107, 58), and bottom (65, 99).
+const diamondShoulderY = 58 - (40 - 23) * 41 / 42;
+
 // Shared geometry: crown, eyebrows, outer perimeter, lower eye outline.
 export const LOGO_PATHS = [
   [[51,30],[65,17],[79,30]],
   [[35,33],[65,63],[95,33]],
-  [[40,403/9],[23,58],[65,99],[107,58],[90,403/9]],
-  [[40,403/9],[40,61],[90,61],[90,403/9]]
+  [[40,diamondShoulderY],[23,58],[65,99],[107,58],[90,diamondShoulderY]],
+  [[40,diamondShoulderY],[40,61],[90,61],[90,diamondShoulderY]]
 ];
 const pass=(group,start,travel,reverse=false,easing='linear')=>({group,start,travel,reverse,easing});
 export const LOGO_PRESETS = {
