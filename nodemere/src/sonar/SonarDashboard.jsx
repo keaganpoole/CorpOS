@@ -2,7 +2,7 @@
  * SonarDashboard — Wraps the Sonar App component for use inside Nodemere routing.
  * Renders the full Sonar dashboard UI at /dashboard.
  */
-import React, { useState, useEffect, useRef, useCallback, Component, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, Component, lazy, Suspense } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from './lib/supabase';
 import { avatarVideoUrl } from './studio/catalogGeometry';
@@ -156,7 +156,7 @@ const POPUP_DEFINITIONS = [
     placement: 'dashboard',
     title: 'Hire Your First Receptionist',
     emoji: '✨',
-    getDescription: () => 'Your roster is empty right now. Add your first AI receptionist so Nodemere has someone ready to answer calls, represent your business, and start taking real work off your front desk.',
+    getDescription: () => 'Your roster could use its first hire. Add an AI receptionist to answer calls, represent your business, and start taking work off your plate.',
     primaryActionLabel: 'Got it',
     showDontRemindMe: true,
     shouldShow: ({ currentRoute, teamView, agentsLoading, receptionistCount }) => (
@@ -302,6 +302,20 @@ const TASKLIST_DEFINITIONS = [
         instructionTitle: 'Set The Receptionist Role',
         instruction:
           'Use the receptionist card controls to define whether this receptionist handles inbound calls, outbound calls, or both. The role should match how you expect them to operate day to day.',
+      },
+    ],
+  },
+  {
+    id: 'account_security',
+    title: 'Secure your account',
+    subtasks: [
+      {
+        id: 'setup_authenticator',
+        title: 'Set up authenticator',
+        videoUrl: TASKLIST_VIDEO_PLACEHOLDER,
+        instructionTitle: 'Set Up Your Authenticator',
+        instruction:
+          'Open Settings, go to Workforce & Security, and set up an authenticator app. Scan the QR code, enter the six-digit code, and verify it to protect your account.',
       },
     ],
   },
@@ -453,7 +467,7 @@ const hasConfiguredIntakeField = (business, activeCustomFieldKeys = []) => {
   });
 };
 
-const createTasklistState = ({ business = null, agents = [], staff = [], purchasedNumbers = [], activeCustomFieldKeys = [] }) => {
+const createTasklistState = ({ business = null, agents = [], staff = [], purchasedNumbers = [], activeCustomFieldKeys = [], authenticatorConfigured = false }) => {
   const activeReceptionists = (Array.isArray(agents) ? agents : []).filter(isActiveReceptionist);
   const activeStaff = (Array.isArray(staff) ? staff : []).filter(isActiveStaff);
   const completions = {
@@ -468,6 +482,9 @@ const createTasklistState = ({ business = null, agents = [], staff = [], purchas
     first_receptionist: {
       hire_receptionist: activeReceptionists.length > 0,
       set_role: activeReceptionists.some((agent) => ['inbound', 'outbound', 'all'].includes(normalizeDirection(agent.direction))),
+    },
+    account_security: {
+      setup_authenticator: authenticatorConfigured === true,
     },
     staff_setup: {
       add_staff_member: activeStaff.some(hasStaffName),
@@ -1396,8 +1413,25 @@ const TasklistInstructionModal = ({ subtask, onClose }) => {
 
 const TasklistWidget = ({ tasklistState = null, onOpenIntro = null, onHide = null }) => {
   const [open, setOpen] = useState(false);
+  const widgetRef = useRef(null);
   const [activeTaskIndex, setActiveTaskIndex] = useState(0);
   const [activeInstruction, setActiveInstruction] = useState(null);
+  useLayoutEffect(() => {
+    const widget = widgetRef.current;
+    const shell = widget?.closest('.sonar-dashboard-shell');
+    if (!widget || !shell) return undefined;
+
+    const syncHeight = () => {
+      shell.style.setProperty('--mobile-team-widget-height', `${Math.ceil(widget.getBoundingClientRect().height)}px`);
+    };
+    syncHeight();
+    const observer = new ResizeObserver(syncHeight);
+    observer.observe(widget);
+    return () => {
+      observer.disconnect();
+      shell.style.removeProperty('--mobile-team-widget-height');
+    };
+  }, []);
   const tasklist = tasklistState && typeof tasklistState === 'object' ? tasklistState : {};
   const activeTask = TASKLIST_DEFINITIONS[activeTaskIndex] || TASKLIST_DEFINITIONS[0];
 
@@ -1436,7 +1470,7 @@ const TasklistWidget = ({ tasklistState = null, onOpenIntro = null, onHide = nul
           </linearGradient>
         </defs>
       </svg>
-      <div className="dashboard-setup-widget fixed bottom-6 right-6 z-[1100] flex w-[min(328px,calc(100vw-48px))] flex-col items-end">
+      <div ref={widgetRef} className="dashboard-setup-widget fixed bottom-6 right-6 z-[1100] flex w-[min(328px,calc(100vw-48px))] flex-col items-end">
         <AnimatePresence mode="wait" initial={false}>
           {open ? (
             <motion.div
@@ -2059,7 +2093,8 @@ const SonarDashboard = () => {
       : [...dismissedPopupIds, popup.id];
     setDismissedPopupIds(nextDismissedPopupIds);
 
-    if (!dontRemindMe || !userId) return;
+    const persistDismissal = dontRemindMe || popup.id === 'tasklist_intro';
+    if (!persistDismissal || !userId) return;
 
     const currentPopups = profile?.popups && typeof profile.popups === 'object' ? profile.popups : {};
     const currentPopupState = getPopupState(currentPopups, popup.id);
@@ -2088,6 +2123,7 @@ const SonarDashboard = () => {
 
   useEffect(() => {
     setDismissedPopupIds([]);
+    setManualPopupId(null);
   }, [currentRoute]);
 
   useEffect(() => {
@@ -2337,6 +2373,13 @@ const SonarDashboard = () => {
 
     try {
       const business = await api.getBusinessProfile();
+      let authenticatorConfigured = false;
+      try {
+        const { data, error } = await supabase.auth.mfa.listFactors();
+        if (!error) authenticatorConfigured = (data?.totp || []).some((factor) => factor?.status === 'verified');
+      } catch {
+        // Keep the task incomplete if MFA status cannot be confirmed.
+      }
 
       let staffRows = [];
       let purchasedNumberRows = [];
@@ -2379,6 +2422,7 @@ const SonarDashboard = () => {
         staff: staffRows,
         purchasedNumbers: purchasedNumberRows,
         activeCustomFieldKeys,
+        authenticatorConfigured,
       });
 
       setBackendTasklistState(nextTasklist);
@@ -2405,6 +2449,12 @@ const SonarDashboard = () => {
 
   useEffect(() => {
     loadTasklistState();
+  }, [loadTasklistState]);
+
+  useEffect(() => {
+    const reload = () => { void loadTasklistState(); };
+    window.addEventListener('nodemere:authenticator-updated', reload);
+    return () => window.removeEventListener('nodemere:authenticator-updated', reload);
   }, [loadTasklistState]);
 
   useEffect(() => {
@@ -2491,13 +2541,13 @@ const SonarDashboard = () => {
     if (popupState.shown !== false || popupState.hide !== false) return null;
     return manualPopup;
   })();
-  const activePopup = activeManualPopup || (SHOW_AUTOMATIC_DASHBOARD_POPUPS ? POPUP_DEFINITIONS.find((popup) => {
+  const activePopup = showPlanChangePopup ? null : (activeManualPopup || (SHOW_AUTOMATIC_DASHBOARD_POPUPS ? POPUP_DEFINITIONS.find((popup) => {
     if (popup.manualOnly) return false;
     if (popup.placement !== 'dashboard' || dismissedPopupIds.includes(popup.id)) return false;
     const popupState = getPopupState(profile?.popups, popup.id);
     if (popupState.shown !== false || popupState.hide !== false) return false;
     return typeof popup.shouldShow === 'function' ? popup.shouldShow(popupContext) : true;
-  }) : null);
+  }) : null));
 
   useEffect(() => {
     if (!pendingModel || !agents) return;
@@ -2546,27 +2596,37 @@ const SonarDashboard = () => {
             ) : null}
             <div className="team-toolbar shrink-0 px-10 pb-3 pt-8 flex items-center justify-between">
               <div className="flex items-center gap-5">
-                <div className="flex rounded-xl border border-white/[0.08] bg-white/[0.02] p-1">
+                <div className={isCompact
+                  ? 'team-view-tabs relative flex w-[280px] shrink-0 items-center gap-1 border-b border-white/[0.06] bg-[#050505] px-1.5 pb-0.5 pt-px'
+                  : 'flex rounded-xl border border-white/[0.08] bg-white/[0.02] p-1'}
+                  style={isPhone ? { width: 'calc(100% + 32px)', transform: 'translateX(-16px)' } : undefined}>
+                  {isCompact && (
+                    <>
+                      <div className="absolute bottom-0 left-1.5 right-1.5 h-px bg-white/[0.04]" />
+                      <div
+                        className="absolute bottom-0 left-1.5 h-px rounded-full bg-gradient-to-r from-[var(--brandGradientStart)] to-[var(--brandGradientEnd)] shadow-[0_0_10px_color-mix(in_srgb,var(--brandGradientStart)_24%,transparent)] transition-transform duration-300 ease-out"
+                        style={{
+                          width: 'calc(50% - 0.1875rem)',
+                          transform: `translateX(${teamView === 'staff' ? 'calc(100% + 0.25rem)' : '0'})`,
+                        }}
+                      />
+                    </>
+                  )}
                   <button
                     onClick={() => setTeamView('receptionists')}
-                    className={`relative px-4 py-2 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all ${teamView === 'receptionists' ? 'bg-white/[0.08] text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                    className={isCompact
+                      ? `relative flex ${isPhone ? 'h-11 text-[13px]' : 'h-10 text-[11px]'} flex-1 items-center justify-center rounded-none font-semibold tracking-[-0.02em] transition-all ${teamView === 'receptionists' ? 'text-zinc-100' : 'text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-200'}`
+                      : `relative px-4 py-2 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all ${teamView === 'receptionists' ? 'bg-white/[0.08] text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
                   >
                     Receptionists
-                    {isPhone && teamView === 'receptionists' && <motion.span layoutId="mobile-team-tab-indicator" className="mobile-team-tab-indicator" transition={{ type: 'spring', stiffness: 520, damping: 38 }} />}
                   </button>
                   <button
                     onClick={() => setTeamView('staff')}
-                    className={`relative px-4 py-2 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all ${teamView === 'staff' ? 'bg-white/[0.08] text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                    className={isCompact
+                      ? `relative flex ${isPhone ? 'h-11 text-[13px]' : 'h-10 text-[11px]'} flex-1 items-center justify-center rounded-none font-semibold tracking-[-0.02em] transition-all ${teamView === 'staff' ? 'text-zinc-100' : 'text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-200'}`
+                      : `relative px-4 py-2 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all ${teamView === 'staff' ? 'bg-white/[0.08] text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
                   >
                     Staff
-                    {isPhone && teamView === 'staff' && <motion.span layoutId="mobile-team-tab-indicator" className="mobile-team-tab-indicator" transition={{ type: 'spring', stiffness: 520, damping: 38 }} />}
-                  </button>
-                  <button
-                    onClick={() => setTeamView('archived')}
-                    className={`relative px-4 py-2 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all ${teamView === 'archived' ? 'bg-white/[0.08] text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
-                  >
-                    Archived
-                    {isPhone && teamView === 'archived' && <motion.span layoutId="mobile-team-tab-indicator" className="mobile-team-tab-indicator" transition={{ type: 'spring', stiffness: 520, damping: 38 }} />}
                   </button>
                 </div>
               </div>

@@ -41,7 +41,7 @@ const PlanChangePopupModal = ({ isOpen, onClose, plan }) => {
                     <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.18em] text-zinc-600">Welcome</p>
                     <h2 className="text-xl font-semibold tracking-[-0.04em] text-white sm:text-2xl">Welcome to Nodemere</h2>
                     <p className="mx-auto mt-3 max-w-[520px] text-center text-sm leading-6 text-zinc-500">
-                      Your workspace is ready. You’re getting started on the {formattedPlan} plan, with a front desk built to help your business run with more clarity, consistency, and momentum.
+                      It’s time to revolutionize your front desk. Your Free plan includes 20 call minutes on us.
                     </p>
                   </div>
                   <button

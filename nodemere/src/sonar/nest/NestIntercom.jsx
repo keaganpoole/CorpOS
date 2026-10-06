@@ -9,12 +9,31 @@ import IntercomVoiceLine from './IntercomVoiceLine';
 import useIntercomMicrophone from './useIntercomMicrophone';
 import CubePreloader from '../components/CubePreloader';
 import CirclePreloader from '../components/CirclePreloader';
+import ModalSpectrumLine from '../../components/ModalSpectrumLine';
 import ringingSound from '../../assets/ringing.mp3';
 import pickupSound from '../../assets/pickup.mp3';
 
 const PRIVACY_COPY = 'Voice conversations may be transcribed and saved so you can review them later.';
 const CALL_MINUTES_NOTICE_KEY = 'nodemere.nest.call-minutes-notice-accepted';
 const ACTIVE_PHASES = new Set(['connecting', 'listening', 'speaking']);
+const RECEPTIONIST_WARNINGS = {
+  no_receptionist: 'Hire a receptionist to place a call.',
+  call_handling_off: 'Set call handling for a receptionist.',
+  inactive: 'Turn on a receptionist to place a call.',
+  voice_missing: 'Add a voice to your receptionist.',
+  business_missing: 'Finish business setup to place a call.',
+};
+const intercomStartError = (error) => {
+  if (error?.status === 429) return 'Daily voice limit reached.';
+  if (['NotAllowedError', 'SecurityError'].includes(error?.name)) return 'Allow microphone access.';
+  if (['NotFoundError', 'DevicesNotFoundError', 'OverconstrainedError'].includes(error?.name)) return 'No microphone found.';
+  if (error?.name === 'NotReadableError') return 'Microphone is in use.';
+  const detail = String(error?.message || '');
+  if (detail.includes('Choose an eligible receptionist') || detail.includes('not eligible for voice conversations')) return 'That receptionist is no longer available.';
+  if (detail.includes("voice is unavailable")) return "Receptionist's voice is unavailable.";
+  if (detail.includes('Voice availability could not be verified')) return 'Could not check the voice. Try again.';
+  return 'Could not start the call.';
+};
 
 const createLine = (message) => {
   const text = String(message?.message || message?.text || '').trim();
@@ -79,6 +98,51 @@ function PrivacyNotice({ open, busy, onCancel, onAccept }) {
           </motion.section>
         </motion.div>
       )}
+    </AnimatePresence>,
+    document.body,
+  );
+}
+
+function CallMinutesNotice({ onClose, onAccept }) {
+  if (typeof document === 'undefined') return null;
+  return createPortal(
+    <AnimatePresence>
+      <motion.div
+        className="responsive-dialog fixed inset-0 z-[1400] flex items-center justify-center bg-black/55 p-6 backdrop-blur-[2px]"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+      >
+        <motion.section
+          className="relative flex max-h-[calc(100vh-48px)] w-full max-w-[520px] flex-col overflow-hidden rounded-[34px] border border-white/[0.08] bg-[#070707]/95 shadow-[0_28px_90px_rgba(0,0,0,0.55)] backdrop-blur-xl"
+          initial={{ opacity: 0, y: 10, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 7, scale: 0.99 }}
+          transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="intercom-mobile-call-minutes-title"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <ModalSpectrumLine variant="general" />
+          <div className="relative flex flex-1 flex-col p-6 text-center sm:p-8">
+            <div className="mb-6 flex items-start justify-between gap-5">
+              <div className="min-w-0 flex-1 pl-8">
+                <h2 id="intercom-mobile-call-minutes-title" className="text-[26px] font-semibold tracking-[-0.01em] text-white sm:text-[34px]">Intercom</h2>
+                <p className="mt-4 w-full text-sm leading-[1.55] text-zinc-300 sm:text-[15px]">Talk directly with your receptionist, who doubles as your business assistant. Ask questions, get updates, or put them to work. Calls use your available minutes.</p>
+              </div>
+              <button type="button" onClick={onClose} className="shrink-0 rounded-full p-2 text-zinc-500 transition hover:bg-white/[0.04] hover:text-white" aria-label="Close">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="mt-2 flex justify-center gap-3">
+              <button type="button" onClick={onClose} className="h-12 rounded-full border border-white/[0.08] px-10 text-sm font-semibold text-zinc-300 transition hover:bg-white/[0.04] hover:text-white">Never mind</button>
+              <button type="button" onClick={onAccept} className="h-12 rounded-full bg-white px-10 text-sm font-bold text-black transition hover:bg-zinc-200">Accept</button>
+            </div>
+          </div>
+        </motion.section>
+      </motion.div>
     </AnimatePresence>,
     document.body,
   );
@@ -177,7 +241,7 @@ function NestIntercomInner({ open, onClose, mobile = false }) {
 
   useEffect(() => {
     if (!open) return undefined;
-    refreshBootstrap().catch(() => setError('Voice is unavailable right now.'));
+    refreshBootstrap().catch(() => setError('Voice unavailable.'));
     return undefined;
   }, [open, refreshBootstrap]);
 
@@ -260,7 +324,7 @@ function NestIntercomInner({ open, onClose, mobile = false }) {
       transcriptRef.current = [...transcriptRef.current, nextLine].slice(-200);
     }
     persistLine(nextLine).catch((err) => {
-      setError(err.message || 'The daily voice limit has been reached.');
+      setError(err?.status === 429 ? 'Daily voice limit reached.' : 'Could not save the conversation.');
       if (err?.status === 429) endTransportRef.current();
     });
   }, [persistLine]);
@@ -329,7 +393,7 @@ function NestIntercomInner({ open, onClose, mobile = false }) {
       if (sessionRef.current && !endingRef.current) finalizeSession();
     },
     onError: (message) => {
-      setError(String(message || 'Voice had trouble connecting.'));
+      setError('Call connection issue.');
       if (sessionRef.current) finalizeSession({ close: false });
       else { stopMicrophone(); setPhase('selecting'); }
     },
@@ -454,10 +518,10 @@ function NestIntercomInner({ open, onClose, mobile = false }) {
       stopMicrophone();
       if (err?.name === 'NotAllowedError' || err?.name === 'SecurityError') {
         setMicPermissionState('denied');
-        setError('Microphone access is required to talk.');
+        setError(intercomStartError(err));
         setPhase('mic-permission');
       } else {
-        setError(err.message || 'Voice could not start.');
+        setError(intercomStartError(err));
         setPhase('selecting');
       }
     } finally {
@@ -480,7 +544,7 @@ function NestIntercomInner({ open, onClose, mobile = false }) {
 
   const requestStart = (receptionistId = selectedId) => {
     if (!receptionistId) {
-      setError('Choose a receptionist first.');
+      setError('Choose a receptionist.');
       return;
     }
     setError('');
@@ -499,7 +563,7 @@ function NestIntercomInner({ open, onClose, mobile = false }) {
       setPrivacyOpen(false);
       await beginSession({ force: true });
     } catch (err) {
-      setError(err.message || 'Voice could not start.');
+      setError(intercomStartError(err));
     } finally {
       setLoading(false);
     }
@@ -513,9 +577,27 @@ function NestIntercomInner({ open, onClose, mobile = false }) {
     finalizeSession();
   };
 
-  const unavailable = bootstrap && (!bootstrap.agent_configured || !(bootstrap.receptionists || []).length);
-  const hasTranscript = Boolean(line?.text);
   const receptionists = bootstrap?.receptionists || [];
+  const dailyLimitReached = Boolean(bootstrap?.usage?.limit && bootstrap.usage.used >= bootstrap.usage.limit);
+  const unavailable = Boolean(bootstrap && (!bootstrap.agent_configured || !receptionists.length || dailyLimitReached));
+  const warningMessage = error || (bootstrap && (
+    !bootstrap.agent_configured ? 'Voice calls are unavailable right now.'
+      : !receptionists.length ? RECEPTIONIST_WARNINGS[bootstrap.receptionist_unavailable_reason] || 'Needs a receptionist to place a call.'
+        : dailyLimitReached ? 'Daily voice limit reached.' : ''
+  ));
+  useEffect(() => {
+    if (!open || !warningMessage) return undefined;
+    const timer = window.setTimeout(() => {
+      if (ACTIVE_PHASES.has(phase)) {
+        setError('');
+      } else {
+        startAttemptRef.current += 1;
+        onClose?.();
+      }
+    }, 2700);
+    return () => window.clearTimeout(timer);
+  }, [onClose, open, phase, warningMessage]);
+  const hasTranscript = Boolean(line?.text);
   const pickerCount = receptionists.length > 4 ? 'many' : receptionists.length;
   const sessionFallback = phase === 'connecting'
     ? 'Opening the intercom'
@@ -528,7 +610,7 @@ function NestIntercomInner({ open, onClose, mobile = false }) {
       <AnimatePresence>
         {open && (
           <motion.div
-            className={`intercom-surface phase-${phase} ${hasTranscript ? 'has-transcript' : ''}`}
+            className={`intercom-surface phase-${phase} ${hasTranscript ? 'has-transcript' : ''} ${warningMessage ? 'has-warning' : ''}`}
             initial={{ opacity: 0, scale: 0.96 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.98 }}
@@ -546,15 +628,17 @@ function NestIntercomInner({ open, onClose, mobile = false }) {
                   <CubePreloader size={10} />
                 </span>
               ) : phase === 'call-minutes-notice' ? (
-                <motion.div className="intercom-action no-drag" role="dialog" aria-labelledby="intercom-call-minutes-title" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
-                  <span className="intercom-action-label">
-                    <span id="intercom-call-minutes-title">Calling a receptionist uses your available call minutes.</span>
-                  </span>
-                  <div className="intercom-notice-actions">
-                    <button type="button" onClick={onClose}>Never mind</button>
-                    <button type="button" className="is-accept" onClick={acceptCallMinutesNotice}><Check size={14} />Accept</button>
-                  </div>
-                </motion.div>
+                mobile ? <CallMinutesNotice onClose={onClose} onAccept={acceptCallMinutesNotice} /> : (
+                  <motion.div className="intercom-action no-drag" role="dialog" aria-labelledby="intercom-call-minutes-title" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+                    <span className="intercom-action-label">
+                      <span id="intercom-call-minutes-title">Talk directly with your receptionist, who doubles as your business assistant. Ask questions, get updates, or put them to work. Calls use your available minutes.</span>
+                    </span>
+                    <div className="intercom-notice-actions">
+                      <button type="button" onClick={onClose}>Never mind</button>
+                      <button type="button" className="is-accept" onClick={acceptCallMinutesNotice}><Check size={14} />Accept</button>
+                    </div>
+                  </motion.div>
+                )
               ) : phase === 'mic-permission' && selectedReceptionist ? (
                 <motion.div className="intercom-mic-permission no-drag" role="status" aria-live="polite" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
                   <span>{micPermissionState === 'denied' ? 'Allow microphone access to talk' : 'Please allow microphone access'}</span>
@@ -692,8 +776,7 @@ function NestIntercomInner({ open, onClose, mobile = false }) {
             )}
 
             {idleWarning && <span className="intercom-idle-warning">Still there?</span>}
-            {error && <span className="intercom-error">{error}</span>}
-            {unavailable && <span className="intercom-error">Add an eligible receptionist and configure the voice agent.</span>}
+            {warningMessage && <span className="intercom-error" role="alert">⚠️ {warningMessage}</span>}
           </motion.div>
         )}
       </AnimatePresence>

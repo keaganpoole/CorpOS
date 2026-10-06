@@ -31,7 +31,7 @@
   .sonar-dashboard-shell[data-responsive="true"] main,
   .sonar-dashboard-shell[data-responsive="true"] main > div { min-height: 0; }
   .sonar-dashboard-shell[data-responsive="true"] .nest-toolbar-meta { display: none; }
-  .sonar-dashboard-shell[data-responsive="true"] .team-toolbar { padding: 24px 24px 12px; gap: 16px; }
+  .sonar-dashboard-shell[data-responsive="true"] .team-toolbar { padding: 16px 24px 0; gap: 16px; }
   .sonar-dashboard-shell[data-responsive="true"] .receptionists-page-scope .custom-scrollbar.absolute { padding: 16px 24px 24px; }
   .sonar-dashboard-shell[data-responsive="true"] .receptionists-page-scope .grid.items-start { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
   .sonar-dashboard-shell[data-responsive="true"] .team-receptionist-card,
@@ -299,13 +299,14 @@
   .sonar-dashboard-shell[data-responsive="true"] .team-toolbar > div:first-child,
   .sonar-dashboard-shell[data-responsive="true"] .team-toolbar > div:first-child > div { width: 100%; }
   .sonar-dashboard-shell[data-responsive="true"] .team-toolbar > div:first-child button { flex: 1; min-height: 44px; padding-inline: 8px; }
+  .sonar-dashboard-shell[data-responsive="true"] .team-toolbar .team-view-tabs > button { min-height: 40px; }
   .sonar-dashboard-shell[data-responsive="true"] .team-toolbar > div:last-child { width: 100%; justify-content: flex-end; }
   .sonar-dashboard-shell[data-responsive="true"] .team-toolbar > div:last-child button { min-height: 44px; }
   .sonar-dashboard-shell[data-responsive="true"] .receptionists-page-scope .custom-scrollbar.absolute { padding: 12px 16px 24px; }
   .sonar-dashboard-shell[data-responsive="true"] .receptionists-page-scope .grid.items-start { grid-template-columns: minmax(0, 1fr); gap: 16px; }
   .sonar-dashboard-shell[data-responsive="true"] .calendar-page { padding: 0; }
   .sonar-dashboard-shell[data-responsive="true"] .calendar-page > div { border: 0; border-radius: 0; }
-  .sonar-dashboard-shell[data-responsive="true"] .calendar-page > div > div:first-child button { height: 48px; font-size: 13px; }
+  .sonar-dashboard-shell[data-responsive="true"] .calendar-page > div > div:first-child button { height: 44px; font-size: 13px; }
   .sonar-dashboard-shell[data-responsive="true"] .calendar-month-mobile { padding: 16px; overflow-y: auto; display: block; scrollbar-width: thin; scrollbar-color: #28282d transparent; }
   .sonar-dashboard-shell[data-responsive="true"] .calendar-month-mobile > div { padding: 16px; height: auto; min-height: 100%; overflow: visible; border-radius: 20px; }
   .sonar-dashboard-shell[data-responsive="true"] .calendar-month-mobile > div > div:first-child { flex-wrap: wrap; gap: 12px; }
@@ -330,6 +331,8 @@
   .sonar-dashboard-shell[data-responsive="true"] .settings-page-scope .grid-cols-3 { grid-template-columns: minmax(0, 1fr); }
   .sonar-dashboard-shell[data-responsive="true"] .settings-page-scope :is(input:not([type="checkbox"]):not([type="color"]), textarea, select) { font-size: 16px; min-width: 0; }
   .sonar-dashboard-shell[data-responsive="true"] .settings-page-scope h3 { font-size: 25px; }
+  .sonar-dashboard-shell[data-responsive="true"] .settings-page-scope .workforce-members h3 { font-size: 11px; line-height: 1.4; }
+  .sonar-dashboard-shell[data-responsive="true"] .settings-page-scope .workforce-inline-row h3 { font-size: 13px; line-height: 1.4; }
   .sonar-dashboard-shell[data-responsive="true"] .business-intelligence-report > .mx-auto { padding: 24px 16px 32px; }
   .sonar-dashboard-shell[data-responsive="true"] .business-intelligence-report h1 { font-size: 32px; line-height: 1.15; }
   .sonar-dashboard-shell[data-responsive="true"] .business-intelligence-report :is(button, a) { min-height: 44px; }

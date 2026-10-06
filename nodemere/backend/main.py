@@ -10744,6 +10744,33 @@ def is_intercom_receptionist_eligible(row: dict) -> bool:
     )
 
 
+def intercom_receptionist_unavailable_reason(*, user_id: str, business_id: int) -> str:
+    rows = (
+        intercom_store().table("hired_receptionists")
+        .select("direction,is_active,status,elevenlabs_voice_id")
+        .eq("business_id", business_id)
+        .eq("user_id", user_id)
+        .execute()
+        .data
+        or []
+    )
+    if not rows:
+        return "no_receptionist"
+    active = [
+        row for row in rows
+        if row.get("is_active") is not False
+        and str(row.get("status") or "").strip().lower() not in {"offline", "disabled", "inactive", "archived"}
+    ]
+    if not active:
+        return "inactive"
+    assigned = [row for row in active if normalize_receptionist_direction(row.get("direction")) in {"inbound", "outbound", "all"}]
+    if not assigned:
+        return "call_handling_off"
+    if not any(str(row.get("elevenlabs_voice_id") or "").strip() for row in assigned):
+        return "voice_missing"
+    return "unavailable"
+
+
 def list_intercom_receptionists(*, user_id: str, business_id: int) -> list[dict]:
     rows = (
         intercom_store().table("hired_receptionists")
@@ -11002,16 +11029,18 @@ async def get_intercom_bootstrap(current_user: dict = Depends(get_current_user))
     user_id = intercom_actor_id(current_user)
     business = load_business_by_user_id(owner_id)
     if not business:
-        return {"receptionists": [], "settings": {}, "usage": {"used": 0, "limit": 0}}
+        return {"receptionists": [], "receptionist_unavailable_reason": "business_missing", "settings": {}, "usage": {"used": 0, "limit": 0}}
     limits = intercom_plan_limits(owner_id)
     usage = get_or_create_intercom_usage(user_id=user_id, business_id=business["id"], plan=limits["plan"], limit_turns=limits["daily_turns"])
     settings = get_intercom_settings(user_id=user_id, business_id=business["id"])
     receptionists = list_intercom_receptionists(user_id=owner_id, business_id=business["id"])
+    unavailable_reason = None if receptionists else intercom_receptionist_unavailable_reason(user_id=owner_id, business_id=business["id"])
     selected_id = settings.get("last_receptionist_id")
     selected_eligible = any(str(item.get("id")) == str(selected_id) for item in receptionists)
     return {
         "agent_configured": bool(elevenlabs_api_key and elevenlabs_agent_id_intercom and internal_tool_secret),
         "receptionists": receptionists,
+        "receptionist_unavailable_reason": unavailable_reason,
         "settings": {**settings, "last_receptionist_eligible": selected_eligible},
         "usage": {"used": int(usage.get("turns_used") or 0), "limit": int(usage.get("limit_turns") or limits["daily_turns"]), "plan": limits["plan"]},
         "limits": limits,

@@ -8,7 +8,7 @@ const API_BASE_URL = (window.sonar?.apiUrl || import.meta.env.VITE_API_URL || (i
 
 export default function LegalAcceptanceGate({ children }) {
   const { session, profile, refreshProfile, logout } = useAuth();
-  const [accepted, setAccepted] = useState(false);
+  const [showExperienceNotice, setShowExperienceNotice] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -16,7 +16,7 @@ export default function LegalAcceptanceGate({ children }) {
 
   const acceptCurrentTerms = async (event) => {
     event.preventDefault();
-    if (!accepted || !session?.access_token) return;
+    if (!session?.access_token) return;
     setBusy(true);
     setError('');
     try {
@@ -34,13 +34,45 @@ export default function LegalAcceptanceGate({ children }) {
       });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.detail || 'Could not record legal acceptance.');
-      await refreshProfile();
+      if (window.matchMedia('(max-width: 767px)').matches) {
+        setShowExperienceNotice(true);
+      } else {
+        await refreshProfile();
+      }
     } catch (acceptanceError) {
       setError(acceptanceError.message || 'Could not record legal acceptance.');
     } finally {
       setBusy(false);
     }
   };
+
+  const continueToSetup = async () => {
+    setBusy(true);
+    setError('');
+    try {
+      await refreshProfile();
+    } catch (refreshError) {
+      setError(refreshError.message || 'Could not continue to setup.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (showExperienceNotice) {
+    return (
+      <main className="legal-document-page">
+        <section className="legal-acceptance-card">
+          <p className="legal-eyebrow">A smoother setup</p>
+          <h1>For the best experience</h1>
+          <p className="legal-acceptance-intro">Nodemere works on your device, but for the best experience, we recommend using a PC or tablet.</p>
+          {error && <p className="legal-form-error" role="alert">{error}</p>}
+          <button type="button" className="legal-primary-button" onClick={continueToSetup} disabled={busy}>
+            {busy ? 'Loading…' : 'Got it'}
+          </button>
+        </section>
+      </main>
+    );
+  }
 
   return (
     <main className="legal-document-page">
@@ -49,12 +81,9 @@ export default function LegalAcceptanceGate({ children }) {
         <h1>Let’s get started</h1>
         <p className="legal-acceptance-intro">Nodemere puts unprecedented power behind your front desk. Your receptionists can answer, call, take action, and automate the work that keeps your business moving. Use that power responsibly.</p>
         <form className="legal-acceptance-form" onSubmit={acceptCurrentTerms}>
-          <label className="legal-checkbox-row">
-            <input type="checkbox" checked={accepted} onChange={(event) => setAccepted(event.target.checked)} disabled={busy} />
-            <span>I’m authorized to accept the <Link to="/terms" target="_blank">Terms</Link>, <Link to="/privacy-policy" target="_blank">Privacy Policy</Link>, <Link to="/acceptable-use-policy" target="_blank">Acceptable Use Policy</Link>, <Link to="/communications-notice" target="_blank">AI &amp; Recording Notice</Link>, and <Link to="/data-processing-addendum" target="_blank">DPA</Link>. I’ll use Nodemere only for permitted business workflows.</span>
-          </label>
+          <p className="legal-small-copy">By continuing, you agree to use Nodemere only for permitted business workflows.</p>
           {error && <p className="legal-form-error" role="alert">{error}</p>}
-          <button className="legal-primary-button" disabled={busy || !accepted}>{busy ? 'Saving…' : 'Continue to setup'}</button>
+          <button className="legal-primary-button" disabled={busy}>{busy ? 'Saving…' : 'Continue to setup'}</button>
         </form>
       </section>
     </main>

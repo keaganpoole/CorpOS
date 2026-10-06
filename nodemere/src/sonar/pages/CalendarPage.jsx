@@ -109,7 +109,7 @@ export default function CalendarPage({ onToolbarMetaChange = null }) {
         className="flex h-full min-h-0 flex-col overflow-hidden rounded-[28px] border border-white/[0.06] bg-[#020202] shadow-[0_32px_100px_-36px_rgba(0,0,0,0.92)] 2xl:flex-row"
         style={{ '--calendar-panel-width': `${calendarWidth ?? CALENDAR_DEFAULT_WIDTH}px` }}
       >
-        <div className="relative flex shrink-0 items-center gap-1 border-b border-white/[0.06] bg-[#050505] px-1.5 pb-2 pt-1.5 2xl:hidden">
+        <div className={`relative flex shrink-0 items-center gap-1 border-b border-white/[0.06] bg-[#050505] px-1.5 2xl:hidden ${isCompact ? 'pb-0.5 pt-px' : 'pb-2 pt-1.5'}`}>
           <div className="absolute bottom-0 left-1.5 right-1.5 h-px bg-white/[0.04]" />
           <div
             className="absolute bottom-0 left-1.5 h-px rounded-full bg-gradient-to-r from-[var(--brandGradientStart)] to-[var(--brandGradientEnd)] shadow-[0_0_10px_color-mix(in_srgb,var(--brandGradientStart)_24%,transparent)] transition-transform duration-300 ease-out"
@@ -121,7 +121,7 @@ export default function CalendarPage({ onToolbarMetaChange = null }) {
           <button
             type="button"
             onClick={() => setMobilePanel('appointments')}
-            className={`flex h-10 flex-1 items-center justify-center rounded-2xl text-[11px] font-semibold tracking-[-0.02em] transition-all ${
+            className={`flex h-10 flex-1 items-center justify-center ${isCompact ? 'rounded-none' : 'rounded-2xl'} text-[11px] font-semibold tracking-[-0.02em] transition-all ${
               mobilePanel === 'appointments'
                 ? 'text-zinc-100'
                 : 'text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-200'
@@ -132,7 +132,7 @@ export default function CalendarPage({ onToolbarMetaChange = null }) {
           <button
             type="button"
             onClick={() => setMobilePanel('calendar')}
-            className={`flex h-10 flex-1 items-center justify-center rounded-2xl text-[11px] font-semibold tracking-[-0.02em] transition-all ${
+            className={`flex h-10 flex-1 items-center justify-center ${isCompact ? 'rounded-none' : 'rounded-2xl'} text-[11px] font-semibold tracking-[-0.02em] transition-all ${
               mobilePanel === 'calendar'
                 ? 'text-zinc-100'
                 : 'text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-200'

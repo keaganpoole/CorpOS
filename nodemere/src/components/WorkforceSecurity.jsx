@@ -68,6 +68,7 @@ export function MfaPanel({ onVerified, gate = false }) {
       setSetup(null);
       await load();
       await onVerified?.();
+      window.dispatchEvent(new CustomEvent('nodemere:authenticator-updated'));
     } catch (verificationError) {
       submittedCodeRef.current = '';
       setCode('');
@@ -112,7 +113,7 @@ export function MfaPanel({ onVerified, gate = false }) {
     <div className={gate ? '' : 'workforce-actions'}>
       <button type="button" disabled={busy || factorsLoading || Boolean(setup)} className={gate ? (factors.length ? 'text-xs font-medium text-white/45 transition hover:text-white/75 disabled:opacity-40' : 'rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-black transition hover:bg-zinc-200 disabled:opacity-40') : 'workforce-button'} onClick={() => run(async () => setSetup(await enrollTotp(supabase.auth)))}>{factors.length ? 'Use a different authenticator' : 'Set up authenticator'}</button>
       {setup && <button type="button" disabled={busy} className={gate ? 'ml-3 text-sm' : 'workforce-text-button'} onClick={() => run(async () => { const { error: e } = await supabase.auth.mfa.unenroll({ factorId: setup.id }); if (e) throw new Error('Could not cancel setup'); setSetup(null); })}>Cancel setup</button>}
-      {!setup && selected && !gate && <button type="button" disabled={busy} className="workforce-text-button" onClick={() => run(async () => { await removeTotp(supabase.auth, selected); await load(); await onVerified?.(); })}>Remove authenticator</button>}
+      {!setup && selected && !gate && <button type="button" disabled={busy} className="workforce-text-button" onClick={() => run(async () => { await removeTotp(supabase.auth, selected); await load(); await onVerified?.(); window.dispatchEvent(new CustomEvent('nodemere:authenticator-updated')); })}>Remove authenticator</button>}
     </div>
     <p className={gate ? 'pt-2 text-xs text-white/35' : 'workforce-help'}>{gate ? 'Need help? Contact Nodemere support.' : 'Lost access? Use another authenticator or contact Nodemere support.'}</p>
     </div>

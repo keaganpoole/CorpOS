@@ -1,27 +1,32 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { AlertTriangle, ArrowUpRight, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../sonar/lib/api';
+import ModalSpectrumLine from '../ModalSpectrumLine';
 
 const PlanLimitModal = ({ detail, onClose }) => {
   const navigate = useNavigate();
   const [openingPortal, setOpeningPortal] = useState(false);
   const [portalError, setPortalError] = useState('');
-  if (!detail) return null;
-
-  const isSubscriptionIssue = ['subscription_inactive', 'billing_customer_invalid', 'overage_limit_reached', 'billing_context_missing'].includes(detail.code);
-  const title = detail.code === 'minute_limit_reached'
+  const isSubscriptionIssue = ['subscription_inactive', 'billing_customer_invalid', 'overage_limit_reached', 'billing_context_missing'].includes(detail?.code);
+  const title = detail?.code === 'minute_limit_reached'
     ? 'Call minutes used'
-    : detail.code === 'overage_limit_reached'
+    : detail?.code === 'overage_limit_reached'
       ? 'Billing limit reached'
-    : detail.code === 'billing_context_missing'
+    : detail?.code === 'billing_context_missing'
       ? 'Billing verification required'
-    : detail.code === 'feature_not_in_plan'
+    : detail?.code === 'feature_not_in_plan'
       ? 'Plan feature unavailable'
-      : detail.code === 'subscription_inactive'
+      : detail?.code === 'subscription_inactive'
         ? 'Subscription needs attention'
-        : `${String(detail.resource || 'Plan').replace(/\b\w/g, (letter) => letter.toUpperCase())} limit reached`;
+        : detail?.resource === 'receptionists'
+          ? 'Receptionist limit reached'
+          : `${String(detail?.resource || 'Plan').replace(/\b\w/g, (letter) => letter.toUpperCase())} limit reached`;
+  const description = String(detail?.message || 'Your current plan does not include enough capacity for this action.')
+    .replace(/\b1 receptionists\b/gi, '1 receptionist')
+    .replace('Upgrade in Stripe Billing Portal to add more.', 'View plans to add more.');
 
   const handleAction = async () => {
     if (!isSubscriptionIssue) {
@@ -42,43 +47,50 @@ const PlanLimitModal = ({ detail, onClose }) => {
     }
   };
 
-  return (
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
     <AnimatePresence>
-      <motion.div
-        className="fixed inset-0 z-[1200] flex items-center justify-center bg-black/70 p-5 backdrop-blur-md"
+      {detail && <motion.div
+        className="responsive-dialog fixed inset-0 z-[1400] flex items-center justify-center bg-black/55 p-6 backdrop-blur-[2px]"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         onClick={onClose}
       >
-        <motion.div
-          className="relative w-full max-w-[470px] rounded-2xl border border-white/[0.1] bg-[#141414] p-8 text-center text-white shadow-[0_20px_60px_rgba(0,0,0,0.55)]"
-          initial={{ scale: 0.94, opacity: 0, y: 18 }}
-          animate={{ scale: 1, opacity: 1, y: 0 }}
-          exit={{ scale: 0.94, opacity: 0, y: 18 }}
+        <motion.section
+          className="relative flex max-h-[calc(100vh-48px)] w-full max-w-[520px] flex-col overflow-hidden rounded-[34px] border border-white/[0.08] bg-[#070707]/95 text-center text-white shadow-[0_28px_90px_rgba(0,0,0,0.55)] backdrop-blur-xl"
+          initial={{ opacity: 0, y: 24, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 16, scale: 0.98 }}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="plan-limit-title"
           onClick={(event) => event.stopPropagation()}
         >
-          <button type="button" onClick={onClose} className="absolute right-4 top-4 rounded-lg p-2 text-zinc-500 transition hover:bg-white/[0.05] hover:text-white" aria-label="Close">
-            <X size={17} />
-          </button>
-          <div className="mx-auto mb-5 flex h-12 w-12 items-center justify-center rounded-xl border border-amber-400/20 bg-amber-400/10 text-amber-300">
-            <AlertTriangle size={21} />
+          <ModalSpectrumLine variant="plan" />
+          <div className="relative flex flex-1 flex-col overflow-y-auto p-6 sm:p-8">
+            <div className="mb-6 flex items-start justify-between gap-5">
+              <div className="min-w-0 flex-1 pl-8">
+                <h2 id="plan-limit-title" className="text-[26px] font-semibold tracking-[-0.01em] text-white sm:text-[34px]">{title}</h2>
+                <p className="mt-4 text-sm leading-[1.55] text-zinc-300 sm:text-[15px]">{description}</p>
+              </div>
+              <button type="button" onClick={onClose} className="shrink-0 rounded-full p-2 text-zinc-500 transition hover:bg-white/[0.04] hover:text-white" aria-label="Close">
+                <X size={16} />
+              </button>
+            </div>
+            {portalError && <p role="alert" className="mb-4 text-sm text-zinc-300">{portalError}</p>}
+            <div className="mt-2 flex flex-wrap justify-center gap-3">
+              <button type="button" onClick={onClose} className="h-12 rounded-full border border-white/[0.08] px-8 text-sm font-semibold text-zinc-300 transition hover:bg-white/[0.04] hover:text-white">Maybe later</button>
+              <button type="button" onClick={handleAction} disabled={openingPortal} className="h-12 rounded-full bg-white px-8 text-sm font-bold text-black transition hover:bg-zinc-200 disabled:cursor-wait disabled:opacity-60">
+                {openingPortal ? 'Opening...' : isSubscriptionIssue ? 'Open Billing Portal' : 'View Plans'}
+              </button>
+            </div>
           </div>
-          <h2 className="text-[22px] font-bold tracking-tight">{title}</h2>
-          <p className="mt-3 text-[14px] leading-6 text-zinc-400">
-            {detail.message || 'Your current plan does not include enough capacity for this action.'}
-          </p>
-          {portalError && <p className="mt-3 text-[12px] text-red-300">{portalError}</p>}
-          <div className="mt-7 flex flex-col items-center gap-3">
-            <button type="button" onClick={handleAction} disabled={openingPortal} className="flex w-full max-w-[240px] items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-[var(--brandGradientStart)] to-[var(--brandGradientEnd)] px-4 py-3 text-[13px] font-semibold text-black transition hover:brightness-110 disabled:cursor-wait disabled:opacity-60">
-              {openingPortal ? 'Opening...' : isSubscriptionIssue ? 'Open Billing Portal' : 'View Plans'}
-              {!openingPortal && <ArrowUpRight size={15} />}
-            </button>
-            <button type="button" onClick={onClose} className="text-[12px] text-zinc-500 transition hover:text-white">Maybe later</button>
-          </div>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
+        </motion.section>
+      </motion.div>}
+    </AnimatePresence>,
+    document.body,
   );
 };
 

@@ -244,6 +244,8 @@
 
 /* Intercom occupies the existing NEST strip; it never creates a second dock. */
 .intercom-surface { position: absolute; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; overflow: hidden; isolation: isolate; color: white; }
+.intercom-surface.has-warning::after { content: ''; position: absolute; right: 0; bottom: 0; left: 0; z-index: 5; height: 1px; pointer-events: none; background: linear-gradient(90deg, transparent, rgba(250, 204, 21, .48) 22%, rgba(250, 204, 21, .6) 50%, rgba(250, 204, 21, .48) 78%, transparent); box-shadow: 0 -1px 4px rgba(250, 204, 21, .1); animation: intercom-warning-bottom .85s ease-in-out both; }
+@keyframes intercom-warning-bottom { 0%, 100% { opacity: 0; } 42% { opacity: 1; } }
 .intercom-banner { position: absolute; inset: 0; z-index: -3; background-position: center 40%; background-repeat: no-repeat; background-size: auto 104px; opacity: .18; filter: saturate(.7) contrast(1.04); transform: scale(1); transition: opacity 420ms ease, filter 420ms ease, transform 600ms cubic-bezier(.16,1,.3,1), background-size 600ms cubic-bezier(.16,1,.3,1); }
 .phase-selecting .intercom-banner { opacity: .055; filter: saturate(.42) contrast(.92); }
 .intercom-surface:not(.phase-selecting) .intercom-banner { inset: 0 auto 0 0; width: 59%; background-position: 60% 38%; background-size: cover; opacity: .3; filter: saturate(.62) contrast(1.02) brightness(.78); transform: scale(1.03); transform-origin: left center; }
@@ -349,7 +351,9 @@
 .intercom-close { position: absolute; right: 8px; top: 50%; z-index: 5; width: 27px; height: 27px; transform: translateY(-50%); }
 .intercom-close:hover { transform: translateY(-50%) scale(1.04); }
 .intercom-queue { position: absolute; left: 9px; top: 50%; z-index: 5; display: grid; place-items: center; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 999px; color: rgba(255,255,255,.5); background: rgba(255,255,255,.08); font-size: 8px; font-weight: 700; transform: translateY(-50%); }
-.intercom-error, .intercom-idle-warning { position: absolute; left: 50%; bottom: 2px; z-index: 6; max-width: calc(100% - 180px); overflow: hidden; color: rgba(255,170,186,.72); font-size: 8px; line-height: 1; text-overflow: ellipsis; white-space: nowrap; transform: translateX(-50%); }
+.intercom-error, .intercom-idle-warning { position: absolute; top: 50%; left: 50%; z-index: 6; max-width: calc(100% - 150px); overflow: hidden; color: rgba(255,255,255,.62); font-size: 15px; font-weight: 450; letter-spacing: -.01em; line-height: 1.2; text-align: center; text-overflow: ellipsis; white-space: nowrap; text-shadow: 0 1px 10px rgba(0,0,0,.42); transform: translate(-50%, -50%); }
+.intercom-surface.has-warning .intercom-error { animation: intercom-warning-copy-in .42s cubic-bezier(.16, 1, .3, 1) .52s both; }
+@keyframes intercom-warning-copy-in { from { opacity: 0; filter: blur(3px); transform: translate(-50%, calc(-50% + 5px)); } to { opacity: 1; filter: blur(0); transform: translate(-50%, -50%); } }
 .intercom-idle-warning { color: rgba(255,255,255,.4); }
 
 .intercom-privacy-overlay { align-items: center; padding-top: 24px; }
@@ -516,7 +520,8 @@
   .nest-content-icon { width: 18px; height: 18px; }
   .nest-layout-return .nest-icon-part-one { width: 20px; height: 20px; }
   .nest-content-eyebrow, .nest-content-secondary, .nest-content-metric, .nest-live-indicator { display: none; }
-  .nest-content-primary { max-width: 150px; font-size: 11px !important; }
+  .nest-content-primary { max-width: 176px; font-size: 18px !important; line-height: 1; }
+  .nest-layout-return .nest-content-primary { max-width: 176px; font-size: 18px !important; line-height: 1; }
   .nest-dock-tools { right: 38px; }
   .intercom-main { width: calc(100% - 118px); gap: 10px; }
   .intercom-picker { max-width: 100%; gap: 3px; padding-inline: 3px; }
@@ -539,7 +544,7 @@
   .intercom-controls { right: 3px; gap: 1px; }
   .intercom-controls button, .intercom-close { width: 25px; height: 25px; }
   .intercom-close { right: 3px; }
-  .intercom-error, .intercom-idle-warning { max-width: calc(100% - 110px); }
+  .intercom-error, .intercom-idle-warning { max-width: calc(100% - 72px); font-size: 14px; }
   .intercom-history-list > button { grid-template-columns: 32px minmax(0,1fr); }
   .intercom-history-list time { display: none; }
   .nest-studio { height: calc(100vh - 76px); }
@@ -556,6 +561,8 @@
   .intercom-transcript { min-width: 0; max-width: none; }
 }
 @media (prefers-reduced-motion: reduce) {
+  .intercom-surface.has-warning::after { animation: none; opacity: 0; }
+  .intercom-surface.has-warning .intercom-error { animation: none; }
   .nest-stage *, .nest-stage *::before, .nest-stage *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
   .intercom-surface *, .intercom-surface *::before, .intercom-surface *::after,
   .intercom-spectrum { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
