@@ -170,6 +170,7 @@
     background-clip: text;
   }
   .sonar-dashboard-shell[data-responsive="true"] .nest-dock { left: 224px; right: 224px; }
+  .sonar-dashboard-shell[data-responsive="true"] .nest-dock.is-intercom { left: 82px; right: 76px; }
 
   /* Tablet keeps the desktop destinations, but presents them as a compact
      floating dock so the content gets the full canvas without a static rail. */

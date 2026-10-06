@@ -349,6 +349,7 @@
 .intercom-controls button { width: 27px; height: 27px; }
 .intercom-controls button.is-end { color: rgba(255,137,155,.76); }
 .intercom-close { position: absolute; right: 8px; top: 50%; z-index: 5; width: 27px; height: 27px; transform: translateY(-50%); }
+.sonar-dashboard-chrome > .intercom-close { right: 84px; z-index: 40; }
 .intercom-close:hover { transform: translateY(-50%) scale(1.04); }
 .intercom-queue { position: absolute; left: 9px; top: 50%; z-index: 5; display: grid; place-items: center; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 999px; color: rgba(255,255,255,.5); background: rgba(255,255,255,.08); font-size: 8px; font-weight: 700; transform: translateY(-50%); }
 .intercom-error, .intercom-idle-warning { position: absolute; top: 50%; left: 50%; z-index: 6; max-width: calc(100% - 150px); overflow: hidden; color: rgba(255,255,255,.62); font-size: 15px; font-weight: 450; letter-spacing: -.01em; line-height: 1.2; text-align: center; text-overflow: ellipsis; white-space: nowrap; text-shadow: 0 1px 10px rgba(0,0,0,.42); transform: translate(-50%, -50%); }
@@ -356,15 +357,6 @@
 @keyframes intercom-warning-copy-in { from { opacity: 0; filter: blur(3px); transform: translate(-50%, calc(-50% + 5px)); } to { opacity: 1; filter: blur(0); transform: translate(-50%, -50%); } }
 .intercom-idle-warning { color: rgba(255,255,255,.4); }
 
-.intercom-privacy-overlay { align-items: center; padding-top: 24px; }
-.intercom-privacy-panel { position: relative; width: min(390px, calc(100vw - 32px)); overflow: hidden; padding: 28px; border: 1px solid rgba(255,255,255,.09); border-radius: 20px; background: rgba(8,8,9,.98); box-shadow: 0 30px 90px rgba(0,0,0,.64), inset 0 1px rgba(255,255,255,.04); text-align: center; }
-.intercom-spectrum { position: absolute; left: -20%; right: -20%; top: 0; height: 1px; background: linear-gradient(90deg, transparent 5%, #f05fb9, #b776ef, #70c9f3, #f05fb9, transparent 95%); background-size: 50% 100%; animation: intercom-spectrum-shift 4.2s linear infinite; opacity: .86; }
-.intercom-privacy-mark { display: grid; place-items: center; width: 38px; height: 38px; margin: 0 auto 16px; border: 1px solid rgba(255,255,255,.08); border-radius: 50%; color: rgba(255,255,255,.72); background: rgba(255,255,255,.035); }
-.intercom-privacy-panel h2 { margin: 0; color: rgba(255,255,255,.94); font-size: 18px; font-weight: 610; letter-spacing: 0; }
-.intercom-privacy-panel p { margin: 10px auto 22px; max-width: 300px; color: rgba(255,255,255,.4); font-size: 11px; line-height: 1.65; }
-.intercom-privacy-actions { display: flex; justify-content: center; gap: 7px; }
-.intercom-privacy-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 34px; padding: 0 14px; border: 1px solid rgba(255,255,255,.08); border-radius: 8px; color: rgba(255,255,255,.52); background: transparent; font-size: 10px; font-weight: 650; }
-.intercom-privacy-actions button.is-primary { color: rgba(255,255,255,.9); border-color: rgba(221,126,221,.23); background: rgba(190,76,185,.13); }
 .intercom-notice-actions { display: inline-flex; align-items: center; gap: 7px; }
 .intercom-notice-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 5px; height: 27px; padding: 0 10px; border: 1px solid rgba(255,255,255,.08); border-radius: 7px; color: rgba(255,255,255,.52); background: transparent; font-size: 9px; font-weight: 650; }
 .intercom-notice-actions button:hover, .intercom-notice-actions button:focus-visible { border-color: rgba(255,255,255,.28); background: rgba(255,255,255,.1); outline: none; }
@@ -417,7 +409,6 @@
 
 @keyframes intercom-wave { 0% { opacity: .58; transform: scale(.88); } 72%,100% { opacity: 0; transform: scale(1.32); } }
 @keyframes intercom-particle { 0%,100% { opacity: .18; transform: translate3d(0,2px,0) scale(.72); } 48% { opacity: .9; transform: translate3d(1px,-2px,0) scale(1.12); } }
-@keyframes intercom-spectrum-shift { to { background-position: 100% 0; } }
 @keyframes intercom-presence-flow { 0% { border-radius: 46% 54% 58% 42% / 54% 43% 57% 46%; transform: rotate(-5deg) scale(.96); opacity: .7; } 46% { border-radius: 59% 41% 45% 55% / 42% 58% 47% 53%; transform: rotate(5deg) scale(1.04); opacity: 1; } 100% { border-radius: 42% 58% 52% 48% / 58% 46% 54% 42%; transform: rotate(-2deg) scale(.99); opacity: .82; } }
 @keyframes intercom-presence-flow-reverse { 0% { border-radius: 57% 43% 46% 54% / 44% 56% 45% 55%; transform: rotate(5deg) scale(1.03); } 52% { border-radius: 43% 57% 56% 44% / 58% 42% 54% 46%; transform: rotate(-6deg) scale(.95); } 100% { border-radius: 52% 48% 42% 58% / 47% 55% 45% 53%; transform: rotate(3deg) scale(1); } }
 @keyframes intercom-status-breathe { 0%,100% { opacity: .62; transform: scaleY(.88); } 50% { opacity: 1; transform: scaleY(1.08); } }
@@ -564,8 +555,7 @@
   .intercom-surface.has-warning::after { animation: none; opacity: 0; }
   .intercom-surface.has-warning .intercom-error { animation: none; }
   .nest-stage *, .nest-stage *::before, .nest-stage *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
-  .intercom-surface *, .intercom-surface *::before, .intercom-surface *::after,
-  .intercom-spectrum { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+  .intercom-surface *, .intercom-surface *::before, .intercom-surface *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
 @keyframes nest-live-pulse { 0%,100%{opacity:.38;transform:scale(.82)} 50%{opacity:1;transform:scale(1.08)} }
 @keyframes nest-call-breathe { 0%,100%{transform:translateY(0) rotate(0)} 50%{transform:translateY(-.5px) rotate(-1.4deg)} }

@@ -13,7 +13,6 @@ import ModalSpectrumLine from '../../components/ModalSpectrumLine';
 import ringingSound from '../../assets/ringing.mp3';
 import pickupSound from '../../assets/pickup.mp3';
 
-const PRIVACY_COPY = 'Voice conversations may be transcribed and saved so you can review them later.';
 const CALL_MINUTES_NOTICE_KEY = 'nodemere.nest.call-minutes-notice-accepted';
 const ACTIVE_PHASES = new Set(['connecting', 'listening', 'speaking']);
 const RECEPTIONIST_WARNINGS = {
@@ -67,41 +66,6 @@ const isSuccessfulDispatchToolResponse = (response) => {
 
 const fallbackInitial = (name) => String(name || 'R').trim().slice(0, 1).toUpperCase();
 const receptionistImage = (receptionist) => receptionist?.avatar || receptionist?.banner_url || '';
-
-function PrivacyNotice({ open, busy, onCancel, onAccept }) {
-  if (typeof document === 'undefined') return null;
-  return createPortal(
-    <AnimatePresence>
-      {open && (
-        <motion.div className="nest-overlay intercom-privacy-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-          <motion.section
-            className="intercom-privacy-panel no-drag"
-            initial={{ opacity: 0, y: 10, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 7, scale: 0.99 }}
-            transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="intercom-privacy-title"
-          >
-            <span className="intercom-spectrum" aria-hidden="true" />
-            <div className="intercom-privacy-mark"><Mic size={17} /></div>
-            <h2 id="intercom-privacy-title">Before you begin</h2>
-            <p>{PRIVACY_COPY}</p>
-            <div className="intercom-privacy-actions">
-              <button type="button" className="is-secondary" onClick={onCancel}>Not now</button>
-              <button type="button" className="is-primary" onClick={onAccept} disabled={busy}>
-                <Check size={14} />
-                {busy ? 'Starting' : 'Continue'}
-              </button>
-            </div>
-          </motion.section>
-        </motion.div>
-      )}
-    </AnimatePresence>,
-    document.body,
-  );
-}
 
 function CallMinutesNotice({ onClose, onAccept }) {
   if (typeof document === 'undefined') return null;
@@ -158,7 +122,6 @@ function NestIntercomInner({ open, onClose, mobile = false }) {
   const [line, setLine] = useState(null);
   const [muted, setMuted] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [privacyOpen, setPrivacyOpen] = useState(false);
   const [callMinutesNoticeAccepted, setCallMinutesNoticeAccepted] = useState(false);
   const [micPermissionState, setMicPermissionState] = useState('unknown');
   const [silenceHintVisible, setSilenceHintVisible] = useState(false);
@@ -548,25 +511,7 @@ function NestIntercomInner({ open, onClose, mobile = false }) {
       return;
     }
     setError('');
-    if (!bootstrap?.settings?.privacy_accepted) {
-      setPrivacyOpen(true);
-      return;
-    }
     beginSession({ receptionistId: String(receptionistId) });
-  };
-
-  const acceptPrivacy = async () => {
-    setLoading(true);
-    try {
-      const result = await api.updateIntercomSettings({ privacy_accepted: true });
-      setBootstrap((current) => ({ ...current, settings: { ...(current?.settings || {}), ...(result?.settings || {}) } }));
-      setPrivacyOpen(false);
-      await beginSession({ force: true });
-    } catch (err) {
-      setError(intercomStartError(err));
-    } finally {
-      setLoading(false);
-    }
   };
 
   const endSession = () => {
@@ -604,6 +549,10 @@ function NestIntercomInner({ open, onClose, mobile = false }) {
     : phase === 'speaking'
       ? 'Speaking with you'
       : 'I\u2019m here. What do you need?';
+  const header = typeof document !== 'undefined' ? document.querySelector('.sonar-dashboard-chrome') : null;
+  const closeButton = (
+    <button type="button" className="intercom-close" onClick={() => { startAttemptRef.current += 1; onClose?.(); }} aria-label="Close voice conversation"><X size={13} /></button>
+  );
 
   return (
     <>
@@ -765,7 +714,7 @@ function NestIntercomInner({ open, onClose, mobile = false }) {
             </div>
 
             {phase === 'selecting' || phase === 'calling' || phase === 'mic-permission' || phase === 'call-minutes-notice' ? (
-              <button type="button" className="intercom-close" onClick={() => { startAttemptRef.current += 1; onClose?.(); }} aria-label="Close voice conversation"><X size={13} /></button>
+              !mobile && header ? createPortal(closeButton, header) : closeButton
             ) : (
               <div className="intercom-controls no-drag">
                 <button type="button" onClick={() => setMuted((value) => !value)} aria-label={muted ? 'Unmute microphone' : 'Mute microphone'}>
@@ -780,7 +729,6 @@ function NestIntercomInner({ open, onClose, mobile = false }) {
           </motion.div>
         )}
       </AnimatePresence>
-      <PrivacyNotice open={privacyOpen} busy={loading} onCancel={() => setPrivacyOpen(false)} onAccept={acceptPrivacy} />
     </>
   );
 }
