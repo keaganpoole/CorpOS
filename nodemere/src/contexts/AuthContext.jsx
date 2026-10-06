@@ -25,8 +25,11 @@ export const AuthProvider = ({ children }) => {
     const [isProfileLoaded, setIsProfileLoaded] = useState(false);
     const [isAppLoading, setIsAppLoading] = useState(false);
     const currentUserIdRef = useRef(null);
+    const workforceRefreshRevisionRef = useRef(0);
     const [workforce, setWorkforce] = useState(null);
     const refreshWorkforce = useCallback(async () => {
+        const refreshRevision = workforceRefreshRevisionRef.current + 1;
+        workforceRefreshRevisionRef.current = refreshRevision;
         const { data } = await withTimeout(supabase.auth.getSession(), 'Supabase session');
         const active = data.session;
         if (!active) { setWorkforce(null); setWorkforceContext(null); return null; }
@@ -44,10 +47,20 @@ export const AuthProvider = ({ children }) => {
             const body = await response.json();
             if (assurance.error) throw new Error('Could not verify authentication assurance. Please sign in again.');
             const value = { tenant: body.tenant, policy_requires_mfa: body.policy_requires_mfa, needsMfa: needsMfa(assurance.data, body.tenant) };
-            if (currentUserIdRef.current !== active.user.id) return null;
+            if (currentUserIdRef.current !== active.user.id || workforceRefreshRevisionRef.current !== refreshRevision) return null;
             setWorkforceContext(body.tenant); setWorkforce(value); return value;
         } catch (error) {
-            if (currentUserIdRef.current === active.user.id) { setWorkforceContext(null); setWorkforce({ error: error.message }); }
+            if (currentUserIdRef.current === active.user.id && workforceRefreshRevisionRef.current === refreshRevision) {
+                const requestWasAborted = error?.name === 'AbortError' || /signal is aborted|operation was aborted/i.test(String(error?.message || ''));
+                setWorkforce((current) => {
+                    if (current?.tenant && !current.error) return current;
+                    return {
+                        error: requestWasAborted
+                            ? 'Workforce access is taking longer than expected. Please retry.'
+                            : (error?.message || 'Workforce access is temporarily unavailable.'),
+                    };
+                });
+            }
             return null;
         }
     }, []);

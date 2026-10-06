@@ -14,7 +14,7 @@ import {
   ArrowRight, X, Users, Maximize2, Wand2,
   CalendarClock, Mail, PhoneCall, ListChecks, Upload, CalendarCheck, Pencil, Play, LogOut,
   ThumbsUp, ThumbsDown, Palette,
-  Loader2, CreditCard, ExternalLink,
+  Loader2, CreditCard,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -3577,7 +3577,6 @@ const BillingSettings = ({ profile }) => {
             disabled={openingPortal}
             className="settings-neutral-button inline-flex shrink-0 items-center gap-2 rounded-xl px-4 py-2 text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 disabled:cursor-wait disabled:opacity-50"
           >
-            {openingPortal ? <Loader2 size={13} className="animate-spin" /> : <ExternalLink size={13} />}
             {openingPortal ? 'Opening' : 'Open Portal'}
           </button>
         </div>

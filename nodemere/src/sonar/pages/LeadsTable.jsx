@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from 'react';
 import MobileRecords from '../components/MobileRecords';
 import useDashboardViewport from '../hooks/useDashboardViewport';
 import { createPortal } from 'react-dom';
@@ -1149,6 +1149,7 @@ const LeadsTable = ({
   const horizontalScrollRef = useRef(null);
   const headerStickyRef = useRef(null);
   const headerRowRef = useRef(null);
+  const zoneOverlayRef = useRef(null);
   const headerRefs = useRef({});
   const [dragIndex, setDragIndex] = useState(null);
   const [dragOverIndex, setDragOverIndex] = useState(null);
@@ -1266,28 +1267,28 @@ const LeadsTable = ({
   }, [columns, customFields, fieldConfig, onSchemaChange]);
 
   const measureHeaderMetrics = useCallback(() => {
-    if (!headerRowRef.current) return;
+    if (!zoneOverlayRef.current) return;
+    const overlayRect = zoneOverlayRef.current.getBoundingClientRect();
     const nextMetrics = columns
       .map((col, index) => {
         const el = headerRefs.current[col.id];
-        const rowRect = headerRowRef.current.getBoundingClientRect();
-        if (!el) return null;
+        if (!el || !zoneOverlayRef.current.contains(el)) return null;
         const rect = el.getBoundingClientRect();
         return {
           id: col.id,
           index,
-          left: rect.left - rowRect.left,
-          right: rect.right - rowRect.left,
+          left: rect.left - overlayRect.left,
+          right: rect.right - overlayRect.left,
           width: rect.width,
-          center: rect.left - rowRect.left + (rect.width / 2),
+          center: rect.left - overlayRect.left + (rect.width / 2),
           eligible: isZoneEligibleColumn(col),
         };
       })
       .filter(Boolean);
     setHeaderMetrics(nextMetrics);
-  }, [columns]);
+  }, [columns, viewSettings.frozenCount]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     measureHeaderMetrics();
   }, [measureHeaderMetrics]);
 
@@ -1297,11 +1298,15 @@ const LeadsTable = ({
   }, [measureHeaderMetrics]);
 
   useEffect(() => {
-    if (!headerRowRef.current || typeof ResizeObserver === 'undefined') return undefined;
+    if (!zoneOverlayRef.current || typeof ResizeObserver === 'undefined') return undefined;
     const observer = new ResizeObserver(() => measureHeaderMetrics());
-    observer.observe(headerRowRef.current);
+    observer.observe(zoneOverlayRef.current);
+    columns.forEach((column) => {
+      const header = headerRefs.current[column.id];
+      if (header && zoneOverlayRef.current.contains(header)) observer.observe(header);
+    });
     return () => observer.disconnect();
-  }, [measureHeaderMetrics]);
+  }, [columns, measureHeaderMetrics]);
 
   const persistFieldConfig = async (next) => {
     setFieldConfig(next);
@@ -1680,9 +1685,9 @@ const LeadsTable = ({
   }, [fieldConfig]);
 
   const findClosestZoneMetric = useCallback((clientX) => {
-    if (!headerRowRef.current || headerMetrics.length === 0) return null;
-    const rowRect = headerRowRef.current.getBoundingClientRect();
-    const relativeX = clientX - rowRect.left;
+    if (!zoneOverlayRef.current || headerMetrics.length === 0) return null;
+    const overlayRect = zoneOverlayRef.current.getBoundingClientRect();
+    const relativeX = clientX - overlayRect.left;
     const eligibleMetrics = headerMetrics.filter((metric) => metric.eligible);
     if (!eligibleMetrics.length) return null;
     const containing = eligibleMetrics.find((metric) => relativeX >= metric.left && relativeX <= metric.right);
@@ -1827,9 +1832,9 @@ const LeadsTable = ({
   ), [headerMetrics, hoveredZoneColumnId]);
 
   const zonePalette = useMemo(() => zoneLayouts.find((zone) => zone.id === zonePaletteId) || null, [zoneLayouts, zonePaletteId]);
-  const zonePalettePosition = zonePalette && headerRowRef.current && headerStickyRef.current
+  const zonePalettePosition = zonePalette && zoneOverlayRef.current && headerStickyRef.current
     ? {
-        left: headerRowRef.current.getBoundingClientRect().left + zonePalette.center,
+        left: zoneOverlayRef.current.getBoundingClientRect().left + zonePalette.center,
         top: headerStickyRef.current.getBoundingClientRect().top,
       }
     : null;
@@ -2047,7 +2052,7 @@ const LeadsTable = ({
         <div ref={horizontalScrollRef} className="crm-horizontal-scroll min-w-0 flex-1 overflow-x-auto overflow-y-visible custom-scrollbar">
           <div className="min-w-max">
             <div ref={headerStickyRef} className="sticky top-0 z-10 border-b border-white/[0.04] bg-[#0a0a0a]/95 backdrop-blur-sm overflow-visible">
-              <div className="relative">
+              <div ref={zoneOverlayRef} className="relative">
                 <div className="hidden" style={{ left: frozenCount > 0 ? 0 : frozenHandleLeft }}>
                   {isDraggingFrozenDivider && <div className="absolute top-0 h-[calc(100vh-220px)] border-l border-dotted border-zinc-300/35" />}
                 </div>

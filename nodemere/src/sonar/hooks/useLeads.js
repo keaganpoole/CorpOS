@@ -50,7 +50,15 @@ const timestampMs = (value) => {
 
 const mergePendingLocalUpdate = (incoming, pending) => {
   if (!incoming || !pending?.updates) return incoming;
-  return { ...incoming, ...pending.updates, updated_at: incoming.updated_at || pending.updated_at };
+  const incomingUpdatedAt = incoming.updated_at;
+  const pendingUpdatedAt = pending.updated_at;
+  return {
+    ...incoming,
+    ...pending.updates,
+    updated_at: timestampMs(pendingUpdatedAt) >= timestampMs(incomingUpdatedAt)
+      ? (pendingUpdatedAt || incomingUpdatedAt)
+      : incomingUpdatedAt,
+  };
 };
 
 const mergePendingRows = (rows, pendingUpdates) => rows.map((row) => {
@@ -222,7 +230,7 @@ export function useLeads() {
   const updateLead = async (id, updates) => {
     const payload = normalizePayload(updates, { isCreate: false });
     let previousRow = null;
-    let optimisticUpdatedAt = payload.updated_at;
+    const optimisticUpdatedAt = payload.updated_at;
     setError(null);
     setLeads((prev) => prev.map((row) => {
       if (row.id !== id) return row;
@@ -232,9 +240,12 @@ export function useLeads() {
     const pendingKey = String(id);
     const existingPending = pendingLocalUpdatesRef.current.get(pendingKey);
     if (existingPending?.timeout) clearTimeout(existingPending.timeout);
+    const revision = (existingPending?.revision || 0) + 1;
+    const combinedUpdates = { ...(existingPending?.updates || {}), ...payload };
     pendingLocalUpdatesRef.current.set(pendingKey, {
+      revision,
       updated_at: optimisticUpdatedAt,
-      updates: payload,
+      updates: combinedUpdates,
       timeout: setTimeout(() => pendingLocalUpdatesRef.current.delete(pendingKey), 15000),
     });
 
@@ -243,23 +254,30 @@ export function useLeads() {
       data = await api.updatePerson(id, payload);
     } catch (err) {
       const pending = pendingLocalUpdatesRef.current.get(pendingKey);
-      if (pending?.timeout) clearTimeout(pending.timeout);
-      pendingLocalUpdatesRef.current.delete(pendingKey);
-      if (previousRow) {
-        setLeads((prev) => prev.map((row) => (row.id === id ? previousRow : row)));
+      if (pending?.revision === revision) {
+        if (pending.timeout) clearTimeout(pending.timeout);
+        pendingLocalUpdatesRef.current.delete(pendingKey);
+        if (previousRow) {
+          setLeads((prev) => prev.map((row) => (row.id === id ? previousRow : row)));
+        }
       }
       throw err;
     }
 
-    const nextUpdatedAt = data?.updated_at || optimisticUpdatedAt;
     const pending = pendingLocalUpdatesRef.current.get(pendingKey);
-    if (pending?.timeout) clearTimeout(pending.timeout);
-    pendingLocalUpdatesRef.current.set(pendingKey, {
-      updated_at: nextUpdatedAt,
-      updates: payload,
+    if (pending?.revision !== revision) {
+      setLeads((prev) => prev.map((row) => (row.id === id ? mergePendingLocalUpdate(data, pending) : row)));
+      return data;
+    }
+
+    if (pending.timeout) clearTimeout(pending.timeout);
+    const confirmedPending = {
+      ...pending,
+      updated_at: data?.updated_at || pending.updated_at,
       timeout: setTimeout(() => pendingLocalUpdatesRef.current.delete(pendingKey), 15000),
-    });
-    setLeads((prev) => prev.map((row) => (row.id === id ? mergePendingLocalUpdate(data, pendingLocalUpdatesRef.current.get(pendingKey)) : row)));
+    };
+    pendingLocalUpdatesRef.current.set(pendingKey, confirmedPending);
+    setLeads((prev) => prev.map((row) => (row.id === id ? mergePendingLocalUpdate(data, confirmedPending) : row)));
     return data;
   };
 

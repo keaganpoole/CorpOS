@@ -11,6 +11,29 @@ const getReceptionistBannerUrl = (bannerId) => (
 const SINGLE_SELECT_FIELDS = new Set(['status', 'source']);
 const TRIMMED_TEXT_FIELDS = new Set(['notes', 'time']);
 
+const timestampMs = (value) => {
+  const time = Date.parse(value || '');
+  return Number.isFinite(time) ? time : 0;
+};
+
+const mergePendingLocalUpdate = (incoming, pending) => {
+  if (!incoming || !pending?.updates) return incoming;
+  const incomingUpdatedAt = incoming.updated_at;
+  const pendingUpdatedAt = pending.updated_at;
+  return {
+    ...incoming,
+    ...pending.updates,
+    updated_at: timestampMs(pendingUpdatedAt) >= timestampMs(incomingUpdatedAt)
+      ? (pendingUpdatedAt || incomingUpdatedAt)
+      : incomingUpdatedAt,
+  };
+};
+
+const mergePendingRows = (rows, pendingUpdates) => rows.map((row) => {
+  const pending = pendingUpdates.get(String(row.id));
+  return pending ? mergePendingLocalUpdate(row, pending) : row;
+});
+
 const normalizePayload = (payload = {}, { isCreate = false } = {}) => {
   const next = { ...payload };
   const now = new Date().toISOString();
@@ -100,6 +123,7 @@ export function useAppointments() {
   const abortRef = useRef(false);
   const businessIdRef = useRef(null);
   const pendingInsertPlacementRef = useRef(new Map());
+  const pendingLocalUpdatesRef = useRef(new Map());
   const shimmerTimersRef = useRef(new Map());
 
   const lookups = useMemo(() => {
@@ -143,7 +167,7 @@ export function useAppointments() {
     try {
       const appointmentRows = await api.getAppointments(500);
       if (!abortRef.current && Array.isArray(appointmentRows)) {
-        setAppointments(appointmentRows);
+        setAppointments(mergePendingRows(appointmentRows, pendingLocalUpdatesRef.current));
         setLoading(false);
       }
       if (!abortRef.current && !Array.isArray(appointmentRows)) {
@@ -208,6 +232,8 @@ export function useAppointments() {
       abortRef.current = true;
       shimmerTimersRef.current.forEach((timeout) => clearTimeout(timeout));
       shimmerTimersRef.current.clear();
+      pendingLocalUpdatesRef.current.forEach(({ timeout }) => clearTimeout(timeout));
+      pendingLocalUpdatesRef.current.clear();
     };
   }, [fetchAppointments]);
 
@@ -253,18 +279,47 @@ export function useAppointments() {
       previousRow = row;
       return { ...row, ...payload };
     }));
+    const pendingKey = String(id);
+    const existingPending = pendingLocalUpdatesRef.current.get(pendingKey);
+    if (existingPending?.timeout) clearTimeout(existingPending.timeout);
+    const revision = (existingPending?.revision || 0) + 1;
+    const combinedUpdates = { ...(existingPending?.updates || {}), ...payload };
+    pendingLocalUpdatesRef.current.set(pendingKey, {
+      revision,
+      updated_at: payload.updated_at,
+      updates: combinedUpdates,
+      timeout: setTimeout(() => pendingLocalUpdatesRef.current.delete(pendingKey), 15000),
+    });
 
     let data;
     try {
       data = await api.updateAppointment(id, payload);
     } catch (err) {
-      if (previousRow) {
-        setAppointments((prev) => prev.map((row) => (row.id === id ? previousRow : row)));
+      const pending = pendingLocalUpdatesRef.current.get(pendingKey);
+      if (pending?.revision === revision) {
+        if (pending.timeout) clearTimeout(pending.timeout);
+        pendingLocalUpdatesRef.current.delete(pendingKey);
+        if (previousRow) {
+          setAppointments((prev) => prev.map((row) => (row.id === id ? previousRow : row)));
+        }
       }
       throw err;
     }
 
-    setAppointments((prev) => prev.map((row) => (row.id === id ? data : row)));
+    const pending = pendingLocalUpdatesRef.current.get(pendingKey);
+    if (pending?.revision !== revision) {
+      setAppointments((prev) => prev.map((row) => (row.id === id ? mergePendingLocalUpdate(data, pending) : row)));
+      return data;
+    }
+
+    if (pending.timeout) clearTimeout(pending.timeout);
+    const confirmedPending = {
+      ...pending,
+      updated_at: data?.updated_at || pending.updated_at,
+      timeout: setTimeout(() => pendingLocalUpdatesRef.current.delete(pendingKey), 15000),
+    };
+    pendingLocalUpdatesRef.current.set(pendingKey, confirmedPending);
+    setAppointments((prev) => prev.map((row) => (row.id === id ? mergePendingLocalUpdate(data, confirmedPending) : row)));
     return data;
   };
 
