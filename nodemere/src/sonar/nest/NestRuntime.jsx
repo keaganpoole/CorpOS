@@ -18,6 +18,13 @@ const MAX_ORPHANED_CALL_AGE_MS = 10 * 60 * 1000;
 const PAYMENT_SUCCESS = new Set(['paid', 'succeeded', 'successful', 'complete', 'completed']);
 const PAYMENT_FAILED = new Set(['failed', 'declined', 'canceled', 'cancelled']);
 const PRIORITY = { routine: 1, major: 2, critical: 3 };
+const DURABLE_MILESTONE_KEYS = new Set([
+  'first_receptionist_hired', 'first_staff_member_added', 'first_call_received',
+  'first_successful_call', 'first_receptionist_booking', 'first_person_added',
+  'first_appointment_booked', 'first_appointment_completed', 'first_successful_payment',
+  'first_invoice_paid', 'first_repeat_customer', 'first_automated_booking',
+  'first_automated_follow_up', 'business_setup_completed',
+]);
 
 const safeJsonParse = (value, fallback) => {
   try {
@@ -87,7 +94,9 @@ const durationForEvent = (event) => {
 const shownEventKey = (event = {}) => {
   if (!event || typeof event !== 'object') return '';
   if (event.dedupe_key) return `dedupe:${event.dedupe_key}`;
-  const milestoneKey = event.milestone_key || event.milestone_keys?.[0] || '';
+  const milestoneKey = event.milestone_key
+    || event.milestone_keys?.[0]
+    || (event.source === 'nest' && DURABLE_MILESTONE_KEYS.has(event.event_type) ? event.event_type : '');
   if (milestoneKey) return `milestone:${milestoneKey}`;
   if (event.source && event.source_id && event.event_type) {
     return `${event.source}:${event.source_id}:${event.event_type}`;
@@ -250,6 +259,15 @@ const normalizeRealtimePayload = (table, payload, history = []) => {
   return null;
 };
 
+const milestoneKeysForEvent = (event = {}) => {
+  const keys = [
+    ...(Array.isArray(event.milestone_keys) ? event.milestone_keys : []),
+    ...(event.milestone_key ? [event.milestone_key] : []),
+    ...(event.source === 'nest' && DURABLE_MILESTONE_KEYS.has(event.event_type) ? [event.event_type] : []),
+  ];
+  return [...new Set(keys)];
+};
+
 const callRow = (call) => call?.raw || call || {};
 
 const isLiveCallRecord = (call) => {
@@ -385,6 +403,13 @@ export const NestProvider = ({ children, businessId, tasklistState }) => {
     if (!preview && (!categoryEnabled || nestPreferences.notifications?.[notificationKey] === false)) return;
     if (!incoming?.id || (!preview && seenRef.current.has(incoming.id))) return;
     if (!preview && shownRef.current.has(shownEventKey(incoming))) return;
+    if (!preview) {
+      const milestoneKeys = milestoneKeysForEvent(incoming);
+      const milestoneAlreadyClaimed = milestoneKeys.some((key) => historyRef.current.some((event) => (
+        event.source === 'nest' && event.event_type === key
+      )));
+      if (milestoneAlreadyClaimed) return;
+    }
     const event = {
       priority: 'routine',
       occurred_at: new Date().toISOString(),
@@ -513,12 +538,10 @@ export const NestProvider = ({ children, businessId, tasklistState }) => {
         if (label) setLiveCallActions((current) => current.some((action) => action.id === normalized.id)
           ? current : [...current, { id: normalized.id, type: normalized.event_type, label }].slice(-4));
       }
-      const milestoneKeys = normalized.milestone_keys || (normalized.milestone_key ? [normalized.milestone_key] : []);
-      const alreadyClaimed = milestoneKeys.length > 0 && normalized.source_id
+      const milestoneKeys = milestoneKeysForEvent(normalized);
+      const alreadyClaimed = milestoneKeys.length > 0
         && historyRef.current.some((event) => (
-          event.source === 'nest'
-          && event.source_id === String(normalized.source_id)
-          && milestoneKeys.includes(event.event_type)
+          event.source === 'nest' && milestoneKeys.includes(event.event_type)
         ));
       if (!alreadyClaimed) enqueue(normalized);
     };

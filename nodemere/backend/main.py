@@ -12769,6 +12769,7 @@ async def hire_receptionist(payload: dict, current_user: dict = Depends(get_curr
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="catalog_id is required")
 
     current_user_id = business_owner_id(current_user)
+    newly_hired = False
     try:
         business = load_business_by_user_id(current_user_id)
         if not business:
@@ -12784,6 +12785,7 @@ async def hire_receptionist(payload: dict, current_user: dict = Depends(get_curr
             created = result["receptionist"]
             if not result["newly_hired"]:
                 return created
+            newly_hired = True
         else:
             if is_voice_clone_hire:
                 voice_response = (
@@ -12808,6 +12810,7 @@ async def hire_receptionist(payload: dict, current_user: dict = Depends(get_curr
                     created = result["receptionist"]
                     if not result["newly_hired"]:
                         return created
+                    newly_hired = True
                 else:
                     enforce_plan_limit(plan_context, "receptionists", count_active_receptionists(current_user_id), "max_receptionists")
                     normalized = normalize_custom_voice_receptionist(catalog_row)
@@ -12827,9 +12830,25 @@ async def hire_receptionist(payload: dict, current_user: dict = Depends(get_curr
                 )}
                 insert_payload.update(catalog_id=catalog_row["id"], elevenlabs_voice_id=catalog_row.get("elevenlabs_voice_id") or catalog_row.get("elevenlabs_agent_id"))
             if not is_voice_clone_hire or not linked:
-                insert_payload.update(is_active=True, direction="all", user_id=current_user_id, business_id=business_id)
+                insert_payload.update(is_active=True, status="Idle", direction="none", user_id=current_user_id, business_id=business_id)
                 response = supabase.table("hired_receptionists").insert(insert_payload).execute()
                 created = response.data[0] if response.data else insert_payload
+                newly_hired = True
+        if newly_hired:
+            # A fresh hire must not claim both scarce call-routing slots. Keep
+            # it active but unassigned until the owner chooses inbound or outbound.
+            routing_response = (
+                supabase.table("hired_receptionists")
+                .update({"status": "Idle", "direction": "none"})
+                .eq("id", str(created.get("id")))
+                .eq("user_id", current_user_id)
+                .eq("business_id", business_id)
+                .execute()
+            )
+            if routing_response.data:
+                created = routing_response.data[0]
+            else:
+                created = {**created, "status": "Idle", "direction": "none"}
         clear_inbound_call_boot_cache(created.get("business_id") or business_id)
         claim_nest_milestone(
             supabase,

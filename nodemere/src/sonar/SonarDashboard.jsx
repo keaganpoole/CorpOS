@@ -5,6 +5,7 @@
 import React, { useState, useEffect, useRef, useCallback, Component, lazy, Suspense } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from './lib/supabase';
+import { avatarVideoUrl } from './studio/catalogGeometry';
 import {
   IdCardLanyard,
   Activity,
@@ -146,7 +147,7 @@ const POPUP_DEFINITIONS = [
     placement: 'dashboard',
     title: 'Getting Started',
     manualOnly: true,
-    getDescription: () => 'A few finishing touches can help you get the most out of your account. We’ll keep things simple and guide you along the way as everything comes together.',
+    getDescription: () => 'Your new front desk needs a few things before it’s ready to go. We’ll guide you through each step and make setup simple.',
     primaryActionLabel: 'Got it',
   },
   {
@@ -714,6 +715,120 @@ const CallHandlingIcon = ({ direction }) => {
 
 const TeamCards = ({ phone, children }) => phone ? <MobileTeamCarousel>{children}</MobileTeamCarousel> : <motion.div className="grid grid-cols-[repeat(auto-fill,340px)] items-start justify-start gap-6" variants={teamGridVariants}>{children}</motion.div>;
 
+const StableHoverVideo = ({ src, poster, name, onError }) => {
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
+  const [canvasReady, setCanvasReady] = useState(false);
+  const [canvasFailed, setCanvasFailed] = useState(false);
+
+  useEffect(() => {
+    if (canvasFailed) return undefined;
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas) return undefined;
+
+    let stopped = false;
+    let videoFrameId = null;
+    let animationFrameId = null;
+    let lastVideoTime = -1;
+    let ready = false;
+    const paint = () => {
+      if (stopped || video.readyState < 2 || !video.videoWidth || !video.videoHeight) return;
+      const width = canvas.clientWidth;
+      const height = canvas.clientHeight;
+      if (!width || !height) return;
+      const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+      const pixelWidth = Math.round(width * pixelRatio);
+      const pixelHeight = Math.round(height * pixelRatio);
+      if (canvas.width !== pixelWidth || canvas.height !== pixelHeight) {
+        canvas.width = pixelWidth;
+        canvas.height = pixelHeight;
+      }
+      const context = canvas.getContext('2d', { alpha: false });
+      if (!context) return;
+      const sourceAspect = video.videoWidth / video.videoHeight;
+      const targetAspect = pixelWidth / pixelHeight;
+      const sourceWidth = sourceAspect > targetAspect ? video.videoHeight * targetAspect : video.videoWidth;
+      const sourceHeight = sourceAspect > targetAspect ? video.videoHeight : video.videoWidth / targetAspect;
+      try {
+        context.drawImage(
+          video,
+          (video.videoWidth - sourceWidth) / 2,
+          (video.videoHeight - sourceHeight) / 2,
+          sourceWidth,
+          sourceHeight,
+          0,
+          0,
+          pixelWidth,
+          pixelHeight,
+        );
+        if (!ready) {
+          ready = true;
+          setCanvasReady(true);
+        }
+      } catch {
+        setCanvasFailed(true);
+      }
+    };
+    const nextFrame = () => {
+      if (stopped) return;
+      if (typeof video.requestVideoFrameCallback === 'function') {
+        videoFrameId = video.requestVideoFrameCallback(() => {
+          paint();
+          nextFrame();
+        });
+      } else {
+        animationFrameId = requestAnimationFrame(() => {
+          if (video.currentTime !== lastVideoTime) {
+            lastVideoTime = video.currentTime;
+            paint();
+          }
+          nextFrame();
+        });
+      }
+    };
+    const resizeObserver = new ResizeObserver(paint);
+    resizeObserver.observe(canvas);
+    video.addEventListener('loadeddata', paint);
+    paint();
+    nextFrame();
+    return () => {
+      stopped = true;
+      resizeObserver.disconnect();
+      video.removeEventListener('loadeddata', paint);
+      if (videoFrameId != null) video.cancelVideoFrameCallback?.(videoFrameId);
+      if (animationFrameId != null) cancelAnimationFrame(animationFrameId);
+    };
+  }, [src, canvasFailed]);
+
+  return (
+    <>
+      <video
+        ref={videoRef}
+        crossOrigin="anonymous"
+        src={src}
+        poster={poster || undefined}
+        autoPlay
+        muted
+        loop
+        playsInline
+        preload="metadata"
+        aria-label={name}
+        className={`absolute inset-0 block h-full w-full object-cover ${canvasReady && !canvasFailed ? 'opacity-0' : canvasFailed ? 'transition-transform duration-700 group-hover:scale-105' : ''}`}
+        onError={onError}
+      />
+      {!canvasFailed && (
+        <span
+          className={`pointer-events-none absolute inset-0 block overflow-hidden transition-transform duration-700 group-hover:scale-105 ${canvasReady ? 'opacity-100' : 'opacity-0'}`}
+          style={{ willChange: 'transform', contain: 'paint' }}
+        >
+          <canvas ref={canvasRef} className="block h-full w-full" aria-hidden="true" />
+        </span>
+      )}
+    </>
+  );
+};
+
 const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = null, onOpenMarketplace, onOpenScenarios, onUpdateDirection, onTerminate, compact = false, slim = false }) => {
   const borderClass = isActive ? 'border-[color-mix(in_srgb,var(--brandGradientStart)_14%,transparent)] shadow-[0_0_10px_color-mix(in_srgb,var(--brandGradientStart)_1.5%,transparent)]' : 'border-white/[0.04]';
   const pending = pendingModel?.agentId === agent.id ? pendingModel.model : null;
@@ -731,6 +846,9 @@ const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = nul
   const failedCalls = formatMetricValue(agent.failed_calls_count);
   const missedCalls = formatMetricValue(agent.missed_calls_count);
   const directionLabel = displayAgentDirection(agent.direction);
+  const assignedDirection = ['inbound', 'outbound', 'all'].includes(normalizeAgentDirection(agent.direction));
+  const [videoFailed, setVideoFailed] = useState(false);
+  const showCatalogVideo = assignedDirection && Boolean(agent.catalog_video) && !videoFailed;
   const cardWidthClass = compact ? 'w-[300px]' : slim ? 'w-[340px]' : 'w-[380px]';
   const imageHeightClass = compact ? 'h-[250px]' : 'h-[280px]';
   const bodyClass = compact ? 'p-4 space-y-2.5' : 'p-6 space-y-3.5';
@@ -745,16 +863,25 @@ const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = nul
       className={`team-receptionist-card box-border shrink-0 bg-[#0A0A0A] border ${borderClass} rounded-[28px] ${cardWidthClass} flex flex-col hover:border-white/10 transition-colors duration-300 relative group overflow-hidden`}
     >
       <div className={`relative ${imageHeightClass} overflow-hidden rounded-t-[28px]`}>
-        <img
-          src={agent.avatar || `${AVATAR_BASE}/${agent.name.toLowerCase()}.jpg`}
-          alt={agent.name}
-          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-          style={agent.stereotype === 'Studio Voice Design' ? { objectPosition: 'center 8%', transformOrigin: 'center top' } : undefined}
-          onError={(e) => {
-            e.target.style.display = 'none';
-            e.target.parentElement.classList.add('bg-gradient-to-br', 'from-zinc-800', 'to-zinc-950');
-          }}
-        />
+        {showCatalogVideo ? (
+          <StableHoverVideo
+            src={agent.catalog_video}
+            poster={agent.avatar}
+            name={agent.name}
+            onError={() => setVideoFailed(true)}
+          />
+        ) : (
+          <img
+            src={agent.avatar || `${AVATAR_BASE}/${agent.name.toLowerCase()}.jpg`}
+            alt={agent.name}
+            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+            style={agent.stereotype === 'Studio Voice Design' ? { objectPosition: 'center 8%', transformOrigin: 'center top' } : undefined}
+            onError={(e) => {
+              e.target.style.display = 'none';
+              e.target.parentElement.classList.add('bg-gradient-to-br', 'from-zinc-800', 'to-zinc-950');
+            }}
+          />
+        )}
         <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0A] via-[#0A0A0A]/40 to-transparent" />
 
         <div className="absolute top-4 left-4 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-xl border border-white/[0.06]">
@@ -1780,12 +1907,28 @@ const SonarDashboard = () => {
   const [teamExperience, setTeamExperience] = useState('team');
   const [studioLaunchDestination, setStudioLaunchDestination] = useState('create');
   const [showReceptionistChoice, setShowReceptionistChoice] = useState(false);
+  const [catalogVideoById, setCatalogVideoById] = useState({});
   useEffect(() => () => disposeCatalogChoiceVideo(), []);
   useEffect(() => {
     if (currentRoute !== 'receptionists') return;
     // Begin asynchronously on Teams load; the page-session promise retains one
     // random source and its media element across every modal opening.
     void preloadCatalogChoiceVideo();
+  }, [currentRoute]);
+  useEffect(() => {
+    if (currentRoute !== 'receptionists') return undefined;
+    let cancelled = false;
+    api.getReceptionistCatalog().then((rows) => {
+      if (cancelled || !Array.isArray(rows)) return;
+      const videos = {};
+      rows.forEach((row) => {
+        if (row?.id != null && row.avatar_video) videos[String(row.id)] = avatarVideoUrl(row.avatar_video);
+      });
+      setCatalogVideoById(videos);
+    }).catch(() => {
+      if (!cancelled) setCatalogVideoById({});
+    });
+    return () => { cancelled = true; };
   }, [currentRoute]);
 
   const studioDirty = useRef(false);
@@ -2311,11 +2454,12 @@ const SonarDashboard = () => {
   }, [loadArchivedAgents, refresh]);
 
   const enrichedAgents = (agents || []).map(a => {
+    const catalogVideo = a.catalog_id != null ? catalogVideoById[String(a.catalog_id)] : null;
     const scenario = agentScenarios[a.name?.toLowerCase?.() || ''];
     if (scenario) {
-      return { ...a, _scenario: scenario, scenario_name: scenario.name, scenario_id: scenario.id };
+      return { ...a, catalog_video: catalogVideo, _scenario: scenario, scenario_name: scenario.name, scenario_id: scenario.id };
     }
-    return { ...a, _scenario: null, scenario_name: null, scenario_id: null };
+    return { ...a, catalog_video: catalogVideo, _scenario: null, scenario_name: null, scenario_id: null };
   });
   useEffect(() => {
     if (!agentsLoading && !archivedAgentsLoading && !teamStaffLoading) {
@@ -2388,6 +2532,8 @@ const SonarDashboard = () => {
           if (!result) throw new Error('Failed to hire receptionist');
           await refresh();
           await loadAgentScenarios();
+          setCurrentRoute('receptionists');
+          setTeamView('receptionists');
           setTeamExperience('team');
           return result;
         }} onDirtyChange={updateStudioDirty} onSaved={async () => { await refresh(); await loadAgentScenarios(); }} /></Suspense>;

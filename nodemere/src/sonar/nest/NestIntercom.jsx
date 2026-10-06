@@ -96,11 +96,13 @@ function NestIntercomInner({ open, onClose, mobile = false }) {
   const [silenceHintVisible, setSilenceHintVisible] = useState(false);
   const [idleWarning, setIdleWarning] = useState(false);
   const [error, setError] = useState('');
+  const selectedIdRef = useRef('');
   const sessionRef = useRef(null);
   const transcriptRef = useRef([]);
   const agentDraftRef = useRef('');
   const lastActivityRef = useRef(Date.now());
   const endingRef = useRef(false);
+  const startAttemptRef = useRef(0);
   const endTransportRef = useRef(() => {});
   const userHasSpokenRef = useRef(false);
   const silenceHintTimerRef = useRef(null);
@@ -154,11 +156,19 @@ function NestIntercomInner({ open, onClose, mobile = false }) {
     [bootstrap, selectedId],
   );
 
+  useEffect(() => {
+    selectedIdRef.current = String(selectedId || '');
+  }, [selectedId]);
+
   const refreshBootstrap = useCallback(async () => {
     const data = await api.getIntercomBootstrap();
     setBootstrap(data);
     const remembered = data?.settings?.last_receptionist_eligible ? data.settings.last_receptionist_id : '';
-    setSelectedId(remembered || data?.receptionists?.[0]?.id || '');
+    const current = selectedIdRef.current;
+    const currentIsEligible = current && (data?.receptionists || []).some((item) => String(item.id) === current);
+    const nextId = currentIsEligible ? current : String(remembered || data?.receptionists?.[0]?.id || '');
+    selectedIdRef.current = nextId;
+    setSelectedId(nextId);
   }, []);
 
   useEffect(() => {
@@ -169,6 +179,7 @@ function NestIntercomInner({ open, onClose, mobile = false }) {
 
   useEffect(() => {
     setVoiceActive(open);
+    if (!open) startAttemptRef.current += 1;
     if (!open) {
       stopMicrophone();
       stopNestSounds();
@@ -383,8 +394,11 @@ function NestIntercomInner({ open, onClose, mobile = false }) {
     return () => window.clearTimeout(timer);
   }, [bootstrap?.limits?.turn_seconds?.agent, conversation.sendUserActivity, open, phase]);
 
-  const beginSession = async ({ force = false, receptionistId = selectedId, requestPermission = false } = {}) => {
+  const beginSession = async ({ force = false, receptionistId = selectedIdRef.current, requestPermission = false } = {}) => {
     if (!receptionistId || (loading && !force)) return;
+    const startAttempt = startAttemptRef.current + 1;
+    startAttemptRef.current = startAttempt;
+    const wasCancelled = () => startAttemptRef.current !== startAttempt || !open;
     setLoading(true);
     setError('');
     try {
@@ -395,9 +409,17 @@ function NestIntercomInner({ open, onClose, mobile = false }) {
         return;
       }
       await startMicrophone();
+      if (wasCancelled()) {
+        stopMicrophone();
+        return;
+      }
       setMicPermissionState('granted');
       setPhase('calling');
       const session = await api.createIntercomSession({ receptionist_id: receptionistId });
+      if (wasCancelled()) {
+        stopMicrophone();
+        return;
+      }
       const startedAt = new Date().toISOString();
       sessionRef.current = { ...session, started_at: startedAt };
       transcriptRef.current = [];
@@ -406,6 +428,10 @@ function NestIntercomInner({ open, onClose, mobile = false }) {
       lastActivityRef.current = Date.now();
       setLine(null);
       setPhase('connecting');
+      if (wasCancelled()) {
+        stopMicrophone();
+        return;
+      }
       conversation.startSession({
         signedUrl: session.signed_url,
         userId: session.user_id,
@@ -433,7 +459,9 @@ function NestIntercomInner({ open, onClose, mobile = false }) {
   };
 
   const selectReceptionist = (receptionistId) => {
-    setSelectedId(receptionistId);
+    const nextId = String(receptionistId || '');
+    selectedIdRef.current = nextId;
+    setSelectedId(nextId);
     setError('');
   };
 
@@ -447,7 +475,7 @@ function NestIntercomInner({ open, onClose, mobile = false }) {
       setPrivacyOpen(true);
       return;
     }
-    beginSession({ receptionistId });
+    beginSession({ receptionistId: String(receptionistId) });
   };
 
   const acceptPrivacy = async () => {
@@ -608,7 +636,7 @@ function NestIntercomInner({ open, onClose, mobile = false }) {
             </div>
 
             {phase === 'selecting' || phase === 'calling' || phase === 'mic-permission' ? (
-              <button type="button" className="intercom-close" onClick={onClose} aria-label="Close voice conversation"><X size={13} /></button>
+              <button type="button" className="intercom-close" onClick={() => { startAttemptRef.current += 1; onClose?.(); }} aria-label="Close voice conversation"><X size={13} /></button>
             ) : (
               <div className="intercom-controls no-drag">
                 <button type="button" onClick={() => setMuted((value) => !value)} aria-label={muted ? 'Unmute microphone' : 'Mute microphone'}>
