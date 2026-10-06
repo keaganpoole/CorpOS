@@ -1,17 +1,19 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ConversationProvider, useConversation } from '@elevenlabs/react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Check, Mic, MicOff, PhoneOff, X } from 'lucide-react';
 import { api } from '../lib/api';
 import { useNest } from './NestRuntime';
 import IntercomVoiceLine from './IntercomVoiceLine';
 import useIntercomMicrophone from './useIntercomMicrophone';
 import CubePreloader from '../components/CubePreloader';
+import CirclePreloader from '../components/CirclePreloader';
 import ringingSound from '../../assets/ringing.mp3';
 import pickupSound from '../../assets/pickup.mp3';
 
 const PRIVACY_COPY = 'Voice conversations may be transcribed and saved so you can review them later.';
+const CALL_MINUTES_NOTICE_KEY = 'nodemere.nest.call-minutes-notice-accepted';
 const ACTIVE_PHASES = new Set(['connecting', 'listening', 'speaking']);
 
 const createLine = (message) => {
@@ -83,6 +85,7 @@ function PrivacyNotice({ open, busy, onCancel, onAccept }) {
 }
 
 function NestIntercomInner({ open, onClose, mobile = false }) {
+  const reducedMotion = useReducedMotion();
   const { start: startMicrophone, stop: stopMicrophone, sample: sampleMicrophone, setMuted: setMicrophoneMuted } = useIntercomMicrophone();
   const { queueLength, setVoiceActive, nestSoundsMuted } = useNest();
   const [bootstrap, setBootstrap] = useState(null);
@@ -92,6 +95,7 @@ function NestIntercomInner({ open, onClose, mobile = false }) {
   const [muted, setMuted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [privacyOpen, setPrivacyOpen] = useState(false);
+  const [callMinutesNoticeAccepted, setCallMinutesNoticeAccepted] = useState(false);
   const [micPermissionState, setMicPermissionState] = useState('unknown');
   const [silenceHintVisible, setSilenceHintVisible] = useState(false);
   const [idleWarning, setIdleWarning] = useState(false);
@@ -187,7 +191,10 @@ function NestIntercomInner({ open, onClose, mobile = false }) {
       setSilenceHintVisible(false);
     }
     if (open) {
-      setPhase('selecting');
+      let accepted = false;
+      try { accepted = window.localStorage.getItem(CALL_MINUTES_NOTICE_KEY) === 'true'; } catch { accepted = false; }
+      setCallMinutesNoticeAccepted(accepted);
+      setPhase(accepted ? 'selecting' : 'call-minutes-notice');
       setError('');
       setLine(null);
     }
@@ -465,6 +472,12 @@ function NestIntercomInner({ open, onClose, mobile = false }) {
     setError('');
   };
 
+  const acceptCallMinutesNotice = () => {
+    try { window.localStorage.setItem(CALL_MINUTES_NOTICE_KEY, 'true'); } catch { /* session-only fallback */ }
+    setCallMinutesNoticeAccepted(true);
+    setPhase('selecting');
+  };
+
   const requestStart = (receptionistId = selectedId) => {
     if (!receptionistId) {
       setError('Choose a receptionist first.');
@@ -532,6 +545,16 @@ function NestIntercomInner({ open, onClose, mobile = false }) {
                 <span className="intercom-loading-indicator" role="status" aria-label="Loading intercom">
                   <CubePreloader size={10} />
                 </span>
+              ) : phase === 'call-minutes-notice' ? (
+                <motion.div className="intercom-action no-drag" role="dialog" aria-labelledby="intercom-call-minutes-title" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+                  <span className="intercom-action-label">
+                    <span id="intercom-call-minutes-title">Calling a receptionist uses your available call minutes.</span>
+                  </span>
+                  <div className="intercom-notice-actions">
+                    <button type="button" onClick={onClose}>Never mind</button>
+                    <button type="button" className="is-accept" onClick={acceptCallMinutesNotice}><Check size={14} />Accept</button>
+                  </div>
+                </motion.div>
               ) : phase === 'mic-permission' && selectedReceptionist ? (
                 <motion.div className="intercom-mic-permission no-drag" role="status" aria-live="polite" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
                   <span>{micPermissionState === 'denied' ? 'Allow microphone access to talk' : 'Please allow microphone access'}</span>
@@ -548,34 +571,52 @@ function NestIntercomInner({ open, onClose, mobile = false }) {
                       : <span className="intercom-receptionist-fallback">{fallbackInitial(selectedReceptionist.name)}</span>}
                   </span>
                   <span>Calling {selectedReceptionist.name}...</span>
+                  <CirclePreloader size={4} wiggleIntensity={2.1} className="intercom-calling-loader" />
                 </motion.div>
               ) : phase === 'selecting' && selectedReceptionist && !mobile && (
-                <div className="intercom-action no-drag">
-                  <span className="intercom-action-label">
+                <motion.div
+                  className="intercom-action no-drag"
+                  initial={{ opacity: 0, x: -5, y: 3 }}
+                  animate={{ opacity: 1, x: 0, y: 0 }}
+                  transition={{ duration: reducedMotion ? 0.01 : 0.38, delay: reducedMotion ? 0 : 0.46, ease: [0.16, 1, 0.3, 1] }}
+                >
+                  <motion.span className="intercom-action-label" initial={{ opacity: 0, x: -5 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: reducedMotion ? 0.01 : 0.3, delay: reducedMotion ? 0 : 0.5, ease: [0.16, 1, 0.3, 1] }}>
                     <span>Talk with</span>
                     <strong>{selectedReceptionist.name.split(' ')[0]}</strong>
-                  </span>
-                  <button
+                  </motion.span>
+                  <motion.button
                     type="button"
                     className="intercom-talk-button"
                     onClick={() => requestStart(selectedId)}
                     disabled={loading || unavailable}
                     aria-label={`Talk with ${selectedReceptionist.name}`}
                     title={`Talk with ${selectedReceptionist.name}`}
+                    initial={{ opacity: 0, scale: 0.72, x: -5, filter: 'blur(3px)' }}
+                    animate={{ opacity: 1, scale: 1, x: 0, filter: 'blur(0px)' }}
+                    transition={{ duration: reducedMotion ? 0.01 : 0.4, delay: reducedMotion ? 0 : 0.62, ease: [0.16, 1, 0.3, 1] }}
                   >
                     <Mic size={14} />
-                  </button>
-                </div>
+                  </motion.button>
+                </motion.div>
               )}
               {phase === 'selecting' ? (
-                <motion.div className={`intercom-picker is-${phase} count-${pickerCount}`} layout>
-                  {receptionists.map((item) => {
+                <motion.div
+                  className={`intercom-picker is-${phase} count-${pickerCount}`}
+                  layout
+                  initial={{ opacity: 0, x: 11, scale: 0.98 }}
+                  animate={{ opacity: 1, x: 0, scale: 1 }}
+                  transition={{ duration: reducedMotion ? 0.01 : 0.54, delay: reducedMotion ? 0 : 0.02, ease: [0.22, 1, 0.36, 1] }}
+                >
+                  {receptionists.map((item, index) => {
                     const isSelected = String(item.id) === String(selectedId);
                     return (
                       <motion.button
                         type="button"
                         key={item.id}
                         layout
+                        initial={{ opacity: 0, y: 6, scale: 0.96 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        transition={{ duration: reducedMotion ? 0.01 : 0.38, delay: reducedMotion ? 0 : 0.06 + index * 0.06, ease: [0.16, 1, 0.3, 1] }}
                         className={`intercom-receptionist ${isSelected ? 'is-selected' : ''}`}
                         onClick={() => { selectReceptionist(String(item.id)); if (mobile) requestStart(String(item.id)); }}
                         disabled={loading || unavailable}
@@ -584,11 +625,15 @@ function NestIntercomInner({ open, onClose, mobile = false }) {
                         title={item.name}
                       >
                         {item.banner_url && (
-                          <span
+                          <motion.span
                             className="intercom-receptionist-banner"
-                            style={{ backgroundImage: `url(${item.banner_url})` }}
                             aria-hidden="true"
-                          />
+                            initial={{ opacity: 0, x: 22 }}
+                            animate={{ opacity: isSelected ? 0.82 : 0.64, x: 0 }}
+                            transition={{ duration: reducedMotion ? 0.01 : 0.62, delay: reducedMotion ? 0 : 0.12 + index * 0.06, ease: [0.22, 1, 0.36, 1] }}
+                          >
+                            <span className="intercom-receptionist-banner-image" style={{ backgroundImage: `url(${item.banner_url})` }} />
+                          </motion.span>
                         )}
                         <span className="intercom-receptionist-shade" aria-hidden="true" />
                         <span className="intercom-receptionist-name">
@@ -635,7 +680,7 @@ function NestIntercomInner({ open, onClose, mobile = false }) {
               )}
             </div>
 
-            {phase === 'selecting' || phase === 'calling' || phase === 'mic-permission' ? (
+            {phase === 'selecting' || phase === 'calling' || phase === 'mic-permission' || phase === 'call-minutes-notice' ? (
               <button type="button" className="intercom-close" onClick={() => { startAttemptRef.current += 1; onClose?.(); }} aria-label="Close voice conversation"><X size={13} /></button>
             ) : (
               <div className="intercom-controls no-drag">
