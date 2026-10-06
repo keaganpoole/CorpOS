@@ -46,7 +46,7 @@ export const AuthProvider = ({ children }) => {
             if (!response.ok) throw new Error('Workforce access is unavailable. Check that the backend and security migrations are ready.');
             const body = await response.json();
             if (assurance.error) throw new Error('Could not verify authentication assurance. Please sign in again.');
-            const value = { tenant: body.tenant, policy_requires_mfa: body.policy_requires_mfa, needsMfa: needsMfa(assurance.data, body.tenant) };
+            const value = { tenant: body.tenant, policy_requires_mfa: body.policy_requires_mfa, wasTeamMember: body.was_team_member, needsMfa: needsMfa(assurance.data, body.tenant) };
             if (currentUserIdRef.current !== active.user.id || workforceRefreshRevisionRef.current !== refreshRevision) return null;
             setWorkforceContext(body.tenant); setWorkforce(value); return value;
         } catch (error) {

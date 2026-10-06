@@ -18,7 +18,7 @@ console.debug("AuthPage.jsx:event_16");
 console.debug("AuthPage.jsx:event_17");
 
 const AuthPage = () => {
-    const { login, logout, session, profile, refreshProfile, isLoading: isAuthLoading } = useAuth();
+    const { login, logout, session, profile, refreshProfile, refreshWorkforce, isLoading: isAuthLoading } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
     const { invitationId } = useParams();
@@ -95,6 +95,12 @@ const AuthPage = () => {
             }
             if (cancelled) return;
             if (isInvitation) {
+                const currentWorkforce = await refreshWorkforce();
+                if (!currentWorkforce) {
+                    if (!cancelled) setError('Could not check your team access. Please try opening the invitation again.');
+                    return;
+                }
+                if (cancelled) return;
                 navigate(`/dashboard?invite=${invitationId}`, { replace: true });
                 return;
             }
@@ -126,7 +132,7 @@ const AuthPage = () => {
         };
         void continueAfterAuthentication();
         return () => { cancelled = true; };
-    }, [session, profile?.onboarded, isAuthLoading, navigate, refreshProfile, isInvitation, invitation, invitationLoading, invitationId]);
+    }, [session, profile?.onboarded, isAuthLoading, navigate, refreshProfile, refreshWorkforce, isInvitation, invitation, invitationLoading, invitationId]);
 
     useEffect(() => {
         if (resendTimer > 0) {

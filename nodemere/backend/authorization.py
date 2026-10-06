@@ -18,6 +18,7 @@ class Tenant:
     role: str = "OWNER"
     aal: str = "aal1"
     mfa_required: bool = False
+    policy_requires_mfa: bool = False
     service: bool = False
 
 
@@ -70,7 +71,9 @@ def resolve_tenant(db, actor_id, *, aal="aal1", allow_missing=False):
     if not rows or member["role"] not in {"OWNER", "MANAGER", "STAFF"} or not account_active(db, rows[0]['user_id']):
         forbidden("Business unavailable")
     return Tenant(str(actor_id), rows[0]["id"], str(rows[0]["user_id"]),
-                  role=member["role"], aal=aal, mfa_required=bool(rows[0].get("workforce_mfa_required")))
+                  role=member["role"], aal=aal,
+                  mfa_required=bool(rows[0].get("workforce_mfa_required")),
+                  policy_requires_mfa=bool(rows[0].get("workforce_mfa_required")))
 
 
 def resolve_session_tenant(db, actor_id, *, aal="aal1", allow_missing=False):
@@ -92,7 +95,8 @@ def resolve_session_tenant(db, actor_id, *, aal="aal1", allow_missing=False):
         forbidden("Business unavailable")
     return Tenant(str(actor_id), row["business_id"], str(row["owner_id"]),
                   role=row["membership_role"], aal=aal,
-                  mfa_required=bool(row.get("workforce_mfa_required") or row.get("mfa_enrolled")))
+                  mfa_required=bool(row.get("workforce_mfa_required") or row.get("mfa_enrolled")),
+                  policy_requires_mfa=bool(row.get("workforce_mfa_required")))
 
 
 @contextmanager

@@ -39,6 +39,7 @@ export async function workforceRequest(path, method = 'GET', body) {
 export function MfaPanel({ onVerified, gate = false }) {
   const [factors, setFactors] = useState([]);
   const [unfinished, setUnfinished] = useState([]);
+  const [factorsLoading, setFactorsLoading] = useState(true);
   const [selected, setSelected] = useState('');
   const [setup, setSetup] = useState(null);
   const [code, setCode] = useState('');
@@ -52,7 +53,7 @@ export function MfaPanel({ onVerified, gate = false }) {
     setUnfinished((result.data?.all || []).filter(f => f.factor_type === 'totp' && f.status !== 'verified'));
     setFactors(verified); setSelected(verified[0]?.id || '');
   }
-  useEffect(() => { load().catch(e => setError(e.message)); return () => { /* secrets only live in component memory */ }; }, []);
+  useEffect(() => { load().catch(e => setError(e.message)).finally(() => setFactorsLoading(false)); return () => { /* secrets only live in component memory */ }; }, []);
   async function run(action) { setBusy(true); setError(''); try { await action(); } catch (e) { setError(e.message); } finally { setBusy(false); } }
   async function verifyCode() {
     const factorId = setup?.id || selected;
@@ -87,8 +88,8 @@ export function MfaPanel({ onVerified, gate = false }) {
     </>}
     <div className={gate ? 'mb-7 space-y-2' : 'workforce-card-heading'}>
       <div>
-        <h2 className={gate ? 'text-2xl font-semibold tracking-[-0.04em] sm:text-[28px]' : ''}>{gate ? 'Confirm it’s you.' : 'Authenticator'}</h2>
-        <p className={gate ? 'mx-auto max-w-sm text-sm leading-6 text-white/50' : ''}>{gate ? 'Enter the six-digit code from your authenticator app.' : 'Add an extra layer of protection to your account.'}</p>
+        <h2 className={gate ? 'text-2xl font-semibold tracking-[-0.04em] sm:text-[28px]' : ''}>{gate ? (factorsLoading ? 'Checking authenticator…' : factors.length ? 'Confirm it’s you.' : 'Set up your authenticator.') : 'Authenticator'}</h2>
+        <p className={gate ? 'mx-auto max-w-sm text-sm leading-6 text-white/50' : ''}>{gate ? (factorsLoading ? 'One moment.' : factors.length ? 'Enter the six-digit code from your authenticator app.' : 'Your team requires an authenticator before you can use the dashboard.') : 'Add an extra layer of protection to your account.'}</p>
       </div>
       {!gate && <span className="workforce-status">{factors.length ? 'Active' : 'Optional'}</span>}
     </div>
@@ -109,7 +110,7 @@ export function MfaPanel({ onVerified, gate = false }) {
       {gate && busy && <p aria-live="polite" className="text-xs font-medium text-white/45">Checking…</p>}
     </form>}
     <div className={gate ? '' : 'workforce-actions'}>
-      <button type="button" disabled={busy || Boolean(setup)} className={gate ? 'text-xs font-medium text-white/45 transition hover:text-white/75 disabled:opacity-40' : 'workforce-button'} onClick={() => run(async () => setSetup(await enrollTotp(supabase.auth)))}>{factors.length ? 'Use a different authenticator' : 'Set up authenticator'}</button>
+      <button type="button" disabled={busy || factorsLoading || Boolean(setup)} className={gate ? (factors.length ? 'text-xs font-medium text-white/45 transition hover:text-white/75 disabled:opacity-40' : 'rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-black transition hover:bg-zinc-200 disabled:opacity-40') : 'workforce-button'} onClick={() => run(async () => setSetup(await enrollTotp(supabase.auth)))}>{factors.length ? 'Use a different authenticator' : 'Set up authenticator'}</button>
       {setup && <button type="button" disabled={busy} className={gate ? 'ml-3 text-sm' : 'workforce-text-button'} onClick={() => run(async () => { const { error: e } = await supabase.auth.mfa.unenroll({ factorId: setup.id }); if (e) throw new Error('Could not cancel setup'); setSetup(null); })}>Cancel setup</button>}
       {!setup && selected && !gate && <button type="button" disabled={busy} className="workforce-text-button" onClick={() => run(async () => { await removeTotp(supabase.auth, selected); await load(); await onVerified?.(); })}>Remove authenticator</button>}
     </div>
@@ -186,7 +187,16 @@ export function WorkforceGate({ children }) {
   const [pending, setPending] = useState([]);
   const [pendingChecked, setPendingChecked] = useState(false);
   const [error, setError] = useState('');
+  const [acceptedInvitationId, setAcceptedInvitationId] = useState(null);
   useEffect(() => { if (workforce && (!workforce.tenant || linkedInvitationId) && !workforce.error) { setPendingChecked(false); workforceRequest('/invitations/pending').then(setPending).catch(e => setError(e.message)).finally(() => setPendingChecked(true)); } }, [workforce, linkedInvitationId]);
+  async function confirmAcceptedInvitation(businessId) {
+    const current = await refreshWorkforce();
+    if (!current?.tenant || String(current.tenant.business_id) !== String(businessId)) {
+      setError('The invitation was accepted, but team access could not be refreshed. Please try again.');
+      return;
+    }
+    navigate('/dashboard', { replace: true });
+  }
   if (!workforce || workforce.loading) return <SplashScreen />;
   if (workforce.error) return <div className="p-8 text-white"><p role="alert">{workforce.error}</p><button onClick={refreshWorkforce}>Retry</button><button className="ml-4" onClick={logout}>Sign out</button></div>;
   if (workforce.needsMfa) return <main className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-[#050506] px-5 py-10">
@@ -195,6 +205,7 @@ export function WorkforceGate({ children }) {
       <button className="mx-auto mt-5 block text-xs font-medium text-white/35 transition hover:text-white/70" onClick={logout}>Sign out</button>
     </div>
   </main>;
+  if (acceptedInvitationId?.id === linkedInvitationId) return <main className="min-h-[var(--app-height)] bg-black px-5 py-12 text-white font-inter flex items-center justify-center"><section className="w-full max-w-md rounded-[24px] border border-zinc-800 bg-[#101010] p-7 text-center"><h1 className="text-xl font-semibold">Joining your team…</h1>{error && <><p role="alert" className="mt-3 text-sm text-zinc-400">{error}</p><button type="button" className="dashboard-gradient-button mt-5 rounded-full px-6 py-3 text-sm font-semibold" onClick={() => void confirmAcceptedInvitation(acceptedInvitationId.businessId)}>Retry</button></>}</section></main>;
   if ((!workforce.tenant || linkedInvitationId) && !pendingChecked) return <div className="min-h-screen" aria-busy="true" aria-label="Loading" />;
   if (linkedInvitationId && workforce.tenant) return <main className="min-h-[var(--app-height)] bg-black px-5 py-12 text-white font-inter flex items-center justify-center"><section className="w-full max-w-md rounded-[24px] border border-zinc-800 bg-[#101010] p-7"><h1 className="text-xl font-semibold">This account already has a team</h1><p className="mt-3 text-sm leading-6 text-zinc-400">Nodemere currently supports one business team per account. To join this invitation, ask the owner to invite an email that does not already belong to a team.</p></section></main>;
   if (linkedInvitationId && !pending.some(i => i.id === linkedInvitationId)) return <main className="min-h-[var(--app-height)] bg-black px-5 py-12 text-white font-inter flex items-center justify-center"><section className="w-full max-w-md rounded-[24px] border border-zinc-800 bg-[#101010] p-7"><h1 className="text-xl font-semibold">Invitation not found</h1><p className="mt-3 text-sm leading-6 text-zinc-400">{error || 'This invitation may have expired, or it may be for a different email address.'}</p><button type="button" onClick={logout} className="mt-5 text-sm text-zinc-300 underline">Use another account</button></section></main>;
@@ -207,10 +218,11 @@ export function WorkforceGate({ children }) {
         {ordered.map(i => <div key={i.id} className="mt-5 border-t border-zinc-800 pt-5">
           {ordered.length > 1 && i.business_name && <p className="text-base font-semibold">{i.business_name}</p>}
           <p className="text-sm capitalize text-zinc-400">{i.role.toLowerCase()}</p>
-          <button type="button" className="dashboard-gradient-button mt-5 w-full rounded-full py-3 text-sm font-semibold" onClick={async () => { try { await workforceRequest(`/invitations/${i.id}/accept`,'POST',{}); navigate('/dashboard', { replace: true }); await refreshWorkforce(); } catch (e) { setError(e.message); } }}>Accept invitation</button>
+          <button type="button" className="dashboard-gradient-button mt-5 w-full rounded-full py-3 text-sm font-semibold" onClick={async () => { try { const result = await workforceRequest(`/invitations/${i.id}/accept`,'POST',{}); setAcceptedInvitationId({ id: i.id, businessId: result.business_id }); setError(''); await confirmAcceptedInvitation(result.business_id); } catch (e) { setError(e.message); } }}>Accept invitation</button>
         </div>)}
       </section>
     </main>;
   }
+  if (!workforce.tenant && (error || workforce.wasTeamMember)) return <main className="min-h-[var(--app-height)] bg-black px-5 py-12 text-white font-inter flex items-center justify-center"><section className="w-full max-w-md rounded-[24px] border border-zinc-800 bg-[#101010] p-7"><h1 className="text-xl font-semibold">No team access yet</h1><p className="mt-3 text-sm leading-6 text-zinc-400">{error || 'Your previous team access was removed. Open a new invitation from your email to rejoin.'}</p>{error && <button type="button" className="mt-5 text-sm text-zinc-300 underline" onClick={() => { setError(''); setPendingChecked(false); workforceRequest('/invitations/pending').then(setPending).catch(e => setError(e.message)).finally(() => setPendingChecked(true)); }}>Retry</button>}</section></main>;
   return children;
 }

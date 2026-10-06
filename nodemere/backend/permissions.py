@@ -28,6 +28,8 @@ def contains_privileged_scenario_action(value):
 def require_permission(tenant, permission):
     if not tenant or tenant.role not in PERMISSIONS.get(permission, set()):
         raise HTTPException(403, "Your business role does not permit this action")
+    if not tenant.service and tenant.mfa_required and tenant.aal != "aal2":
+        raise HTTPException(403, {"code": "mfa_required", "message": "Verify your authenticator to continue"})
     if not tenant.service and permission in STEP_UP and tenant.aal != "aal2":
         raise HTTPException(403, {"code": "mfa_required", "message": "Verify your authenticator to continue"})
 

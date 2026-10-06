@@ -55,7 +55,7 @@ function DashboardGate() {
 }
 
 function OnboardingGate() {
-  const { session, profile, isLoading } = useAuth();
+  const { session, profile, workforce, isLoading } = useAuth();
 
   if (isLoading) {
     return <SplashScreen />;
@@ -66,6 +66,10 @@ function OnboardingGate() {
   }
 
   if (profile?.onboarded) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  if (workforce?.wasTeamMember && !workforce.tenant) {
     return <Navigate to="/dashboard" replace />;
   }
 

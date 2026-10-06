@@ -125,8 +125,13 @@ async def session(user=Depends(get_current_user_for_workforce_session)):
         raise
     except Exception:
         raise HTTPException(503, "Workforce membership service is unavailable")
+    was_team_member = False
+    if tenant is None:
+        removed = database().table('business_memberships').select('user_id').eq('user_id',str(user.id)).eq('status','removed').limit(1).execute().data or []
+        was_team_member = bool(removed)
     return {"tenant":asdict(tenant) if tenant else None,
-            "policy_requires_mfa":bool(tenant and tenant.mfa_required)}
+            "policy_requires_mfa":bool(tenant and tenant.policy_requires_mfa),
+            "was_team_member":was_team_member}
 
 
 @router.get('/invitations/pending')

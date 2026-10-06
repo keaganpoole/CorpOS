@@ -83,6 +83,27 @@ class InvitationFlowTests(unittest.TestCase):
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0]['business_name'], '')
 
+    def test_removed_member_is_identified_before_owner_onboarding(self):
+        member_id = uuid4()
+        class MembershipDatabase:
+            def table(self, name):
+                assert name == 'business_memberships'
+                return Query([{'user_id': str(member_id), 'status': 'removed'}])
+        with patch.object(workforce, 'database', return_value=MembershipDatabase()), patch.object(workforce, 'resolve_session_tenant', return_value=None):
+            result = asyncio.run(workforce.session(SimpleNamespace(id=member_id)))
+        self.assertIsNone(result['tenant'])
+        self.assertTrue(result['was_team_member'])
+
+    def test_new_owner_without_team_can_continue_onboarding(self):
+        member_id = uuid4()
+        class EmptyMembershipDatabase:
+            def table(self, name):
+                assert name == 'business_memberships'
+                return Query([])
+        with patch.object(workforce, 'database', return_value=EmptyMembershipDatabase()), patch.object(workforce, 'resolve_session_tenant', return_value=None):
+            result = asyncio.run(workforce.session(SimpleNamespace(id=member_id)))
+        self.assertFalse(result['was_team_member'])
+
     def test_removing_member_revokes_unused_invitations(self):
         member_id = uuid4()
         member = {'business_id': self.invitation['business_id'], 'user_id': str(member_id), 'role': 'STAFF', 'status': 'active'}
