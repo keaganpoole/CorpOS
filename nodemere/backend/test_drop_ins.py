@@ -15,7 +15,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from backend.authorization import ScopedClient, Tenant, tenant_scope
 from backend.drop_ins import build_router, run_identity
-from backend.drop_in_templates import for_industry, INDUSTRY_VISITS, TEMPLATES
+from backend.drop_in_templates import for_industry, INDUSTRY_VISITS, STATUS_STARTERS, TEMPLATES
 
 OWNER = '11111111-1111-4111-8111-111111111111'
 APPT = '22222222-2222-4222-8222-222222222222'
@@ -126,6 +126,10 @@ class DropInTests(unittest.TestCase):
         self.assertEqual(by_status('pending'), ['Confirm', 'Reschedule', 'Cancel'])
         self.assertEqual(by_status('confirmed'), ['Reschedule', 'Cancel'])
         self.assertEqual(by_status('cancelled'), ['Reschedule'])
+        starter_purposes = {(item['available_on_status'], item['name']): item['purpose'] for item in items}
+        for status in ('pending', 'confirmed', 'cancelled'):
+            for name, purpose, _ in STATUS_STARTERS[status]:
+                self.assertEqual(starter_purposes[(status, name)], purpose)
         self.assertEqual(by_status('completed'), ['Thank You', 'Rebook', 'Google Review', 'Check In', 'Request Feedback'])
         self.assertEqual(by_status('missed'), [])
     def test_pending_starters_seed_once_and_respect_edits_and_deletions(self):
@@ -133,6 +137,7 @@ class DropInTests(unittest.TestCase):
         self.assertEqual(first.status_code, 200, first.text)
         pending = [item for item in first.json()['items'] if item['available_on_status'] == 'pending']
         self.assertEqual([item['name'] for item in pending], ['Confirm', 'Reschedule', 'Cancel'])
+        self.assertEqual([item['purpose'] for item in pending], ['confirm', 'reschedule', 'cancel'])
         original_count = len(self.db.data['drop_ins'])
         confirm = pending[0]
         changed = self.client.put('/api/sonar/drop-ins/' + confirm['id'], json={
@@ -146,6 +151,29 @@ class DropInTests(unittest.TestCase):
         self.assertEqual([item['name'] for item in second.json()['items'] if item['available_on_status'] == 'pending'],
                          ['Confirm visit', 'Cancel'])
         self.assertEqual(len(self.db.data['drop_ins']), original_count)
+    def test_existing_starter_purposes_update_without_changing_customs_or_deleted_rows(self):
+        starters = [
+            ('Confirm', 'confirm appointment', 'confirm'),
+            ('Reschedule', 'reschedule the appointment', 'reschedule'),
+            ('Cancel', 'canceled', 'cancel'),
+        ]
+        for name, old, _ in starters:
+            canonical = next(item for item in STATUS_STARTERS['pending'] if item[0] == name)
+            self.db.data['drop_ins'].append({
+                'id': str(uuid4()), 'business_id': 1, 'name': name, 'purpose': old,
+                'prompt': canonical[2], 'available_on_status': 'pending',
+                'is_active': True, 'sort_order': 0, 'deleted_at': None,
+            })
+        custom = dict(self.db.data['drop_ins'][-1], id=str(uuid4()), purpose='cancel appointment', prompt='Custom instruction.')
+        deleted = dict(self.db.data['drop_ins'][-1], id=str(uuid4()), deleted_at='2026-10-01T00:00:00Z')
+        self.db.data['drop_ins'].extend([custom, deleted])
+        response = self.client.get('/api/sonar/drop-ins')
+        self.assertEqual(response.status_code, 200, response.text)
+        for name, _, expected in starters:
+            row = next(row for row in self.db.data['drop_ins'] if row['name'] == name and row['id'] not in {custom['id'], deleted['id']})
+            self.assertEqual(row['purpose'], expected)
+        self.assertEqual(next(row for row in self.db.data['drop_ins'] if row['id'] == custom['id'])['purpose'], 'cancel appointment')
+        self.assertEqual(next(row for row in self.db.data['drop_ins'] if row['id'] == deleted['id'])['purpose'], 'canceled')
     def test_existing_pending_name_is_not_duplicated(self):
         self.db.data['drop_ins'].append({
             'id': str(uuid4()), 'business_id': 1, 'name': 'Confirm', 'purpose': 'confirm visit',
@@ -241,9 +269,9 @@ class DropInTests(unittest.TestCase):
         self.assertEqual(len(TEMPLATES), len({x['key'] for x in TEMPLATES}))
         for industry in expected:
             templates = for_industry(industry)
-            self.assertGreaterEqual(len(templates), 14)
-            self.assertTrue(any(industry in t['industries'] for t in templates))
-            self.assertTrue(all(not t['industries'] or industry in t['industries'] for t in templates))
+            self.assertEqual(len(templates), len(TEMPLATES))
+            self.assertTrue(any(t['name'] == 'Viewing Follow-Up' for t in templates))
+            self.assertTrue(all(not t['industries'] for t in templates))
     def test_request_ids_are_bound_to_business_and_appointment(self):
         key = uuid4()
         self.assertNotEqual(run_identity(1, APPT, DROP, key), run_identity(2, APPT, DROP, key))

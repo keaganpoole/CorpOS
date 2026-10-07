@@ -7,7 +7,7 @@ from postgrest.exceptions import APIError
 from .authorization import current_tenant
 from .audit import StampedQuery
 from .permissions import require_permission
-from .drop_in_templates import STATUS_STARTERS, STATUSES, for_industry
+from .drop_in_templates import LEGACY_STARTER_PURPOSES, STATUS_STARTERS, STATUSES, for_industry
 
 
 class DropInDraft(BaseModel):
@@ -137,13 +137,22 @@ def build_router(db, get_user, load_business, executor, find_outbound_receptioni
     def ensure_status_starters(business_id):
         # Include soft-deleted rows so removing a starter is permanent. Stable
         # identifiers also preserve edits and prevent concurrent duplicate seeds.
+        all_existing = rows(db.table('drop_ins').select('id,name,purpose,prompt,sort_order,deleted_at,available_on_status')
+                            .eq('business_id', business_id))
         for status, starters in STATUS_STARTERS.items():
-            existing = rows(db.table('drop_ins').select('id,name,sort_order,deleted_at')
-                            .eq('business_id', business_id).eq('available_on_status', status))
+            existing = [item for item in all_existing if item.get('available_on_status') == status]
             ids = {str(item['id']) for item in existing}
             names = {str(item.get('name') or '').casefold() for item in existing}
             next_order = max((item.get('sort_order') or 0 for item in existing if not item.get('deleted_at')), default=-1) + 1
             for name, purpose, prompt in starters:
+                for item in existing:
+                    if (not item.get('deleted_at') and item.get('name') == name
+                            and item.get('purpose') in LEGACY_STARTER_PURPOSES.get(name, set())
+                            and item.get('prompt') == prompt):
+                        rows(db.table('drop_ins').update({'purpose': purpose})
+                             .eq('id', item['id']).eq('business_id', business_id)
+                             .eq('purpose', item['purpose'])
+                             .is_('deleted_at', 'null'))
                 starter_id = str(uuid5(NAMESPACE_URL, f'nodemere:{status}-drop-in-starter:v1:{business_id}:{name.casefold()}'))
                 if starter_id in ids or name.casefold() in names:
                     continue

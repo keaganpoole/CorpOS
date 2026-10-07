@@ -8,7 +8,7 @@ import { ancestry, builderPayload, descendants, freePosition, layoutGraph, order
 import './dropInsPage.css';
 
 const ICONS = { google: Star, calendar: CalendarDays, bell: Bell, heart: Heart, message: MessageSquare, repeat: Repeat2, receipt: Receipt, sparkles: Sparkles, phone: Phone };
-const COLORS = { pending: '#fbbf24', confirmed: '#34d399', completed: '#22c55e', missed: '#fb7185', cancelled: '#f43f5e' };
+const COLORS = { pending: '#fbbf24', confirmed: '#34d399', completed: '#22c55e', missed: '#f97316', cancelled: '#ef4444' };
 const MAGGIE = { name: 'Maggie', avatar: 'https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/avatars/maggie.png', banner: 'https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/banners/maggie_001.png' };
 const normalize = items => STATUSES.flatMap(status => layoutGraph(items.filter(x => x.available_on_status === status)));
 

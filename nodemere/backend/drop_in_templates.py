@@ -8,36 +8,36 @@ def template(key, name, description, prompt, category, statuses, icon='phone', i
 
 
 TEMPLATES = [
-    template('confirm', 'Confirm Appointment', 'Make sure they are still joining you.', 'Call the customer to confirm the appointment provided in your context. Confirm the date, time and service. If they need a change, use the available scheduling tools and confirm any change with the customer before saving it.', 'Appointments', ['pending'], 'calendar'),
-    template('cancel-appointment', 'Cancel', 'Confirm that they want to cancel.', 'Call the customer about cancelling this appointment. Confirm that they want to cancel before changing the booking. If cancellation tools are unavailable, explain that the team will need to handle the request. Do not claim the appointment was cancelled unless the change succeeds.', 'Appointments', ['pending', 'confirmed'], 'calendar'),
-    template('reminder', 'Appointment Reminder', 'A friendly heads-up before their visit.', 'Call the customer with a friendly reminder of their appointment date, time and service. Answer preparation questions using the business information. Do not invent instructions.', 'Appointments', ['pending', 'confirmed'], 'bell'),
-    template('reschedule', 'Reschedule', 'Help find a time that works better.', 'Call the customer about rescheduling this appointment. Ask their preferred time, check real availability with the scheduling tools, and obtain confirmation before changing the booking. Do not promise a slot without checking.', 'Appointments', ['pending', 'confirmed', 'cancelled', 'missed'], 'calendar'),
-    template('rebook', 'Rebook', 'Turn a recent visit into the next one.', 'Call the customer, ask whether they would like another appointment, and help book a suitable service using real availability. Confirm all details before creating a new booking; do not change the historical appointment.', 'Appointments', ['completed', 'cancelled', 'missed'], 'repeat'),
-    template('missed', 'Missed You', 'Reconnect after a missed appointment.', 'Call the customer kindly about their missed appointment. Ask if they would like help booking again. Avoid blame, do not invent a cancellation fee, and check real availability before booking.', 'Customer Experience', ['missed'], 'heart'),
-    template('cancelled', 'Cancellation Follow-Up', 'Keep the door open after a cancellation.', 'Call the customer to follow up on their cancelled appointment. Ask if there is anything the business can help with and whether they want to arrange another visit. Respect their decision if they decline.', 'Customer Experience', ['cancelled'], 'heart'),
-    template('google-review', 'Google Review', 'Invite an honest account of their visit.', 'Call the customer, thank them for their visit, and politely invite an honest Google review of their experience, regardless of whether it was positive or negative. Never offer incentives or ask for a particular rating. Use the business review link only if it is available; never invent a link or claim to have sent one.', 'Reviews & Reputation', ['completed'], 'google'),
-    template('feedback', 'Request Feedback', 'Listen to what went well and what could improve.', 'Call the customer and ask for candid feedback about their appointment. Listen without pressure, summarize their feedback, and offer to pass concerns to the team. Do not promise compensation or an outcome without authorization.', 'Reviews & Reputation', ['completed'], 'message'),
-    template('care', 'Experience Follow-Up', 'Give an unresolved concern personal attention.', 'Call the customer to follow up on any concern documented for this appointment. Ask how the team can help and record what they share. If no concern is documented, ask how their experience was without assuming something went wrong. Escalate requests outside your authority.', 'Reviews & Reputation', ['completed'], 'heart'),
-    template('thank-you', 'Thank You', 'A personal thank-you from your receptionist.', 'Call the customer to thank them for choosing the business and visiting for this appointment. Keep the conversation warm and brief, ask if they need anything else, and respect their time.', 'Customer Experience', ['completed'], 'sparkles'),
-    template('check-in', 'Check In', 'See how things are going after the service.', 'Call the customer to check how things have been since their appointment. Answer questions within the business information and offer a team follow-up for anything you cannot resolve.', 'Customer Experience', ['completed'], 'heart'),
-    template('win-back', 'Welcome Back', 'Invite a customer to reconnect.', 'Call the customer and ask whether they would be interested in visiting again. Do not assume how long it has been unless the history confirms it. Mention only current documented services and offers. Respect a decline.', 'Sales & Retention', ['completed', 'cancelled', 'missed'], 'repeat'),
-    template('service-follow-up', 'Service Follow-Up', 'Help with the next step after a visit.', 'Call the customer about the service connected to this appointment. Ask if they have questions or would like help with a next step. Use only documented recommendations and prices.', 'Sales & Retention', ['completed'], 'sparkles'),
-    template('payment-reminder', 'Payment Reminder', 'A courteous reminder about a verified balance.', 'Call the customer only about an outstanding invoice verified through the available payment records. Confirm you are speaking with the customer before discussing the balance. Do not infer a balance from the appointment price. Never invent an amount, charge a card, or claim a payment link was sent without a successful tool result. If no verified balance exists, do not request payment.', 'Customer Experience', ['completed'], 'receipt'),
+    template('confirm', 'Confirm Appointment', 'Make sure they are still joining you.', 'Confirm the appointment provided in your context. Confirm the date, time and service. If they need a change, use the available scheduling tools and confirm any change with the customer before saving it.', 'Appointments', ['pending'], 'calendar'),
+    template('cancel-appointment', 'Cancel', 'Confirm that they want to cancel.', 'Discuss cancelling this appointment. Confirm that they want to cancel before changing the booking. If cancellation tools are unavailable, explain that the team will need to handle the request. Do not claim the appointment was cancelled unless the change succeeds.', 'Appointments', ['pending', 'confirmed'], 'calendar'),
+    template('reminder', 'Appointment Reminder', 'A friendly heads-up before their visit.', 'Provide a friendly reminder of their appointment date, time and service. Answer preparation questions using the business information. Do not invent instructions.', 'Appointments', ['pending', 'confirmed'], 'bell'),
+    template('reschedule', 'Reschedule', 'Help find a time that works better.', 'Discuss rescheduling this appointment. Ask their preferred time, check real availability with the scheduling tools, and obtain confirmation before changing the booking. Do not promise a slot without checking.', 'Appointments', ['pending', 'confirmed', 'cancelled', 'missed'], 'calendar'),
+    template('rebook', 'Rebook', 'Turn a recent visit into the next one.', 'Ask whether they would like another appointment, and help book a suitable service using real availability. Confirm all details before creating a new booking; do not change the historical appointment.', 'Appointments', ['completed', 'cancelled', 'missed'], 'repeat'),
+    template('missed', 'Missed You', 'Reconnect after a missed appointment.', 'Speak kindly about their missed appointment. Ask if they would like help booking again. Avoid blame, do not invent a cancellation fee, and check real availability before booking.', 'Customer Experience', ['missed'], 'heart'),
+    template('cancelled', 'Cancellation Follow-Up', 'Keep the door open after a cancellation.', 'Follow up on their cancelled appointment. Ask if there is anything the business can help with and whether they want to arrange another visit. Respect their decision if they decline.', 'Customer Experience', ['cancelled'], 'heart'),
+    template('google-review', 'Google Review', 'Invite an honest account of their visit.', 'Thank them for their visit, and politely invite an honest Google review of their experience, regardless of whether it was positive or negative. Never offer incentives or ask for a particular rating. Use the business review link only if it is available; never invent a link or claim to have sent one.', 'Reviews & Reputation', ['completed'], 'google'),
+    template('feedback', 'Request Feedback', 'Listen to what went well and what could improve.', 'Ask for candid feedback about their appointment. Listen without pressure, summarize their feedback, and offer to pass concerns to the team. Do not promise compensation or an outcome without authorization.', 'Reviews & Reputation', ['completed'], 'message'),
+    template('care', 'Experience Follow-Up', 'Give an unresolved concern personal attention.', 'Follow up on any concern documented for this appointment. Ask how the team can help and record what they share. If no concern is documented, ask how their experience was without assuming something went wrong. Escalate requests outside your authority.', 'Reviews & Reputation', ['completed'], 'heart'),
+    template('thank-you', 'Thank You', 'A personal thank-you from your receptionist.', 'Thank them for choosing the business and visiting for this appointment. Keep the conversation warm and brief, ask if they need anything else, and respect their time.', 'Customer Experience', ['completed'], 'sparkles'),
+    template('check-in', 'Check In', 'See how things are going after the service.', 'Check how things have been since their appointment. Answer questions within the business information and offer a team follow-up for anything you cannot resolve.', 'Customer Experience', ['completed'], 'heart'),
+    template('win-back', 'Welcome Back', 'Invite a customer to reconnect.', 'Ask whether they would be interested in visiting again. Do not assume how long it has been unless the history confirms it. Mention only current documented services and offers. Respect a decline.', 'Sales & Retention', ['completed', 'cancelled', 'missed'], 'repeat'),
+    template('service-follow-up', 'Service Follow-Up', 'Help with the next step after a visit.', 'Discuss the service connected to this appointment. Ask if they have questions or would like help with a next step. Use only documented recommendations and prices.', 'Sales & Retention', ['completed'], 'sparkles'),
+    template('payment-reminder', 'Payment Reminder', 'A courteous reminder about a verified balance.', 'Discuss only an outstanding invoice verified through the available payment records. Confirm you are speaking with the customer before discussing the balance. Do not infer a balance from the appointment price. Never invent an amount, charge a card, or claim a payment link was sent without a successful tool result. If no verified balance exists, do not request payment.', 'Customer Experience', ['completed'], 'receipt'),
 ]
 
 _BASE_TEMPLATES = {item['key']: item for item in TEMPLATES}
 STATUS_STARTERS = {
     'pending': (
-        ('Confirm', 'confirm the appointment', _BASE_TEMPLATES['confirm']['prompt']),
-        ('Reschedule', 'reschedule the appointment', _BASE_TEMPLATES['reschedule']['prompt']),
-        ('Cancel', 'cancel the appointment', _BASE_TEMPLATES['cancel-appointment']['prompt']),
+        ('Confirm', 'confirm', _BASE_TEMPLATES['confirm']['prompt']),
+        ('Reschedule', 'reschedule', _BASE_TEMPLATES['reschedule']['prompt']),
+        ('Cancel', 'cancel', _BASE_TEMPLATES['cancel-appointment']['prompt']),
     ),
     'confirmed': (
-        ('Reschedule', 'reschedule the appointment', _BASE_TEMPLATES['reschedule']['prompt']),
-        ('Cancel', 'cancel the appointment', _BASE_TEMPLATES['cancel-appointment']['prompt']),
+        ('Reschedule', 'reschedule', _BASE_TEMPLATES['reschedule']['prompt']),
+        ('Cancel', 'cancel', _BASE_TEMPLATES['cancel-appointment']['prompt']),
     ),
     'cancelled': (
-        ('Reschedule', 'reschedule the appointment', _BASE_TEMPLATES['reschedule']['prompt']),
+        ('Reschedule', 'reschedule', _BASE_TEMPLATES['reschedule']['prompt']),
     ),
     'completed': (
         ('Rebook', 'rebook', _BASE_TEMPLATES['rebook']['prompt']),
@@ -46,6 +46,13 @@ STATUS_STARTERS = {
         ('Thank You', 'thank them', _BASE_TEMPLATES['thank-you']['prompt']),
         ('Request Feedback', 'request feedback', _BASE_TEMPLATES['feedback']['prompt']),
     ),
+}
+
+# Older seeded records remain editable, so only migrate untouched starter wording.
+LEGACY_STARTER_PURPOSES = {
+    'Confirm': {'confirm appointment', 'confirm the appointment'},
+    'Reschedule': {'reschedule appointment', 'reschedule the appointment'},
+    'Cancel': {'cancel appointment', 'cancel the appointment', 'canceled'},
 }
 
 # These keys exactly match the industries offered by onboarding.
@@ -82,14 +89,11 @@ for industry, (follow_name, follow_topic, prep_name, prep_topic) in INDUSTRY_VIS
     slug = ''.join(c if c.isalnum() else '-' for c in industry.lower()).strip('-')
     TEMPLATES.append(template(f'{slug}-follow', follow_name, f'A follow-up tailored to {industry.lower()}.',
         f'Call the customer to discuss {follow_topic}. Use the appointment context and verified business information. Record concerns and hand off specialist questions. Do not invent advice, offers or commitments.',
-        'For Your Industry', ['completed'], 'sparkles', [industry]))
+        'Customer Experience', ['completed'], 'sparkles'))
     TEMPLATES.append(template(f'{slug}-prepare', prep_name, f'Help customers prepare for their {industry.lower()} appointment.',
         f'Call the customer to confirm {prep_topic}. Use only the details provided by the appointment and business. Ask about missing details and pass them to the team rather than making assumptions.',
-        'For Your Industry', ['pending', 'confirmed'], 'calendar', [industry]))
+        'Appointments', ['pending', 'confirmed'], 'calendar'))
 
 
 def for_industry(value):
-    if isinstance(value, dict):
-        value = value.get('industry', '')
-    industry = value if value in INDUSTRY_VISITS else 'Other General Business'
-    return [t for t in TEMPLATES if not t['industries'] or industry in t['industries']]
+    return list(TEMPLATES)

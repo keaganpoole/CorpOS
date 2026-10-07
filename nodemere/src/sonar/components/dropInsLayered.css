@@ -80,7 +80,7 @@
   box-shadow: none;
 }
 .drop-ins-modal .drop-ins-statuses { position: relative; padding: 0 30px; gap: 24px; border-color: #b6bedb14; scrollbar-width: thin; scrollbar-color: #44475f transparent; }
-.drop-ins-modal .drop-ins-statuses > button { color: #777b8d; padding: 15px 0; }
+.drop-ins-modal .drop-ins-statuses > button { color: #5b5f70; padding: 15px 0; }
 .drop-ins-modal .drop-ins-statuses > button.is-current { color: #fff; }
 .drop-ins-modal .drop-ins-statuses > button.is-current:after { display: none; }
 .drop-ins-modal .drop-ins-status-indicator { position: absolute; left: 0; bottom: 0; height: 1px; border-radius: 3px; pointer-events: none; background: linear-gradient(90deg, #d4d4d8, #fff, #a1a1aa); transition: left .52s cubic-bezier(.22, 1, .36, 1), width .42s cubic-bezier(.22, 1, .36, 1); }
@@ -88,14 +88,20 @@
 .drop-ins-modal .drop-ins-statuses > button:not(.is-current) .drop-ins-status-dot { opacity: .45; }
 .drop-ins-modal .drop-ins-statuses > button.is-current .drop-ins-status-dot { box-shadow: 0 0 6px color-mix(in srgb, currentColor 80%, transparent); }
 .drop-ins-modal .drop-ins-tab-count { color: #a6acc2; }
-.drop-ins-modal .drop-ins-statuses > button:not(.is-current) .drop-ins-tab-count { color: #777b8d; }
+.drop-ins-modal .drop-ins-statuses > button:not(.is-current) .drop-ins-tab-count { color: #5b5f70; }
 .drop-ins-modal .drop-ins-workspace { flex: 1; padding: 16px 30px 6px; scrollbar-color: #44475f transparent; }
 .drop-ins-modal .drop-ins-section-heading { margin-bottom: 14px; }
 .drop-ins-modal .drop-ins-section-heading h3 { font-size: 22px; margin: 0 0 7px; }
 .drop-ins-modal .drop-ins-section-heading p:not(.drop-ins-eyebrow) { color: #a1a6bb; }
-.drop-ins-modal .drop-ins-heading-actions { display: flex; align-items: center; gap: 9px; flex-shrink: 0; }
+.drop-ins-modal .drop-ins-heading-actions { display: flex; align-items: center; gap: 15px; flex-shrink: 0; }
+.drop-ins-modal .drop-ins-inline-sort { display: flex; align-items: center; gap: 7px; color: #8d93aa; font-size: 10px; white-space: nowrap; }
+.drop-ins-modal .drop-ins-inline-sort select { background: #111111; border: 1px solid #b6bedb26; border-radius: 7px; padding: 6px 8px; color: #a1a6bb; font-size: 10px; }
 .drop-ins-modal .drop-ins-secondary { display: inline-flex; align-items: center; justify-content: center; height: 39px; padding: 0 16px; border: 1px solid #ffffff1c; border-radius: 100px; background: #ffffff08; color: #d4d4d8; font-size: 12px; font-weight: 600; transition: background .18s, border-color .18s, color .18s; }
 .drop-ins-modal .drop-ins-secondary:hover { background: #ffffff; border-color: #ffffff; color: #09090b; }
+.drop-ins-modal .drop-ins-templates-button { height: auto; padding: 6px 0; border: 0; border-radius: 0; background: transparent; color: #d4d4d8; font-size: 12px; font-weight: 600; }
+.drop-ins-modal .drop-ins-templates-button:hover { background: transparent; color: #d4d4d8; }
+.drop-ins-modal .drop-in-preview-record .drop-in-chip { font-size: 8.5px; }
+.drop-ins-modal .drop-in-preview-record .drop-in-preview-add { height: 20px; line-height: 20px; }
 .drop-ins-modal .drop-ins-back { margin-bottom: 14px; }
 .drop-ins-modal .drop-ins-empty { padding: 22px; background: #ffffff03; border-color: #b6bedb26; }
 .drop-ins-modal .drop-ins-empty-icon { width: 46px; height: 46px; margin-bottom: 14px; border-radius: 14px; transform: none; }
@@ -104,7 +110,9 @@
 .drop-ins-modal .drop-ins-gallery-heading { display: flex; align-items: center; gap: 14px; }
 .drop-ins-modal .drop-ins-gallery-title { display: flex; align-items: center; gap: 10px; margin-right: auto; }
 .drop-ins-modal .drop-ins-gallery-title h3 { margin: 0; color: #f4f4f5; font-size: 17px; font-weight: 550; letter-spacing: -.025em; }
-.drop-ins-modal .drop-ins-gallery-search { width: 240px; padding: 10px 12px; background: #ffffff03; border-color: #b6bedb1c; color: #a1a6bb; }
+.drop-ins-modal .drop-ins-gallery-search { width: 240px; height: 38px; box-sizing: border-box; padding: 0 12px; background: #ffffff03; border-color: #b6bedb1c; color: #a1a6bb; }
+.drop-ins-modal .drop-ins-gallery-search svg { width: 15px; height: 15px; }
+.drop-ins-modal .drop-ins-gallery-search input { font-size: 11px; }
 .drop-ins-modal .drop-ins-gallery-search input::placeholder { color: #959bb3; }
 .drop-ins-modal .drop-ins-categories { gap: 18px; margin: 13px 0; }
 .drop-ins-modal .drop-ins-categories button { padding: 7px 0; color: #8d93aa; border-color: transparent; background: transparent; transition: color .22s ease; }
@@ -119,6 +127,7 @@
 .drop-ins-modal .drop-ins-template p { color: #a1a6bb; line-height: 1.65; margin-bottom: 15px; }
 .drop-ins-modal .drop-ins-template-bottom { color: #949ab2; }
 .drop-ins-modal .drop-ins-list-toolbar, .drop-ins-modal .drop-ins-sort-note { color: #a1a6bb; }
+.drop-ins-modal .drop-ins-list-toolbar { justify-content: flex-end; }
 .drop-ins-modal .drop-ins-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .drop-ins-modal .drop-ins-list-toolbar select { background: #111111; border-color: #b6bedb26; }
 .drop-ins-modal .drop-ins-list-row { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: minmax(0, 1fr) auto; min-width: 0; min-height: 124px; padding: 14px; align-items: start; gap: 10px; background: #111111e6; border-color: #b6bedb1c; }
@@ -127,6 +136,13 @@
 .drop-ins-modal .drop-ins-list-text > span { color: #949ab2; }
 .drop-ins-modal .drop-ins-order-number { position: absolute; top: 15px; left: 14px; width: auto; color: #949ab2; }
 .drop-ins-modal .drop-ins-row-actions { grid-column: 1 / -1; justify-content: flex-end; width: 100%; padding-top: 8px; border-top: 1px solid #b6bedb14; }
+.drop-ins-modal .drop-ins-list-row .drop-ins-row-actions { min-width: 0; min-height: 36px; overflow: hidden; }
+.drop-ins-modal .drop-ins-list-row .drop-ins-action-content,
+.drop-ins-modal .drop-ins-list-row .drop-ins-delete-inline { display: flex; align-items: center; width: 100%; min-width: 0; gap: 3px; }
+.drop-ins-modal .drop-ins-list-row .drop-ins-delete-inline { gap: 8px; }
+.drop-ins-modal .drop-ins-list-row .drop-ins-delete-inline span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #d4d4d8; font-size: 10px; }
+.drop-ins-modal .drop-ins-list-row .drop-ins-delete-inline button { flex-shrink: 0; border: 0; background: none; padding: 4px 5px; color: #d4d4d8; font-size: 10px; }
+.drop-ins-modal .drop-ins-list-row .drop-ins-delete-inline button:last-child { color: #fda4af; }
 .drop-ins-modal .drop-ins-card-statuses { display: flex; align-items: center; gap: 2px; margin-right: auto; }
 .drop-ins-modal .drop-ins-card-status-button { width: 22px; height: 26px; display: grid; place-items: center; padding: 0; border: 0; background: transparent; cursor: pointer; }
 .drop-ins-modal .drop-ins-card-status-button:disabled { cursor: default; }
@@ -149,6 +165,7 @@
 .drop-ins-modal .drop-ins-field > label { color: #e4e4e7; font-size: 12px; font-weight: 550; margin-bottom: 9px; }
 .drop-ins-modal .drop-ins-field > label span { display: block; font-size: 11px; line-height: 1.6; font-weight: 400; color: #a1a6bb; margin-top: 5px; }
 .drop-ins-modal .drop-ins-editor input, .drop-ins-modal .drop-ins-editor textarea { margin: 0; background: #0f0f10f2; border-color: #b6bedb26; padding: 11px 14px; }
+.drop-ins-modal .drop-ins-editor-identity input { box-sizing: border-box; height: 38px; padding: 0 14px; line-height: normal; }
 .drop-ins-modal .drop-ins-editor input::placeholder, .drop-ins-modal .drop-ins-editor textarea::placeholder { color: #8c93ad; }
 .drop-ins-modal .drop-ins-editor textarea { flex: 0 0 140px; height: 140px; min-height: 0; }
 .drop-ins-modal .drop-ins-editor-footer { grid-column: 1 / -1; padding-top: 8px; border-top: 1px solid #b6bedb14; }
@@ -249,7 +266,7 @@
   .drop-ins-modal .drop-ins-section-heading { align-items: flex-start; gap: 10px; margin-bottom: 14px; }
   .drop-ins-modal .drop-ins-section-heading h3 { font-size: 19px; }
   .drop-ins-modal .drop-ins-section-heading p:not(.drop-ins-eyebrow) { line-height: 1.45; }
-  .drop-ins-modal .drop-ins-heading-actions { width: auto; gap: 6px; }
+  .drop-ins-modal .drop-ins-heading-actions { width: auto; gap: 11px; }
   .drop-ins-modal .drop-ins-primary,
   .drop-ins-modal .drop-ins-secondary { height: 34px; padding-inline: 11px; font-size: 10px!important; }
   .drop-ins-modal .drop-ins-list { grid-template-columns: minmax(0, 1fr); gap: 8px; }
