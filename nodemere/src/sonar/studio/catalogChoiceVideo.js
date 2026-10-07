@@ -27,14 +27,31 @@ export function preloadCatalogChoiceVideo() {
         resolve(value);
       };
       const loaded = () => finish(video);
-      const failed = () => finish(null);
-      cancelLoad = failed;
+      let attempts = 0;
+      const failed = () => {
+        if (currentGeneration !== generation || attempts >= sources.length) {
+          finish(null);
+          return;
+        }
+        video.src = sources[attempts++];
+        video.load();
+      };
+      cancelLoad = () => finish(null);
       video.addEventListener('loadeddata', loaded, { once: true });
-      video.addEventListener('error', failed, { once: true });
-      video.src = sources[Math.floor(Math.random() * sources.length)];
-      video.load();
+      video.addEventListener('error', failed);
+      // A broken first source should not leave the hire card blank.
+      const startIndex = Math.floor(Math.random() * sources.length);
+      sources.push(...sources.splice(0, startIndex));
+      failed();
     });
-  }).catch(() => null);
+  }).catch(() => null).then(video => {
+    if (!video && currentGeneration === generation) {
+      media?.removeAttribute('src');
+      media = null;
+      request = null;
+    }
+    return video;
+  });
   return request;
 }
 

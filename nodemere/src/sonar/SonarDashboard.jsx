@@ -1469,10 +1469,9 @@ const TasklistWidget = ({ tasklistState = null, onOpenIntro = null, onHide = nul
   const taskRingRadius = 13;
   const taskRingCircumference = 2 * Math.PI * taskRingRadius;
   const taskRingDashOffset = taskRingCircumference - (activeTaskCompletionRatio * taskRingCircumference);
-  const nextIncompleteTask = TASKLIST_DEFINITIONS.find((task) => (
-    !task.subtasks.every((subtask) => isSubtaskComplete(task.id, subtask.id))
-  )) || activeTask;
-  const nextIncompleteTaskComplete = nextIncompleteTask.subtasks.every((subtask) => isSubtaskComplete(nextIncompleteTask.id, subtask.id));
+  const nextIncompleteSubtask = TASKLIST_DEFINITIONS.flatMap((task) => (
+    task.subtasks.map((subtask) => ({ ...subtask, taskId: task.id }))
+  )).find((subtask) => !isSubtaskComplete(subtask.taskId, subtask.id));
   const isBusinessSetupTask = activeTask.id === 'business_setup';
   const isTwoColumnTask = isBusinessSetupTask || activeTask.id === 'first_receptionist';
   const taskColumnBreak = Math.ceil(activeTask.subtasks.length / 2);
@@ -1671,8 +1670,8 @@ const TasklistWidget = ({ tasklistState = null, onOpenIntro = null, onHide = nul
             </div>
             <div className="flex items-center gap-2 px-3 py-2">
               <p className="shrink-0 text-[10px] font-medium uppercase tracking-[0.16em] text-zinc-600">Next task</p>
-              <p className={`min-w-0 flex-1 truncate text-[12px] font-medium tracking-[-0.01em] ${nextIncompleteTaskComplete ? 'text-zinc-600 line-through' : 'text-zinc-400'}`}>
-                {nextIncompleteTask.title}
+              <p className="min-w-0 flex-1 truncate text-[12px] font-medium tracking-[-0.01em] text-zinc-400">
+                {nextIncompleteSubtask?.title || 'All tasks complete'}
               </p>
             </div>
           </motion.button>
@@ -2682,6 +2681,7 @@ const SonarDashboard = () => {
                 style={{ pointerEvents: teamView === 'receptionists' && !teamInitialLoading ? 'auto' : 'none' }}
                 aria-hidden={teamView !== 'receptionists' || teamInitialLoading}
               >
+                {teamActionError && <p role="alert" className="mb-4 text-xs text-rose-300">{teamActionError}</p>}
                 {
                 !teamInitialLoading && teamView === 'receptionists' && agentsLoading ? (
                   <div className="dashboard-mobile-viewport-loader flex min-h-full items-center justify-center pb-20">
@@ -2709,7 +2709,12 @@ const SonarDashboard = () => {
                             pendingModel={pendingModel?.agentId === agent.id ? pendingModel : null}
                             onOpenMarketplace={setMarketplaceAgent}
                             onOpenScenarios={setReceptionistsAgent}
-                            onUpdateDirection={(agent, nextDirection) => updateAgentDirection(agent.id, nextDirection)}
+                            onUpdateDirection={(agent, nextDirection) => {
+                              setTeamActionError('');
+                              updateAgentDirection(agent.id, nextDirection).catch(() => {
+                                setTeamActionError('Could not save the receptionist role. Please try again.');
+                              });
+                            }}
                             onTerminate={(agent) => { setTeamActionError(''); setTerminateAgent(agent); }}
                             slim
                           />
@@ -2758,7 +2763,7 @@ const SonarDashboard = () => {
                         </div>
                         <div className="space-y-4 p-6">
                           <p className="text-[12px] leading-5 text-zinc-500">
-                            {agent.created_receptionist_id != null ? 'Your saved receptionist is archived. Restore them to the catalog when you are ready.' : 'This receptionist is hidden from the active roster but appointment history remains intact.'}
+                            {agent.created_receptionist_id != null ? 'Your saved receptionist is archived. Restore them to the collection when you are ready.' : 'This receptionist is hidden from the active roster but appointment history remains intact.'}
                           </p>
                           <button
                             type="button"
@@ -2828,7 +2833,7 @@ const SonarDashboard = () => {
                 title={terminateAgent.stereotype === 'Studio Voice Design' ? 'Remove from team' : terminateAgentHasAppointments && terminateAgent.catalog_id == null ? 'Archive Receptionist' : 'Delete Receptionist'}
                 action={terminateAgent.stereotype === 'Studio Voice Design' ? 'Remove from team' : terminateAgentHasAppointments && terminateAgent.catalog_id == null ? 'Archive' : 'Delete'}
                 name={terminateAgent.first_name || terminateAgent.name}
-                description={terminateAgent.stereotype === 'Studio Voice Design' ? 'This returns your saved receptionist to the catalog. Their portrait, voice, profile, and history are preserved.' : terminateAgentHasAppointments && terminateAgent.catalog_id != null ? 'System receptionists with appointment history cannot be deleted or archived.' : terminateAgentHasAppointments ? 'This removes them from the active roster and preserves their record, portrait, voice, and history. You can restore them from Archived.' : 'This action cannot be undone.'}
+                description={terminateAgent.stereotype === 'Studio Voice Design' ? 'This returns your saved receptionist to the collection. Their portrait, voice, profile, and history are preserved.' : terminateAgentHasAppointments && terminateAgent.catalog_id != null ? 'System receptionists with appointment history cannot be deleted or archived.' : terminateAgentHasAppointments ? 'This removes them from the active roster and preserves their record, portrait, voice, and history. You can restore them from Archived.' : 'This action cannot be undone.'}
                 error={teamActionError}
                 onClose={() => setTerminateAgent(null)}
                 onConfirm={async () => {

@@ -24,18 +24,27 @@ export function AuditionChoiceBackground() {
 export function CatalogChoiceBackground() {
   const hostRef = useRef(null);
   useEffect(() => {
-    let cancelled = false, video = null;
+    let cancelled = false, video = null, retryTimer = null, attempts = 0;
     const failed = () => { video?.pause(); video?.remove(); };
-    preloadCatalogChoiceVideo().then(loadedVideo => {
-      if (cancelled || !loadedVideo || !hostRef.current || loadedVideo.error) return;
-      video = loadedVideo;
-      video.autoplay = true;
-      video.addEventListener('error', failed);
-      hostRef.current.appendChild(video);
-      video.play()?.catch(() => {});
-    });
+    const attach = () => {
+      preloadCatalogChoiceVideo().then(loadedVideo => {
+        if (cancelled) return;
+        if (!loadedVideo || loadedVideo.error) {
+          if (++attempts < 3) retryTimer = window.setTimeout(attach, 1200);
+          return;
+        }
+        if (!hostRef.current) return;
+        video = loadedVideo;
+        video.autoplay = true;
+        video.addEventListener('error', failed);
+        hostRef.current.appendChild(video);
+        video.play()?.catch(() => {});
+      });
+    };
+    attach();
     return () => {
       cancelled = true;
+      if (retryTimer) window.clearTimeout(retryTimer);
       if (video) {
         video.removeEventListener('error', failed);
         video.pause(); video.autoplay = false; video.remove();

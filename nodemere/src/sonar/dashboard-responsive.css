@@ -260,6 +260,21 @@
   }
 }
 
+@media (min-width: 768px) and (max-width: 1023px) {
+  .sonar-dashboard-shell[data-responsive="true"] .team-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .sonar-dashboard-shell[data-responsive="true"] .team-toolbar > div:first-child,
+  .sonar-dashboard-shell[data-responsive="true"] .team-toolbar .team-view-tabs {
+    width: 100%;
+  }
+  .sonar-dashboard-shell[data-responsive="true"] .team-toolbar > div:last-child {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
 @media (min-width: 1024px) and (max-width: 1279px) {
   .sonar-dashboard-shell[data-responsive="true"] .call-logs-page > .grid { display: flex; flex-direction: column; }
   .sonar-dashboard-shell[data-responsive="true"] .call-logs-page > .grid > :is(aside, section) { flex: 1; min-height: 0; }

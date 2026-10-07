@@ -3,7 +3,7 @@
  * Connects to WebSocket on mount, manages all operational data
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { api, connectWebSocket, addMessageListener, disconnectWebSocket } from '../lib/api';
 import { supabase } from '../lib/supabase';
 
@@ -24,9 +24,33 @@ function directionConflicts(selectedDirection, existingDirection) {
   return false;
 }
 
+function withSelectedDirection(items, agentId, direction) {
+  return items.map(agent => {
+    if (String(agent.id) === String(agentId)) {
+      return {
+        ...agent,
+        direction,
+        status: agent.is_active === false ? 'Offline' : direction === 'none' ? 'Idle' : 'Online',
+      };
+    }
+    return directionConflicts(direction, agent.direction)
+      ? { ...agent, direction: 'none', status: agent.is_active === false ? 'Offline' : 'Idle' }
+      : agent;
+  });
+}
+
 export function useSonarState() {
   const [tasks, setTasks] = useState([]);
   const [agents, setAgents] = useState([]);
+  const [pendingDirections, setPendingDirections] = useState([]);
+  const pendingDirectionsRef = useRef([]);
+  const directionRevisionRef = useRef(0);
+  const directionWriteQueueRef = useRef(Promise.resolve());
+  const agentsRequestEpochRef = useRef(0);
+  const visibleAgents = useMemo(() => pendingDirections.reduce(
+    (items, pending) => withSelectedDirection(items, pending.agentId, pending.direction),
+    agents,
+  ), [agents, pendingDirections]);
   const [controlState, setControlState] = useState({ runtime_mode: 'running', stage: 'code_blue', calls_filter: 'all' });
   const [session, setSession] = useState(null);
   const [livePulse, setLivePulse] = useState([]);
@@ -45,10 +69,11 @@ const [reactions, setReactions] = useState([]);
     // Receptionist cards are the primary content on this screen. Resolve that
     // request independently so a slow, unrelated dashboard widget cannot hold
     // the whole page behind one Promise.all barrier.
+    const requestEpoch = agentsRequestEpochRef.current;
     const agentsRequest = api.getAgents();
     setAgentsLoading(true);
     agentsRequest.then((agentsData) => {
-      if (!Array.isArray(agentsData)) return;
+      if (!Array.isArray(agentsData) || requestEpoch !== agentsRequestEpochRef.current) return;
       setAgents(agentsData);
       const activeAgents = agentsData.filter((agent) => agent?.is_active !== false).length;
       setSummary({ ok: activeAgents, warnings: 0, errors: 0, activeAgents, totalAgents: agentsData.length });
@@ -91,7 +116,7 @@ const [reactions, setReactions] = useState([]);
     switch (data.type) {
       case 'initial_state':
         setTasks(data.tasks || []);
-        setAgents(data.agents || []);
+        if (!pendingDirectionsRef.current.length) setAgents(data.agents || []);
         setAgentsLoading(false);
         setControlState(prev => ({ ...prev, ...(data.control || {}), calls_filter: prev.calls_filter || 'all' }));
         setSession(data.session);
@@ -195,7 +220,11 @@ const [reactions, setReactions] = useState([]);
         }
 
         // Refresh only for other changes that may affect field mapping.
-        api.getAgents().then(d => { if (d) setAgents(d); });
+        const requestEpoch = agentsRequestEpochRef.current;
+        api.getAgents().then(d => {
+          if (!Array.isArray(d) || requestEpoch !== agentsRequestEpochRef.current) return;
+          setAgents(d);
+        });
       })
       .subscribe();
 
@@ -398,52 +427,44 @@ const [reactions, setReactions] = useState([]);
     return result;
   }, []);
 
-  const updateAgentDirection = useCallback(async (agentId, direction) => {
+  const updateAgentDirection = useCallback((agentId, direction) => {
     const normalizedDirection = normalizeCallDirection(direction);
-    let previousAgents = null;
+    const revision = ++directionRevisionRef.current;
+    const pending = { agentId, direction: normalizedDirection, revision };
+    pendingDirectionsRef.current = [...pendingDirectionsRef.current, pending];
+    agentsRequestEpochRef.current += 1;
+    setPendingDirections(pendingDirectionsRef.current);
 
-    setAgents(prev => {
-      previousAgents = prev;
-      return prev.map(agent => (
-        String(agent.id) === String(agentId)
-          ? {
-              ...agent,
-              direction: normalizedDirection,
-              status: agent.is_active === false ? 'Offline' : 'Online',
-            }
-          : directionConflicts(normalizedDirection, agent.direction)
-            ? {
-                ...agent,
-                direction: 'none',
-                status: agent.is_active === false ? 'Offline' : 'Idle',
-              }
-          : agent
-      ));
-    });
-
-    const result = await api.patchAgent(agentId, {
-      direction: normalizedDirection,
-    });
-
-    if (!result) {
-      if (previousAgents) {
-        setAgents(previousAgents);
+    // Serialize rapid changes so an older save cannot land after the latest choice.
+    const save = async () => {
+      try {
+        const result = await api.patchAgent(agentId, { direction: normalizedDirection });
+        if (!result) throw new Error('Could not save receptionist role.');
+        // Commit this save even if a second card was changed while it ran.
+        // The later choice stays layered over this confirmed result.
+        setAgents(prev => withSelectedDirection(prev, agentId, normalizedDirection));
+        agentsRequestEpochRef.current += 1;
+        const requestEpoch = agentsRequestEpochRef.current;
+        const refreshed = await api.getAgents();
+        if (Array.isArray(refreshed) && requestEpoch === agentsRequestEpochRef.current) {
+          setAgents(refreshed);
+        }
+        pendingDirectionsRef.current = pendingDirectionsRef.current.filter(item => item.revision !== revision);
+        setPendingDirections(pendingDirectionsRef.current);
+        return result;
+      } catch (error) {
+        agentsRequestEpochRef.current += 1;
+        const requestEpoch = agentsRequestEpochRef.current;
+        const refreshed = await api.getAgents();
+        if (Array.isArray(refreshed) && requestEpoch === agentsRequestEpochRef.current) setAgents(refreshed);
+        pendingDirectionsRef.current = pendingDirectionsRef.current.filter(item => item.revision !== revision);
+        setPendingDirections(pendingDirectionsRef.current);
+        throw error;
       }
-      return null;
-    }
-
-    setAgents(prev => prev.map(agent => (
-      String(agent.id) === String(agentId)
-        ? {
-            ...agent,
-            ...result,
-            direction: normalizeCallDirection(result.direction ?? normalizedDirection),
-            status: result.status ?? agent.status,
-          }
-        : agent
-    )));
-
-    return result;
+    };
+    const request = directionWriteQueueRef.current.then(save, save);
+    directionWriteQueueRef.current = request.catch(() => {});
+    return request;
   }, []);
 
   const removeAgent = useCallback((agentId) => {
@@ -453,7 +474,7 @@ const [reactions, setReactions] = useState([]);
 
   return {
     tasks,
-    agents,
+    agents: visibleAgents,
     controlState,
     session,
     livePulse,

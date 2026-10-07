@@ -107,7 +107,7 @@ const HireReceptionistModal = ({
       }
     } catch (err) {
       console.error("HireReceptionistModal.jsx:event_46");
-      setLoadError('The catalog couldn’t load. Please try again.');
+      setLoadError('The collection couldn’t load. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -318,7 +318,7 @@ const HireReceptionistModal = ({
         {embedded && <span className="sr-only">Press Escape or click outside to close receptionist details.</span>}
         {/* Header */}
         {!embedded && <div className="text-center mb-10 space-y-2">
-          <h1 className="text-xs uppercase tracking-[6px] font-bold text-white/20">RECEPTIONIST CATALOG</h1>
+          <h1 className="text-xs uppercase tracking-[6px] font-bold text-white/20">RECEPTIONIST COLLECTION</h1>
           <p className="text-2xl font-semibold tracking-tight text-white">Hire a Receptionist</p>
         </div>}
 
@@ -581,14 +581,14 @@ const HireReceptionistModal = ({
 
   if (!embedded) return detail;
   if (loading || loadError || !receptionists.length) return <div className="ns-gallery-status" role="status">
-    {loading ? <><CubePreloader size={26}/><span>Opening the catalog</span></> : <>
+    {loading ? <><CubePreloader size={26}/><span>Loading receptionists</span></> : <>
       <User size={32}/><span>{loadError || 'No receptionists available'}</span>
       {loadError && <button type="button" onClick={loadReceptionists}>Try again</button>}
     </>}
   </div>;
   return <><AnimatePresence>{archiveTarget?.created_receptionist_id != null && <ReceptionistActionConfirmation
     title="Archive Receptionist" action="Archive" name={archiveTarget.first_name || archiveTarget.full_name || 'receptionist'}
-    description="This moves your saved receptionist to Archives. Their portrait, voice, and profile are preserved. You can restore them to the catalog."
+    description="This moves your saved receptionist to Archives. Their portrait, voice, and profile are preserved. You can restore them to the collection."
     error={hireError} onClose={() => { setArchiveTarget(null); setHireError(''); }}
     onConfirm={async () => {
       setArchiving(true); setHireError('');

@@ -61,7 +61,7 @@ export function ReceptionistChoiceCards({ onCreate, onHire, createBackground, ca
         cascadeIndex={cascade ? 1 : undefined}
         background={catalogBackground}
         eyebrow={catalogEyebrow}
-        title={catalogTitle ?? <>Choose from<br/>the catalog.</>}
+        title={catalogTitle ?? <>Choose from<br/>the collection.</>}
         copy={<>Explore ready-to-hire receptionists with their own voice, look, and point of view.</>}
         action="Explore the collection"
         onClick={onHire}
