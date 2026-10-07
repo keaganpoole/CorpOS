@@ -189,7 +189,7 @@ export function WorkforceGate({ children }) {
   const [pendingChecked, setPendingChecked] = useState(false);
   const [error, setError] = useState('');
   const [acceptedInvitationId, setAcceptedInvitationId] = useState(null);
-  useEffect(() => { if (workforce && (!workforce.tenant || linkedInvitationId) && !workforce.error) { setPendingChecked(false); workforceRequest('/invitations/pending').then(setPending).catch(e => setError(e.message)).finally(() => setPendingChecked(true)); } }, [workforce, linkedInvitationId]);
+  useEffect(() => { if (workforce && (!workforce.tenant || linkedInvitationId) && !workforce.error) { workforceRequest('/invitations/pending').then(setPending).catch(e => setError(e.message)).finally(() => setPendingChecked(true)); } }, [workforce, linkedInvitationId]);
   async function confirmAcceptedInvitation(businessId) {
     const current = await refreshWorkforce();
     if (!current?.tenant || String(current.tenant.business_id) !== String(businessId)) {
