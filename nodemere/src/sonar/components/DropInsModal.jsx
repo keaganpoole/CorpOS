@@ -1,10 +1,11 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { ArrowLeft, Plus, X, Search, Sparkles, Phone, PhoneCall, CalendarDays, Bell, Heart, MessageCircle, Repeat2, Receipt, Check, Pencil, Trash2, Loader2, Lightbulb } from 'lucide-react';
+import { ArrowLeft, Plus, X, Search, Sparkles, Phone, CalendarDays, Bell, Heart, MessageCircle, Repeat2, Receipt, Check, Pencil, Trash2, Loader2, Lightbulb } from 'lucide-react';
 import { FcGoogle } from 'react-icons/fc';
 import { api } from '../lib/api';
-import { APPOINTMENT_STATUS_COLORS, STATUS_OPTIONS } from '../lib/appointmentSchema';
+import { STATUS_OPTIONS } from '../lib/appointmentSchema';
+import { groupDropIns, stabilizeDropInGroups } from '../lib/dropInGrouping';
 import DropInAppointmentPreview from './DropInAppointmentPreview';
 import ModalSpectrumLine from '../../components/ModalSpectrumLine';
 import './dropIns.css';
@@ -16,14 +17,12 @@ const statusCopy = {
   pending: 'Before the appointment is confirmed.', confirmed: 'Help customers get ready for their visit.',
   completed: 'Keep the conversation going after a visit.', missed: 'A thoughtful way to reconnect.', cancelled: 'Leave the door open for another visit.',
 };
-const STATUS_COLORS = Object.fromEntries(
-  Object.entries(APPOINTMENT_STATUS_COLORS).map(([name, color]) => [name.toLowerCase(), color]),
-);
 const blank = (status) => ({ name: '', purpose: '', prompt: '', is_active: true, available_on_status: status });
 const manual = (a, b) => a.sort_order - b.sort_order || a.id.localeCompare(b.id);
 
 export default function DropInsModal({ model, onClose }) {
   const [status, setStatus] = useState('completed');
+  const [previewStatus, setPreviewStatus] = useState('completed');
   const [view, setView] = useState('gallery');
   const [draft, setDraft] = useState(null);
   const [baseline, setBaseline] = useState(null);
@@ -35,34 +34,50 @@ export default function DropInsModal({ model, onClose }) {
   const [category, setCategory] = useState('All');
   const [sort, setSort] = useState('manual');
   const [busy, setBusy] = useState(false);
+  const dotSaveJobs = useRef(new Map());
+  const [pendingActive, setPendingActive] = useState(() => new Set());
+  const activeSaveJobs = useRef(new Map());
+  const [activeOverrides, setActiveOverrides] = useState({});
+  const [dotOverrides, setDotOverrides] = useState({});
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [headerNotice, setHeaderNotice] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [previewDeleteTarget, setPreviewDeleteTarget] = useState(null);
   const [pendingNavigation, setPendingNavigation] = useState(null);
   const [tipsOpen, setTipsOpen] = useState(false);
   const modal = useRef(null);
+  const previousGroups = useRef([]);
   const statusTabs = useRef(null);
   const [statusIndicator, setStatusIndicator] = useState({ left: 0, width: 0 });
   const reduced = useReducedMotion();
   const dirty = draft && JSON.stringify(draft) !== JSON.stringify(baseline);
   const statusItems = model.items.filter(x => x.available_on_status === status).sort(manual);
+  const allGroups = useMemo(() => {
+    const groups = stabilizeDropInGroups(groupDropIns(model.items), previousGroups.current);
+    previousGroups.current = groups;
+    return groups;
+  }, [model.items]);
   const activeItems = statusItems.filter(x => x.is_active);
   const previewItems = useMemo(() => {
-    const saved = model.items.filter(x => x.available_on_status === status && x.is_active && x.id !== draft?.id).sort(manual);
+    const saved = model.items.filter(x => x.available_on_status === previewStatus && x.is_active && x.id !== draft?.id).sort(manual);
     if (view === 'editor' && draft?.id && draft?.is_active) {
       saved.push({ ...draft, id: draft.id || 'draft', name: draft.name.trim() || 'New drop-in', purpose: draft.purpose.trim() || draft.name.trim() || 'follow up', sort_order: draft.sort_order ?? 2147483647 });
     }
     return saved.sort(manual);
-  }, [model.items, status, draft, view]);
+  }, [model.items, previewStatus, draft, view]);
   const itemSort = sort === 'alpha' ? (a, b) => a.name.localeCompare(b.name) : sort === 'newest' ? (a, b) => b.created_at.localeCompare(a.created_at) : sort === 'used' ? (a, b) => (b.usage_count || 0) - (a.usage_count || 0) || manual(a, b) : manual;
   const sortedItems = [...statusItems].sort(itemSort);
+  const sortedGroups = [...allGroups].sort((a, b) => {
+    if (sort === 'alpha') return a.primary.name.localeCompare(b.primary.name) || a.position - b.position;
+    if (sort === 'newest') return (b.firstCreatedAt || '').localeCompare(a.firstCreatedAt || '') || a.position - b.position;
+    if (sort === 'used') return b.firstUsageCount - a.firstUsageCount || a.position - b.position;
+    return a.position - b.position;
+  });
   const applicableTemplates = templates.filter(t => t.statuses.includes(status));
   const categories = ['All', ...new Set(applicableTemplates.map(t => t.category))];
   const visibleTemplates = applicableTemplates.filter(t => (category === 'All' || t.category === category) && `${t.name} ${t.description} ${t.category}`.toLowerCase().includes(search.toLowerCase()));
 
   const navigate = action => {
-    if (busy) return;
     if (dirty) setPendingNavigation(() => action);
     else action();
   };
@@ -86,7 +101,11 @@ export default function DropInsModal({ model, onClose }) {
     }, 240);
     return () => clearTimeout(timer);
   }, [view]);
-  useEffect(() => { if (!success) return; const timer = setTimeout(() => setSuccess(''), 2600); return () => clearTimeout(timer); }, [success]);
+  useEffect(() => {
+    if (!headerNotice || busy) return undefined;
+    const timer = setTimeout(() => setHeaderNotice(null), 2800);
+    return () => clearTimeout(timer);
+  }, [headerNotice, busy]);
   useEffect(() => {
     const previous = document.activeElement;
     const overflow = document.body.style.overflow;
@@ -103,13 +122,91 @@ export default function DropInsModal({ model, onClose }) {
       else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first?.focus(); }
     }
   };
-  const perform = async (action, message) => {
+  const perform = async (action, message, onError) => {
     setBusy(true); setError('');
-    try { await action(); if (message) setSuccess(message); }
-    catch (e) { setError(e.message); }
+    try { await action(); if (message) setHeaderNotice({ text: message, failed: false }); }
+    catch (e) { setError(e.message); if (onError) onError(); else setHeaderNotice({ text: 'Could not save change', failed: true }); }
     finally { setBusy(false); }
   };
-  const save = () => perform(async () => { await model.save(draft); leaveEditor('manage'); }, draft.id ? 'Drop-in updated' : 'Drop-in added to your calendar');
+  const save = () => {
+    const next = draft;
+    leaveEditor('manage');
+    setHeaderNotice({ text: next.id ? 'Drop-in updated' : 'Drop-in added', failed: false });
+    return perform(async () => { await model.save(next); }, next.id ? 'Drop-in updated' : 'Drop-in added', () => {
+      setDraft(next);
+      setBaseline(next);
+      setView('editor');
+    });
+  };
+  const toggleGroupStatus = (group, nextStatus, assigned) => {
+    const label = nextStatus.charAt(0).toUpperCase() + nextStatus.slice(1);
+    const pendingKey = `${group.id}:${nextStatus}`;
+    const desired = !assigned;
+    setDotOverrides(current => ({ ...current, [pendingKey]: desired }));
+    setError('');
+    setHeaderNotice({ text: `${desired ? 'Added to' : 'Removed from'} ${label}`, failed: false });
+    const existingJob = dotSaveJobs.current.get(pendingKey);
+    if (existingJob) { existingJob.desired = desired; return; }
+
+    const job = { desired, savedRow: group.byStatus[nextStatus] || null };
+    dotSaveJobs.current.set(pendingKey, job);
+    const finish = () => {
+      dotSaveJobs.current.delete(pendingKey);
+      setDotOverrides(current => { const next = { ...current }; delete next[pendingKey]; return next; });
+    };
+    const flush = async () => {
+      while (true) {
+        const target = job.desired;
+        try {
+          if (target && !job.savedRow) job.savedRow = await model.save({ name: group.primary.name, purpose: group.primary.purpose, prompt: group.primary.prompt, is_active: activeOverrides[`group:${group.id}`] ?? group.rows.some(row => row.is_active), available_on_status: nextStatus });
+          else if (!target && job.savedRow) {
+            await model.remove(job.savedRow.id);
+            job.savedRow = null;
+          }
+        } catch (e) {
+          if (job.desired !== target) continue;
+          setError(e.message);
+          setHeaderNotice({ text: `Could not ${target ? 'add to' : 'remove from'} ${label}`, failed: true });
+          finish();
+          return;
+        }
+        if (job.desired === target) { finish(); return; }
+      }
+    };
+    void flush();
+  };
+  const toggleActive = (rows, enabled, overrideKey) => {
+    const nextEnabled = !enabled;
+    setActiveOverrides(current => ({ ...current, [overrideKey]: nextEnabled }));
+    setError('');
+    setHeaderNotice({ text: nextEnabled ? 'Drop-in turned on' : 'Drop-in turned off', failed: false });
+    const existingJob = activeSaveJobs.current.get(overrideKey);
+    if (existingJob) { existingJob.desired = nextEnabled; return; }
+
+    const job = { rows, desired: nextEnabled };
+    activeSaveJobs.current.set(overrideKey, job);
+    setPendingActive(current => new Set(current).add(overrideKey));
+    const finish = () => {
+      activeSaveJobs.current.delete(overrideKey);
+      setActiveOverrides(current => { const next = { ...current }; delete next[overrideKey]; return next; });
+      setPendingActive(current => { const next = new Set(current); next.delete(overrideKey); return next; });
+    };
+    const flush = async () => {
+      while (true) {
+        const target = job.desired;
+        try { await Promise.all(job.rows.map(row => model.save({ ...row, is_active: target }))); }
+        catch (e) {
+          if (job.desired !== target) continue;
+          setError(e.message);
+          setHeaderNotice({ text: 'Could not change drop-in', failed: true });
+          finish();
+          return;
+        }
+        if (job.desired === target) { finish(); return; }
+      }
+    };
+    void flush();
+  };
   const hasConfiguredDropIns = nextStatus => model.items.some(item => item.available_on_status === nextStatus);
   useLayoutEffect(() => {
     const updateIndicator = () => {
@@ -126,46 +223,62 @@ export default function DropInsModal({ model, onClose }) {
   }, [status]);
   const deleteDropIn = () => {
     if (!previewDeleteTarget) return;
-    perform(async () => { await model.remove(previewDeleteTarget.id); setPreviewDeleteTarget(null); }, 'Drop-in removed');
+    const target = previewDeleteTarget;
+    setPreviewDeleteTarget(null);
+    perform(async () => { await model.remove(target.id); }, 'Drop-in removed');
   };
 
   return createPortal(<div className="drop-ins-backdrop" style={{ '--di-background': `url("${dropInsAurora}")` }} onMouseDown={e => { if (e.target === e.currentTarget) navigate(onClose); }}>
     <motion.section ref={modal} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="drop-ins-title" className="drop-ins-modal" onKeyDown={handleKeys} initial={{ opacity: 0, y: reduced ? 0 : 20, scale: reduced ? 1 : .98 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: .24 }}>
       <header className="drop-ins-header">
-        <div className="drop-ins-heading"><span className="drop-ins-heading-icon"><PhoneCall size={22} /></span><div><p className="drop-ins-eyebrow">YOUR CALENDAR, WITH A LITTLE MORE POSSIBILITY</p><div className="drop-ins-title-row"><h2 id="drop-ins-title">Drop-ins<span className="drop-ins-title-dot">.</span></h2><button type="button" className="drop-ins-tips-button" onClick={() => setTipsOpen(true)} aria-label="Drop-ins tips" title="Drop-ins tips"><Lightbulb size={16} /></button></div></div></div>
-        <div className="drop-ins-header-actions"><span className="drop-ins-header-status"><i style={{ background: STATUS_COLORS[status] }} />{status}</span><button type="button" className="drop-ins-icon-button" aria-label="Close drop-ins" onClick={() => navigate(onClose)}><X size={20} /></button></div>
+        <div className="drop-ins-heading"><div><p className="drop-ins-eyebrow">YOUR CALENDAR, WITH A LITTLE MORE POSSIBILITY</p><div className="drop-ins-title-row"><h2 id="drop-ins-title">Drop-ins<span className="drop-ins-title-dot">.</span></h2><button type="button" className="drop-ins-tips-button" onClick={() => setTipsOpen(true)} aria-label="Drop-ins tips" title="Drop-ins tips"><Lightbulb size={16} /></button></div></div></div>
+        <div className="drop-ins-header-actions"><span className="drop-ins-header-feedback" role="status" aria-live="polite"><AnimatePresence mode="wait" initial={false}>{headerNotice && <motion.span key={`${headerNotice.text}-${headerNotice.failed}`} className={`drop-ins-header-status ${headerNotice.failed ? 'is-error' : ''}`} initial={{ opacity: 0, y: reduced ? 0 : 3 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: reduced ? 0 : -2 }} transition={{ duration: reduced ? 0 : .18 }}><span className="drop-ins-header-feedback-icon">{headerNotice.failed ? <X size={12} /> : <Check size={12} />}</span>{headerNotice.text}</motion.span>}</AnimatePresence></span><button type="button" className="drop-ins-icon-button" aria-label="Close drop-ins" onClick={() => navigate(onClose)}><X size={20} /></button></div>
       </header>
       <div className="drop-ins-body">
-        <DropInAppointmentPreview items={previewItems} status={status} draft={view === 'editor' ? draft : null} showCallLayer={previewCallLayer} receptionist={model.previewReceptionist}
-          canManage={model.canManage && !busy && !model.loading}
-          onDelete={model.canManage && !busy ? item => setPreviewDeleteTarget(item) : undefined}
-          onAdd={() => navigate(() => { leaveEditor('gallery'); setCategory('All'); })} />
+        <DropInAppointmentPreview items={previewItems} status={previewStatus} draft={view === 'editor' ? draft : null} showCallLayer={previewCallLayer} receptionist={model.previewReceptionist}
+          canManage={model.canManage && !model.loading}
+          onDelete={model.canManage ? item => setPreviewDeleteTarget(item) : undefined}
+          onAdd={() => navigate(() => { if (status === 'all') setStatus(previewStatus); leaveEditor('gallery'); setCategory('All'); })} />
         <div className="drop-ins-controls">
           <div ref={statusTabs} className="drop-ins-statuses" role="tablist" aria-label="Appointment status">
-            {STATUS_OPTIONS.map(option => { const key = option.value.toLowerCase(); return <button type="button" role="tab" aria-selected={status === key} key={key} onClick={() => navigate(() => { setStatus(key); leaveEditor(hasConfiguredDropIns(key) ? 'manage' : 'gallery'); setCategory('All'); setSearch(''); })} className={status === key ? 'is-current' : ''}><span className={`drop-ins-status-dot status-${key}`} />{option.value}<span className="drop-ins-tab-count">{model.items.filter(x => x.available_on_status === key && x.is_active).length}</span></button>; })}
+            <button type="button" role="tab" aria-selected={status === 'all'} onClick={() => navigate(() => { setStatus('all'); leaveEditor('manage'); setSearch(''); })} className={status === 'all' ? 'is-current' : ''}>All<span className="drop-ins-tab-count">{allGroups.length}</span></button>
+            {STATUS_OPTIONS.map(option => { const key = option.value.toLowerCase(); return <button type="button" role="tab" aria-selected={status === key} key={key} onClick={() => navigate(() => { setStatus(key); setPreviewStatus(key); leaveEditor(hasConfiguredDropIns(key) ? 'manage' : 'gallery'); setCategory('All'); setSearch(''); })} className={status === key ? 'is-current' : ''}><span className={`drop-ins-status-dot status-${key}`} />{option.value}<span className="drop-ins-tab-count">{model.items.filter(x => x.available_on_status === key && x.is_active).length}</span></button>; })}
             <span aria-hidden="true" className="drop-ins-status-indicator" style={{ left: statusIndicator.left, width: statusIndicator.width }} />
           </div>
           <main className="drop-ins-workspace">
-          <div aria-live="polite">{success && <div className="drop-ins-success"><Check size={15} />{success}</div>}</div>
           {(error || model.error) && <div role="alert" className="drop-ins-error">{error || model.error}{model.error && <button type="button" onClick={model.refresh}>Retry loading</button>}</div>}
           {pendingNavigation && <div className="drop-ins-discard" role="alert"><span>You have unsaved changes.</span><button type="button" onClick={() => setPendingNavigation(null)}>Keep editing</button><button type="button" onClick={() => { const next = pendingNavigation; setPendingNavigation(null); next(); }}>Discard changes</button></div>}
           <AnimatePresence mode="wait" initial={false}>
             <motion.div key={view} initial={{ opacity: 0, x: reduced ? 0 : 14 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: reduced ? 0 : -10 }} transition={{ duration: .18 }}>
-              {view === 'manage' && <>
+              {view === 'manage' && status === 'all' && <>
+                <div className="drop-ins-section-heading"><div><p className="drop-ins-eyebrow">ALL APPOINTMENTS</p><h3>Your drop-ins</h3><p>Choose which appointment statuses can use each drop-in.</p></div>{model.canManage && <div className="drop-ins-heading-actions"><button type="button" className="drop-ins-primary" disabled={model.loading} onClick={() => { setStatus(previewStatus); setView('gallery'); setCategory('All'); }}><Plus size={16} />Add drop-in</button></div>}</div>
+                {model.loading ? <div className="drop-ins-loading"><Loader2 className="animate-spin" size={22} />Loading your drop-ins…</div> : !allGroups.length ? <div className="drop-ins-no-results">No drop-ins yet. Select an appointment status to add one.</div> : <>
+                  <div className="drop-ins-list-toolbar"><span>{allGroups.filter(group => group.rows.some(row => row.is_active)).length} active · {allGroups.length} total</span><label>Sort <select aria-label="Sort drop-ins" value={sort} onChange={e => setSort(e.target.value)}><option value="manual">Manual</option><option value="used">Most Used</option><option value="alpha">Alphabetical</option><option value="newest">Newest</option></select></label></div>
+                  <div className="drop-ins-builder-note"><span>Lit dots show where each drop-in appears. Select a dot to add or remove it for that status.</span></div>
+                  <div className="drop-ins-list">{sortedGroups.map((group, index) => { const item = group.primary; const overrideKey = `group:${group.id}`; const enabled = activeOverrides[overrideKey] ?? group.rows.some(row => row.is_active); return <div key={group.id} className={`drop-ins-list-row ${enabled ? '' : 'is-inactive'}`}>
+                    <span className="drop-ins-order-number">{index + 1}</span><div className="drop-ins-list-text"><h4>{item.name}</h4><p>{item.prompt}</p><span>{enabled ? 'Active' : 'Inactive'}{group.rows.some(row => row.usage_count > 0) ? ` · ${group.rows.reduce((sum, row) => sum + (row.usage_count || 0), 0)} calls started` : ''}</span></div>
+                    <div className="drop-ins-row-actions"><div className="drop-ins-card-statuses" aria-label={`Appointment statuses for ${item.name}`}>{STATUS_OPTIONS.map(option => { const key = option.value.toLowerCase(); const pendingKey = `${group.id}:${key}`; const assigned = dotOverrides[pendingKey] ?? Boolean(group.byStatus[key]); return <button key={key} type="button" className={`drop-ins-card-status-button status-${key} ${assigned ? 'is-assigned' : ''}`} aria-label={`${assigned ? 'Remove' : 'Add'} ${item.name} ${assigned ? 'from' : 'to'} ${key} appointments`} title={`${option.value}: ${assigned ? 'included' : 'not included'}`} aria-pressed={assigned} disabled={!model.canManage} onClick={() => toggleGroupStatus(group, key, assigned)}><span className="drop-ins-card-status-dot" /></button>; })}</div>
+                      {model.canManage && <><button type="button" role="switch" aria-checked={enabled} aria-label={`Enable ${item.name} for assigned statuses`} className="drop-ins-switch" onClick={() => toggleActive(group.rows, enabled, overrideKey)}><span /></button><button type="button" className="drop-ins-icon-button" aria-label={`Edit ${item.name} for ${item.available_on_status} appointments`} title={`Edit ${item.available_on_status} copy`} disabled={pendingActive.has(overrideKey)} onClick={() => { setStatus(item.available_on_status); setPreviewStatus(item.available_on_status); edit(item); }}><Pencil size={15} /></button><button type="button" className="drop-ins-icon-button" aria-label={`Delete ${item.name} from all statuses`} disabled={pendingActive.has(overrideKey)} onClick={() => setConfirmDelete(group.id)}><Trash2 size={15} /></button></>}
+                    </div>
+                    {confirmDelete === group.id && <div className="drop-ins-delete-confirm"><span>Remove this drop-in from every status? Call history is kept.</span><button type="button" disabled={busy} onClick={() => setConfirmDelete(null)}>Keep</button><button type="button" disabled={busy} onClick={() => { setConfirmDelete(null); perform(async () => { await Promise.all(group.rows.map(row => model.remove(row.id))); }, 'Drop-in removed'); }}>Remove</button></div>}
+                  </div>; })}</div>
+                </>}
+              </>}
+              {view === 'manage' && status !== 'all' && <>
                 <div className="drop-ins-section-heading"><div><p className="drop-ins-eyebrow">{status.toUpperCase()} APPOINTMENTS</p><h3>Your drop-ins</h3><p>{statusCopy[status]}</p></div>{model.canManage && <div className="drop-ins-heading-actions"><button type="button" className="drop-ins-secondary" onClick={() => { setView('gallery'); setCategory('All'); }}><span>Templates</span></button><button type="button" className="drop-ins-primary" onClick={() => { setView('gallery'); setCategory('All'); }} disabled={model.loading}><Plus size={16} />Add drop-in</button></div>}</div>
                 {model.loading ? <div className="drop-ins-loading"><Loader2 className="animate-spin" size={22} />Loading your drop-ins…</div> : !statusItems.length ? <div className="drop-ins-no-results">No drop-ins for {status} appointments.</div> : <>
                   <div className="drop-ins-list-toolbar"><span>{activeItems.length} active · {statusItems.length} total</span><label>Sort <select aria-label="Sort drop-ins" value={sort} onChange={e => setSort(e.target.value)}><option value="manual">Manual</option><option value="used">Most Used</option><option value="alpha">Alphabetical</option><option value="newest">Newest</option></select></label></div>
                   {sort !== 'manual' && <p className="drop-ins-sort-note">Calendar buttons always follow your manual order.</p>}
                   <div className="drop-ins-builder-note"><span>Use the controls on each row to edit, enable, or remove calendar drop-ins.</span></div>
-                  <div className="drop-ins-list">{sortedItems.map(item => <div key={item.id} className={`drop-ins-list-row ${item.is_active ? '' : 'is-inactive'}`}>
-                    <span className="drop-ins-order-number">{statusItems.indexOf(item) + 1}</span><div className="drop-ins-list-text"><h4>{item.name}</h4><p>{item.prompt}</p><span>{item.is_active ? 'Active' : 'Inactive'}{item.usage_count > 0 ? ` · ${item.usage_count} calls started` : ''}</span></div>
+                  <div className="drop-ins-list">{sortedItems.map(item => { const overrideKey = `row:${item.id}`; const enabled = activeOverrides[overrideKey] ?? item.is_active; return <div key={item.id} className={`drop-ins-list-row ${enabled ? '' : 'is-inactive'}`}>
+                    <span className="drop-ins-order-number">{statusItems.indexOf(item) + 1}</span><div className="drop-ins-list-text"><h4>{item.name}</h4><p>{item.prompt}</p><span>{enabled ? 'Active' : 'Inactive'}{item.usage_count > 0 ? ` · ${item.usage_count} calls started` : ''}</span></div>
                     {model.canManage && <div className="drop-ins-row-actions">
-                      <button type="button" role="switch" aria-checked={item.is_active} aria-label={`Enable ${item.name}`} className="drop-ins-switch" disabled={busy} onClick={() => perform(() => model.save({ ...item, is_active: !item.is_active }))}><span /></button>
-                      <button type="button" className="drop-ins-icon-button" aria-label={`Edit ${item.name}`} disabled={busy} onClick={() => edit(item)}><Pencil size={15} /></button>
-                      <button type="button" className="drop-ins-icon-button" aria-label={`Delete ${item.name}`} disabled={busy} onClick={() => setConfirmDelete(item.id)}><Trash2 size={15} /></button>
+                      <button type="button" role="switch" aria-checked={enabled} aria-label={`Enable ${item.name}`} className="drop-ins-switch" onClick={() => toggleActive([item], enabled, overrideKey)}><span /></button>
+                      <button type="button" className="drop-ins-icon-button" aria-label={`Edit ${item.name}`} disabled={pendingActive.has(overrideKey)} onClick={() => edit(item)}><Pencil size={15} /></button>
+                      <button type="button" className="drop-ins-icon-button" aria-label={`Delete ${item.name}`} disabled={pendingActive.has(overrideKey)} onClick={() => setConfirmDelete(item.id)}><Trash2 size={15} /></button>
                     </div>}
-                    {confirmDelete === item.id && <div className="drop-ins-delete-confirm"><span>Remove this drop-in? Call history is kept.</span><button type="button" disabled={busy} onClick={() => setConfirmDelete(null)}>Keep</button><button type="button" disabled={busy} onClick={() => perform(async () => { await model.remove(item.id); setConfirmDelete(null); }, 'Drop-in removed')}>Remove</button></div>}
-                  </div>)}</div>
+                    {confirmDelete === item.id && <div className="drop-ins-delete-confirm"><span>Remove this drop-in? Call history is kept.</span><button type="button" disabled={busy} onClick={() => setConfirmDelete(null)}>Keep</button><button type="button" disabled={busy} onClick={() => { setConfirmDelete(null); perform(async () => { await model.remove(item.id); }, 'Drop-in removed'); }}>Remove</button></div>}
+                  </div>; })}</div>
                 </>}
               </>}
               {view === 'gallery' && <>

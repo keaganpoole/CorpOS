@@ -130,7 +130,7 @@ export default function DropInAppointmentPreview({ items, status, draft, showCal
                     {studioNavigation ? <DropInHierarchyStrip items={visibleItems} parent={currentParent} direction={reelDirection} pathKey={path.join('/') || 'root'} onBack={() => { setReelDirection(-1); setPath(value => value.slice(0, -1)); }} onSelect={selectAction} onDelete={onDelete} highlightedId={highlight} childIds={new Set(items.flatMap(item => [item.parent_id, item.has_children ? item.id : null]).filter(Boolean))}
                       emptyLabel={currentParent ? 'No active children' : <button type="button" className="drop-in-preview-add" disabled={!canManage} onClick={() => onAdd?.()}>Add drop-in</button>} /> : <DropInStrip items={stripItems} highlightedId={highlight} onSelect={selectAction} onDelete={onDelete} reelKey={path.join('/') || 'root'} reelDirection={reelDirection}
                       chipGap={2}
-                      getChipClassName={item => item.isAdd ? 'drop-in-preview-add is-inline-add' : ''}
+                      getChipClassName={item => item.isAdd ? 'drop-in-preview-add is-inline-add' : item.name?.trim().toLowerCase() === 'cancel' ? 'is-cancel-action' : ''}
                       getTitle={item => item.isAdd ? 'Add drop-in' : item.name}
                       emptyLabel={<button type="button" className="drop-in-preview-add" aria-label="Add a drop-in to the preview" title="Add drop-in" disabled={!canManage}
                         onPointerDown={event => { event.preventDefault(); event.stopPropagation(); onAdd?.(); }}

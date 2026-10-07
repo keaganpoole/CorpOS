@@ -7,7 +7,7 @@ from postgrest.exceptions import APIError
 from .authorization import current_tenant
 from .audit import StampedQuery
 from .permissions import require_permission
-from .drop_in_templates import STATUSES, for_industry
+from .drop_in_templates import STATUS_STARTERS, STATUSES, for_industry
 
 
 class DropInDraft(BaseModel):
@@ -134,9 +134,35 @@ def build_router(db, get_user, load_business, executor, find_outbound_receptioni
         found = rows(query)
         return found[0] if found else {}
 
+    def ensure_status_starters(business_id):
+        # Include soft-deleted rows so removing a starter is permanent. Stable
+        # identifiers also preserve edits and prevent concurrent duplicate seeds.
+        for status, starters in STATUS_STARTERS.items():
+            existing = rows(db.table('drop_ins').select('id,name,sort_order,deleted_at')
+                            .eq('business_id', business_id).eq('available_on_status', status))
+            ids = {str(item['id']) for item in existing}
+            names = {str(item.get('name') or '').casefold() for item in existing}
+            next_order = max((item.get('sort_order') or 0 for item in existing if not item.get('deleted_at')), default=-1) + 1
+            for name, purpose, prompt in starters:
+                starter_id = str(uuid5(NAMESPACE_URL, f'nodemere:{status}-drop-in-starter:v1:{business_id}:{name.casefold()}'))
+                if starter_id in ids or name.casefold() in names:
+                    continue
+                try:
+                    rows(db.table('drop_ins').insert({
+                        'id': starter_id, 'business_id': business_id, 'name': name,
+                        'purpose': purpose, 'prompt': prompt, 'available_on_status': status,
+                        'is_active': True, 'sort_order': next_order,
+                    }))
+                except APIError as exc:
+                    if str(getattr(exc, 'code', '')) != '23505':
+                        raise
+                ids.add(starter_id)
+                next_order += 1
+
     @router.get('/api/sonar/drop-ins')
     def list_drop_ins(user=Depends(get_user)):
         auth = tenant()
+        ensure_status_starters(auth.business_id)
         result, offset = [], 0
         # PostgREST caps response sizes; fetch all definitions without a UI cap.
         while True:

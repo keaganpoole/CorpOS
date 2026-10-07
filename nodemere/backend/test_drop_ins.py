@@ -120,7 +120,42 @@ class DropInTests(unittest.TestCase):
     def run_call(self, request_id=None): return self.client.post(self.url, json={'request_id': request_id or str(uuid4())})
     def test_saved_definitions_are_scoped(self):
         self.db.data['drop_ins'].append(dict(self.db.data['drop_ins'][0], id=str(uuid4()), business_id=2))
-        self.assertEqual(len(self.client.get('/api/sonar/drop-ins').json()['items']), 1)
+        items = self.client.get('/api/sonar/drop-ins').json()['items']
+        self.assertTrue(all(item['business_id'] == 1 for item in items))
+        by_status = lambda status: [item['name'] for item in items if item['available_on_status'] == status]
+        self.assertEqual(by_status('pending'), ['Confirm', 'Reschedule', 'Cancel'])
+        self.assertEqual(by_status('confirmed'), ['Reschedule', 'Cancel'])
+        self.assertEqual(by_status('cancelled'), ['Reschedule'])
+        self.assertEqual(by_status('completed'), ['Thank You', 'Rebook', 'Google Review', 'Check In', 'Request Feedback'])
+        self.assertEqual(by_status('missed'), [])
+    def test_pending_starters_seed_once_and_respect_edits_and_deletions(self):
+        first = self.client.get('/api/sonar/drop-ins')
+        self.assertEqual(first.status_code, 200, first.text)
+        pending = [item for item in first.json()['items'] if item['available_on_status'] == 'pending']
+        self.assertEqual([item['name'] for item in pending], ['Confirm', 'Reschedule', 'Cancel'])
+        original_count = len(self.db.data['drop_ins'])
+        confirm = pending[0]
+        changed = self.client.put('/api/sonar/drop-ins/' + confirm['id'], json={
+            'name': 'Confirm visit', 'purpose': confirm['purpose'], 'prompt': confirm['prompt'],
+            'available_on_status': 'pending', 'is_active': True,
+        })
+        self.assertEqual(changed.status_code, 200, changed.text)
+        self.assertEqual(self.client.delete('/api/sonar/drop-ins/' + pending[1]['id']).status_code, 200)
+        second = self.client.get('/api/sonar/drop-ins')
+        self.assertEqual(second.status_code, 200, second.text)
+        self.assertEqual([item['name'] for item in second.json()['items'] if item['available_on_status'] == 'pending'],
+                         ['Confirm visit', 'Cancel'])
+        self.assertEqual(len(self.db.data['drop_ins']), original_count)
+    def test_existing_pending_name_is_not_duplicated(self):
+        self.db.data['drop_ins'].append({
+            'id': str(uuid4()), 'business_id': 1, 'name': 'Confirm', 'purpose': 'confirm visit',
+            'prompt': 'Existing custom instruction.', 'available_on_status': 'pending',
+            'is_active': True, 'sort_order': 0, 'deleted_at': None,
+        })
+        pending = [item for item in self.client.get('/api/sonar/drop-ins').json()['items']
+                   if item['available_on_status'] == 'pending']
+        self.assertEqual([item['name'] for item in pending], ['Confirm', 'Reschedule', 'Cancel'])
+        self.assertEqual(pending[0]['prompt'], 'Existing custom instruction.')
     def test_staff_can_execute_but_cannot_edit(self):
         self.role = 'STAFF'
         self.assertEqual(self.run_call().status_code, 200)

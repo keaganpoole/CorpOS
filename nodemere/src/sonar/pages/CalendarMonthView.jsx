@@ -226,7 +226,7 @@ function CalendarMonthViewBody({ data, className = '', selectedDate: selectedDat
   const [expandedAppointmentId, setExpandedAppointmentId] = useState(null);
   const [activeAppointmentActionsId, setActiveAppointmentActionsId] = useState(null);
   const [dropInsOpen, setDropInsOpen] = useState(false);
-  const dropIns = useDropIns(dropInsOpen);
+  const dropIns = useDropIns();
   const [callingAppointment, setCallingAppointment] = useState(null);
   const callLock = useRef(false);
   const [callFeedback, setCallFeedback] = useState({});
@@ -703,7 +703,7 @@ function CalendarMonthViewBody({ data, className = '', selectedDate: selectedDat
                             <button type="button" disabled={callingAppointment === appointment.id} onClick={() => setActiveAppointmentPrompt(null)}>Cancel</button>
                           </div>
                         </motion.div> : <motion.div key="action-list" initial={{ opacity: 0, x: -14, scale: .96 }} animate={{ opacity: 1, x: 0, scale: 1 }} exit={{ opacity: 0, x: -12, scale: .97 }} transition={{ duration: .28, ease: [.22, 1, .36, 1] }} style={{ willChange: 'transform, opacity' }} className="flex min-w-0 flex-1">
-                          <DropInStrip items={appointmentActions} onSelect={action => {
+                          <DropInStrip items={appointmentActions} getChipClassName={action => action.name?.trim().toLowerCase() === 'cancel' ? 'is-cancel-action' : ''} onSelect={action => {
                             setActiveAppointmentPrompt({ appointmentId: appointment.id, action, requestId: crypto.randomUUID() });
                           }} />
                         </motion.div>}

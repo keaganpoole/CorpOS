@@ -29,27 +29,27 @@
 
 .drop-ins-modal .drop-ins-header { padding: 22px 30px 10px; border-bottom: 0; background: var(--drop-ins-panel-bg); }
 .drop-ins-modal .drop-ins-header-actions { display: flex; align-items: center; gap: 10px; }
+.drop-ins-modal .drop-ins-header-feedback { display: inline-flex; align-items: center; min-height: 20px; }
 .drop-ins-modal .drop-ins-header-status {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  height: 32px;
-  padding: 0 10px;
-  border: 1px solid #b6bedb1c;
-  border-radius: 999px;
-  background: #111111e6;
+  max-width: min(48vw, 250px);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   color: #c0c4d4;
   font-size: 11px;
   font-weight: 650;
-  text-transform: capitalize;
 }
+.drop-ins-modal .drop-ins-header-status.is-error { color: #fda4af; }
+.drop-ins-modal .drop-ins-header-feedback-icon { display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: center; }
 .drop-ins-modal .drop-ins-header-status i {
   width: 6px;
   height: 6px;
   border-radius: 50%;
   box-shadow: 0 0 8px currentColor;
 }
-.drop-ins-modal .drop-ins-heading-icon { background: #ffffff08; }
 .drop-ins-modal .drop-ins-eyebrow { color: #969cb3; }
 .drop-ins-modal .drop-ins-body { display: flex; flex-direction: column; }
 
@@ -64,6 +64,8 @@
 .drop-ins-modal .drop-in-preview-stage { width: min(100%, 690px); min-height: 0; margin-inline: auto; }
 .drop-ins-modal .drop-in-preview-light,
 .drop-ins-modal .drop-in-preview-floor { display: none; }
+.drop-ins-modal .drop-in-preview-record > button[aria-label$="appointment actions"] > span { box-shadow: none; }
+.drop-ins-modal .drop-in-preview-record .demo-calendar-avatar-trigger__image { border: 0; box-shadow: none; }
 
 .drop-ins-modal .drop-ins-controls {
   position: relative;
@@ -78,12 +80,15 @@
   box-shadow: none;
 }
 .drop-ins-modal .drop-ins-statuses { position: relative; padding: 0 30px; gap: 24px; border-color: #b6bedb14; scrollbar-width: thin; scrollbar-color: #44475f transparent; }
-.drop-ins-modal .drop-ins-statuses > button { color: #969cb3; padding: 15px 0; }
+.drop-ins-modal .drop-ins-statuses > button { color: #777b8d; padding: 15px 0; }
 .drop-ins-modal .drop-ins-statuses > button.is-current { color: #fff; }
 .drop-ins-modal .drop-ins-statuses > button.is-current:after { display: none; }
-.drop-ins-modal .drop-ins-status-indicator { position: absolute; left: 0; bottom: 0; height: 2px; border-radius: 3px; pointer-events: none; background: linear-gradient(90deg, #d4d4d8, #fff, #a1a1aa); transition: left .52s cubic-bezier(.22, 1, .36, 1), width .42s cubic-bezier(.22, 1, .36, 1); }
-.drop-ins-modal .drop-ins-statuses .drop-ins-status-dot { box-shadow: 0 0 7px currentColor; }
+.drop-ins-modal .drop-ins-status-indicator { position: absolute; left: 0; bottom: 0; height: 1px; border-radius: 3px; pointer-events: none; background: linear-gradient(90deg, #d4d4d8, #fff, #a1a1aa); transition: left .52s cubic-bezier(.22, 1, .36, 1), width .42s cubic-bezier(.22, 1, .36, 1); }
+.drop-ins-modal .drop-ins-statuses .drop-ins-status-dot { box-shadow: none; }
+.drop-ins-modal .drop-ins-statuses > button:not(.is-current) .drop-ins-status-dot { opacity: .45; }
+.drop-ins-modal .drop-ins-statuses > button.is-current .drop-ins-status-dot { box-shadow: 0 0 6px color-mix(in srgb, currentColor 80%, transparent); }
 .drop-ins-modal .drop-ins-tab-count { color: #a6acc2; }
+.drop-ins-modal .drop-ins-statuses > button:not(.is-current) .drop-ins-tab-count { color: #777b8d; }
 .drop-ins-modal .drop-ins-workspace { flex: 1; padding: 16px 30px 6px; scrollbar-color: #44475f transparent; }
 .drop-ins-modal .drop-ins-section-heading { margin-bottom: 14px; }
 .drop-ins-modal .drop-ins-section-heading h3 { font-size: 22px; margin: 0 0 7px; }
@@ -122,6 +127,14 @@
 .drop-ins-modal .drop-ins-list-text > span { color: #949ab2; }
 .drop-ins-modal .drop-ins-order-number { position: absolute; top: 15px; left: 14px; width: auto; color: #949ab2; }
 .drop-ins-modal .drop-ins-row-actions { grid-column: 1 / -1; justify-content: flex-end; width: 100%; padding-top: 8px; border-top: 1px solid #b6bedb14; }
+.drop-ins-modal .drop-ins-card-statuses { display: flex; align-items: center; gap: 2px; margin-right: auto; }
+.drop-ins-modal .drop-ins-card-status-button { width: 22px; height: 26px; display: grid; place-items: center; padding: 0; border: 0; background: transparent; cursor: pointer; }
+.drop-ins-modal .drop-ins-card-status-button:disabled { cursor: default; }
+.drop-ins-modal .drop-ins-card-status-button:disabled,
+.drop-ins-modal .drop-ins-switch:disabled { opacity: 1; }
+.drop-ins-modal .drop-ins-card-status-dot { display: block; width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: .25; transition: opacity .16s ease, box-shadow .16s ease; }
+.drop-ins-modal .drop-ins-card-status-button.is-assigned .drop-ins-card-status-dot { opacity: 1; box-shadow: 0 0 5px color-mix(in srgb, currentColor 55%, transparent); }
+.drop-ins-modal .drop-ins-card-status-button:focus-visible { outline: 1px solid currentColor; outline-offset: -2px; border-radius: 4px; }
 .drop-ins-modal .drop-ins-order-controls { flex-direction: row; margin-right: auto; }
 .drop-ins-modal .drop-ins-delete-confirm { grid-column: 1 / -1; }
 .drop-ins-modal .drop-ins-error,
@@ -149,7 +162,7 @@
 @media (max-width: 760px) {
   .drop-ins-modal { width: min(100%, 540px); height: 96dvh; border-radius: 20px; }
   .drop-ins-modal .drop-ins-header { padding: 18px 18px 6px; }
-  .drop-ins-modal .drop-ins-header-status { height: 30px; padding-inline: 9px; font-size: 10px; }
+  .drop-ins-modal .drop-ins-header-status { font-size: 10px; }
   .drop-ins-modal .drop-ins-body { overflow: auto; scrollbar-width: thin; scrollbar-color: #44475f transparent; }
   .drop-ins-modal::before { background: var(--drop-ins-panel-bg); }
   .drop-ins-modal .drop-in-preview { position: relative; top: auto; flex-basis: 240px; }
@@ -195,11 +208,9 @@
     border-bottom: 1px solid #ffffff0b;
   }
   .drop-ins-modal .drop-ins-heading { gap: 9px; min-width: 0; }
-  .drop-ins-modal .drop-ins-heading-icon { width: 32px; height: 32px; border-radius: 10px; }
-  .drop-ins-modal .drop-ins-heading-icon svg { width: 17px; height: 17px; }
   .drop-ins-modal .drop-ins-heading h2 { font-size: 21px; }
   .drop-ins-modal .drop-ins-heading .drop-ins-eyebrow { display: none; }
-  .drop-ins-modal .drop-ins-header-status { height: 25px; padding-inline: 7px; font-size: 9px; }
+  .drop-ins-modal .drop-ins-header-status { font-size: 9px; }
   .drop-ins-modal .drop-ins-icon-button { width: 30px; height: 30px; }
   .drop-ins-modal .drop-ins-body {
     min-width: 0;
@@ -226,7 +237,7 @@
     padding: 9px 0;
     font-size: 10px;
   }
-  .drop-ins-modal .drop-ins-statuses > button.is-current:after { display: block; }
+  .drop-ins-modal .drop-ins-statuses > button.is-current:after { display: block; height: 1px; }
   .drop-ins-modal .drop-ins-status-indicator { display: none; }
   .drop-ins-modal .drop-ins-tab-count { font-size: 9px; padding-inline: 3px; }
   .drop-ins-modal .drop-ins-workspace {
