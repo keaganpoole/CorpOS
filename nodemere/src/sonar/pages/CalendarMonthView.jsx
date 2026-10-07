@@ -513,22 +513,22 @@ function CalendarMonthViewBody({ data, className = '', selectedDate: selectedDat
 
   return (
     <div ref={calendarGridRef} className={`relative flex h-full min-h-0 w-full items-start justify-center bg-transparent p-4 pt-3 md:p-5 md:pt-4 2xl:p-5 2xl:pt-4 ${className}`.trim()}>
-      <div className="relative flex h-full min-h-0 w-full flex-col overflow-hidden rounded-[28px] border border-white/[0.05] bg-[#0a0a0a] p-5 shadow-[0_22px_48px_-28px_rgba(0,0,0,0.8)] md:p-6 lg:p-7 2xl:p-10">
-        <div className="mb-4 flex items-center justify-between gap-2 border-b border-white/5 pb-4 text-left lg:mb-5 lg:pb-5 2xl:mb-6 2xl:pb-6">
-          <span className="flex items-center space-x-2 font-bold tracking-tight text-white text-[1.5rem] md:text-[1.65rem] lg:text-[1.75rem] 2xl:text-[2rem]">
+      <div className="relative flex h-full min-h-0 w-full flex-col overflow-hidden rounded-[28px] border border-white/[0.05] bg-[#0a0a0a] p-3 shadow-[0_22px_48px_-28px_rgba(0,0,0,0.8)] sm:p-4 md:p-5 lg:p-7 2xl:p-10">
+        <div className="mb-3 flex items-center justify-between gap-1 border-b border-white/5 pb-3 text-left md:mb-4 md:gap-2 md:pb-4 lg:mb-5 lg:pb-5 2xl:mb-6 2xl:pb-6">
+          <span className="flex min-w-0 items-center space-x-1.5 font-bold tracking-tight text-white text-[1rem] sm:text-[1.15rem] md:space-x-2 md:text-[1.35rem] lg:text-[1.75rem] 2xl:text-[2rem]">
             <CalendarIcon className="text-zinc-300" size={22} />
-            <span>{MONTHS[month]} {year}</span>
+            <span className="truncate">{MONTHS[month]} {year}</span>
           </span>
 
-          <div className="relative flex items-center gap-1.5" ref={detailFieldPickerRef}>
-            <button type="button" onClick={() => setDropInsOpen(true)} className="flex h-8 items-center gap-1.5 rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 text-[11px] font-semibold text-zinc-300 transition hover:bg-white/[0.08] hover:text-white">Drop-ins</button>
+          <div className="relative flex shrink-0 items-center gap-1" ref={detailFieldPickerRef}>
+            <button type="button" onClick={() => setDropInsOpen(true)} className="flex h-7 items-center gap-1 rounded-lg border border-white/[0.08] bg-white/[0.04] px-2 text-[10px] font-semibold text-zinc-300 transition hover:bg-white/[0.08] hover:text-white md:h-8 md:gap-1.5 md:px-3 md:text-[11px]">Drop-ins</button>
             <button
               type="button"
               onClick={() => setShowDetailFieldPicker((current) => !current)}
               aria-label="Choose appointment detail fields"
-              className="flex h-8 w-8 items-center justify-center rounded-lg border border-transparent bg-white/[0.04] text-zinc-500 transition-all hover:bg-white/[0.08] hover:text-white"
+              className="flex h-7 w-7 items-center justify-center rounded-lg border border-transparent bg-white/[0.04] text-zinc-500 transition-all hover:bg-white/[0.08] hover:text-white md:h-8 md:w-8"
             >
-              <ChevronDown size={14} />
+              <ChevronDown size={12} className="md:h-3.5 md:w-3.5" />
             </button>
             <AnimatePresence>
               {showDetailFieldPicker && (
@@ -541,15 +541,15 @@ function CalendarMonthViewBody({ data, className = '', selectedDate: selectedDat
             </AnimatePresence>
             <button
               onClick={goToPrevMonth}
-              className="flex h-8 w-8 items-center justify-center rounded-lg border border-transparent bg-white/[0.04] text-zinc-500 transition-all hover:bg-white/[0.08] hover:text-white"
+              className="flex h-7 w-7 items-center justify-center rounded-lg border border-transparent bg-white/[0.04] text-zinc-500 transition-all hover:bg-white/[0.08] hover:text-white md:h-8 md:w-8"
             >
-              <ChevronLeft size={14} />
+              <ChevronLeft size={12} className="md:h-3.5 md:w-3.5" />
             </button>
             <button
               onClick={goToNextMonth}
-              className="flex h-8 w-8 items-center justify-center rounded-lg border border-transparent bg-white/[0.04] text-zinc-500 transition-all hover:bg-white/[0.08] hover:text-white"
+              className="flex h-7 w-7 items-center justify-center rounded-lg border border-transparent bg-white/[0.04] text-zinc-500 transition-all hover:bg-white/[0.08] hover:text-white md:h-8 md:w-8"
             >
-              <ChevronRight size={14} />
+              <ChevronRight size={12} className="md:h-3.5 md:w-3.5" />
             </button>
           </div>
         </div>
