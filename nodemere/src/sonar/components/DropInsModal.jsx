@@ -6,6 +6,7 @@ import { FcGoogle } from 'react-icons/fc';
 import { api } from '../lib/api';
 import { STATUS_OPTIONS } from '../lib/appointmentSchema';
 import { groupDropIns, stabilizeDropInGroups } from '../lib/dropInGrouping';
+import CirclePreloader from './CirclePreloader';
 import DropInAppointmentPreview from './DropInAppointmentPreview';
 import ModalSpectrumLine from '../../components/ModalSpectrumLine';
 import './dropIns.css';
@@ -19,6 +20,7 @@ const statusCopy = {
 };
 const blank = (status) => ({ name: '', purpose: '', prompt: '', is_active: true, available_on_status: status });
 const manual = (a, b) => a.sort_order - b.sort_order || a.id.localeCompare(b.id);
+const isTimeoutMessage = value => /timed out|timeout/i.test(String(value || ''));
 
 export default function DropInsModal({ model, onClose }) {
   const [status, setStatus] = useState('completed');
@@ -50,6 +52,8 @@ export default function DropInsModal({ model, onClose }) {
   const statusTabs = useRef(null);
   const [statusIndicator, setStatusIndicator] = useState({ left: 0, width: 0 });
   const reduced = useReducedMotion();
+  const displayedError = isTimeoutMessage(error) ? '' : error;
+  const displayedModelError = isTimeoutMessage(model.error) ? '' : model.error;
   const dirty = draft && JSON.stringify(draft) !== JSON.stringify(baseline);
   const statusItems = model.items.filter(x => x.available_on_status === status).sort(manual);
   const allGroups = useMemo(() => {
@@ -95,7 +99,7 @@ export default function DropInsModal({ model, onClose }) {
         ? { ...item, category: 'All', industries: [] }
         : item));
     }
-    catch (e) { setTemplateError(e.message); }
+    catch (e) { if (!isTimeoutMessage(e.message)) setTemplateError(e.message); }
     finally { setTemplatesLoading(false); }
   };
   useEffect(() => { loadTemplates(); }, []);
@@ -247,11 +251,11 @@ export default function DropInsModal({ model, onClose }) {
         <div className="drop-ins-controls">
           <div ref={statusTabs} className="drop-ins-statuses" role="tablist" aria-label="Appointment status">
             <button type="button" role="tab" aria-selected={status === 'all'} onClick={() => navigate(() => { setStatus('all'); leaveEditor('manage'); setSearch(''); })} className={status === 'all' ? 'is-current' : ''}>All<span className="drop-ins-tab-count">{allGroups.length}</span></button>
-            {STATUS_OPTIONS.map(option => { const key = option.value.toLowerCase(); return <button type="button" role="tab" aria-selected={status === key} key={key} onClick={() => navigate(() => { setStatus(key); setPreviewStatus(key); leaveEditor(hasConfiguredDropIns(key) ? 'manage' : 'gallery'); setCategory('All'); setSearch(''); })} className={status === key ? 'is-current' : ''}><span className={`drop-ins-status-dot status-${key}`} />{option.value}<span className="drop-ins-tab-count">{model.items.filter(x => x.available_on_status === key && x.is_active).length}</span></button>; })}
+            {STATUS_OPTIONS.map((option, index) => { const key = option.value.toLowerCase(); return <button type="button" role="tab" aria-selected={status === key} key={key} onClick={() => navigate(() => { setStatus(key); setPreviewStatus(key); leaveEditor(hasConfiguredDropIns(key) ? 'manage' : 'gallery'); setCategory('All'); setSearch(''); })} className={status === key ? 'is-current' : ''}><motion.span aria-hidden="true" className="drop-ins-status-dot-intro" style={{ '--dot-color-delay': `${.6 + index * .07}s` }} initial={reduced ? false : { opacity: 0, scale: .25, y: 5 }} animate={{ opacity: 1, scale: 1, y: 0 }} transition={reduced ? { duration: 0 } : { delay: .35 + index * .07, duration: .22, ease: [.22, 1, .36, 1] }}><span className={`drop-ins-status-dot status-${key}`} /></motion.span>{option.value}<span className="drop-ins-tab-count">{model.items.filter(x => x.available_on_status === key && x.is_active).length}</span></button>; })}
             <span aria-hidden="true" className="drop-ins-status-indicator" style={{ left: statusIndicator.left, width: statusIndicator.width }} />
           </div>
           <main className="drop-ins-workspace">
-          {(error || model.error) && <div role="alert" className="drop-ins-error">{error || model.error}{model.error && <button type="button" onClick={model.refresh}>Retry loading</button>}</div>}
+          {(displayedError || displayedModelError) && <div role="alert" className="drop-ins-error">{displayedError || displayedModelError}{displayedModelError && <button type="button" onClick={model.refresh}>Retry loading</button>}</div>}
           {pendingNavigation && <div className="drop-ins-discard" role="alert"><span>You have unsaved changes.</span><button type="button" onClick={() => setPendingNavigation(null)}>Keep editing</button><button type="button" onClick={() => { const next = pendingNavigation; setPendingNavigation(null); next(); }}>Discard changes</button></div>}
           <AnimatePresence mode="wait" initial={false}>
             <motion.div key={view} initial={{ opacity: 0, x: reduced ? 0 : 14 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: reduced ? 0 : -10 }} transition={{ duration: .18 }}>
@@ -289,7 +293,7 @@ export default function DropInsModal({ model, onClose }) {
                   <button type="button" className="drop-ins-primary" onClick={() => chooseTemplate(null)}>Create blank</button>
                 </div>
                 <div className="drop-ins-categories">{categories.map(c => <button type="button" key={c} className={category === c ? 'is-current' : ''} onClick={() => setCategory(c)}>{c}</button>)}</div>
-                {templatesLoading ? <div className="drop-ins-loading"><Loader2 size={22} className="animate-spin" />Finding your templates…</div> : templateError ? <div className="drop-ins-error" role="alert">{templateError}<button type="button" onClick={loadTemplates}>Retry</button></div> : <div className="drop-ins-gallery">{visibleTemplates.map(t => { const Icon = ICONS[t.icon] || Phone; return <button type="button" key={t.key} className={`drop-ins-template template-${t.icon}`} onClick={() => chooseTemplate(t)}><div className="drop-ins-template-top"><span className="drop-ins-template-icon"><Icon size={22} /></span></div><h4>{t.name}</h4><p>{t.description}</p><span className="drop-ins-template-bottom">{t.category}</span></button>; })}{!visibleTemplates.length && <p className="drop-ins-no-results">No matching templates. Try another search or create a blank drop-in.</p>}</div>}
+                {templatesLoading ? <div className="drop-ins-template-loading"><CirclePreloader size={14} /></div> : templateError ? <div className="drop-ins-error" role="alert">{templateError}<button type="button" onClick={loadTemplates}>Retry</button></div> : <div className="drop-ins-gallery">{visibleTemplates.map(t => { const Icon = ICONS[t.icon] || Phone; return <button type="button" key={t.key} className={`drop-ins-template template-${t.icon}`} onClick={() => chooseTemplate(t)}><div className="drop-ins-template-top"><span className="drop-ins-template-icon"><Icon size={22} /></span></div><h4>{t.name}</h4><p>{t.description}</p><span className="drop-ins-template-bottom">{t.category}</span></button>; })}{!visibleTemplates.length && <p className="drop-ins-no-results">No matching templates. Try another search or create a blank drop-in.</p>}</div>}
               </>}
               {view === 'editor' && draft && <>
                 <button type="button" className="drop-ins-back" onClick={() => navigate(() => leaveEditor(draft.id ? 'manage' : 'gallery'))}><ArrowLeft size={15} />{draft.id ? 'Your drop-ins' : 'Templates'}</button>

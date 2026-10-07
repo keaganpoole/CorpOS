@@ -86,6 +86,8 @@
 .drop-ins-modal .drop-ins-statuses > button.is-current:after { display: none; }
 .drop-ins-modal .drop-ins-status-indicator { position: absolute; left: 0; bottom: 0; height: 1px; border-radius: 3px; pointer-events: none; background: linear-gradient(90deg, #d4d4d8, #fff, #a1a1aa); transition: left .52s cubic-bezier(.22, 1, .36, 1), width .42s cubic-bezier(.22, 1, .36, 1); }
 .drop-ins-modal .drop-ins-statuses .drop-ins-status-dot { box-shadow: none; }
+.drop-ins-modal .drop-ins-status-dot-intro { display: inline-flex; align-items: center; justify-content: center; width: 6px; height: 6px; flex-shrink: 0; animation: drop-ins-dot-color .28s ease-in-out var(--dot-color-delay) both; }
+@keyframes drop-ins-dot-color { from { filter: grayscale(1); } to { filter: grayscale(0); } }
 .drop-ins-modal .drop-ins-statuses > button:not(.is-current) .drop-ins-status-dot { opacity: .45; }
 .drop-ins-modal .drop-ins-statuses > button.is-current .drop-ins-status-dot { box-shadow: 0 0 6px color-mix(in srgb, currentColor 80%, transparent); }
 .drop-ins-modal .drop-ins-tab-count { color: #a1a1aa; }
@@ -124,6 +126,7 @@
 .drop-ins-modal .drop-ins-categories button:hover { color: #d4d4d8; }
 .drop-ins-modal .drop-ins-categories button.is-current { color: #f4f4f5; background: transparent; border-color: transparent; }
 .drop-ins-modal .drop-ins-gallery { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.drop-ins-modal .drop-ins-template-loading { display: grid; place-items: center; min-height: clamp(180px, 30dvh, 280px); width: 100%; }
 .drop-ins-modal .drop-ins-template { padding: 16px; min-height: 170px; background: #111111e6; border-color: #d4d4d81c; border-radius: 15px; }
 .drop-ins-modal .drop-ins-template:hover { background: #ffffff08; border-color: #ffffff45; box-shadow: 0 0 22px #ffffff05; }
 .drop-ins-modal .drop-ins-template-top { margin-bottom: 10px; flex-wrap: wrap; }
@@ -202,6 +205,7 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .drop-ins-modal .drop-ins-status-indicator { transition: none; }
+  .drop-ins-modal .drop-ins-status-dot-intro { animation: none; filter: none; }
 }
 @media (max-width: 420px) {
   .drop-ins-modal .drop-ins-list { grid-template-columns: minmax(0, 1fr); }
