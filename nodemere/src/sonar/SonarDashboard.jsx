@@ -2003,6 +2003,7 @@ const SonarDashboard = () => {
     return true;
   }, []);
   const leaveStudio = useCallback(() => requestStudioExit(() => { studioDirty.current = false; setTeamExperience('team'); }), [requestStudioExit]);
+  const leaveStudioToChoices = useCallback(() => requestStudioExit(() => { studioDirty.current = false; setTeamExperience('team'); setShowReceptionistChoice(true); }), [requestStudioExit]);
   const navigateDashboard = route => {
     const resume = () => requestStudioExit(() => { studioDirty.current = false; setTeamExperience('team'); setCurrentRoute(route); });
     if (isPhone && route !== currentRoute && !window.dispatchEvent(new CustomEvent('sonar:before-navigate', { cancelable: true, detail: { resume } }))) return;
@@ -2608,7 +2609,7 @@ const SonarDashboard = () => {
     }
     switch (route) {
       case 'receptionists':
-        if (teamExperience !== 'team') return <Suspense fallback={<div className="dashboard-mobile-viewport-loader h-full grid place-items-center"><CubePreloader /></div>}><OfficeExperience initialDestination={studioLaunchDestination} onReturn={leaveStudio} onCreateStarted={() => setTeamExperience('studio')} hiredCatalogIds={enrichedAgents.map((agent) => agent.catalog_id).filter(Boolean)} hiredVoiceIds={enrichedAgents.map((agent) => agent.elevenlabs_voice_id).filter(Boolean)} onHire={async (receptionist) => {
+        if (teamExperience !== 'team') return <Suspense fallback={<div className="dashboard-mobile-viewport-loader h-full grid place-items-center"><CubePreloader /></div>}><OfficeExperience initialDestination={studioLaunchDestination} onReturn={leaveStudio} onBackToChoices={leaveStudioToChoices} hiredCatalogIds={enrichedAgents.map((agent) => agent.catalog_id).filter(Boolean)} hiredVoiceIds={enrichedAgents.map((agent) => agent.elevenlabs_voice_id).filter(Boolean)} onHire={async (receptionist) => {
           const result = await api.hireReceptionist(receptionist);
           if (!result) throw new Error('Failed to hire receptionist');
           await refresh();

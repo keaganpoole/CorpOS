@@ -18,15 +18,15 @@
 @container nodemere-office (max-width:680px){.ns-office.ns-choice-modal .ns-choice-card-title{font-size:45px}}
 .ns-office.ns-choice-modal .ns-choice-card{border-color:rgba(255,255,255,.065);border-left-color:rgba(255,255,255,.04);box-shadow:0 26px 68px rgba(0,0,0,.44),0 0 0 1px rgba(255,255,255,.012)}
 .ns-office.ns-choice-modal .ns-choice-card:hover{border-color:rgba(255,255,255,.085);box-shadow:0 32px 82px rgba(0,0,0,.52),0 0 0 1px rgba(255,255,255,.022)}
-.ns-office.ns-choice-modal .ns-choice-card .ns-choice-card-edge{padding:1.5px;opacity:.34;filter:saturate(.45) contrast(1.025)}
-.ns-office.ns-choice-modal .ns-choice-card.is-primary .ns-choice-card-edge{padding:2px;opacity:.43;filter:saturate(.5) contrast(1.05) drop-shadow(0 0 4px rgba(255,255,255,.07))}
-.ns-office.ns-choice-modal .ns-choice-card:hover .ns-choice-card-edge{opacity:.52}
+.ns-office.ns-choice-modal .ns-choice-card .ns-choice-card-edge{padding:1px;opacity:.23;filter:saturate(.4) contrast(1.015)}
+.ns-office.ns-choice-modal .ns-choice-card.is-primary .ns-choice-card-edge{padding:1.5px;opacity:.28;filter:saturate(.42) contrast(1.025)}
+.ns-office.ns-choice-modal .ns-choice-card:hover .ns-choice-card-edge{opacity:.33}
 .ns-office.ns-choice-modal .ns-choice-card .ns-choice-card-edge--hover,.ns-office.ns-choice-modal .ns-choice-card.is-primary .ns-choice-card-edge--hover{opacity:0}
-.ns-office.ns-choice-modal .ns-choice-card:hover .ns-choice-card-edge--hover,.ns-office.ns-choice-modal .ns-choice-card.is-primary:hover .ns-choice-card-edge--hover{opacity:.43}
+.ns-office.ns-choice-modal .ns-choice-card:hover .ns-choice-card-edge--hover,.ns-office.ns-choice-modal .ns-choice-card.is-primary:hover .ns-choice-card-edge--hover{opacity:.2}
 .ns-office.ns-choice-modal .ns-choice-card:focus-visible{outline:2px solid rgba(255,255,255,.6);outline-offset:4px}
 .ns-office.ns-choice-modal .ns-choice-card{transform:none;transition:box-shadow .3s cubic-bezier(.4,0,.2,1),border-color .65s cubic-bezier(.25,.1,.25,1) .06s}
-.ns-office.ns-choice-modal .ns-choice-card .ns-choice-card-edge{animation-duration:36s!important;transition:opacity .9s cubic-bezier(.25,.1,.25,1) .06s}
-.ns-office.ns-choice-modal .ns-choice-card .ns-choice-card-edge--hover{animation-duration:14s!important;transition:opacity 1.2s cubic-bezier(.25,.1,.25,1) .06s}
+.ns-office.ns-choice-modal .ns-choice-card .ns-choice-card-edge{animation-duration:48s!important;transition:opacity .9s cubic-bezier(.25,.1,.25,1) .06s}
+.ns-office.ns-choice-modal .ns-choice-card .ns-choice-card-edge--hover{animation-duration:24s!important;transition:opacity 1.2s cubic-bezier(.25,.1,.25,1) .06s}
 .ns-office.ns-choice-modal .ns-choice-card-action svg{transition:transform .55s cubic-bezier(.25,.1,.25,1)}
 .ns-office.ns-choice-modal .ns-choice-card:hover .ns-choice-card-action svg{transform:translateX(2px)}
 .ns-office.ns-choice-modal .ns-choice-card .ns-choice-card-edge{background:conic-gradient(from var(--ns-liquid-angle,0deg),#c9cbd3 0deg,#777985 18deg,#15151a 48deg,#b9bcc6 78deg,#33343d 116deg,#d6d8df 151deg,#777985 176deg,#19191f 221deg,#b9bcc6 263deg,#40424c 305deg,#c9cbd3 340deg,#777985 360deg),radial-gradient(190px 150px at var(--ns-liquid-x) var(--ns-liquid-y),rgba(214,216,225,.78),rgba(175,178,193,.52) 26%,transparent 70%);background-blend-mode:screen}
