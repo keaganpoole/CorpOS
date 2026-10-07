@@ -51,6 +51,7 @@
   box-shadow: 0 0 8px currentColor;
 }
 .drop-ins-modal .drop-ins-eyebrow { color: #969cb3; }
+.drop-ins-modal .drop-ins-heading .drop-ins-eyebrow { color: #a1a1aa; font-size: 11px!important; font-weight: 500!important; letter-spacing: .01em; text-transform: none; }
 .drop-ins-modal .drop-ins-body { display: flex; flex-direction: column; }
 
 /* Only the preview's surrounding stage changes; its object, transforms and motion are untouched. */
@@ -79,7 +80,7 @@
   border-radius: 0;
   box-shadow: none;
 }
-.drop-ins-modal .drop-ins-statuses { position: relative; padding: 0 30px; gap: 24px; border-color: #b6bedb14; scrollbar-width: thin; scrollbar-color: #44475f transparent; }
+.drop-ins-modal .drop-ins-statuses { position: relative; padding: 0 30px; gap: 24px; border-color: #b6bedb14; scrollbar-width: thin; scrollbar-color: rgba(90, 90, 98, 0.72) rgba(255, 255, 255, 0.03); }
 .drop-ins-modal .drop-ins-statuses > button { color: #5b5f70; padding: 15px 0; }
 .drop-ins-modal .drop-ins-statuses > button.is-current { color: #fff; }
 .drop-ins-modal .drop-ins-statuses > button.is-current:after { display: none; }
@@ -89,7 +90,11 @@
 .drop-ins-modal .drop-ins-statuses > button.is-current .drop-ins-status-dot { box-shadow: 0 0 6px color-mix(in srgb, currentColor 80%, transparent); }
 .drop-ins-modal .drop-ins-tab-count { color: #a6acc2; }
 .drop-ins-modal .drop-ins-statuses > button:not(.is-current) .drop-ins-tab-count { color: #5b5f70; }
-.drop-ins-modal .drop-ins-workspace { flex: 1; padding: 16px 30px 6px; scrollbar-color: #44475f transparent; }
+.drop-ins-modal .drop-ins-workspace { flex: 1; padding: 16px 30px 6px; scrollbar-color: rgba(90, 90, 98, 0.72) rgba(255, 255, 255, 0.03); }
+.drop-ins-modal :is(.drop-ins-statuses, .drop-ins-workspace, .drop-ins-body)::-webkit-scrollbar { width: 10px; height: 10px; }
+.drop-ins-modal :is(.drop-ins-statuses, .drop-ins-workspace, .drop-ins-body)::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.03); border-radius: 9999px; }
+.drop-ins-modal :is(.drop-ins-statuses, .drop-ins-workspace, .drop-ins-body)::-webkit-scrollbar-thumb { background: linear-gradient(180deg, rgba(92, 92, 100, 0.92), rgba(72, 72, 80, 0.92)); border-radius: 9999px; border: 2px solid rgba(7, 7, 9, 0.95); }
+.drop-ins-modal :is(.drop-ins-statuses, .drop-ins-workspace, .drop-ins-body)::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, rgba(110, 110, 118, 0.94), rgba(82, 82, 90, 0.94)); }
 .drop-ins-modal .drop-ins-section-heading { margin-bottom: 14px; }
 .drop-ins-modal .drop-ins-section-heading h3 { font-size: 22px; margin: 0 0 7px; }
 .drop-ins-modal .drop-ins-section-heading p:not(.drop-ins-eyebrow) { color: #a1a6bb; }
@@ -180,7 +185,7 @@
   .drop-ins-modal { width: min(100%, 540px); height: 96dvh; border-radius: 20px; }
   .drop-ins-modal .drop-ins-header { padding: 18px 18px 6px; }
   .drop-ins-modal .drop-ins-header-status { font-size: 10px; }
-  .drop-ins-modal .drop-ins-body { overflow: auto; scrollbar-width: thin; scrollbar-color: #44475f transparent; }
+  .drop-ins-modal .drop-ins-body { overflow: auto; scrollbar-width: thin; scrollbar-color: rgba(90, 90, 98, 0.72) rgba(255, 255, 255, 0.03); }
   .drop-ins-modal::before { background: var(--drop-ins-panel-bg); }
   .drop-ins-modal .drop-in-preview { position: relative; top: auto; flex-basis: 240px; }
   .drop-ins-modal .drop-in-preview-label { padding: 18px; }
