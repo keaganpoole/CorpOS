@@ -3138,6 +3138,9 @@ class AccountDeletionRequest(BaseModel):
     feedback: Optional[str] = Field(default=None, max_length=2000)
     acknowledged: bool = False
 
+class AccountResetRequest(BaseModel):
+    confirmation: str
+
 class CustomerCreateRequest(BaseModel):
     person_id: Optional[str] = None
     customer_name: Optional[str] = None
@@ -15559,6 +15562,34 @@ async def close_account(current_user: dict = Depends(get_current_user)):
         "closed": True,
         "message": "Your account is closed and your deletion request has been submitted.",
     }
+
+
+@app.post("/users/me/account/reset", tags=["Users"])
+async def reset_account(payload: AccountResetRequest, current_user: dict = Depends(get_current_user)):
+    """Reset operational workspace data without changing billing or Auth."""
+    from .authorization import authorize_account_closure
+
+    if payload.confirmation.strip() != "RESET ACCOUNT":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Type RESET ACCOUNT to confirm")
+
+    user_id = str(current_user.id)
+    authorize_account_closure(
+        getattr(supabase_admin, 'raw', supabase_admin),
+        user_id,
+        getattr(current_user, 'nodemere_aal', 'aal1'),
+    )
+    try:
+        response = supabase_admin.rpc(
+            'nodemere_reset_account',
+            {'target_user': user_id},
+        ).execute()
+    except Exception as exc:
+        logging.exception('main.reset_account.rpc_failed.event_14001')
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Account reset could not be completed") from exc
+    result = response.data or {}
+    if not result.get('reset'):
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Account reset could not be completed")
+    return {'reset': True, 'billing_preserved': True, 'message': 'Operational data was reset. Your account is ready for onboarding again.'}
 
 
 @app.post("/users/me/account/delete", tags=["Users"])

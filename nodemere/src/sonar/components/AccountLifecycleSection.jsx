@@ -17,6 +17,22 @@ const DELETE_REASONS = [
 
 const normalizeBusinessName = (value) => String(value || '').trim().replace(/\s+/g, ' ').toLocaleLowerCase();
 
+const clearResettableBrowserState = () => {
+  if (typeof window === 'undefined') return;
+  try {
+    const preserved = (key) => {
+      const normalized = String(key || '').toLowerCase();
+      return normalized.startsWith('sb-') || normalized.includes('cookie') || normalized.includes('consent') || normalized.includes('visitor');
+    };
+    [window.localStorage, window.sessionStorage].forEach((storage) => {
+      const keys = Array.from({ length: storage.length }, (_, index) => storage.key(index));
+      keys.forEach((key) => { if (key && !preserved(key)) storage.removeItem(key); });
+    });
+  } catch {
+    // Browser storage is optional and must never block a completed reset.
+  }
+};
+
 const AccountDeletionModal = ({ isOpen, onClose, businessName, subscriptionStatus, onManageBilling, onComplete }) => {
   const [step, setStep] = useState(0);
   const [confirmationName, setConfirmationName] = useState('');
@@ -156,10 +172,55 @@ const AccountDeletionModal = ({ isOpen, onClose, businessName, subscriptionStatu
   );
 };
 
+const AccountResetModal = ({ isOpen, onClose, onComplete }) => {
+  const [confirmation, setConfirmation] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setConfirmation('');
+    setSubmitting(false);
+    setError('');
+  }, [isOpen]);
+
+  const submit = async () => {
+    if (confirmation.trim() !== 'RESET ACCOUNT' || submitting) return;
+    setSubmitting(true);
+    setError('');
+    try {
+      await api.resetAccount(confirmation.trim());
+      await onComplete();
+    } catch (resetError) {
+      setError(resetError?.message || 'Could not reset the account. Nothing was changed.');
+      setSubmitting(false);
+    }
+  };
+
+  if (!isOpen) return null;
+  return createPortal(
+    <div className="fixed inset-0 z-[1400] flex items-center justify-center bg-black/75 px-4 py-5 backdrop-blur-xl" onMouseDown={() => !submitting && onClose()}>
+      <section className="relative w-full max-w-[620px] overflow-hidden rounded-[30px] border border-white/[0.08] bg-[#070707]/95 shadow-[0_28px_90px_rgba(0,0,0,0.62)]" onMouseDown={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="account-reset-title">
+        <div className="brand-gradient h-1 w-full" />
+        <button type="button" onClick={onClose} disabled={submitting} className="absolute right-5 top-5 z-20 flex h-8 w-8 items-center justify-center text-zinc-600 transition hover:text-white disabled:opacity-40" aria-label="Close account reset"><X className="h-4 w-4" /></button>
+        <div className="space-y-6 p-7 sm:p-9">
+          <div><h2 id="account-reset-title" className="text-2xl font-semibold tracking-[-0.03em] text-white">Reset your account</h2><p className="mt-3 text-sm leading-6 text-zinc-500">This clears your Nodemere workspace so you can start onboarding again. Your login and billing history stay unchanged.</p></div>
+          <div className="space-y-2 rounded-2xl border border-rose-400/15 bg-rose-400/[0.04] p-4 text-sm leading-6 text-zinc-300"><p>Operational data, team access, integrations, receptionist setup, call records, and purchased-number records will be removed.</p><p className="text-zinc-500">Billing, subscription, invoices, payments, security history, and legal records are preserved.</p></div>
+          <div><label htmlFor="account-reset-confirmation" className="mb-2 block text-[11px] font-bold uppercase tracking-[0.16em] text-zinc-600">Type RESET ACCOUNT to continue</label><input id="account-reset-confirmation" autoFocus value={confirmation} onChange={(event) => setConfirmation(event.target.value)} className="w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] px-5 py-4 text-sm text-white outline-none focus:border-white/[0.18]" /></div>
+          {error ? <p className="text-[11px] font-medium text-rose-300" role="alert">{error}</p> : null}
+          <div className="flex items-center justify-end gap-3 border-t border-white/[0.06] pt-5"><button type="button" onClick={onClose} disabled={submitting} className="flex h-11 items-center rounded-full px-5 text-sm font-medium text-zinc-500 transition hover:text-white">Cancel</button><button type="button" onClick={submit} disabled={confirmation.trim() !== 'RESET ACCOUNT' || submitting} className="flex h-11 items-center justify-center rounded-full bg-white px-6 text-sm font-bold text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-40">{submitting ? 'Resetting…' : 'Reset account'}</button></div>
+        </div>
+      </section>
+    </div>,
+    document.body,
+  );
+};
+
 const AccountLifecycleSection = ({ businessName, profile, onManageBilling, allowBusinessDeletion = true }) => {
   const { logout } = useAuth();
   const navigate = useNavigate();
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [resetModalOpen, setResetModalOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [error, setError] = useState('');
 
@@ -180,10 +241,18 @@ const AccountLifecycleSection = ({ businessName, profile, onManageBilling, allow
     navigate('/auth', { replace: true });
   };
 
+  const handleResetComplete = async () => {
+    setResetModalOpen(false);
+    clearResettableBrowserState();
+    window.location.assign('/onboarding');
+  };
+
   return (
     <div className="settings-account-section space-y-4">
       <div className="rounded-[24px] border border-white/[0.05] bg-zinc-950/40 p-5"><div className="flex items-start justify-between gap-5"><div className="min-w-0"><div className="flex items-center gap-2"><LogOut size={15} className="settings-icon" /><h4 className="text-[13px] font-semibold text-zinc-100">Session</h4></div><p className="mt-2 max-w-2xl text-[12px] leading-5 text-zinc-500">Log out of Nodemere on this device. Your account and business data stay unchanged.</p></div><button type="button" onClick={handleLogout} disabled={loggingOut} className="settings-neutral-button inline-flex shrink-0 items-center rounded-xl px-4 py-2 text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 disabled:cursor-wait disabled:opacity-50">{loggingOut ? 'Logging out' : 'Log out'}</button></div></div>
+      <div className="rounded-[24px] border border-rose-400/15 bg-rose-400/[0.03] p-5"><div className="flex items-start justify-between gap-5"><div className="min-w-0"><div className="flex items-center gap-2"><AlertTriangle size={15} className="text-rose-300" /><h4 className="text-[13px] font-semibold text-zinc-100">Reset workspace</h4></div><p className="mt-2 max-w-2xl text-[12px] leading-5 text-zinc-500">Remove operational data and return to onboarding. Your login and billing information are preserved.</p></div><button type="button" onClick={() => setResetModalOpen(true)} className="shrink-0 rounded-xl border border-rose-300/20 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-rose-200 transition hover:bg-rose-300/10 active:scale-95">Reset workspace</button></div></div>
       {allowBusinessDeletion && <><div className="rounded-[24px] border border-rose-400/15 bg-rose-400/[0.03] p-5"><div className="flex items-start justify-between gap-5"><div className="min-w-0"><div className="flex items-center gap-2"><Trash2 size={15} className="text-rose-300" /><h4 className="text-[13px] font-semibold text-zinc-100">Delete account</h4></div><p className="mt-2 max-w-2xl text-[12px] leading-5 text-zinc-500">Cancel billing, end access, and submit your business data for deletion. You can restore the account during the 30-day recovery window.</p></div><button type="button" onClick={() => { setError(''); setDeleteModalOpen(true); }} className="shrink-0 rounded-xl border border-rose-300/20 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-rose-200 transition hover:bg-rose-300/10 active:scale-95">Delete account</button></div><div className="mt-5 grid gap-3 sm:grid-cols-3">{[['Access', 'Ends immediately'], ['Billing', 'Canceled immediately'], ['Recovery', '30-day restore window']].map(([label, value]) => <div key={label} className="rounded-2xl border border-white/[0.04] bg-black/20 p-4"><p className="text-[8px] font-black uppercase tracking-widest text-zinc-700">{label}</p><p className="mt-2 text-[12px] leading-5 text-zinc-300">{value}</p></div>)}</div>{error ? <p className="mt-4 text-[11px] font-medium text-rose-300" role="alert">{error}</p> : null}{profile?.account_status === 'pending_deletion' ? <p className="mt-4 text-[11px] font-medium text-amber-200/80">A deletion request is already pending for this account.</p> : null}</div><AccountDeletionModal isOpen={deleteModalOpen} onClose={() => setDeleteModalOpen(false)} businessName={businessName} subscriptionStatus={profile?.subscription_status} onManageBilling={() => { setDeleteModalOpen(false); onManageBilling(); }} onComplete={handleDeletionComplete} /></>}
+      <AccountResetModal isOpen={resetModalOpen} onClose={() => setResetModalOpen(false)} onComplete={handleResetComplete} />
     </div>
   );
 };

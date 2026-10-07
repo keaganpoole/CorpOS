@@ -175,6 +175,7 @@ export const api = {
   submitBugReport: (report) => postJSON('/api/sonar/bugs', report),
   createPrivacyRequest: (request) => postJSON('/users/me/privacy-requests', request),
   closeAccount: () => postJSON('/users/me/account/close', {}),
+  resetAccount: (confirmation) => postJSON('/users/me/account/reset', { confirmation }),
   requestAccountDeletion: (request) => postJSON('/users/me/account/delete', request),
   reactivateAccount: () => postJSON('/users/me/account/reactivate', {}),
   getCronJobs: () => fetchJSON('/api/cron'),
