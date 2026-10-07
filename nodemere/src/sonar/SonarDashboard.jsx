@@ -2,7 +2,7 @@
  * SonarDashboard — Wraps the Sonar App component for use inside Nodemere routing.
  * Renders the full Sonar dashboard UI at /dashboard.
  */
-import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, Component, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useId, Component, lazy, Suspense } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from './lib/supabase';
 import { avatarVideoUrl } from './studio/catalogGeometry';
@@ -263,73 +263,61 @@ const TASKLIST_VIDEO_PLACEHOLDER = 'https://www.youtube.com/embed/ysz5S6PUM-U';
 const TASKLIST_DEFINITIONS = [
   {
     id: 'business_setup',
-    title: 'Complete business setup',
+    title: 'Set business details',
     subtasks: [
       {
         id: 'basic_info',
         title: 'Add basic info',
         videoUrl: TASKLIST_VIDEO_PLACEHOLDER,
-        instructionTitle: 'Add Basic Business Info',
+        instructionTitle: 'Set Business Details',
         instruction:
-          'Open Settings, go to Business, and fill in the core details customers expect your receptionist to know. Add the business name, phone, email, and location details, then save the page so calls, bookings, and records can reference the right account information.',
+          'Basic business details give your receptionist the foundation they need to understand your business and represent it with confidence.',
       },
       {
         id: 'business_hours',
-        title: 'Set business hours',
+        title: 'Set hours of operation',
         videoUrl: TASKLIST_VIDEO_PLACEHOLDER,
-        instructionTitle: 'Set Business Hours',
+        instructionTitle: 'Set hours of operation',
         instruction:
-          'Open Settings and update the Hours section to match when your business is available. These hours help your receptionist understand when to book appointments, when to route calls, and when customers should expect a response.',
+          'Business hours tell your receptionist when you are available for customers, so calls, appointments, and expectations stay aligned with your real schedule.',
+      },
+      {
+        id: 'knowledge_base',
+        title: 'Set knowledge base',
+        videoUrl: TASKLIST_VIDEO_PLACEHOLDER,
+        instructionTitle: 'Set Up Your Knowledge Base',
+        instruction:
+          'The knowledge base gives your receptionist the important context behind your business, including what you offer, your policies, and the questions customers ask most.',
       },
     ],
   },
   {
     id: 'first_receptionist',
-    title: 'Hire your first receptionist',
+    title: 'Onboard your team',
     subtasks: [
       {
         id: 'hire_receptionist',
         title: 'Hire a receptionist',
         videoUrl: TASKLIST_VIDEO_PLACEHOLDER,
-        instructionTitle: 'Hire A Receptionist',
+        instructionTitle: 'Onboard Your Team',
         instruction:
-          'Open Receptionists and click New Receptionist. Choose the receptionist that best fits your front desk, complete the hire flow, and confirm they appear in your active team before moving on.',
+          'Your AI receptionists handle the front desk, while your human staff are the people they work alongside. They understand each person’s role, availability, and specialties, giving them the context to connect customers, coordinate appointments, and become a natural part of your day-to-day operations.',
       },
       {
         id: 'set_role',
-        title: 'Set role',
+        title: 'Set receptionist role',
         videoUrl: TASKLIST_VIDEO_PLACEHOLDER,
         instructionTitle: 'Set The Receptionist Role',
         instruction:
-          'Use the receptionist card controls to define whether this receptionist handles inbound calls, outbound calls, or both. The role should match how you expect them to operate day to day.',
+          'The receptionist role explains whether they focus on incoming calls, outgoing calls, or both, so their responsibilities match the way your business works.',
       },
-    ],
-  },
-  {
-    id: 'account_security',
-    title: 'Secure your account',
-    subtasks: [
-      {
-        id: 'setup_authenticator',
-        title: 'Set up authenticator',
-        videoUrl: TASKLIST_VIDEO_PLACEHOLDER,
-        instructionTitle: 'Set Up Your Authenticator',
-        instruction:
-          'Open Settings, go to Workforce & Security, and set up an authenticator app. Scan the QR code, enter the six-digit code, and verify it to protect your account.',
-      },
-    ],
-  },
-  {
-    id: 'staff_setup',
-    title: 'Add staff',
-    subtasks: [
       {
         id: 'add_staff_member',
         title: 'Add a staff member',
         videoUrl: TASKLIST_VIDEO_PLACEHOLDER,
         instructionTitle: 'Add A Staff Member',
         instruction:
-          'Open Receptionists, switch to Staff, and add a real team member your receptionist can book with or route callers to. Include the basic contact details so the staff record is useful during scheduling and escalations.',
+          'Staff members are the people your receptionist can schedule with or contact, helping calls and appointments reach the right person on your team.',
       },
       {
         id: 'staff_availability',
@@ -337,7 +325,7 @@ const TASKLIST_DEFINITIONS = [
         videoUrl: TASKLIST_VIDEO_PLACEHOLDER,
         instructionTitle: 'Set Staff Availability',
         instruction:
-          'Inside the staff modal, open the schedule step and set the days and times this person can accept appointments. Accurate availability keeps bookings aligned with how the team actually works.',
+          'Staff availability tells your receptionist which appointment times are realistic, so customers are not offered times when nobody is available.',
       },
     ],
   },
@@ -347,19 +335,19 @@ const TASKLIST_DEFINITIONS = [
     subtasks: [
       {
         id: 'assign_receptionist_number',
-        title: 'Choose or assign the receptionist number',
+        title: 'Assign a phone number',
         videoUrl: TASKLIST_VIDEO_PLACEHOLDER,
-        instructionTitle: 'Choose The Receptionist Number',
+        instructionTitle: 'Connect A Phone Number',
         instruction:
-          'Open the forwarding setup and choose the number your business line will forward into. This becomes the receptionist number that receives calls after forwarding is enabled.',
+          'Think of this as your receptionist’s direct line. It can receive incoming calls and, when outbound calling is enabled, give your receptionist a number to call customers from too.',
       },
       {
         id: 'forward_business_line',
-        title: 'Forward the business line to that number',
+        title: 'Forward your business line',
         videoUrl: TASKLIST_VIDEO_PLACEHOLDER,
         instructionTitle: 'Forward The Business Line',
         instruction:
-          'Open your phone provider settings, enable call forwarding, and forward your business line to the receptionist number shown in Nodemere. Save the provider settings so incoming calls can reach the AI receptionist.',
+          'Forwarding sends calls from your existing business line to your receptionist, so customers can reach the right front desk without changing the number they already know.',
       },
     ],
   },
@@ -371,9 +359,23 @@ const TASKLIST_DEFINITIONS = [
         id: 'set_intake_field',
         title: 'Set an intake field',
         videoUrl: TASKLIST_VIDEO_PLACEHOLDER,
-        instructionTitle: 'Set An Intake Field',
+        instructionTitle: 'Set Intake Fields',
         instruction:
-          'Open People and configure the field you want captured during intake. Start with one important field your receptionist should collect consistently, then expand the intake setup once the core flow feels right.',
+          'Think of intake fields as the important details your receptionist should collect during a call, such as an email address, the reason for the call, or a customer’s location. They help make sure the details that matter most are not missed.',
+      },
+    ],
+  },
+  {
+    id: 'account_security',
+    title: 'Secure your account',
+    subtasks: [
+      {
+        id: 'setup_authenticator',
+        title: 'Set up authenticator',
+        videoUrl: TASKLIST_VIDEO_PLACEHOLDER,
+        instructionTitle: 'Secure Your Account',
+        instruction:
+          'An authenticator adds an extra layer of protection by asking for a temporary security code when you sign in.',
       },
     ],
   },
@@ -467,7 +469,7 @@ const hasConfiguredIntakeField = (business, activeCustomFieldKeys = []) => {
   });
 };
 
-const createTasklistState = ({ business = null, agents = [], staff = [], purchasedNumbers = [], activeCustomFieldKeys = [], authenticatorConfigured = false }) => {
+const createTasklistState = ({ business = null, agents = [], staff = [], services = [], purchasedNumbers = [], activeCustomFieldKeys = [], authenticatorConfigured = false }) => {
   const activeReceptionists = (Array.isArray(agents) ? agents : []).filter(isActiveReceptionist);
   const activeStaff = (Array.isArray(staff) ? staff : []).filter(isActiveStaff);
   const completions = {
@@ -478,17 +480,20 @@ const createTasklistState = ({ business = null, agents = [], staff = [], purchas
         && [business.phone, business.email, business.address, business.city, business.state, business.zip].some(hasText)
       ),
       business_hours: Boolean(business?.id && hasUsableHours(business.business_hours)),
+      knowledge_base: Boolean(
+        business?.id
+        && (Array.isArray(services) ? services : []).some((service) => service?.is_active !== false && hasText(service?.name))
+        && [business.about_us, business.policies, business.faq].some(hasText)
+      ),
     },
     first_receptionist: {
       hire_receptionist: activeReceptionists.length > 0,
       set_role: activeReceptionists.some((agent) => ['inbound', 'outbound', 'all'].includes(normalizeDirection(agent.direction))),
+      add_staff_member: activeStaff.some(hasStaffName),
+      staff_availability: activeStaff.some((staffRow) => hasUsableHours(staffRow.working_hours)),
     },
     account_security: {
       setup_authenticator: authenticatorConfigured === true,
-    },
-    staff_setup: {
-      add_staff_member: activeStaff.some(hasStaffName),
-      staff_availability: activeStaff.some((staffRow) => hasUsableHours(staffRow.working_hours)),
     },
     phone_setup: {
       assign_receptionist_number: Boolean(business?.id && hasAssignedReceptionistNumber(purchasedNumbers)),
@@ -701,6 +706,7 @@ function CalendarToolbarTitle({ active, count, loading, action = null }) {
 const CallHandlingIcon = ({ direction }) => {
   const normalized = normalizeAgentDirection(direction);
   const Icon = normalized === 'inbound' ? ArrowDown : normalized === 'outbound' ? ArrowUp : normalized === 'none' ? Bed : ArrowUpDown;
+  const gradientId = useId();
   const motionProps = normalized === 'inbound'
     ? {
         initial: { y: -5, scale: 0.9, opacity: 0.45 },
@@ -722,10 +728,19 @@ const CallHandlingIcon = ({ direction }) => {
   return (
     <motion.span
       key={normalized}
-      className={`${normalized === 'none' ? 'text-zinc-500' : 'brand-icon'} inline-flex h-[14px] w-[14px] items-center justify-center`}
+      className={`${normalized === 'none' ? 'text-zinc-500' : ''} inline-flex h-[14px] w-[14px] items-center justify-center`}
       {...motionProps}
     >
-      <Icon size={14} />
+      <Icon size={14} stroke={normalized === 'none' ? 'currentColor' : `url(#${gradientId})`} aria-hidden="true">
+        {normalized !== 'none' && (
+          <defs>
+            <linearGradient id={gradientId} gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="24">
+              <stop offset="0%" stopColor="var(--brandGradientStart)" />
+              <stop offset="100%" stopColor="var(--brandGradientEnd)" />
+            </linearGradient>
+          </defs>
+        )}
+      </Icon>
     </motion.span>
   );
 };
@@ -938,7 +953,7 @@ const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = nul
 
       <div className={bodyClass}>
         <div className="px-0.5 py-1">
-          <p className="mb-1.5 text-[8px] text-zinc-700 font-bold uppercase tracking-widest">Call Handling</p>
+          <p className="mb-1.5 text-[8px] text-zinc-700 font-bold uppercase tracking-widest">Role</p>
           <div className="origin-left">
             <GradientBleed
               trigger="Calls"
@@ -1393,6 +1408,9 @@ const TasklistInstructionModal = ({ subtask, onClose }) => {
               </button>
             </div>
             <div className="px-6 pb-6 sm:px-8 sm:pb-8">
+              <p className="mb-5 text-sm leading-6 text-zinc-300">
+                {subtask.instruction}
+              </p>
               <div className="aspect-video overflow-hidden rounded-2xl border border-white/[0.08] bg-black">
                 <iframe
                   className="h-full w-full"
@@ -1455,6 +1473,9 @@ const TasklistWidget = ({ tasklistState = null, onOpenIntro = null, onHide = nul
     !task.subtasks.every((subtask) => isSubtaskComplete(task.id, subtask.id))
   )) || activeTask;
   const nextIncompleteTaskComplete = nextIncompleteTask.subtasks.every((subtask) => isSubtaskComplete(nextIncompleteTask.id, subtask.id));
+  const isBusinessSetupTask = activeTask.id === 'business_setup';
+  const isTwoColumnTask = isBusinessSetupTask || activeTask.id === 'first_receptionist';
+  const taskColumnBreak = Math.ceil(activeTask.subtasks.length / 2);
 
   const goToPreviousTask = () => setActiveTaskIndex((index) => Math.max(0, index - 1));
   const goToNextTask = () => setActiveTaskIndex((index) => Math.min(TASKLIST_DEFINITIONS.length - 1, index + 1));
@@ -1470,7 +1491,7 @@ const TasklistWidget = ({ tasklistState = null, onOpenIntro = null, onHide = nul
           </linearGradient>
         </defs>
       </svg>
-      <div ref={widgetRef} className="dashboard-setup-widget fixed bottom-6 right-6 z-[1100] flex w-[min(328px,calc(100vw-48px))] flex-col items-end">
+      <div ref={widgetRef} className="dashboard-setup-widget fixed bottom-6 right-6 z-[1100] flex w-[min(360px,calc(100vw-32px))] flex-col items-end">
         <AnimatePresence mode="wait" initial={false}>
           {open ? (
             <motion.div
@@ -1539,30 +1560,37 @@ const TasklistWidget = ({ tasklistState = null, onOpenIntro = null, onHide = nul
                         <ChevronDown size={14} />
                       </button>
                     </div>
-                    <div className="mt-4">
-                      {activeTask.subtasks.map((subtask) => {
-                        const complete = isSubtaskComplete(activeTask.id, subtask.id);
-                        return (
-                          <div key={subtask.id} className="flex items-center gap-2 rounded-xl px-1.5 py-1">
-                            <button
-                              type="button"
-                              tabIndex={-1}
-                              className="flex h-4 w-4 shrink-0 cursor-default items-center justify-center rounded-full"
-                              aria-label={`${subtask.title} is ${complete ? 'complete' : 'incomplete'}`}
-                            >
-                              <Check
-                                size={11}
-                                strokeWidth={3}
-                                className={complete ? '' : 'text-white/10'}
-                                style={complete ? { stroke: 'url(#tasklistCheckGradient)' } : undefined}
-                              />
-                            </button>
-                            <span className={`min-w-0 flex-1 truncate text-[12px] leading-5 ${complete ? 'text-zinc-600 line-through' : 'text-zinc-400'}`}>
-                              {subtask.title}
-                            </span>
-                          </div>
-                        );
-                      })}
+                    <div className={`mt-4 ${isTwoColumnTask ? 'grid grid-cols-2 gap-x-5' : 'space-y-0'}`}>
+                      {(isTwoColumnTask
+                        ? [activeTask.subtasks.slice(0, taskColumnBreak), activeTask.subtasks.slice(taskColumnBreak)]
+                        : [activeTask.subtasks]
+                      ).map((column, columnIndex) => (
+                        <div key={`task-column-${columnIndex}`} className="min-w-0">
+                          {column.map((subtask) => {
+                            const complete = isSubtaskComplete(activeTask.id, subtask.id);
+                            return (
+                              <div key={subtask.id} className="flex items-center gap-2 rounded-xl px-1.5 py-1">
+                                <button
+                                  type="button"
+                                  tabIndex={-1}
+                                  className="flex h-4 w-4 shrink-0 cursor-default items-center justify-center rounded-full"
+                                  aria-label={`${subtask.title} is ${complete ? 'complete' : 'incomplete'}`}
+                                >
+                                  <Check
+                                    size={11}
+                                    strokeWidth={3}
+                                    className={complete ? '' : 'text-white/10'}
+                                    style={complete ? { stroke: 'url(#tasklistCheckGradient)' } : undefined}
+                                  />
+                                </button>
+                                <span className={`min-w-0 flex-1 truncate text-[12px] leading-5 ${complete ? 'text-zinc-600 line-through' : 'text-zinc-400'}`}>
+                                  {subtask.title}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ))}
                     </div>
                   </motion.div>
                 </AnimatePresence>
@@ -2382,12 +2410,14 @@ const SonarDashboard = () => {
       }
 
       let staffRows = [];
+      let serviceRows = [];
       let purchasedNumberRows = [];
       let activeCustomFieldKeys = [];
 
       if (business?.id) {
-        const [staffResponse, purchasedNumbersResponse, customFieldsResponse] = await Promise.all([
+        const [staffResponse, servicesResponse, purchasedNumbersResponse, customFieldsResponse] = await Promise.all([
           api.getStaff(false),
+          api.getServices(),
           supabase
             .from('purchased_numbers')
             .select('phone_number,status,is_active,kind')
@@ -2400,6 +2430,7 @@ const SonarDashboard = () => {
         ]);
 
         staffRows = staffResponse || [];
+        serviceRows = servicesResponse || [];
 
         if (purchasedNumbersResponse.error) {
           console.error("SonarDashboard.jsx:event_2100");
@@ -2420,6 +2451,7 @@ const SonarDashboard = () => {
         business,
         agents,
         staff: staffRows,
+        services: serviceRows,
         purchasedNumbers: purchasedNumberRows,
         activeCustomFieldKeys,
         authenticatorConfigured,
