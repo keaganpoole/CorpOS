@@ -267,6 +267,7 @@ class DropInTests(unittest.TestCase):
         expected = {'Home Services','Real Estate','Automotive','Beauty & Wellness','Hospitality','Professional Services','Retail','Other General Business', *extra}
         self.assertEqual(expected, set(INDUSTRY_VISITS))
         self.assertEqual(len(TEMPLATES), len({x['key'] for x in TEMPLATES}))
+        self.assertTrue(all(t['category'] == 'All' for t in TEMPLATES if t['key'].endswith(('-follow', '-prepare'))))
         for industry in expected:
             templates = for_industry(industry)
             self.assertEqual(len(templates), len(TEMPLATES))

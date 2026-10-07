@@ -74,7 +74,7 @@ export default function DropInsModal({ model, onClose }) {
     return a.position - b.position;
   });
   const applicableTemplates = templates.filter(t => t.statuses.includes(status));
-  const categories = ['All', ...new Set(applicableTemplates.map(t => t.category))];
+  const categories = ['All', ...new Set(applicableTemplates.map(t => t.category).filter(value => value && value !== 'All'))];
   const visibleTemplates = applicableTemplates.filter(t => (category === 'All' || t.category === category) && `${t.name} ${t.description} ${t.category}`.toLowerCase().includes(search.toLowerCase()));
 
   const navigate = action => {
@@ -89,7 +89,12 @@ export default function DropInsModal({ model, onClose }) {
   const edit = item => { const next = { ...item, purpose: item.purpose || item.name.slice(0, 30) }; setDraft(next); setBaseline(next); setPreviewCallLayer(false); setView('editor'); setError(''); };
   const loadTemplates = async () => {
     setTemplatesLoading(true); setTemplateError('');
-    try { setTemplates((await api.getDropInTemplates()).items); }
+    try {
+      const items = (await api.getDropInTemplates()).items;
+      setTemplates(items.map(item => /^for your industry$/i.test(String(item.category || '').trim()) || item.industries?.length
+        ? { ...item, category: 'All', industries: [] }
+        : item));
+    }
     catch (e) { setTemplateError(e.message); }
     finally { setTemplatesLoading(false); }
   };

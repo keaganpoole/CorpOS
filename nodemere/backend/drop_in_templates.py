@@ -89,10 +89,10 @@ for industry, (follow_name, follow_topic, prep_name, prep_topic) in INDUSTRY_VIS
     slug = ''.join(c if c.isalnum() else '-' for c in industry.lower()).strip('-')
     TEMPLATES.append(template(f'{slug}-follow', follow_name, f'A follow-up tailored to {industry.lower()}.',
         f'Call the customer to discuss {follow_topic}. Use the appointment context and verified business information. Record concerns and hand off specialist questions. Do not invent advice, offers or commitments.',
-        'Customer Experience', ['completed'], 'sparkles'))
+        'All', ['completed'], 'sparkles'))
     TEMPLATES.append(template(f'{slug}-prepare', prep_name, f'Help customers prepare for their {industry.lower()} appointment.',
         f'Call the customer to confirm {prep_topic}. Use only the details provided by the appointment and business. Ask about missing details and pass them to the team rather than making assumptions.',
-        'Appointments', ['pending', 'confirmed'], 'calendar'))
+        'All', ['pending', 'confirmed'], 'calendar'))
 
 
 def for_industry(value):
