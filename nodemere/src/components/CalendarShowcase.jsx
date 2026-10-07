@@ -35,6 +35,7 @@ const TAG_COLORS = {
 const DEMO_APPOINTMENT_STATUS_COLORS = {
   Completed: APPOINTMENT_STATUS_COLORS.Completed,
   Cancelled: APPOINTMENT_STATUS_COLORS.Cancelled,
+  Missed: APPOINTMENT_STATUS_COLORS.Missed,
   Confirmed: APPOINTMENT_STATUS_COLORS.Confirmed,
   Booked: APPOINTMENT_STATUS_COLORS.Pending,
 };
@@ -1716,7 +1717,7 @@ function RightCalendarGrid({ hasAnimatedDots, calendarVisible = true }) {
       className="relative flex h-full w-full items-center"
       onPointerDownCapture={cancelAvatarGuide}
     >
-      <div className={`relative isolate w-full overflow-hidden border border-white/[0.08] bg-[#0b0b0c]/95 shadow-[0_32px_80px_-24px_rgba(0,0,0,0.95)] ${isCompact ? 'rounded-[22px] p-3 sm:p-4 md:p-5' : 'rounded-[28px] p-10'}`}>
+      <div className={`relative isolate w-full overflow-hidden border border-white/[0.08] bg-[#0a0a0a] shadow-[0_32px_80px_-24px_rgba(0,0,0,0.95)] ${isCompact ? 'rounded-[22px] p-3 sm:p-4 md:p-5' : 'rounded-[28px] p-10'}`}>
         <div className={`relative z-10 border-b border-white/5 text-left ${isCompact ? 'mb-3 pb-3 md:mb-4 md:pb-4' : 'mb-6 pb-6'}`}>
           <span className={`flex items-center space-x-2 font-bold tracking-tight text-white ${isMobile ? 'text-[1rem]' : isCompact ? 'text-[1.25rem]' : 'text-[2rem]'}`}>
             <CalendarIcon className="text-zinc-300" size={22} />
@@ -1749,10 +1750,10 @@ function RightCalendarGrid({ hasAnimatedDots, calendarVisible = true }) {
                 className={`relative flex aspect-square flex-col justify-between overflow-hidden border transition-all duration-300 ${isMobile ? 'rounded-lg p-1.5' : isCompact ? 'rounded-lg p-2' : 'rounded-xl p-2'} ${
                   isSelected
                     ? 'z-10 border-transparent bg-gradient-to-tr from-zinc-300 via-zinc-100 to-white text-zinc-900 shadow-[0_0_18px_rgba(255,255,255,0.18)]'
-                    : 'border-white/5 bg-zinc-950/60 text-zinc-400 hover:border-white/20'
+                    : 'border-white/5 bg-[rgba(14,14,14,0.72)] text-zinc-400 hover:border-white/20'
                 }`}
               >
-                <span className={`${isMobile ? 'text-[9px]' : isCompact ? 'text-[10px]' : 'text-[11px]'} font-bold ${isSelected ? 'text-zinc-900' : 'text-zinc-500'}`}>
+                <span className={`${isMobile || isCompact ? '!text-[9px]' : 'text-[11px]'} font-bold ${isSelected ? 'text-zinc-900' : 'text-zinc-500'}`}>
                   {dayNum}
                 </span>
 
@@ -1809,7 +1810,7 @@ function RightCalendarGrid({ hasAnimatedDots, calendarVisible = true }) {
                   <motion.div
                     initial={false}
                     animate={{ opacity: 1, y: 0 }}
-                    className={`agenda-item ${calendarVisible ? 'agenda-item--visible' : ''} demo-calendar-appointment-record flex w-full items-center rounded-lg border bg-[#070707]/92 text-left ${activePromptAction ? 'demo-call-agenda-item' : 'border-white/[0.08]'} ${isMobile ? 'gap-2 p-2' : isCompact ? 'gap-2.5 p-2.5' : 'gap-3 p-3'}`}
+                    className={`agenda-item ${calendarVisible ? 'agenda-item--visible' : ''} demo-calendar-appointment-record flex w-full items-center rounded-lg border bg-[#070707]/92 text-left ${activePromptAction ? 'demo-call-agenda-item' : 'border-white/[0.08]'} ${isMobile ? 'min-h-[40px] gap-2 p-2' : isCompact ? 'gap-2.5 p-2.5' : 'gap-3 p-3'}`}
                     style={{
                       animationDelay: `${index * 90}ms`,
                       '--demo-receptionist-banner': `url(${event.receptionistBannerUrl || event.receptionistAvatar})`,
