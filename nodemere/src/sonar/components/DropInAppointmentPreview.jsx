@@ -120,13 +120,13 @@ export default function DropInAppointmentPreview({ items, status, draft, showCal
                 category={<span className="drop-in-preview-placeholder is-category" aria-label="Service placeholder" />}
                 time={<span className="drop-in-preview-placeholder is-time" aria-label="Appointment time placeholder" />}
                 actions={<AnimatePresence mode="wait" initial={false}>
-                  {selectedAction ? <motion.div key="action-prompt" initial={{ opacity: 0, x: -14, scale: .96 }} animate={{ opacity: 1, x: 0, scale: 1 }} exit={{ opacity: 0, x: -12, scale: .97 }} transition={{ type: 'spring', stiffness: 440, damping: 28, mass: .7 }} className="flex min-w-0 flex-1">
+                  {selectedAction ? <motion.div key="action-prompt" initial={{ opacity: 0, x: -14, scale: .96 }} animate={{ opacity: 1, x: 0, scale: 1 }} exit={{ opacity: 0, x: -12, scale: .97 }} transition={{ duration: .28, ease: [.22, 1, .36, 1] }} style={{ willChange: 'transform, opacity' }} className="flex min-w-0 flex-1">
                     <div className="drop-in-confirm" onClick={event => event.stopPropagation()}>
                       <span title={`${receptionistName} will call the customer to ${purpose}?`}>Call customer to {purpose}?</span>
                       <button type="button" title="Preview only; no call will be made." onClick={event => event.stopPropagation()}>Call</button>
                       <button type="button" onClick={closeSelection}>Cancel</button>
                     </div>
-                  </motion.div> : <motion.div key="action-list" initial={{ opacity: 0, x: -14, scale: .96 }} animate={{ opacity: 1, x: 0, scale: 1 }} exit={{ opacity: 0, x: -12, scale: .97 }} transition={{ type: 'spring', stiffness: 440, damping: 28, mass: .7 }} className="flex min-w-0 flex-1">
+                  </motion.div> : <motion.div key="action-list" initial={{ opacity: 0, x: -14, scale: .96 }} animate={{ opacity: 1, x: 0, scale: 1 }} exit={{ opacity: 0, x: -12, scale: .97 }} transition={{ duration: .28, ease: [.22, 1, .36, 1] }} style={{ willChange: 'transform, opacity' }} className="flex min-w-0 flex-1">
                     {studioNavigation ? <DropInHierarchyStrip items={visibleItems} parent={currentParent} direction={reelDirection} pathKey={path.join('/') || 'root'} onBack={() => { setReelDirection(-1); setPath(value => value.slice(0, -1)); }} onSelect={selectAction} onDelete={onDelete} highlightedId={highlight} childIds={new Set(items.flatMap(item => [item.parent_id, item.has_children ? item.id : null]).filter(Boolean))}
                       emptyLabel={currentParent ? 'No active children' : <button type="button" className="drop-in-preview-add" disabled={!canManage} onClick={() => onAdd?.()}>Add drop-in</button>} /> : <DropInStrip items={stripItems} highlightedId={highlight} onSelect={selectAction} onDelete={onDelete} reelKey={path.join('/') || 'root'} reelDirection={reelDirection}
                       chipGap={2}

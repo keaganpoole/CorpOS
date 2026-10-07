@@ -692,7 +692,7 @@ function CalendarMonthViewBody({ data, className = '', selectedDate: selectedDat
                         </>}
                       </>}
                       actions={<AnimatePresence mode="wait" initial={false}>
-                        {activePromptAction ? <motion.div key="action-prompt" initial={{ opacity: 0, x: -14, scale: .96 }} animate={{ opacity: 1, x: 0, scale: 1 }} exit={{ opacity: 0, x: -12, scale: .97 }} transition={{ type: 'spring', stiffness: 440, damping: 28, mass: .7 }} className="flex min-w-0 flex-1">
+                        {activePromptAction ? <motion.div key="action-prompt" initial={{ opacity: 0, x: -14, scale: .96 }} animate={{ opacity: 1, x: 0, scale: 1 }} exit={{ opacity: 0, x: -12, scale: .97 }} transition={{ duration: .28, ease: [.22, 1, .36, 1] }} style={{ willChange: 'transform, opacity' }} className="flex min-w-0 flex-1">
                           <div className="drop-in-confirm" onClick={e => e.stopPropagation()}>
                             <span title={`${appointment._receptionistName || 'Receptionist'} will call ${getCustomerFirstName(appointment)} to ${promptPurpose}?`}>
                               Call customer to {promptPurpose}?
@@ -702,7 +702,7 @@ function CalendarMonthViewBody({ data, className = '', selectedDate: selectedDat
                             </button>
                             <button type="button" disabled={callingAppointment === appointment.id} onClick={() => setActiveAppointmentPrompt(null)}>Cancel</button>
                           </div>
-                        </motion.div> : <motion.div key="action-list" initial={{ opacity: 0, x: -14, scale: .96 }} animate={{ opacity: 1, x: 0, scale: 1 }} exit={{ opacity: 0, x: -12, scale: .97 }} transition={{ type: 'spring', stiffness: 440, damping: 28, mass: .7 }} className="flex min-w-0 flex-1">
+                        </motion.div> : <motion.div key="action-list" initial={{ opacity: 0, x: -14, scale: .96 }} animate={{ opacity: 1, x: 0, scale: 1 }} exit={{ opacity: 0, x: -12, scale: .97 }} transition={{ duration: .28, ease: [.22, 1, .36, 1] }} style={{ willChange: 'transform, opacity' }} className="flex min-w-0 flex-1">
                           <DropInStrip items={appointmentActions} onSelect={action => {
                             setActiveAppointmentPrompt({ appointmentId: appointment.id, action, requestId: crypto.randomUUID() });
                           }} />
