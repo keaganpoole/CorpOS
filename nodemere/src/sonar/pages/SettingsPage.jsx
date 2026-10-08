@@ -3605,6 +3605,7 @@ const SettingsPage = ({ mobileUsage, onMobileUpgrade }) => {
   const { previewNotification } = useNest();
   const [settings, setSettings] = useState(defaultSettings);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
   const [error, setError] = useState(null);
@@ -3718,6 +3719,8 @@ const SettingsPage = ({ mobileUsage, onMobileUpgrade }) => {
 
   const loadSettings = async () => {
     setLoading(true);
+    setLoadError(false);
+    setSavedSnapshot(null);
     try {
       const { data: authData, error: authError } = await supabase.auth.getUser();
       if (authError) throw authError;
@@ -3726,9 +3729,8 @@ const SettingsPage = ({ mobileUsage, onMobileUpgrade }) => {
       const settingsOwnerId = workforce?.tenant?.owner_id || userId;
 
       // Sensitive business profile fields are server-decrypted after tenant authorization.
-      let bizData = null;
-      try { bizData = await api.getBusinessProfile(); }
-      catch (error) { bizData = null; }
+      const bizData = await api.getBusinessProfile();
+      if (!bizData?.id) throw new Error('Business profile did not load');
 
       // Load app config from account_settings
       const { data: settingsData, error: settingsErr } = await supabase
@@ -3796,7 +3798,7 @@ const SettingsPage = ({ mobileUsage, onMobileUpgrade }) => {
       });
     } catch (err) {
       console.error("SettingsPage.jsx:event_3423");
-      setError('Failed to load settings');
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -4294,6 +4296,15 @@ const SettingsPage = ({ mobileUsage, onMobileUpgrade }) => {
     return (
       <div className="dashboard-mobile-viewport-loader h-full flex items-center justify-center bg-[#020202]">
         <CubePreloader size={22} />
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="settings-page-scope flex h-full flex-col items-center justify-center gap-4 bg-[#020202] px-6 text-center text-zinc-300" role="alert">
+        <p>Business settings could not be loaded. Please try again.</p>
+        <button type="button" className="settings-neutral-button rounded-xl px-5 py-2.5 text-sm text-white" onClick={loadSettings}>Retry</button>
       </div>
     );
   }

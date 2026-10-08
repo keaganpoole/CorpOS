@@ -8,6 +8,7 @@ import { receptionistHirePayload } from './receptionistHirePayload';
 const API_BASE = window.sonar?.apiUrl || import.meta.env.VITE_API_URL || '';
 const WS_URL = window.sonar?.wsUrl || import.meta.env.VITE_WS_URL || null;
 const API_TIMEOUT_MS = 15000;
+const BUSINESS_PROFILE_TIMEOUT_MS = 45000;
 
 let authSessionRequest = null;
 
@@ -82,10 +83,10 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = API_TIMEOUT_MS) {
 }
 
 // ─── REST Helpers ───────────────────────────────────────────
-async function fetchJSON(endpoint) {
+async function fetchJSON(endpoint, timeoutMs = API_TIMEOUT_MS) {
   try {
     const headers = await buildAuthHeaders();
-    const res = await fetchWithTimeout(`${API_BASE}${endpoint}`, { headers });
+    const res = await fetchWithTimeout(`${API_BASE}${endpoint}`, { headers }, timeoutMs);
     if (!res.ok) throw await parseApiError(res);
     return await res.json();
   } catch (err) {
@@ -139,7 +140,7 @@ export const api = {
   getVoiceCatalogVoice: (voiceId) => strictGetJSON(`/api/voice-catalog/${encodeURIComponent(voiceId)}`),
   getPeople: (limit = 500) => fetchJSON(`/api/sonar/people?limit=${limit}`),
   getPerson: (id) => fetchJSON(`/api/sonar/people/${encodeURIComponent(id)}`),
-  getBusinessProfile: () => fetchJSON('/api/sonar/business/profile'),
+  getBusinessProfile: () => fetchJSON('/api/sonar/business/profile', BUSINESS_PROFILE_TIMEOUT_MS),
   updateBusinessProfile: (business) => putJSON('/api/sonar/business/profile', business),
   getStaff: (activeOnly = true) => fetchJSON(`/api/sonar/staff?active_only=${activeOnly ? 'true' : 'false'}`),
   createStaff: (staff) => postJSON('/api/sonar/staff', staff),
