@@ -1,0 +1,168 @@
+/* src/styles/BreakroomCanvas.css */
+/* This is the single, authoritative stylesheet for the Breakroom feature. */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Orbitron:wght@900&display=swap');
+
+:root {
+  /* --- Emporium Theme Integration --- */
+  --font-body: 'Inter', sans-serif;
+  --font-display: 'Orbitron', sans-serif;
+  --color1: #7b8afe;
+  --color2: #534eef;
+  --background-dark: #000000;
+
+  /* Breakroom variables mapped to Emporium theme */
+  --br-background-color: var(--background-dark);
+  --br-text-color: #e0e0e0;
+  --br-glow-color: var(--color1); /* Mapped to Emporium's primary accent */
+  --br-label-color: #ffffff;
+  --br-sub-label-color: #ffffff;
+}
+
+/* --- NEW: Keyframes for the starfield animation --- */
+@keyframes move-stars {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-100vh); /* Move stars up one screen height before looping */
+  }
+}
+
+
+/* --- Canvas & Wrapper --- */
+/* This is the master rule that forces the full-screen canvas */
+.breakroom-canvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background-color: #020305; /* A dark, near-black color */
+}
+
+/* --- NEW: Drifting starfield effect --- */
+.breakroom-canvas::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  background: transparent;
+  border-radius: 50%;
+  /* A large number of box-shadows are used to create a starfield.
+     Each shadow is a single "star" at a random x,y position. */
+  box-shadow:
+    /* A selection of stars. More can be added for a denser field. */
+    -3vw 8vh 1px 0px rgba(255,255,255,0.7), 98vw 89vh 0px 0px rgba(255,255,255,0.7), 2vw 74vh 1px 0px rgba(255,255,255,0.9), 11vw 34vh 1px 0px rgba(255,255,255,0.9), 3vw 6vh 0px 0px rgba(255,255,255,0.9), 67vw 2vh 0px 0px rgba(255,255,255,0.9), 92vw 3vh 1px 0px rgba(255,255,255,0.9), 65vw 80vh 0px 0px rgba(255,255,255,0.7), 18vw 86vh 0px 0px rgba(255,255,255,0.9), 56vw 53vh 1px 0px rgba(255,255,255,0.7), 8vw 2vh 0px 0px rgba(255,255,255,0.7), 54vw 25vh 0px 0px rgba(255,255,255,0.7), 88vw 37vh 1px 0px rgba(255,255,255,0.9), 16vw 42vh 0px 0px rgba(255,255,255,0.9), 7vw 80vh 1px 0px rgba(255,255,255,0.9), 89vw 81vh 0px 0px rgba(255,255,255,0.7), 86vw 66vh 1px 0px rgba(255,255,255,0.9), 23vw 36vh 0px 0px rgba(255,255,255,0.7), 2vw 20vh 0px 0px rgba(255,255,255,0.7), 77vw 84vh 1px 0px rgba(255,255,255,0.9), 96vw 5vh 1px 0px rgba(255,255,255,0.9), 30vw 95vh 1px 0px rgba(255,255,255,0.9), 6vw 9vh 1px 0px rgba(255,255,255,0.9), 11vw 3vh 0px 0px rgba(255,255,255,0.7), 2vw 72vh 1px 0px rgba(255,255,255,0.7), 40vw 37vh 1px 0px rgba(255,255,255,0.7), 90vw 5vh 0px 0px rgba(255,255,255,0.7), 74vw 7vh 1px 0px rgba(255,255,255,0.9), 79vw 21vh 1px 0px rgba(255,255,255,0.9), 42vw 8vh 1px 0px rgba(255,255,255,0.7), 33vw 81vh 1px 0px rgba(255,255,255,0.9), 91vw 13vh 0px 0px rgba(255,255,255,0.7), 43vw 98vh 1px 0px rgba(255,255,255,0.7), 37vw 9vh 0px 0px rgba(255,255,255,0.9), 56vw 99vh 0px 0px rgba(255,255,255,0.7), 57vw 69vh 1px 0px rgba(255,255,255,0.7), 4vw 46vh 1px 0px rgba(255,255,255,0.7), 58vw 15vh 1px 0px rgba(255,255,255,0.7), 98vw 12vh 1px 0px rgba(255,255,255,0.7), 70vw 55vh 0px 0px rgba(255,255,255,0.9), 23vw 91vh 1px 0px rgba(255,255,255,0.7), 16vw 86vh 0px 0px rgba(255,255,255,0.9), 9vw 73vh 0px 0px rgba(255,255,255,0.9), 43vw 94vh 0px 0px rgba(255,255,255,0.9), 10vw 92vh 0px 0px rgba(255,255,255,0.7), 2vw 4vh 1px 0px rgba(255,255,255,0.7);
+
+  /* A very slow animation makes the movement subtle */
+  animation: move-stars 200s linear infinite;
+}
+
+.money-table-wrapper {
+  width: 100%;
+  height: 100%;
+  transition: filter 0.3s ease-in-out;
+}
+
+.money-table-wrapper.blur-md {
+  filter: blur(8px);
+}
+
+/* --- MoneyTable SVG and Elements --- */
+.money-table-container {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+  font-family: var(--font-body); /* UPDATED FONT */
+  color: var(--br-text-color);
+}
+
+.money-table-container svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* --- Text & Label Styling --- */
+.labels .label-main {
+  font-size: 11px;
+  font-weight: 700;
+  fill: var(--br-label-color); /* White */
+}
+
+.labels .label-sub {
+  font-size: 11px;
+  fill: var(--br-label-color); /* White */
+}
+
+/* --- RESTORED STYLES --- */
+.links path {
+  transition: stroke-opacity 0.3s ease, filter 0.3s ease, stroke-width 0.3s ease;
+}
+
+.links path:hover {
+    stroke-opacity: 1 !important;
+    opacity: 1 !important;
+    filter: url(#intense-glow);
+}
+
+.nodes rect {
+  transition: filter 0.3s ease, fill 0.3s ease;
+}
+
+.nodes rect:hover {
+    filter: url(#intense-glow);
+}
+
+.labels g {
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.link-labels text {
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+/* --- END RESTORED STYLES --- */
+
+
+/* --- Tooltip --- */
+.tooltip {
+  position: absolute;
+  background-color: rgba(0, 0, 0, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  padding: 12px;
+  color: var(--br-text-color);
+  font-size: 12px;
+  font-family: var(--font-body); /* UPDATED FONT */
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  backdrop-filter: blur(5px);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+  max-width: 250px;
+  text-align: left;
+}
+
+.tooltip h4 {
+  margin: 0 0 8px 0;
+  font-weight: 900; /* Bolder to match Orbitron */
+  font-family: var(--font-display); /* UPDATED FONT */
+  color: var(--br-glow-color);
+  font-size: 14px;
+}
+
+.tooltip p {
+  margin: 4px 0;
+}
+
+.tooltip .value {
+  font-weight: 700;
+  color: #fff;
+}
+

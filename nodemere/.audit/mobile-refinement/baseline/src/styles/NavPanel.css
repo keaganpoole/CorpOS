@@ -1,0 +1,119 @@
+/* src/styles/NavPanel.css */
+@keyframes subtle-gradient-animation {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.nav-panel {
+  flex-shrink: 0;
+  height: 100%;
+  background-color: #0A0A0A;
+  padding-top: 17px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between; /* Pushes content to top and bottom */
+  z-index: 50;
+}
+
+.nav-header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding-bottom: 1rem;
+}
+
+.nav-logo {
+  width: 40px;
+  height: 40px;
+  margin-left: 18px;
+  margin-bottom: 10px;
+}
+
+.nav-links {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.nav-links-bottom {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding-bottom: 1rem; /* Add some padding at the bottom */
+}
+
+.nav-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 43px;
+  margin: 0 12px;
+  padding: 0 12px;
+  cursor: pointer;
+  text-decoration: none;
+  color: #A0A0A0;
+  border-radius: 8px;
+  overflow: hidden;
+  white-space: nowrap;
+  transition: color 0.2s ease, background-color 0.2s ease;
+}
+
+.nav-item:hover {
+  color: #EAEAEA;
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.nav-item.active {
+  color: #fff;
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.nav-item .active-indicator {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: linear-gradient(145deg, #ff1ae0, #ff6de6);
+  background-size: 200% 200%;
+  opacity: 0;
+  transform: scaleY(0);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.nav-item.active .active-indicator {
+  opacity: 1;
+  transform: scaleY(1);
+  animation: subtle-gradient-animation 8s ease infinite;
+}
+
+.nav-item-icon {
+  flex-shrink: 0;
+  font-size: 1.0rem;
+  width: 1.75rem; /* 28px */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transition: color 0.2s ease;
+}
+
+.nav-item-text {
+  margin-left: 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  opacity: 0;
+  transform: translateX(-10px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.nav-panel.expanded .nav-item-text {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.nav-footer {
+  padding-bottom: 1rem;
+}

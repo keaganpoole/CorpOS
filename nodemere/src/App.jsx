@@ -10,6 +10,7 @@ import AuthPage from './pages/AuthPage';
 import AccountRecoveryPage from './pages/AccountRecoveryPage';
 import Onboarding2Page from './pages/Onboarding2Page';
 import ResetPasswordPage from './pages/ResetPasswordPage';
+import AccountResetConfirmationPage from './pages/AccountResetConfirmationPage';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
 import DocumentUploadPage from './pages/DocumentUploadPage';
 import VoiceClonePage from './pages/VoiceClonePage';
@@ -170,6 +171,7 @@ function AppContent() {
         <Route path="/onboarding" element={<OnboardingGate />} />
         <Route path="/onboarding2" element={<Navigate to="/onboarding" replace />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/account-reset/confirm" element={<AccountResetConfirmationPage />} />
         <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
         <Route path="/terms" element={<LegalDocumentPage documentKey="terms" />} />
         <Route path="/acceptable-use-policy" element={<LegalDocumentPage documentKey="acceptableUse" />} />

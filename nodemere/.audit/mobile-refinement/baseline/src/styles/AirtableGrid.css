@@ -1,0 +1,465 @@
+/* src/styles/AirtableGrid.css */
+
+/* CSS Variables for Status Gradients */
+:root {
+  --gradient-won: linear-gradient(135deg, #2eff89, #00e964);
+  --gradient-interest: linear-gradient(135deg, #ff2ef8, #e316d7);
+  --gradient-aware: linear-gradient(135deg, #4c58ff, #312eff);
+  --gradient-dnc: linear-gradient(135deg, #ed1515, #c80d0d);
+}
+
+.grid-container {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background-color: #0d0e12;
+  font-size: 14px;
+}
+
+.grid-toolbar {
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-shrink: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  position: relative;
+  z-index: 20;
+}
+
+/* --- Filter Panel --- */
+.grid-sub-panel {
+  background-color: #111216;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 16px;
+  color: #9ca3af;
+}
+.filter-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.filter-row select, .filter-row input {
+  background-color: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #e5e7eb;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+}
+.filter-row select:focus, .filter-row input:focus {
+  outline: none;
+  border-color: var(--color-brand-purple);
+}
+.add-filter-button {
+  background: none; border: none; color: #9ca3af;
+  display: inline-flex; align-items: center; gap: 6px;
+  cursor: pointer; transition: color 0.2s ease;
+  padding: 4px; margin-top: 8px;
+}
+.add-filter-button:hover { color: #fff; }
+.remove-filter-button {
+  background: none; border: none; color: #6b7280;
+  cursor: pointer; padding: 4px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.2s ease;
+}
+.remove-filter-button:hover {
+  color: #ff9d9d;
+  background-color: rgba(255, 157, 157, 0.1);
+}
+
+/* --- Table Styles --- */
+.grid-table-wrapper { flex-grow: 1; overflow: auto; }
+.grid-table { width: 100%; border-spacing: 0; table-layout: fixed; }
+.grid-table thead { position: sticky; top: 0; z-index: 10; background-color: #111216; }
+
+/* FIX: Row hover behavior */
+.grid-table tr:not(.selected-row):hover td {
+  background-color: #1c1e24;
+}
+
+/* --- Checkbox Styles --- */
+.custom-checkbox {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  background-color: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.custom-checkbox:hover {
+  border-color: rgba(255, 255, 255, 0.3);
+}
+.custom-checkbox .check-icon {
+  color: #fff;
+  opacity: 0;
+  transform: scale(0.5);
+  transition: all 0.2s ease;
+}
+input[type="checkbox"]:checked + .custom-checkbox {
+  background-color: var(--color-brand-purple);
+  border-color: var(--color-brand-purple);
+}
+input[type="checkbox"]:checked + .custom-checkbox .check-icon {
+  opacity: 1;
+  transform: scale(1);
+}
+input[type="checkbox"]:indeterminate + .custom-checkbox {
+  background-color: var(--color-brand-purple);
+  border-color: var(--color-brand-purple);
+}
+input[type="checkbox"]:indeterminate + .custom-checkbox .check-icon {
+  opacity: 1;
+  transform: scale(1);
+  /* Use a minus icon for indeterminate state */
+}
+
+/* --- Status Cell Styles --- */
+.status-select-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  height: 100%;
+}
+.status-gradient-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.status-gradient-dot.won { background-image: var(--gradient-won); }
+.status-gradient-dot.interest { background-image: var(--gradient-interest); }
+.status-gradient-dot.aware { background-image: var(--gradient-aware); }
+.status-gradient-dot.dnc { background-image: var(--gradient-dnc); }
+
+.inline-select-input {
+  /* FIX: Remove focus outline */
+  outline: none;
+}
+.inline-select-input:focus-visible {
+  box-shadow: none;
+}
+.custom-select-wrapper:hover .inline-select-input {
+  /* FIX: Remove hover border */
+  border-color: transparent;
+}
+
+/* --- Date Picker (react-day-picker) Custom Theme --- */
+.rdp {
+  --rdp-cell-size: 36px;
+  --rdp-accent-color: var(--color-brand-purple);
+  --rdp-background-color: #1c1e24;
+  --rdp-accent-color-dark: var(--color-brand-purple);
+  --rdp-background-color-dark: #1c1e24;
+  --rdp-outline: 2px solid var(--rdp-accent-color);
+  --rdp-outline-selected: 3px solid var(--rdp-accent-color);
+  --rdp-border-radius: 6px;
+  margin: 1em;
+  color: #e5e7eb;
+}
+.rdp-caption_label {
+  font-weight: 600;
+}
+.rdp-head_cell {
+  color: #9ca3af;
+  font-size: 0.8em;
+}
+.rdp-button:hover:not([disabled]):not(.rdp-day_selected) {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+.rdp-day_selected, .rdp-day_selected:hover {
+  background-color: var(--rdp-accent-color);
+  color: #fff;
+}
+.rdp-button:focus-visible:not([disabled]) {
+  border: none;
+  outline: var(--rdp-outline);
+  outline-offset: 2px;
+}
+.date-picker-popover {
+  background-color: #1c1e24;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  z-index: 100;
+}
+
+.toolbar-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background-color: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #9ca3af;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.toolbar-button:hover, .toolbar-button.active {
+  background-color: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+.search-wrapper {
+  position: relative;
+  margin-left: auto;
+}
+.search-input {
+  background: none;
+  border: none;
+  outline: none;
+  color: #e5e7eb;
+  padding: 6px 12px 6px 32px;
+  border-radius: 6px;
+  width: 220px;
+  transition: all 0.2s ease;
+  background-color: rgba(255, 255, 255, 0.05);
+}
+.search-input:focus {
+  background-color: rgba(255, 255, 255, 0.1);
+  width: 280px;
+}
+.search-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #6b7280;
+  pointer-events: none;
+}
+
+.grid-table-wrapper {
+  flex-grow: 1;
+  overflow: auto;
+}
+
+.grid-table {
+  width: 100%;
+  border-spacing: 0;
+  table-layout: fixed;
+}
+
+.grid-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background-color: #111216;
+}
+
+.grid-table th {
+  text-align: left;
+  padding: 12px 10px;
+  font-weight: 500;
+  color: #9ca3af;
+  text-transform: capitalize;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-right: 1px solid rgba(255, 255, 255, 0.08); /* NEW: Vertical grid lines */
+  position: relative;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.grid-table th:last-child {
+  border-right: none;
+}
+
+.header-content {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.sort-icon {
+  color: #6b7280;
+  flex-shrink: 0;
+}
+.header-content:hover .sort-icon {
+  color: #fff;
+}
+th.is-sorted .sort-icon {
+  color: var(--color-brand-purple);
+}
+
+.resizer {
+  position: absolute;
+  right: 0;
+  top: 0;
+  height: 100%;
+  width: 5px;
+  cursor: col-resize;
+  user-select: none;
+  touch-action: none;
+  opacity: 0;
+  transition: opacity 0.2s;
+  z-index: 1;
+}
+.resizer:hover, .isResizing {
+  opacity: 1;
+  background-color: var(--color-brand-purple);
+}
+
+.grid-table td {
+  padding: 0; /* Let cell content control padding */
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-right: 1px solid rgba(255, 255, 255, 0.08); /* NEW: Vertical grid lines */
+  transition: background-color 0.2s ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  height: 45px; /* Set a consistent row height */
+}
+.grid-table td:last-child {
+  border-right: none;
+}
+
+.grid-table tr {
+  position: relative;
+}
+
+.grid-table tr:hover td { /* Apply hover to TD for better sticky column behavior */
+  background-color: #1c1e24;
+}
+
+.grid-table tr.selected-row {
+  /* FIX: Use inset box-shadow to prevent layout shift */
+  box-shadow: inset 3px 0 0 0 var(--color-brand-purple);
+}
+.grid-table tr.selected-row td {
+  background-color: rgba(139, 92, 246, 0.1);
+}
+
+.new-row-button-container {
+  padding: 10px 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+.new-row-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #9ca3af;
+  cursor: pointer;
+  transition: color 0.2s ease;
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 14px;
+}
+.new-row-button:hover {
+  color: #fff;
+}
+
+/* Cell Components */
+.status-cell, .editable-cell {
+  padding: 10px;
+}
+.status-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* --- NEW/IMPROVED: Select Input Styles --- */
+.custom-select-wrapper {
+  position: relative;
+  height: 100%;
+}
+.inline-select-input {
+  background: transparent;
+  border: 1px solid transparent; /* Subtle border on hover */
+  border-radius: 4px;
+  color: white;
+  width: 100%;
+  height: 100%;
+  padding: 0 28px 0 10px;
+  font-size: 14px;
+  cursor: pointer;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  transition: border-color 0.2s ease;
+}
+.custom-select-wrapper:hover .inline-select-input {
+  border-color: rgba(255, 255, 255, 0.2);
+}
+.custom-select-arrow {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #9ca3af;
+  pointer-events: none;
+}
+.inline-select-input option {
+  background-color: #111216; /* Match dark theme */
+  color: #e5e7eb;
+}
+/* Special styles for Status dropdowns */
+.status-select-won { color: #6fffb0; }
+.status-select-interest { color: #ff32ac; }
+.status-select-aware { color: #fff844; }
+.status-select-dnc { color: #ff9d9d; }
+
+.inline-edit-input {
+  background: transparent; border: none; outline: none; color: white;
+  width: 100%; height: 100%; padding: 10px; font-size: 14px;
+}
+
+/* Selection Checkbox */
+.checkbox-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
+}
+.row-checkbox {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--color-brand-purple);
+  background-color: rgba(255,255,255,0.1);
+  border-radius: 4px;
+  border: 1px solid rgba(255,255,255,0.2);
+  cursor: pointer;
+}
+
+/* Frozen first column */
+.grid-table th:first-child, .grid-table td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 5;
+  background-color: #111216; /* Match header bg */
+}
+.grid-table tr:hover td:first-child { background-color: #1c1e24; }
+.grid-table th:first-child { z-index: 11; }
+.grid-table th:first-child::after {
+  content: ''; position: absolute; right: 0; top: 0; bottom: 0;
+  width: 1px; background: linear-gradient(to bottom, transparent, rgba(255, 255, 255, 0.1), transparent);
+}
+
+
+/* --- Skeleton & Empty State (no changes) --- */
+.skeleton-row td { padding: 18px 10px; }
+.skeleton-loader { background-color: rgba(255, 255, 255, 0.08); border-radius: 4px; animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite; height: 14px; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+.empty-grid-state { flex-grow: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 40px; color: #9ca3af; }
+.empty-grid-state-icon { color: var(--color-brand-purple); margin-bottom: 20px; }
+.empty-grid-state h3 { font-size: 1.25rem; font-weight: 600; color: #fff; margin-bottom: 8px; }
+
+/* Contextual Action Bar (no changes) */
+.contextual-action-bar { padding: 8px 16px; display: flex; align-items: center; gap: 16px; flex-shrink: 0; background-color: #1a1c22; border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
+.contextual-action-bar span { font-weight: 500; color: #e5e7eb; }

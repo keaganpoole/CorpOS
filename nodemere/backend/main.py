@@ -11,6 +11,8 @@ import math
 import requests
 import base64
 import binascii
+import hashlib
+import secrets
 from dataclasses import replace
 import hmac
 from html import escape as escape_html
@@ -381,7 +383,7 @@ def hydrate_business_with_purchased_number_data(business: Optional[dict]) -> Opt
         candidates = [
             row for row in purchased_numbers
             if row.get("kind") == "assigned_line"
-            and str(row.get("status") or "").lower() in {"active", "quality_checking", "inactive"}
+            and str(row.get("status") or "").lower() in {"active", "quality_checking"}
         ]
         active_assigned = candidates[-1] if candidates else None
 
@@ -842,7 +844,13 @@ def get_twilio_auth_tuple():
 
 
 def get_twilio_voice_test_destination() -> str:
-    return normalize_phone_number(os.environ.get("TWILIO_NUMBER_QUALITY_TEST_TO") or "+12076801233") or "+12076801233"
+    configured_destination = normalize_phone_number(os.environ.get("TWILIO_NUMBER_QUALITY_TEST_TO"))
+    if not configured_destination:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Outbound number quality testing is unavailable until a dedicated QA destination is configured.",
+        )
+    return configured_destination
 
 
 def get_public_backend_base_url() -> Optional[str]:
@@ -1269,10 +1277,10 @@ def get_elevenlabs_headers() -> Optional[dict]:
     }
 
 
-def delete_elevenlabs_phone_number(phone_number_id: Optional[str]) -> None:
+def delete_elevenlabs_phone_number(phone_number_id: Optional[str]) -> bool:
     headers = get_elevenlabs_headers()
     if not headers or not phone_number_id:
-        return
+        return not phone_number_id
     try:
         logging.info('main.delete_elevenlabs_phone_number.event_927')
         response = requests.delete(
@@ -1280,9 +1288,13 @@ def delete_elevenlabs_phone_number(phone_number_id: Optional[str]) -> None:
             headers=headers,
             timeout=30,
         )
+        if response.status_code == 404:
+            return True
         response.raise_for_status()
+        return True
     except Exception as exc:
         logging.warning('main.delete_elevenlabs_phone_number.event_935')
+        return False
 
 
 def search_available_twilio_numbers(
@@ -1343,10 +1355,10 @@ def search_available_twilio_numbers(
     return options
 
 
-def release_twilio_number_by_sid(incoming_phone_number_sid: Optional[str]) -> None:
+def release_twilio_number_by_sid(incoming_phone_number_sid: Optional[str]) -> bool:
     auth = get_twilio_auth_tuple()
     if not twilio_account_sid or not auth or not incoming_phone_number_sid:
-        return
+        return not incoming_phone_number_sid
     try:
         logging.info('main.release_twilio_number_by_sid.event_1006')
         response = requests.delete(
@@ -1354,9 +1366,13 @@ def release_twilio_number_by_sid(incoming_phone_number_sid: Optional[str]) -> No
             auth=auth,
             timeout=30,
         )
+        if response.status_code == 404:
+            return True
         response.raise_for_status()
+        return True
     except Exception as exc:
         logging.warning('main.release_twilio_number_by_sid.event_1009')
+        return False
 
 
 def purchase_specific_twilio_number_for_business(business: dict, phone_number: str, label: Optional[str] = None) -> tuple[dict, dict, dict]:
@@ -3140,6 +3156,12 @@ class AccountDeletionRequest(BaseModel):
 
 class AccountResetRequest(BaseModel):
     confirmation: str
+
+class AccountResetEmailRequest(BaseModel):
+    confirmation: str
+
+class AccountResetEmailConfirmRequest(BaseModel):
+    token: str = Field(min_length=32, max_length=256)
 
 class CustomerCreateRequest(BaseModel):
     person_id: Optional[str] = None
@@ -15573,6 +15595,10 @@ async def reset_account(payload: AccountResetRequest, current_user: dict = Depen
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Type RESET ACCOUNT to confirm")
 
     user_id = str(current_user.id)
+    if getattr(current_user, 'nodemere_aal', 'aal1') != 'aal2':
+        if getattr(current_user, 'nodemere_mfa_enrolled', False):
+            raise HTTPException(status_code=403, detail="Verify your authenticator to reset this account")
+        return await request_account_reset_email(AccountResetEmailRequest(confirmation=payload.confirmation), current_user)
     authorize_account_closure(
         getattr(supabase_admin, 'raw', supabase_admin),
         user_id,
@@ -15590,6 +15616,96 @@ async def reset_account(payload: AccountResetRequest, current_user: dict = Depen
     if not result.get('reset'):
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Account reset could not be completed")
     return {'reset': True, 'billing_preserved': True, 'message': 'Operational data was reset. Your account is ready for onboarding again.'}
+
+
+def _reset_token_hash(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def _owned_business_for_reset(user_id: str) -> dict:
+    rows = supabase_admin.table("businesses").select("id,name").eq("user_id", user_id).order("id").limit(1).execute().data or []
+    return rows[0] if rows else {}
+
+
+@app.post("/users/me/account/reset/request-email", tags=["Users"])
+async def request_account_reset_email(payload: AccountResetEmailRequest, current_user: dict = Depends(get_current_user)):
+    """Email a one-time reset link when the owner has no authenticator session."""
+    if payload.confirmation.strip() != "RESET ACCOUNT":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Type RESET ACCOUNT to confirm")
+    if getattr(current_user, "nodemere_aal", "aal1") == "aal2":
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Use your authenticator to reset this account")
+    if getattr(current_user, "nodemere_mfa_enrolled", False):
+        raise HTTPException(status_code=403, detail="Verify your authenticator to reset this account")
+
+    user_id = str(current_user.id)
+    business = _owned_business_for_reset(user_id)
+    if not business:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="There is no workspace to reset")
+    active_members = (
+        supabase_admin.table("business_memberships")
+        .select("user_id,role")
+        .eq("business_id", str(business["id"]))
+        .eq("status", "active")
+        .execute()
+        .data or []
+    )
+    if any(str(member.get("user_id")) != user_id for member in active_members):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Remove other active team members before resetting this account")
+
+    recipient = str(getattr(current_user, "email", "") or "").strip()
+    if not recipient:
+        profile = supabase_admin.table("users").select("email").eq("id", user_id).limit(1).execute().data or []
+        recipient = str((profile[0] if profile else {}).get("email") or "").strip()
+    if not recipient:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="No account email is available for verification")
+
+    now = datetime.now(timezone.utc)
+    expires_at = now + timedelta(minutes=20)
+    token = secrets.token_urlsafe(48)
+    token_hash = _reset_token_hash(token)
+    supabase_admin.table("account_reset_requests").update({"status": "expired"}).eq("user_id", user_id).eq("status", "pending").execute()
+    request_response = supabase_admin.table("account_reset_requests").insert({
+        "user_id": user_id,
+        "business_id": business["id"],
+        "token_hash": token_hash,
+        "status": "pending",
+        "expires_at": expires_at.isoformat(),
+    }).execute()
+    if not request_response.data:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not prepare the reset email")
+
+    base_url = (frontend_base_url or "http://localhost:5173").rstrip("/")
+    secure_link = f"{base_url}/account-reset/confirm?token={token}"
+    try:
+        send_secure_link_email(
+            kind="account_reset",
+            recipient_email=recipient,
+            business_name=str(business.get("name") or "Nodemere"),
+            secure_link=secure_link,
+            configuration=_system_resend_configuration(),
+        )
+    except EmailDeliveryError as exc:
+        supabase_admin.table("account_reset_requests").update({"status": "expired"}).eq("id", request_response.data[0]["id"]).execute()
+        logging.warning("main.request_account_reset_email.delivery_failed.event_14002")
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=exc.message) from exc
+    except requests.RequestException as exc:
+        supabase_admin.table("account_reset_requests").update({"status": "expired"}).eq("id", request_response.data[0]["id"]).execute()
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="The email provider could not be reached. Please try again.") from exc
+    return {"email_sent": True, "expires_in_minutes": 20, "message": "Check your email for the account reset link."}
+
+
+@app.post("/users/me/account/reset/confirm", tags=["Users"])
+async def confirm_account_reset_email(payload: AccountResetEmailConfirmRequest):
+    """Consume a one-time email proof and reset only its owning workspace."""
+    token_hash = _reset_token_hash(payload.token.strip())
+    try:
+        response = supabase_admin.rpc("nodemere_confirm_account_reset", {"token_digest": token_hash}).execute()
+    except Exception as exc:
+        logging.exception("main.confirm_account_reset_email.rpc_failed.event_14003")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Account reset could not be completed") from exc
+    if not (response.data or {}).get("reset"):
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Account reset could not be completed")
+    return {"reset": True, "billing_preserved": True, "message": "Your account was reset. Sign in to start onboarding again."}
 
 
 @app.post("/users/me/account/delete", tags=["Users"])
@@ -16845,7 +16961,10 @@ async def search_business_forwarding_numbers(
         purchase_count = get_business_number_purchase_count(business)
 
         resolved_near_number = near_number or None
-        resolved_area_code = area_code or extract_us_area_code(business.get("phone"))
+        # An omitted area code means the user cleared the filter. Do not
+        # silently reapply the business phone's area code, otherwise the UI's
+        # unfiltered search still returns area-restricted results.
+        resolved_area_code = area_code or None
         if resolved_near_number:
             resolved_area_code = None
 
@@ -16929,53 +17048,6 @@ async def claim_business_forwarding_number(
                 detail="We couldn't finish preparing that number. Please choose another one.",
             )
 
-        test_call = start_number_quality_test_call(
-            str(phone_number_id),
-            payload.label or elevenlabs_business.get("name") or "Dedicated forwarding line",
-        )
-        logging.info('main.claim_business_forwarding_number.event_13255')
-        quality_result = await wait_for_twilio_quality_test_result(
-            test_call.get("callSid") or test_call.get("call_sid")
-        )
-        logging.info('main.claim_business_forwarding_number.event_13265')
-
-        if not quality_result.get("passed"):
-            delete_elevenlabs_phone_number(str(phone_number_id))
-            release_twilio_number_by_sid(purchased.get("sid"))
-            failure_message = "That number didn't pass our quick quality check. Pick another one and we'll try again."
-            save_purchased_number_record(
-                int(business["id"]),
-                purchased.get("phone_number") or payload.phone_number,
-                {
-                    "friendly_name": payload.label or business.get("name") or "Dedicated forwarding line",
-                    "status": "quality_failed",
-                    "is_active": False,
-                    "twilio_account_sid": twilio_account_sid,
-                    "twilio_incoming_phone_number_sid": purchased.get("sid"),
-                    "elevenlabs_phone_number_id": None,
-                    "quality_check_status": "failed",
-                    "quality_checked_at": datetime.now(timezone.utc).isoformat(),
-                    "quality_failure_reason": failure_message,
-                    "released_at": datetime.now(timezone.utc).isoformat(),
-                    "released_reason": "quality_failed",
-                },
-            )
-            cleared_business = hydrate_business_with_purchased_number_data(business) or business
-            logging.warning('main.claim_business_forwarding_number.event_13206')
-
-            return {
-                "ok": False,
-                "verified": False,
-                "message": failure_message,
-                "technical_reason": quality_result.get("technical_reason"),
-                "twilio_number_status": cleared_business.get("twilio_number_status"),
-                "quality_check_status": "failed",
-                "quality_checked_at": datetime.now(timezone.utc).isoformat(),
-                "twilio_number_quality_error": failure_message,
-                "number_purchase_count": get_business_number_purchase_count(cleared_business),
-                "total_allowed_number_purchases": get_system_number_purchase_limit(),
-            }
-
         activated_row = save_purchased_number_record(
             int(business["id"]),
             elevenlabs_business.get("twilio_number"),
@@ -16986,8 +17058,8 @@ async def claim_business_forwarding_number(
                 "twilio_account_sid": twilio_account_sid,
                 "twilio_incoming_phone_number_sid": purchased.get("sid"),
                 "elevenlabs_phone_number_id": str(phone_number_id),
-                "quality_check_status": "passed",
-                "quality_checked_at": datetime.now(timezone.utc).isoformat(),
+                "quality_check_status": "not_run",
+                "quality_checked_at": None,
                 "quality_failure_reason": None,
             },
         )
@@ -17001,10 +17073,10 @@ async def claim_business_forwarding_number(
         logging.info('main.claim_business_forwarding_number.event_13342')
 
         push_live_event(
-            "Dedicated Twilio number passed quality check.",
+            "Dedicated Twilio number provisioned.",
             actor="system",
             severity="info",
-            event_type="twilio_number_quality_verified",
+            event_type="twilio_number_provisioned",
             payload={
                 "business_id": business.get("id"),
                 "twilio_number": activated_business.get("twilio_number"),
@@ -17015,12 +17087,12 @@ async def claim_business_forwarding_number(
         return {
             "ok": True,
             "verified": True,
-            "message": "This number passed our quick quality check and is ready to use.",
+            "message": "This number is ready to use. Continue to connect your business line.",
             "twilio_number": activated_business.get("twilio_number"),
             "twilio_number_label": activated_business.get("twilio_number_label"),
             "twilio_number_status": activated_business.get("twilio_number_status"),
-            "quality_check_status": "passed",
-            "quality_checked_at": activated_row.get("quality_checked_at"),
+            "quality_check_status": "not_run",
+            "quality_checked_at": None,
             "twilio_number_quality_error": None,
             "elevenlabs_phone_number_id": str(phone_number_id),
             "number_purchase_count": get_business_number_purchase_count(activated_business),
@@ -17034,6 +17106,68 @@ async def claim_business_forwarding_number(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to set up that phone number.",
         )
+
+
+@app.delete("/businesses/me/forwarding/number", tags=["Businesses"])
+async def remove_business_forwarding_number(
+    current_user: dict = Depends(get_current_user),
+):
+    current_user_id = business_owner_id(current_user)
+
+    try:
+        business = get_business_record_for_user(current_user_id)
+        active_number = next((row for row in list_purchased_numbers_for_business(int(business["id"]))
+            if row.get("kind") == "assigned_line" and row.get("is_active") and row.get("status") == "active"), None)
+        if not active_number:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No receptionist number is currently assigned.")
+
+        elevenlabs_phone_number_id = active_number.get("elevenlabs_phone_number_id")
+        twilio_sid = active_number.get("twilio_incoming_phone_number_sid")
+        if not twilio_sid:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="The Twilio number could not be identified for release. Please contact support.")
+        if not elevenlabs_phone_number_id:
+            imported_number = find_elevenlabs_phone_number(active_number.get("phone_number"))
+            elevenlabs_phone_number_id = (imported_number or {}).get("phone_number_id")
+        elevenlabs_removed = delete_elevenlabs_phone_number(str(elevenlabs_phone_number_id)) if elevenlabs_phone_number_id else True
+        twilio_released = release_twilio_number_by_sid(str(twilio_sid)) if twilio_sid else True
+        if not elevenlabs_removed or not twilio_released:
+            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="The number could not be fully removed. Please try again.")
+
+        now = datetime.now(timezone.utc).isoformat()
+        config = normalize_forwarding_config(business.get("forwarding_config"))
+        for entry in config["numbers"]:
+            entry["target_number"] = None
+            entry["status"] = "draft"
+            entry["verified_at"] = None
+            entry["confirmed_enabled_at"] = None
+        config["active_number_id"] = None
+        business_update = supabase.table("businesses").update({"forwarding_config": config}).eq("id", business["id"]).execute()
+        if not business_update.data:
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to clear forwarding settings. Please try again.")
+        number_update = supabase.table("purchased_numbers").update({
+            "status": "released",
+            "is_active": False,
+            "released_at": now,
+            "released_reason": "user_removed",
+            "updated_at": now,
+        }).eq("id", active_number.get("id")).execute()
+        if not number_update.data:
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to finish removing the number. Please try again.")
+        clear_inbound_call_boot_cache(business["id"])
+
+        push_live_event(
+            "Dedicated Twilio number removed.",
+            actor="system",
+            severity="info",
+            event_type="twilio_number_removed",
+            payload={"business_id": business["id"], "twilio_number": active_number.get("phone_number")},
+        )
+        return {"ok": True, "forwarding_config": config, "message": "The receptionist number was removed."}
+    except HTTPException:
+        raise
+    except Exception:
+        logging.error('main.remove_business_forwarding_number.event_13630')
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to remove the receptionist number.")
 
 
 @app.post("/businesses/me/forwarding/caller-id/start", tags=["Businesses"])

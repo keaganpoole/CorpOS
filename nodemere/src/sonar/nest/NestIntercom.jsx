@@ -94,7 +94,7 @@ function CallMinutesNotice({ onClose, onAccept }) {
             <div className="mb-6 flex items-start justify-between gap-5">
               <div className="min-w-0 flex-1 pl-8">
                 <h2 id="intercom-mobile-call-minutes-title" className="text-[26px] font-semibold tracking-[-0.01em] text-white sm:text-[34px]">Intercom</h2>
-                <p className="mt-4 w-full text-sm leading-[1.55] text-zinc-300 sm:text-[15px]">Talk directly with your receptionist, who doubles as your business assistant. Ask questions, get updates, or put them to work. Calls use your available minutes.</p>
+                <p className="mt-4 w-full text-sm leading-[1.55] text-zinc-300 sm:text-[15px]">Talk directly with your receptionist to ask questions, get updates, or put them to work. Calls use your available minutes.</p>
               </div>
               <button type="button" onClick={onClose} className="shrink-0 rounded-full p-2 text-zinc-500 transition hover:bg-white/[0.04] hover:text-white" aria-label="Close">
                 <X size={16} />
@@ -578,9 +578,9 @@ function NestIntercomInner({ open, onClose, mobile = false }) {
                 </span>
               ) : phase === 'call-minutes-notice' ? (
                 mobile ? <CallMinutesNotice onClose={onClose} onAccept={acceptCallMinutesNotice} /> : (
-                  <motion.div className="intercom-action no-drag" role="dialog" aria-labelledby="intercom-call-minutes-title" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+                  <motion.div className="intercom-action no-drag" role="dialog" aria-labelledby="intercom-call-minutes-title" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: reducedMotion ? 0 : 0.3, delay: reducedMotion ? 0 : 0.54, ease: [0.16, 1, 0.3, 1] }}>
                     <span className="intercom-action-label">
-                      <span id="intercom-call-minutes-title">Talk directly with your receptionist, who doubles as your business assistant. Ask questions, get updates, or put them to work. Calls use your available minutes.</span>
+                      <span id="intercom-call-minutes-title">Talk directly with your receptionist to ask questions, get updates, or put them to work. Calls use your available minutes.</span>
                     </span>
                     <div className="intercom-notice-actions">
                       <button type="button" onClick={onClose}>Never mind</button>

@@ -105,8 +105,8 @@ async function fetchJSON(endpoint, timeoutMs = API_TIMEOUT_MS) {
   }
 }
 
-async function strictGetJSON(endpoint) {
-  const res = await fetchWithTimeout(`${API_BASE}${endpoint}`, { headers: await buildAuthHeaders() });
+async function strictGetJSON(endpoint, timeoutMs = API_TIMEOUT_MS) {
+  const res = await fetchWithTimeout(`${API_BASE}${endpoint}`, { headers: await buildAuthHeaders() }, timeoutMs);
   if (!res.ok) throw await parseApiError(res);
   return res.json();
 }
@@ -116,7 +116,7 @@ export const api = {
   generateReceptionistPortraits: (profile) => postJSON('/api/sonar/studio/portraits', profile, 180000),
   saveDesignedVoice: (voice) => postJSON('/api/sonar/studio/save', voice, 150000),
   createStudioCloneSession: () => postJSON('/api/contracts', { metadata: { source: 'nodemere_studio' } }),
-  getDropIns: () => strictGetJSON('/api/sonar/drop-ins'),
+  getDropIns: () => strictGetJSON('/api/sonar/drop-ins', 30000),
   getDashboardBootstrap: () => fetchJSON('/api/sonar/dashboard/bootstrap'),
   getDropInTemplates: () => strictGetJSON('/api/sonar/drop-ins/templates'),
   saveDropInBuilder: (builder) => putJSON('/api/sonar/drop-ins/builder', builder),
@@ -176,7 +176,9 @@ export const api = {
   submitBugReport: (report) => postJSON('/api/sonar/bugs', report),
   createPrivacyRequest: (request) => postJSON('/users/me/privacy-requests', request),
   closeAccount: () => postJSON('/users/me/account/close', {}),
-  resetAccount: (confirmation) => postJSON('/users/me/account/reset', { confirmation }),
+  resetAccount: (confirmation) => postJSON('/users/me/account/reset', { confirmation }, 60000),
+  requestAccountResetEmail: (confirmation) => postJSON('/users/me/account/reset/request-email', { confirmation }),
+  confirmAccountResetEmail: (token) => postJSON('/users/me/account/reset/confirm', { token }, 60000),
   requestAccountDeletion: (request) => postJSON('/users/me/account/delete', request),
   reactivateAccount: () => postJSON('/users/me/account/reactivate', {}),
   getCronJobs: () => fetchJSON('/api/cron'),

@@ -23,6 +23,7 @@ import { api } from '../lib/api';
 import { DEFAULT_NEST_PREFERENCES, NEST_NOTIFICATION_GROUPS, normalizeNestPreferences } from '../nest/nestPreferences';
 import { useNest } from '../nest/NestRuntime';
 import ForwardNumberModal, { FORWARDING_API_BASE_URL } from '../components/ForwardNumberModal';
+import ReceptionistActionConfirmation from '../components/ReceptionistActionConfirmation';
 import CubePreloader from '../components/CubePreloader';
 import AccountLifecycleSection from '../components/AccountLifecycleSection';
 import BrandColorInput from '../components/BrandColorInput';
@@ -3438,15 +3439,18 @@ const formatForwardingPhoneNumber = (value) => {
   return `(${normalized.slice(0, 3)}) ${normalized.slice(3, 6)}-${normalized.slice(6)}`;
 };
 
-const BusinessForwardingSettings = ({ authSession }) => {
+const BusinessForwardingSettings = ({ authSession, businessPhone }) => {
   const [entry, setEntry] = useState(null);
+  const [receptionistNumber, setReceptionistNumber] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showModal, setShowModal] = useState(false);
+  const [confirmRemoveNumber, setConfirmRemoveNumber] = useState(false);
 
   const loadForwardingState = async () => {
     if (!authSession?.access_token) {
       setEntry(null);
+      setReceptionistNumber('');
       setLoading(false);
       return;
     }
@@ -3460,9 +3464,11 @@ const BusinessForwardingSettings = ({ authSession }) => {
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
       setEntry(data?.current_entry || null);
+      setReceptionistNumber(data?.twilio_number_status === 'active' ? data?.twilio_number || '' : '');
     } catch (err) {
       console.error("SettingsPage.jsx:event_3090");
       setEntry(null);
+      setReceptionistNumber('');
       setError('Could not load forwarding status.');
     } finally {
       setLoading(false);
@@ -3473,9 +3479,27 @@ const BusinessForwardingSettings = ({ authSession }) => {
     loadForwardingState();
   }, [authSession?.access_token]);
 
-  const sourceLabel = formatForwardingPhoneNumber(entry?.source_number || entry?.source_label);
-  const targetLabel = formatForwardingPhoneNumber(entry?.target_number);
+  const sourceLabel = formatForwardingPhoneNumber(businessPhone || entry?.source_number || entry?.source_label);
+  const targetLabel = formatForwardingPhoneNumber(receptionistNumber);
   const isVerified = entry?.status === 'verified';
+
+  const removeReceptionistNumber = async () => {
+    setError('');
+    try {
+      const response = await fetch(`${FORWARDING_API_BASE_URL}/businesses/me/forwarding/number`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${authSession.access_token}` },
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        throw new Error(data?.detail || 'Could not remove the receptionist number.');
+      }
+      setConfirmRemoveNumber(false);
+      await loadForwardingState();
+    } catch (err) {
+      setError(err.message || 'Could not remove the receptionist number.');
+    }
+  };
 
   return (
     <>
@@ -3509,9 +3533,23 @@ const BusinessForwardingSettings = ({ authSession }) => {
             </div>
             <div className="rounded-2xl border border-white/[0.04] bg-black/20 p-4">
               <p className="text-[8px] font-black uppercase tracking-widest text-zinc-700">Receptionist Number</p>
-              <p className="mt-2 truncate text-[14px] font-semibold text-zinc-200">
-                {loading ? 'Loading...' : targetLabel}
-              </p>
+              <div className="mt-2 min-w-0 whitespace-nowrap text-[14px] font-semibold leading-5 text-zinc-200">
+                <span className="inline-block max-w-[calc(100%-24px)] truncate align-middle">
+                  {loading ? 'Loading...' : targetLabel}
+                </span>
+                {!loading && receptionistNumber && (
+                  <button
+                    type="button"
+                    onClick={() => { setError(''); setConfirmRemoveNumber(true); }}
+                    aria-label="Delete receptionist number"
+                    title="Delete receptionist number"
+                    className="ml-1.5 inline-block border-0 bg-transparent p-0 align-middle leading-none text-rose-500 shadow-none transition-opacity hover:opacity-75"
+                    style={{ borderRadius: 0, background: 'transparent', boxShadow: 'none' }}
+                  >
+                    <Trash2 size={14} strokeWidth={2} className="block" style={{ color: '#f43f5e', stroke: '#f43f5e' }} />
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
@@ -3522,6 +3560,17 @@ const BusinessForwardingSettings = ({ authSession }) => {
       </div>
 
       <AnimatePresence>
+        {confirmRemoveNumber && (
+          <ReceptionistActionConfirmation
+            title="Delete Receptionist Number"
+            action="Delete"
+            name={targetLabel}
+            description="This releases the number from Twilio and removes it from ElevenLabs. This action cannot be undone."
+            error={error}
+            onClose={() => setConfirmRemoveNumber(false)}
+            onConfirm={removeReceptionistNumber}
+          />
+        )}
         {showModal && (
           <ForwardNumberModal
             authSession={authSession}
@@ -4082,7 +4131,7 @@ const SettingsPage = ({ mobileUsage, onMobileUpgrade }) => {
       case 'security':
         return <WorkforceSecurity />;
       case 'forwarding':
-        return <BusinessForwardingSettings authSession={authSession} />;
+        return <BusinessForwardingSettings authSession={authSession} businessPhone={settings.business_phone} />;
       case 'billing':
         return <>{isPhone && <MobileUsageSummary usage={mobileUsage} onUpgrade={onMobileUpgrade} />}<BillingSettings profile={profile} /></>;
       case 'account':

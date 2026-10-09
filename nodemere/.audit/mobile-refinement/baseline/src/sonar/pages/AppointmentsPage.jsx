@@ -1,0 +1,106 @@
+import React, { useCallback, useEffect, useState } from 'react';
+import { useAppointments } from '../hooks/useAppointments';
+import AppointmentsTable from './AppointmentsTable';
+
+const AppointmentsPageBody = ({ data, className = '', defaultAppointmentDate = null, hideTitle = false, onToolbarMetaChange = null }) => {
+  const {
+    appointments, allAppointments, people, services, receptionists, lookups, loading, error,
+    justAddedAppointmentIds,
+    selectedId, setSelectedId,
+    searchQuery, setSearchQuery,
+    sourceFilter, setSourceFilter,
+    sortBy, sortDir, handleSort,
+    createAppointment, updateAppointment, deleteAppointment, refresh,
+  } = data;
+
+  const [tableSchema, setTableSchema] = useState(null);
+  const [creating, setCreating] = useState(false);
+
+  useEffect(() => {
+    onToolbarMetaChange?.({ count: allAppointments.length, loading });
+  }, [allAppointments.length, loading, onToolbarMetaChange]);
+
+  const handleInlineCreate = useCallback(async () => {
+    if (creating) return;
+    setCreating(true);
+    try {
+      await createAppointment({
+        date: defaultAppointmentDate || new Date().toISOString().slice(0, 10),
+        time: '09:00',
+        duration: 30,
+        status: 'pending',
+        source: 'manual',
+        notes: '',
+      }, { placement: 'end' });
+    } catch (err) {
+      console.error("AppointmentsPage.jsx:event_37");
+    } finally {
+      setCreating(false);
+    }
+  }, [createAppointment, creating]);
+
+  const handleInlineUpdate = useCallback(async (appointmentId, updates) => {
+    try {
+      await updateAppointment(appointmentId, updates);
+    } catch (err) {
+      console.error("AppointmentsPage.jsx:event_47");
+    }
+  }, [updateAppointment]);
+
+  const handleDeleteMany = async (ids) => {
+    for (const id of ids) {
+      await deleteAppointment(id);
+    }
+  };
+
+  return (
+    <div className={`relative flex h-full overflow-hidden bg-[#020202] ${className}`.trim()}>
+      {error && (
+        <div className="absolute top-0 left-0 right-0 z-50 bg-rose-500/10 border-b border-rose-500/20 px-8 py-2 flex items-center gap-3">
+          <span className="text-[11px] text-rose-400 font-medium">{error}</span>
+          <button onClick={refresh} className="text-[10px] text-rose-400 underline hover:text-rose-300 ml-auto">Retry</button>
+        </div>
+      )}
+
+      <AppointmentsTable
+        onCreateRecord={createAppointment}
+        onSaveRecord={updateAppointment}
+        defaultAppointmentDate={defaultAppointmentDate}
+        appointments={appointments}
+        loading={loading}
+        selectedId={selectedId}
+        justAddedAppointmentIds={justAddedAppointmentIds}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        sourceFilter={sourceFilter}
+        onSourceFilterChange={setSourceFilter}
+        sortBy={sortBy}
+        sortDir={sortDir}
+        onSort={handleSort}
+        totalCount={allAppointments.length}
+        onCreateInline={handleInlineCreate}
+        creating={creating}
+        onDeleteMany={handleDeleteMany}
+        onUpdateAppointment={handleInlineUpdate}
+        onSchemaChange={setTableSchema}
+        people={people}
+        services={services}
+        receptionists={receptionists}
+        lookups={lookups}
+        hideTitle={hideTitle}
+        onRefresh={refresh}
+      />
+    </div>
+  );
+};
+
+const StandaloneAppointmentsPage = (props) => {
+  const appointmentsData = useAppointments();
+  return <AppointmentsPageBody {...props} data={appointmentsData} />;
+};
+
+const AppointmentsPage = ({ data = null, ...props }) => (
+  data ? <AppointmentsPageBody {...props} data={data} /> : <StandaloneAppointmentsPage {...props} />
+);
+
+export default AppointmentsPage;

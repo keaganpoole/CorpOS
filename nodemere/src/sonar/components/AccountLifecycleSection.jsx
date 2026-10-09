@@ -175,12 +175,14 @@ const AccountDeletionModal = ({ isOpen, onClose, businessName, subscriptionStatu
 const AccountResetModal = ({ isOpen, onClose, onComplete }) => {
   const [confirmation, setConfirmation] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
     if (!isOpen) return;
     setConfirmation('');
     setSubmitting(false);
+    setEmailSent(false);
     setError('');
   }, [isOpen]);
 
@@ -189,8 +191,15 @@ const AccountResetModal = ({ isOpen, onClose, onComplete }) => {
     setSubmitting(true);
     setError('');
     try {
-      await api.resetAccount(confirmation.trim());
-      await onComplete();
+      const result = await api.resetAccount(confirmation.trim());
+      if (result?.email_sent) {
+        setEmailSent(true);
+        setSubmitting(false);
+      } else if (result?.reset) {
+        await onComplete();
+      } else {
+        throw new Error('The reset could not be completed. Nothing was changed.');
+      }
     } catch (resetError) {
       setError(resetError?.message || 'Could not reset the account. Nothing was changed.');
       setSubmitting(false);
@@ -207,8 +216,9 @@ const AccountResetModal = ({ isOpen, onClose, onComplete }) => {
           <div><h2 id="account-reset-title" className="text-2xl font-semibold tracking-[-0.03em] text-white">Reset your account</h2><p className="mt-3 text-sm leading-6 text-zinc-500">This clears your Nodemere workspace so you can start onboarding again. Your login and billing history stay unchanged.</p></div>
           <div className="space-y-2 rounded-2xl border border-rose-400/15 bg-rose-400/[0.04] p-4 text-sm leading-6 text-zinc-300"><p>Operational data, team access, integrations, receptionist setup, call records, and purchased-number records will be removed.</p><p className="text-zinc-500">Billing, subscription, invoices, payments, security history, and legal records are preserved.</p></div>
           <div><label htmlFor="account-reset-confirmation" className="mb-2 block text-[11px] font-bold uppercase tracking-[0.16em] text-zinc-600">Type RESET ACCOUNT to continue</label><input id="account-reset-confirmation" autoFocus value={confirmation} onChange={(event) => setConfirmation(event.target.value)} className="w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] px-5 py-4 text-sm text-white outline-none focus:border-white/[0.18]" /></div>
+          {emailSent ? <p className="text-sm leading-6 text-zinc-300" role="status">Check your email for a one-time reset link. It expires in 20 minutes.</p> : null}
           {error ? <p className="text-[11px] font-medium text-rose-300" role="alert">{error}</p> : null}
-          <div className="flex items-center justify-end gap-3 border-t border-white/[0.06] pt-5"><button type="button" onClick={onClose} disabled={submitting} className="flex h-11 items-center rounded-full px-5 text-sm font-medium text-zinc-500 transition hover:text-white">Cancel</button><button type="button" onClick={submit} disabled={confirmation.trim() !== 'RESET ACCOUNT' || submitting} className="flex h-11 items-center justify-center rounded-full bg-white px-6 text-sm font-bold text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-40">{submitting ? 'Resetting…' : 'Reset account'}</button></div>
+          <div className="flex items-center justify-end gap-3 border-t border-white/[0.06] pt-5"><button type="button" onClick={onClose} disabled={submitting} className="flex h-11 items-center rounded-full px-5 text-sm font-medium text-zinc-500 transition hover:text-white">Cancel</button><button type="button" onClick={submit} disabled={confirmation.trim() !== 'RESET ACCOUNT' || submitting || emailSent} className="flex h-11 items-center justify-center rounded-full bg-white px-6 text-sm font-bold text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-40">{submitting ? 'Resetting…' : emailSent ? 'Email sent' : 'Reset account'}</button></div>
         </div>
       </section>
     </div>,

@@ -1,0 +1,51 @@
+/* src/styles/DynamicGradient.css */
+
+.animated-gradient-bg {
+    position: absolute;
+    inset: 0;
+    border-radius: 1.5rem; /* Matches rounded-3xl */
+    overflow: hidden;
+    z-index: 10; /* Ensure it's behind content but above modal base */
+    opacity: 0;
+    transition: opacity 1s ease-in-out;
+}
+
+.animated-gradient-bg.active-gradient {
+    opacity: 0.5; /* Reduced opacity for subtlety */
+    background: linear-gradient(
+        -45deg,
+        var(--gradient-color-a, #2563eb),
+        var(--gradient-color-b, #3b82f6),
+        var(--gradient-color-a, #2563eb),
+        var(--gradient-color-b, #3b82f6)
+    );
+    background-size: 400% 400%;
+    animation: gradientMovement 15s ease infinite;
+    filter: blur(3rem); /* Matches blur-3xl */
+}
+
+.animated-gradient-bg.default-gradient {
+    opacity: 1;
+    background: linear-gradient(
+        -45deg,
+        rgba(28, 28, 28, 0.7),
+        rgba(17, 17, 17, 0.7),
+        rgba(28, 28, 28, 0.7),
+        rgba(17, 17, 17, 0.7)
+    );
+    background-size: 400% 400%;
+    animation: gradientMovement 15s ease infinite;
+    filter: blur(3rem); /* Matches blur-3xl */
+}
+
+@keyframes gradientMovement {
+    0% {
+        background-position: 0% 50%;
+    }
+    50% {
+        background-position: 100% 50%;
+    }
+    100% {
+        background-position: 0% 50%;
+    }
+}

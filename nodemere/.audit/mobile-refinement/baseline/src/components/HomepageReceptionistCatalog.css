@@ -1,0 +1,327 @@
+.homepage-receptionist-catalog {
+  position: relative;
+  isolation: isolate;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #020202;
+}
+
+@keyframes homepage-catalog-hand-drift {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(0, 7px); }
+}
+
+.homepage-catalog-continue {
+  display: none;
+}
+
+.ns-gallery-detail-portal {
+  z-index: 1100;
+}
+
+/* Keep the catalog's video review layout ahead of the broader Studio card rules. */
+.ns-gallery-detail-portal .ns-catalog-review.ns-catalog-video-review {
+  grid-template-columns: minmax(0, 1fr);
+  width: min(760px, 100%);
+}
+
+.ns-gallery-detail-portal .ns-catalog-review.ns-catalog-video-review .ns-receptionist-preview-image {
+  width: 100%;
+  height: auto;
+  min-height: 0;
+  aspect-ratio: 16 / 9;
+}
+
+.ns-gallery-detail-portal .ns-catalog-voice-preview.is-autoplay {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  padding: 2px 0;
+}
+
+.ns-gallery-detail-portal .ns-catalog-voice-preview.is-autoplay .intercom-voice-line {
+  display: block;
+  width: min(100%, 560px);
+  height: 40px;
+  margin: 0;
+}
+
+.ns-gallery-detail-portal .ns-catalog-review-traits {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.ns-gallery-detail-portal .ns-catalog-review.ns-catalog-video-review .ns-catalog-review-traits {
+  align-items: center;
+}
+
+.ns-gallery-detail-portal .ns-catalog-review-traits > span,
+.ns-gallery-detail-portal .ns-catalog-review-traits > div {
+  margin-top: 0;
+}
+
+.ns-gallery-detail-portal .ns-catalog-review-traits > div {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.ns-gallery-detail-portal .ns-catalog-review.ns-catalog-video-review .ns-catalog-review-traits > div {
+  align-items: center;
+  margin-top: 0;
+  gap: 0;
+}
+
+.ns-gallery-detail-portal .ns-catalog-review-meta button:focus:not(:focus-visible) {
+  outline: none;
+  box-shadow: none;
+}
+
+.ns-gallery-detail-portal .ns-catalog-review-meta button:focus,
+.ns-gallery-detail-portal .ns-catalog-review-meta button:focus-visible {
+  outline: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+.ns-gallery-detail-portal .ns-catalog-review-traits > div > span {
+  padding: 0 10px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  text-transform: lowercase;
+}
+
+.ns-gallery-detail-portal .ns-catalog-review-traits > div > span + span {
+  position: relative;
+  border-left: 0;
+  padding-left: 10px;
+}
+
+.ns-gallery-detail-portal .ns-catalog-review-traits > div > span + span::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 1px;
+  height: 10px;
+  background: rgba(255,255,255,.16);
+  transform: translateY(-50%);
+}
+
+.ns-gallery-detail-portal .ns-catalog-status-row.is-autoplay {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.ns-gallery-detail-portal .ns-catalog-status-row.is-compact-preview {
+  gap: 6px;
+}
+
+@media (min-width: 761px) {
+  .ns-gallery-detail-portal .ns-catalog-status-row.is-autoplay .intercom-voice-line {
+    width: min(90px, 16vw);
+    height: 26px;
+  }
+
+  .ns-gallery-detail-portal .ns-catalog-status-row.is-compact-preview .intercom-voice-line {
+    width: min(104px, 18vw);
+  }
+}
+
+@media (max-width: 760px) {
+  .ns-gallery-detail-portal .ns-catalog-status-row.is-autoplay .intercom-voice-line {
+    width: min(75px, 21vw);
+    height: 22px;
+  }
+
+  .ns-gallery-detail-portal .ns-catalog-status-row.is-compact-preview .intercom-voice-line {
+    width: min(86px, 24vw);
+  }
+}
+
+@media (max-width: 760px) {
+  .ns-gallery-detail-portal .ns-catalog-review {
+    grid-template-columns: 1fr;
+  }
+
+  .ns-gallery-detail-portal .ns-catalog-review:not(.ns-catalog-video-review) .ns-receptionist-preview-image {
+    width: 100%;
+    height: 340px;
+    min-height: 0;
+  }
+
+  .ns-gallery-detail-portal .ns-catalog-review .ns-receptionist-preview-image-wash {
+    background: none;
+  }
+
+  .ns-gallery-detail-portal .ns-catalog-review.ns-catalog-video-review {
+    min-height: 0;
+  }
+
+  .ns-gallery-detail-portal .ns-catalog-review.ns-catalog-video-review .ns-receptionist-preview-body {
+    min-height: 0;
+    height: auto;
+    justify-content: flex-start;
+  }
+
+}
+
+.homepage-catalog-wordmark {
+  top: 72px;
+  left: 50%;
+  z-index: 12;
+  text-shadow: 0 2px 34px rgba(0,0,0,.96);
+}
+
+.homepage-catalog-wordmark::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  top: 50%;
+  left: 50%;
+  width: min(420px, 90vw);
+  height: 64px;
+  border-radius: 50%;
+  background: rgba(0,0,0,.62);
+  filter: blur(24px);
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+
+@media (min-width: 1181px) {
+  .homepage-catalog-gesture-hint {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    z-index: 28;
+    display: grid;
+    justify-items: center;
+    gap: 7px;
+    color: rgba(255,255,255,.9);
+    text-align: center;
+    pointer-events: none;
+    transform: translate(-50%, -50%);
+    animation: homepage-catalog-hint-in .45s ease-out both;
+  }
+  .homepage-catalog-gesture-icon {
+    display: grid;
+    width: 58px;
+    height: 58px;
+    place-items: center;
+    border: 1px solid rgba(255,255,255,.3);
+    border-radius: 50%;
+    background: rgba(8,8,9,.52);
+    box-shadow: 0 12px 34px rgba(0,0,0,.45);
+    backdrop-filter: blur(10px);
+    animation: homepage-catalog-hand-drift 1.5s ease-in-out infinite;
+  }
+  .homepage-catalog-gesture-icon .is-pan-hand { color: rgba(255,255,255,.9); }
+  .homepage-catalog-gesture-icon svg { position: static; color: rgba(255,255,255,.9); }
+  .homepage-catalog-gesture-icon { animation: homepage-catalog-hand-drift 1.5s ease-in-out infinite !important; }
+  .homepage-catalog-gesture-hint span { font: 700 11px/1 Inter, sans-serif; letter-spacing: .14em; text-transform: uppercase; }
+  .homepage-catalog-gesture-hint small { color: rgba(255,255,255,.58); font: 400 11px/1.3 Inter, sans-serif; }
+}
+
+@media (max-width: 1180px) {
+  .homepage-catalog-gesture-hint {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    z-index: 28;
+    display: grid;
+    justify-items: center;
+    gap: 7px;
+    color: rgba(255,255,255,.9);
+    text-align: center;
+    pointer-events: none;
+    transform: translate(-50%, -50%);
+    animation: homepage-catalog-hint-in .45s ease-out both;
+  }
+
+  .homepage-catalog-gesture-icon {
+    position: relative;
+    display: grid;
+    width: 58px;
+    height: 58px;
+    place-items: center;
+    border: 1px solid rgba(255,255,255,.3);
+    border-radius: 50%;
+    background: rgba(8,8,9,.52);
+    box-shadow: 0 12px 34px rgba(0,0,0,.45);
+    backdrop-filter: blur(10px);
+    animation: homepage-catalog-hand-drift 1.5s ease-in-out infinite;
+  }
+
+  .homepage-catalog-gesture-icon svg:last-child {
+    position: static;
+    color: rgba(255,255,255,.9);
+  }
+
+  .homepage-catalog-gesture-icon .is-pan-hand {
+    position: static;
+    color: rgba(255,255,255,.9);
+  }
+
+  .homepage-catalog-gesture-hint span {
+    font: 700 11px/1 Inter, sans-serif;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+  }
+
+  .homepage-catalog-gesture-hint small {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    color: rgba(255,255,255,.58);
+    font: 400 11px/1.3 Inter, sans-serif;
+  }
+
+  .homepage-receptionist-catalog::after {
+    content: "";
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 30;
+    height: 132px;
+    pointer-events: none;
+    background: linear-gradient(180deg, transparent 0%, rgba(0,0,0,.42) 38%, rgba(0,0,0,.9) 100%);
+  }
+
+  .homepage-catalog-continue {
+    position: absolute;
+    left: 50%;
+    bottom: max(24px, calc(env(safe-area-inset-bottom) + 24px));
+    z-index: 18;
+    display: grid;
+    width: 54px;
+    height: 54px;
+    padding: 0;
+    place-items: center;
+    border: 1px solid rgba(255,255,255,.5);
+    border-radius: 999px;
+    color: rgba(255,255,255,.92);
+    background: rgba(8,8,9,.72);
+    box-shadow: 0 8px 28px rgba(0,0,0,.62), 0 0 0 5px rgba(255,255,255,.06);
+    backdrop-filter: blur(16px);
+    transform: translateX(-50%);
+    animation: homepage-catalog-arrow 1.8s ease-in-out infinite;
+  }
+
+  .homepage-catalog-continue:focus-visible {
+    outline: 2px solid #dab6fa;
+    outline-offset: 4px;
+  }
+
+  @keyframes homepage-catalog-arrow {
+    0%, 100% { transform: translate(-50%, 0); }
+    50% { transform: translate(-50%, 7px); }
+  }
+
+  @keyframes homepage-catalog-hint-in { from { opacity: 0; transform: translate(-50%, -44%); } to { opacity: 1; transform: translate(-50%, -50%); } }
+  @keyframes homepage-catalog-hand-drift { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(0, 7px); } }
+}

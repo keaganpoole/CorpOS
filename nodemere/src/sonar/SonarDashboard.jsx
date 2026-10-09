@@ -1663,7 +1663,7 @@ const TasklistWidget = ({ tasklistState = null, onOpenIntro = null, onHide = nul
               <span className="shrink-0 text-[10px] font-medium text-zinc-500">{completedCount}/{totalCount}</span>
               <ChevronUp size={14} className="shrink-0 text-zinc-500" />
             </div>
-            <div className="h-[3px] w-full overflow-hidden bg-white/[0.06]">
+            <div className="h-[2.75px] w-full overflow-hidden bg-white/[0.06]">
               <div className="transition-all duration-500" style={{ width: `${overallProgress}%` }}>
                 <ModalSpectrumLine variant="general" />
               </div>

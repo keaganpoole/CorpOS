@@ -1,0 +1,366 @@
+import { receptionistHirePayload } from './receptionistHirePayload';
+
+/**
+ * SONAR API Client — Connects to local backend controller
+ * Handles REST fetches and WebSocket subscriptions
+ */
+
+const API_BASE = window.sonar?.apiUrl || import.meta.env.VITE_API_URL || '';
+const WS_URL = window.sonar?.wsUrl || import.meta.env.VITE_WS_URL || null;
+const API_TIMEOUT_MS = 15000;
+
+let authSessionRequest = null;
+
+// All initial dashboard requests start together. Supabase already keeps the
+// session in memory, but calling getSession once per request still creates a
+// burst of redundant auth work. Share the in-flight lookup across callers.
+async function getAuthSession() {
+  if (!authSessionRequest) {
+    let timeout = null;
+    authSessionRequest = import('./supabase')
+      .then(({ supabase }) => Promise.race([
+        supabase.auth.getSession(),
+        new Promise((_, reject) => {
+          timeout = setTimeout(() => reject(new Error(`Auth session timed out after ${API_TIMEOUT_MS}ms`)), API_TIMEOUT_MS);
+        }),
+      ]))
+      .finally(() => {
+        if (timeout) clearTimeout(timeout);
+        authSessionRequest = null;
+      });
+  }
+  return authSessionRequest;
+}
+
+async function buildAuthHeaders(extraHeaders = {}) {
+  const { data } = await getAuthSession();
+  const token = data?.session?.access_token;
+  return {
+    ...extraHeaders,
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
+
+function reportApiError(detail, statusCode) {
+  const value = detail?.detail || detail;
+  if (statusCode === 402 && value && typeof value === 'object') {
+    window.dispatchEvent(new CustomEvent('nodemere:plan-limit', { detail: value }));
+  }
+  const message = typeof value === 'string' ? value : value?.message || `Request failed (HTTP ${statusCode})`;
+  const error = new Error(message);
+  error.status = statusCode;
+  error.detail = value;
+  return error;
+}
+
+async function parseApiError(response) {
+  let body = null;
+  try {
+    body = await response.json();
+  } catch {
+    // Fall back to the HTTP status when the backend returned no JSON body.
+  }
+  return reportApiError(body, response.status);
+}
+
+async function fetchWithTimeout(url, options = {}, timeoutMs = API_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, {
+      ...options,
+      signal: options.signal || controller.signal,
+    });
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      throw new Error(`Request timed out after ${timeoutMs}ms`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+// ─── REST Helpers ───────────────────────────────────────────
+async function fetchJSON(endpoint) {
+  try {
+    const headers = await buildAuthHeaders();
+    const res = await fetchWithTimeout(`${API_BASE}${endpoint}`, { headers });
+    if (!res.ok) throw await parseApiError(res);
+    return await res.json();
+  } catch (err) {
+    const errorDetails = {
+      endpoint,
+      status: err?.status || null,
+      message: err?.message || String(err),
+      detail: err?.detail || null,
+    };
+    if (String(errorDetails.message || '').includes('Request timed out')) {
+      console.debug("api.js:event_62", errorDetails);
+    } else {
+      console.error("api.js:event_62", errorDetails);
+    }
+    return null;
+  }
+}
+
+async function strictGetJSON(endpoint) {
+  const res = await fetchWithTimeout(`${API_BASE}${endpoint}`, { headers: await buildAuthHeaders() });
+  if (!res.ok) throw await parseApiError(res);
+  return res.json();
+}
+
+export const api = {
+  designVoice: (definition) => postJSON('/api/sonar/studio/design', definition, 150000),
+  generateReceptionistPortraits: (profile) => postJSON('/api/sonar/studio/portraits', profile, 180000),
+  saveDesignedVoice: (voice) => postJSON('/api/sonar/studio/save', voice, 150000),
+  createStudioCloneSession: () => postJSON('/api/contracts', { metadata: { source: 'nodemere_studio' } }),
+  getDropIns: () => strictGetJSON('/api/sonar/drop-ins'),
+  getDashboardBootstrap: () => fetchJSON('/api/sonar/dashboard/bootstrap'),
+  getDropInTemplates: () => strictGetJSON('/api/sonar/drop-ins/templates'),
+  saveDropInBuilder: (builder) => putJSON('/api/sonar/drop-ins/builder', builder),
+  createDropIn: (draft) => postJSON('/api/sonar/drop-ins', draft),
+  updateDropIn: (id, draft) => putJSON(`/api/sonar/drop-ins/${encodeURIComponent(id)}`, draft),
+  deleteDropIn: (id) => deleteJSON(`/api/sonar/drop-ins/${encodeURIComponent(id)}`),
+  reorderDropIns: (order) => putJSON('/api/sonar/drop-ins/order', order),
+  moveDropIn: (id, move) => putJSON(`/api/sonar/drop-ins/${encodeURIComponent(id)}/move`, move),
+  runDropIn: (appointmentId, id, requestId) => postJSON(`/api/sonar/appointments/${encodeURIComponent(appointmentId)}/drop-ins/${encodeURIComponent(id)}/run`, { run_id: requestId }),
+  getAgents: (options = {}) => fetchJSON(`/api/agents${options.includeArchived ? '?include_archived=true' : ''}`),
+  getSystemSummary: () => fetchJSON('/api/system/summary'),
+  getLivePulse: (limit = 30) => fetchJSON(`/api/events/live-pulse?limit=${limit}`),
+  getLogs: (limit = 50) => fetchJSON(`/api/logs?limit=${limit}`),
+  getControlState: () => fetchJSON('/api/control-state'),
+  getSession: () => fetchJSON('/api/session'),
+  getPipeline: () => fetchJSON('/api/pipeline'),
+  getReceptionistCatalog: () => fetchJSON('/api/sonar/receptionists/catalog'),
+  getCatalogVideoCandidates: () => fetchJSON('/api/sonar/receptionists/catalog/video-candidates'),
+  checkReceptionistVoiceHealth: () => strictGetJSON('/api/sonar/receptionists/voice-health'),
+  getVoiceCatalog: ({ includeUnavailable = false, recheck = false } = {}) => strictGetJSON(`/api/voice-catalog?include_unavailable=${includeUnavailable ? 'true' : 'false'}&recheck=${recheck ? 'true' : 'false'}`),
+  getVoiceCatalogVoice: (voiceId) => strictGetJSON(`/api/voice-catalog/${encodeURIComponent(voiceId)}`),
+  getPeople: (limit = 500) => fetchJSON(`/api/sonar/people?limit=${limit}`),
+  getPerson: (id) => fetchJSON(`/api/sonar/people/${encodeURIComponent(id)}`),
+  getBusinessProfile: () => fetchJSON('/api/sonar/business/profile'),
+  updateBusinessProfile: (business) => putJSON('/api/sonar/business/profile', business),
+  getStaff: (activeOnly = true) => fetchJSON(`/api/sonar/staff?active_only=${activeOnly ? 'true' : 'false'}`),
+  createStaff: (staff) => postJSON('/api/sonar/staff', staff),
+  updateStaff: (id, staff) => putJSON(`/api/sonar/staff/${encodeURIComponent(id)}`, staff),
+  deleteStaff: (id) => deleteJSON(`/api/sonar/staff/${encodeURIComponent(id)}`),
+  getServices: () => fetchJSON('/api/sonar/services'),
+  createService: (service) => postJSON('/api/sonar/services', service),
+  updateService: (id, service) => putJSON(`/api/sonar/services/${encodeURIComponent(id)}`, service),
+  deleteService: (id) => deleteJSON(`/api/sonar/services/${encodeURIComponent(id)}`),
+  getAppointments: (limit = 500) => fetchJSON(`/api/sonar/appointments?limit=${limit}`),
+  getPayments: (limit = 100) => fetchJSON(`/api/sonar/payments?limit=${limit}`),
+  getInvoices: (limit = 100) => fetchJSON(`/api/sonar/invoices?limit=${limit}`),
+  createAppointment: (appointment) => postJSON('/api/sonar/appointments', appointment),
+  updateAppointment: (id, appointment) => putJSON(`/api/sonar/appointments/${encodeURIComponent(id)}`, appointment),
+  deleteAppointment: (id) => deleteJSON(`/api/sonar/appointments/${encodeURIComponent(id)}`),
+  getPeopleDocuments: () => fetchJSON('/api/sonar/people/documents'),
+  getPersonDocumentUrl: async (personId, documentId) => {
+    const res = await fetchWithTimeout(`${API_BASE}/api/sonar/people/${encodeURIComponent(personId)}/documents/${encodeURIComponent(documentId)}/download`, {headers:await buildAuthHeaders()});
+    if (!res.ok) throw await parseApiError(res);
+    return {url:URL.createObjectURL(await res.blob())};
+  },
+  renamePersonDocument: (personId, documentId, fileName) => putJSON(`/api/sonar/people/${encodeURIComponent(personId)}/documents/${encodeURIComponent(documentId)}`, { file_name: fileName }),
+  deletePersonDocument: (personId, documentId) => deleteJSON(`/api/sonar/people/${encodeURIComponent(personId)}/documents/${encodeURIComponent(documentId)}`),
+  createPerson: (person) => postJSON('/api/sonar/people', person),
+  updatePerson: (id, person) => putJSON(`/api/sonar/people/${encodeURIComponent(id)}`, person),
+  deletePerson: (id) => deleteJSON(`/api/sonar/people/${encodeURIComponent(id)}`),
+  getScenarios: () => fetchJSON('/api/sonar/scenarios'),
+  createScenario: (scenario) => postJSON('/api/sonar/scenarios', scenario),
+  updateScenario: (id, scenario) => putJSON(`/api/sonar/scenarios/${encodeURIComponent(id)}`, scenario),
+  deleteScenario: (id) => deleteJSON(`/api/sonar/scenarios/${encodeURIComponent(id)}`),
+  createBillingPortal: () => postJSON('/api/sonar/billing/portal', {}),
+  getBillingUsage: () => fetchJSON('/api/sonar/billing/usage'),
+  submitBugReport: (report) => postJSON('/api/sonar/bugs', report),
+  createPrivacyRequest: (request) => postJSON('/users/me/privacy-requests', request),
+  closeAccount: () => postJSON('/users/me/account/close', {}),
+  requestAccountDeletion: (request) => postJSON('/users/me/account/delete', request),
+  reactivateAccount: () => postJSON('/users/me/account/reactivate', {}),
+  getCronJobs: () => fetchJSON('/api/cron'),
+  createCronJob: (job) => postJSON('/api/cron', job),
+  deleteCronJob: (id) => deleteJSON(`/api/cron/${id}`),
+  getReactions: () => fetchJSON('/api/reactions'),
+  addReaction: (data) => postJSON('/api/reactions', data),
+  getOpenRouterModels: () => fetchJSON('/api/openrouter/models'),
+  getBusinessIntelligence: () => fetchJSON('/api/sonar/business-intelligence'),
+  getNestHistory: (limit = 40) => fetchJSON(`/api/sonar/nest/history?limit=${limit}`),
+  claimNestMilestone: (milestoneKey, details = {}) => postJSON('/api/sonar/nest/claim', {
+    milestone_key: milestoneKey,
+    ...details,
+  }),
+  getIntercomBootstrap: () => strictGetJSON('/api/sonar/nest/intercom/bootstrap'),
+  updateIntercomSettings: (settings) => postJSON('/api/sonar/nest/intercom/settings', settings),
+  createIntercomSession: (payload) => postJSON('/api/sonar/nest/intercom/session', payload),
+  recordIntercomTurn: (payload = {}) => postJSON('/api/sonar/nest/intercom/turn', payload),
+  getIntercomConversations: (query = '', limit = 40) => strictGetJSON(`/api/sonar/nest/intercom/conversations?limit=${limit}${query ? `&q=${encodeURIComponent(query)}` : ''}`),
+  getIntercomConversation: (id) => strictGetJSON(`/api/sonar/nest/intercom/conversations/${encodeURIComponent(id)}`),
+  saveIntercomConversation: (conversation) => postJSON('/api/sonar/nest/intercom/conversations', conversation),
+  deleteIntercomConversation: (id) => deleteJSON(`/api/sonar/nest/intercom/conversations/${encodeURIComponent(id)}`),
+  getProjectIntelligence: () => fetchJSON('/api/sonar/project-intelligence'),
+  getPublicProjectIntelligence: () => fetchJSON('/api/public/project-intelligence'),
+  reanalyzeProjectIntelligence: () => postJSON('/api/sonar/project-intelligence/reanalyze', {}),
+  refreshMarketResearch: () => postJSON('/api/sonar/project-intelligence/market/refresh', {}),
+  updateAgentModel: (agentId, model) => postJSON(`/api/agents/${agentId}/model`, { model }),
+  patchAgent: (agentId, data) => patchJSON(`/api/agents/${agentId}`, data),
+  deleteAgent: (agentId) => deleteJSON(`/api/agents/${agentId}`),
+  getArchivedCreations: () => fetchJSON('/api/sonar/receptionists/created/archived'),
+  archiveCreation: (id) => postJSON(`/api/sonar/receptionists/created/${encodeURIComponent(id)}/archive`, {}),
+  restoreCreation: (id) => postJSON(`/api/sonar/receptionists/created/${encodeURIComponent(id)}/restore`, {}),
+  restoreAgent: (agentId) => postJSON(`/api/agents/${agentId}/restore`, {}),
+  getPendingRestarts: () => fetchJSON('/api/pending-restarts'),
+  clearPendingRestart: (id) => deleteJSON(`/api/pending-restarts/${id}`),
+  hireReceptionist: (receptionist) => postJSON('/api/sonar/receptionists/hire', receptionistHirePayload(receptionist)),
+
+  // Control commands via REST (fallback when IPC unavailable)
+  setRuntime: (mode) => postJSON('/api/control/runtime', { mode }),
+  setStage: (stage) => postJSON('/api/control/stage', { stage }),
+  pingMax: () => postJSON('/api/control/ping-max', {}),
+};
+
+async function postJSON(endpoint, body, timeoutMs = API_TIMEOUT_MS) {
+  try {
+    const headers = await buildAuthHeaders({ 'Content-Type': 'application/json' });
+    const res = await fetchWithTimeout(`${API_BASE}${endpoint}`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+    }, timeoutMs);
+    if (!res.ok) throw await parseApiError(res);
+    return await res.json();
+  } catch (err) {
+    console.error("api.js:event_150");
+    throw err;
+  }
+}
+
+async function putJSON(endpoint, body) {
+  try {
+    const headers = await buildAuthHeaders({ 'Content-Type': 'application/json' });
+    const res = await fetchWithTimeout(`${API_BASE}${endpoint}`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw await parseApiError(res);
+    return await res.json();
+  } catch (err) {
+    console.error("api.js:event_166");
+    throw err;
+  }
+}
+
+async function patchJSON(endpoint, body) {
+  try {
+    const headers = await buildAuthHeaders({ 'Content-Type': 'application/json' });
+    const res = await fetchWithTimeout(`${API_BASE}${endpoint}`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw await parseApiError(res);
+    return await res.json();
+  } catch (err) {
+    console.error("api.js:event_182");
+    throw err;
+  }
+}
+
+async function deleteJSON(endpoint) {
+  try {
+    const headers = await buildAuthHeaders();
+    const res = await fetchWithTimeout(`${API_BASE}${endpoint}`, {
+      method: 'DELETE',
+      headers,
+    });
+    if (!res.ok) throw await parseApiError(res);
+    return await res.json();
+  } catch (err) {
+    console.error("api.js:event_197");
+    throw err;
+  }
+}
+
+// ─── WebSocket Client ───────────────────────────────────────
+let ws = null;
+let reconnectTimer = null;
+const listeners = new Set();
+const eventListeners = new Map(); // event_type → Set of callbacks
+
+export function connectWebSocket(onStateChange) {
+  if (!WS_URL) {
+    if (onStateChange) onStateChange('disconnected');
+    return;
+  }
+
+  if (ws && ws.readyState === WebSocket.OPEN) return;
+
+  ws = new WebSocket(WS_URL);
+
+  ws.onopen = () => {
+    console.log('[SONAR] WebSocket connected');
+    if (onStateChange) onStateChange('connected');
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+    }
+  };
+
+  ws.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data);
+
+      // Notify all listeners
+      for (const listener of listeners) {
+        listener(data);
+      }
+
+      // Notify event-type specific listeners
+      if (data.event_type && eventListeners.has(data.event_type)) {
+        for (const cb of eventListeners.get(data.event_type)) {
+          cb(data);
+        }
+      }
+    } catch (err) {
+      console.error("api.js:event_243");
+    }
+  };
+
+  ws.onclose = () => {
+    console.log('[SONAR] WebSocket disconnected');
+    if (onStateChange) onStateChange('disconnected');
+    // Auto-reconnect after 3s
+    reconnectTimer = setTimeout(() => connectWebSocket(onStateChange), 3000);
+  };
+
+  ws.onerror = (err) => {
+    console.error("api.js:event_255");
+  };
+}
+
+export function addMessageListener(callback) {
+  listeners.add(callback);
+  return () => listeners.delete(callback);
+}
+
+export function addEventListener(eventType, callback) {
+  if (!eventListeners.has(eventType)) {
+    eventListeners.set(eventType, new Set());
+  }
+  eventListeners.get(eventType).add(callback);
+  return () => {
+    const set = eventListeners.get(eventType);
+    if (set) set.delete(callback);
+  };
+}
+
+export function disconnectWebSocket() {
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+  if (ws) {
+    ws.close();
+    ws = null;
+  }
+}

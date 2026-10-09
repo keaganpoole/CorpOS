@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { AnimatePresence, motion } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { Bug, Check, X } from 'lucide-react';
 import ModalSpectrumLine from '../../components/ModalSpectrumLine';
 import { api } from '../lib/api';
@@ -70,14 +70,10 @@ const ReportProblemModal = ({ onClose, currentPage }) => {
   };
 
   return createPortal(
-    <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="responsive-dialog report-problem-modal fixed inset-0 z-[230] flex items-center justify-center bg-black/70 px-5 backdrop-blur-sm"
-        onMouseDown={() => !submitting && onClose()}
-      >
+    <div
+      className="responsive-dialog report-problem-modal fixed inset-0 z-[230] flex items-center justify-center bg-black/70 px-5 backdrop-blur-sm"
+      onMouseDown={() => !submitting && onClose()}
+    >
         <motion.section
           ref={dialog}
           tabIndex={isPhone ? -1 : undefined}
@@ -181,8 +177,7 @@ const ReportProblemModal = ({ onClose, currentPage }) => {
             )}
           </div>
         </motion.section>
-      </motion.div>
-    </AnimatePresence>,
+    </div>,
     document.body,
   );
 };

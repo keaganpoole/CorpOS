@@ -52,7 +52,7 @@ export default function LegalAcceptanceGate({ children }) {
     try {
       await refreshProfile();
     } catch (refreshError) {
-      setError(refreshError.message || 'Could not continue to setup.');
+      setError(refreshError.message || 'Could not continue');
     } finally {
       setBusy(false);
     }
@@ -83,7 +83,7 @@ export default function LegalAcceptanceGate({ children }) {
         <form className="legal-acceptance-form" onSubmit={acceptCurrentTerms}>
           <p className="legal-small-copy">By continuing, you agree to use Nodemere only for permitted business workflows.</p>
           {error && <p className="legal-form-error" role="alert">{error}</p>}
-          <button className="legal-primary-button" disabled={busy}>{busy ? 'Saving…' : 'Continue to setup'}</button>
+          <button className="legal-primary-button" disabled={busy}>{busy ? 'Saving…' : 'Continue'}</button>
         </form>
       </section>
     </main>

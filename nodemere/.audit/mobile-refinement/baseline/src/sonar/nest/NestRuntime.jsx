@@ -1,0 +1,733 @@
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { supabase } from '../lib/supabase';
+import { api } from '../lib/api';
+import { useCallLogs } from '../contexts/CallLogsContext';
+import { useAuth } from '../../contexts/AuthContext';
+import {
+  DEFAULT_NEST_CONCEPTS,
+  getDailyNestQuote,
+  getNestConcept,
+} from './nestRegistry';
+import { DEFAULT_NEST_PREFERENCES, NEST_NOTIFICATION_GROUP_BY_KEY, normalizeNestPreferences } from './nestPreferences';
+
+const NestContext = createContext(null);
+const MAX_HISTORY = 50;
+const ACTIVE_CALL_STATUSES = new Set(['initiated', 'queued', 'ringing', 'in-progress', 'in_progress', 'ongoing', 'answered', 'connected']);
+const TERMINAL_CALL_STATUSES = new Set(['completed', 'failed', 'missed', 'busy', 'no-answer', 'no_answer', 'canceled', 'cancelled']);
+const MAX_ORPHANED_CALL_AGE_MS = 10 * 60 * 1000;
+const PAYMENT_SUCCESS = new Set(['paid', 'succeeded', 'successful', 'complete', 'completed']);
+const PAYMENT_FAILED = new Set(['failed', 'declined', 'canceled', 'cancelled']);
+const PRIORITY = { routine: 1, major: 2, critical: 3 };
+
+const safeJsonParse = (value, fallback) => {
+  try {
+    return value ? JSON.parse(value) : fallback;
+  } catch {
+    return fallback;
+  }
+};
+
+const sanitizeHistoryEvent = (event) => {
+  if (!event || typeof event !== 'object') return null;
+  const rawMessage = typeof event.message === 'string' ? event.message.trim() : '';
+  const looksLikePayload = rawMessage.startsWith("{'payload'")
+    || rawMessage.startsWith('{"payload"')
+    || rawMessage === '[object Object]';
+  return { ...event, message: looksLikePayload ? '' : rawMessage };
+};
+
+const normalizeStatus = (row = {}) => {
+  const raw = String(row.status || row.call_status || row.call_successful || '').trim().toLowerCase();
+  // A provider may leave the original in-progress status in place while
+  // still supplying definitive terminal metadata. Never keep such a call in
+  // the live indicator after an end or failure has been recorded.
+  if (row.failure_reason || row.error || row.error_message) return 'failed';
+  if (row.ended_at) {
+    if (['failed', 'busy', 'no-answer', 'no_answer', 'canceled', 'cancelled'].includes(raw)) return raw;
+    return 'completed';
+  }
+  if (['true', 'yes', 'success', 'successful', 'done', 'complete'].includes(raw)) return 'completed';
+  if (['false', 'no'].includes(raw)) return 'failed';
+  return raw;
+};
+const eventStamp = (row = {}) => row.updated_at || row.ended_at || row.started_at || row.event_timestamp || row.created_at || new Date().toISOString();
+const eventId = (source, row, type) => `${source}:${row?.id || 'unknown'}:${type}:${eventStamp(row)}`;
+const displayName = (row = {}) => {
+  const joined = [row.first_name, row.last_name].filter(Boolean).join(' ').trim();
+  return joined || row.name || row.caller_name || row.customer_name || '';
+};
+
+const formatAppointmentWhen = (row = {}) => [row.date, row.time].filter(Boolean).join(' · ');
+
+const formatAmount = (row = {}) => {
+  const raw = row.amount ?? row.amount_received ?? row.amount_total;
+  if (raw === null || raw === undefined || raw === '') return '';
+  const numeric = Number(raw);
+  if (!Number.isFinite(numeric)) return String(raw);
+  const normalized = numeric > 10000 ? numeric / 100 : numeric;
+  try {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: String(row.currency || 'USD').toUpperCase(),
+      maximumFractionDigits: 2,
+    }).format(normalized);
+  } catch {
+    return `$${normalized.toFixed(2)}`;
+  }
+};
+
+const durationForEvent = (event) => {
+  if (event?.duration_ms) return event.duration_ms;
+  if (event?.category === 'messages') return 12000;
+  if (event?.priority === 'critical') return 14000;
+  if (event?.priority === 'major') return 9500;
+  return 7000;
+};
+
+const shownEventKey = (event = {}) => {
+  if (!event || typeof event !== 'object') return '';
+  if (event.dedupe_key) return `dedupe:${event.dedupe_key}`;
+  const milestoneKey = event.milestone_key || event.milestone_keys?.[0] || '';
+  if (milestoneKey) return `milestone:${milestoneKey}`;
+  if (event.source && event.source_id && event.event_type) {
+    return `${event.source}:${event.source_id}:${event.event_type}`;
+  }
+  return event.id ? `id:${event.id}` : '';
+};
+
+const previewNotificationFixture = (key, label, category) => {
+  const fixture = {
+    category,
+    event_type: key,
+    title: label,
+    message: 'Test Business',
+    priority: category === 'warnings' ? 'critical' : category === 'milestones' ? 'major' : 'routine',
+    occurred_at: new Date().toISOString(),
+    payload: { preview: true },
+  };
+  const overrides = {
+    call_active: { title: 'Incoming Call', message: 'Jordan Lee', direction: 'inbound', payload: { caller_name: 'Jordan Lee', direction: 'inbound', status: 'in-progress' } },
+    call_completed: { title: 'Call completed', message: 'Jordan Lee · 4m 18s', direction: 'inbound', payload: { caller_name: 'Jordan Lee', direction: 'inbound', status: 'completed' } },
+    call_missed: { title: 'Call missed', message: 'Morgan Smith · (207) 555-0148', direction: 'inbound', priority: 'major', payload: { caller_name: 'Morgan Smith', caller_phone: '(207) 555-0148', direction: 'inbound', status: 'missed' } },
+    call_failed: { title: 'Call needs attention', message: 'Taylor Reed · Connection failed', direction: 'inbound', priority: 'critical', payload: { caller_name: 'Taylor Reed', direction: 'inbound', status: 'failed' } },
+    call_transferred: { title: 'Call transferred', message: 'Jordan Lee → Alex Morgan', direction: 'unknown', priority: 'major', payload: { caller_name: 'Jordan Lee', transferred_to: 'Alex Morgan' } },
+    usage_warning: { title: 'Call minutes running low', message: '42 minutes remaining', priority: 'critical', payload: { used_call_seconds: 69480, included_call_seconds: 72000 } },
+    minutes_exhausted: { title: 'Call minutes exhausted', message: 'Review your plan to keep calls running', priority: 'critical', payload: { used_call_seconds: 72000, included_call_seconds: 72000 } },
+    appointment_booked: { title: 'Appointment booked', message: 'Tomorrow · 10:30 AM', payload: { date: 'Tomorrow', time: '10:30 AM', customer_name: 'Alex Morgan' } },
+    appointment_rescheduled: { title: 'Appointment rescheduled', message: 'Friday · 2:00 PM', payload: { date: 'Friday', time: '2:00 PM', customer_name: 'Alex Morgan' } },
+    appointment_cancelled: { title: 'Appointment cancelled', message: 'Alex Morgan · Tomorrow · 10:30 AM', payload: { customer_name: 'Alex Morgan', date: 'Tomorrow', time: '10:30 AM', status: 'cancelled' } },
+    appointment_updated: { title: 'Appointment updated', message: 'Alex Morgan · Tomorrow · 10:30 AM', payload: { customer_name: 'Alex Morgan', date: 'Tomorrow', time: '10:30 AM' } },
+    appointment_completed: { title: 'Appointment completed', message: 'Alex Morgan · Today · 9:00 AM', payload: { customer_name: 'Alex Morgan', date: 'Today', time: '9:00 AM', status: 'completed' } },
+    appointment_missed: { title: 'Appointment missed', message: 'Alex Morgan · Today · 9:00 AM', priority: 'major', payload: { customer_name: 'Alex Morgan', date: 'Today', time: '9:00 AM', status: 'missed' } },
+    person_added: { title: 'New person added', message: 'Alex Morgan', payload: { first_name: 'Alex', last_name: 'Morgan', phone: '(207) 555-0182' } },
+    person_updated: { title: 'Person record updated', message: 'Alex Morgan', payload: { first_name: 'Alex', last_name: 'Morgan' } },
+    first_repeat_customer: { title: 'Returning customer recognized', message: 'Alex Morgan booked again', category: 'milestones', priority: 'major' },
+    receptionist_hired: { title: 'Receptionist hired', message: 'Maya is ready to help', payload: { name: 'Maya' } },
+    receptionist_activated: { title: 'Receptionist activated', message: 'Maya is live', payload: { name: 'Maya' } },
+    first_staff_member_added: { title: 'First staff member added', message: 'Alex Morgan', category: 'milestones', priority: 'major' },
+    staff_availability_missing: { title: 'Staff availability missing', message: 'Add working hours before booking', category: 'warnings', priority: 'major' },
+    no_staff_available: { title: 'No staff available for booking', message: 'No available staff matched this appointment', category: 'warnings', priority: 'major' },
+    scenario_created: { title: 'Scenario created', message: 'Appointment follow-up', category: 'workflows' },
+    scenario_run: { title: 'Scenario run', message: 'Appointment follow-up', category: 'workflows' },
+    workflow_completed: { title: 'Workflow completed', message: 'Appointment follow-up', category: 'workflows' },
+    workflow_failed: { title: 'Workflow failed', message: 'Appointment follow-up · Needs attention', category: 'warnings', priority: 'critical' },
+    scenario_configuration_needed: { title: 'Scenario needs configuration', message: 'Connect a calendar to continue', category: 'warnings', priority: 'major' },
+    payment_received: { title: 'Payment received', message: '$420.00', payload: { amount: 420, currency: 'USD', status: 'paid' } },
+    payment_failed: { title: 'Payment failed', message: '$420.00 · Card declined', category: 'warnings', priority: 'critical', payload: { amount: 420, currency: 'USD', status: 'failed' } },
+    payment_refunded: { title: 'Payment refunded', message: '$120.00 returned to Alex Morgan', category: 'payments', priority: 'major' },
+    invoice_created: { title: 'Invoice created', message: 'INV-1042 · $850.00', category: 'payments' },
+    invoice_paid: { title: 'Invoice paid', message: 'INV-1042 · $850.00', category: 'payments', priority: 'major' },
+    invoice_overdue: { title: 'Invoice overdue', message: 'INV-1042 · $850.00', category: 'warnings', priority: 'major' },
+    revenue_milestone: { title: 'Revenue milestone reached', message: '$10,000 in revenue', category: 'milestones', priority: 'major' },
+    daily_quote: { title: getDailyNestQuote(new Date()), message: '', category: 'messages' },
+  };
+  return { ...fixture, ...(overrides[key] || {}) };
+};
+
+const normalizeRealtimePayload = (table, payload, history = []) => {
+  const row = payload?.new || {};
+  const old = payload?.old || {};
+  const change = payload?.eventType || payload?.event || 'UPDATE';
+  if (table === 'appointments') {
+    const nextStatus = normalizeStatus(row);
+    const oldStatus = normalizeStatus(old);
+    let type = 'appointment_updated';
+    let title = 'Appointment updated';
+    let priority = 'routine';
+    if (change === 'INSERT') {
+      type = 'appointment_booked';
+      title = 'Appointment booked';
+    } else if (['cancelled', 'canceled'].includes(nextStatus) && nextStatus !== oldStatus) {
+      type = 'appointment_cancelled';
+      title = 'Appointment cancelled';
+    } else if (nextStatus === 'completed' && nextStatus !== oldStatus) {
+      type = 'appointment_completed';
+      title = 'Appointment completed';
+    } else if (nextStatus === 'missed' && nextStatus !== oldStatus) {
+      type = 'appointment_missed';
+      title = 'Appointment missed';
+      priority = 'major';
+    } else if (row.date !== old.date || row.time !== old.time) {
+      type = 'appointment_rescheduled';
+      title = 'Appointment rescheduled';
+    }
+    return {
+      id: eventId(table, row, type), source: table, source_id: row.id || null,
+      milestone_key: change === 'INSERT' ? 'first_appointment_booked' : type === 'appointment_completed' ? 'first_appointment_completed' : null,
+      category: 'appointments',
+      event_type: type, title, message: formatAppointmentWhen(row), priority, occurred_at: eventStamp(row), payload: row,
+    };
+  }
+
+  if (table === 'people' && change === 'INSERT') {
+    return {
+      id: eventId(table, row, 'person_added'), source: table, source_id: row.id || null, milestone_key: 'first_person_added',
+      category: 'people', event_type: 'person_added',
+      title: 'New person added', message: displayName(row),
+      priority: 'routine', occurred_at: eventStamp(row), payload: row,
+    };
+  }
+
+  if (table === 'payments') {
+    const status = normalizeStatus(row);
+    const oldStatus = normalizeStatus(old);
+    if (status === oldStatus && change !== 'INSERT') return null;
+    if (PAYMENT_SUCCESS.has(status)) {
+      return {
+        id: eventId(table, row, 'payment_received'), source: table, source_id: row.id || null,
+        milestone_key: 'first_successful_payment', category: 'payments', event_type: 'payment_received',
+        title: 'Payment received', message: formatAmount(row), priority: 'major', occurred_at: eventStamp(row), payload: row,
+      };
+    }
+    if (PAYMENT_FAILED.has(status)) {
+      return {
+        id: eventId(table, row, 'payment_failed'), category: 'warnings', event_type: 'payment_failed',
+        title: 'Payment failed', message: formatAmount(row), priority: 'critical', occurred_at: eventStamp(row), payload: row,
+      };
+    }
+  }
+
+  if (table === 'hired_receptionists' && change === 'INSERT') {
+    return {
+      id: eventId(table, row, 'receptionist_hired'), source: table, source_id: row.id || null, milestone_key: 'first_receptionist_hired', category: 'milestones', event_type: 'receptionist_hired',
+      title: 'Receptionist hired', message: row.name || row.receptionist_name || 'Your front desk is growing',
+      priority: 'routine', occurred_at: eventStamp(row), payload: row,
+    };
+  }
+
+  if (table === 'nest' && change === 'INSERT') {
+    return {
+      id: row.id || eventId(table, row, row.event_type || 'workflow_event'), source: 'nest', source_id: row.source_id || null,
+      category: row.category || 'workflows', event_type: row.event_type || 'workflow_event',
+      title: row.title || 'Workflow activity', message: row.message || '',
+      priority: row.priority || 'routine', occurred_at: row.occurred_at || eventStamp(row), payload: row.payload || row,
+    };
+  }
+
+  if (table === 'businesses' && change === 'UPDATE') {
+    const used = Number(row.used_call_seconds ?? row.call_seconds_used ?? row.usage_seconds ?? 0);
+    const included = Number(row.included_call_seconds ?? row.call_seconds_included ?? row.usage_limit_seconds ?? 0);
+    const oldUsed = Number(old.used_call_seconds ?? old.call_seconds_used ?? old.usage_seconds ?? 0);
+    if (included > 0) {
+      const ratio = used / included;
+      const oldRatio = oldUsed / included;
+      if (ratio >= 1 && oldRatio < 1) {
+        return {
+          id: eventId(table, row, 'minutes_exhausted'), category: 'warnings', event_type: 'minutes_exhausted',
+          title: 'Call minutes exhausted', message: 'Review your plan to keep calls running', priority: 'critical', occurred_at: eventStamp(row), payload: row,
+        };
+      }
+      if (ratio >= 0.8 && oldRatio < 0.8) {
+        return {
+          id: eventId(table, row, 'usage_warning'), category: 'warnings', event_type: 'usage_warning',
+          title: 'Call minutes running low', message: `${Math.max(0, Math.ceil((included - used) / 60))} minutes remaining`,
+          priority: 'critical', occurred_at: eventStamp(row), payload: row,
+        };
+      }
+    }
+  }
+
+  return null;
+};
+
+const callRow = (call) => call?.raw || call || {};
+
+const isLiveCallRecord = (call) => {
+  const row = callRow(call);
+  if (!ACTIVE_CALL_STATUSES.has(normalizeStatus(row))) return false;
+  if (row.ended_at || row.failure_reason) return false;
+  const startedAt = Date.parse(row.started_at || row.created_at || row.event_timestamp || '');
+  // If the provider never sends its terminal callback, do not leave an
+  // orphaned live banner visible forever. Normal calls remain eligible well
+  // beyond the expected receptionist call duration.
+  const age = Date.now() - startedAt;
+  return Number.isFinite(startedAt) && age >= 0 && age < MAX_ORPHANED_CALL_AGE_MS;
+};
+
+const callLifecycleEvent = (call, status) => {
+  const row = callRow(call);
+  const direction = String(row.direction || call?.direction || 'incoming').toLowerCase();
+  const name = displayName(row) || call?.name || (direction.startsWith('out') ? 'Outgoing call' : 'Incoming call');
+  const failed = status === 'failed';
+  const missed = ['missed', 'busy', 'no-answer', 'no_answer'].includes(status);
+  const inbound = direction.startsWith('in');
+  const milestoneKeys = [
+    ...(inbound ? ['first_call_received'] : []),
+    ...(!failed && !missed && status === 'completed' ? ['first_successful_call'] : []),
+  ];
+  return {
+    id: eventId('call_logs', row, failed ? 'call_failed' : missed ? 'call_missed' : 'call_completed'),
+    category: failed ? 'warnings' : 'calls',
+    event_type: failed ? 'call_failed' : missed ? 'call_missed' : 'call_completed',
+    direction: direction.startsWith('out') ? 'outbound' : direction.startsWith('in') ? 'inbound' : 'unknown',
+    source: 'call_logs', source_id: row.id || null, milestone_keys: milestoneKeys,
+    title: failed ? 'Call needs attention' : missed ? 'Call missed' : 'Call ended',
+    message: name,
+    priority: failed ? 'critical' : missed ? 'major' : 'routine',
+    occurred_at: eventStamp(row),
+    payload: row,
+  };
+};
+
+export const NestProvider = ({ children, businessId, tasklistState }) => {
+  const { session, workforce } = useAuth();
+  const { calls, loading: callsLoading } = useCallLogs();
+  const [history, setHistory] = useState([]);
+  const [queue, setQueue] = useState([]);
+  const [activeEvent, setActiveEvent] = useState(null);
+  const [previewEvent, setPreviewEvent] = useState(null);
+  const [liveCall, setLiveCall] = useState(null);
+  const [liveCallActions, setLiveCallActions] = useState([]);
+  const [hiddenLiveCallId, setHiddenLiveCallId] = useState(null);
+  const [introStarted, setIntroStarted] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [studioOpen, setStudioOpen] = useState(false);
+  const [voiceActive, setVoiceActive] = useState(false);
+  const [privacyMode, setPrivacyMode] = useState(() => localStorage.getItem('nodemere:nest:privacy') === 'true');
+  const [selectedConcepts, setSelectedConcepts] = useState(() => ({
+    ...DEFAULT_NEST_CONCEPTS,
+    ...safeJsonParse(localStorage.getItem('nodemere:nest:concepts'), {}),
+  }));
+  const [nestPreferences, setNestPreferences] = useState(DEFAULT_NEST_PREFERENCES);
+  const historyRef = useRef([]);
+  const activeRef = useRef(null);
+  const liveCallRef = useRef(null);
+  const seenRef = useRef(new Set());
+  const callsBaselineRef = useRef(null);
+  const tasklistBaselineRef = useRef(null);
+  const timerRef = useRef(null);
+  const previewTimerRef = useRef(null);
+  const businessKey = businessId || session?.user?.id || 'anonymous';
+  const historyStorageKey = `nodemere:nest:history:${businessKey}`;
+  const shownStorageKey = `nodemere:nest:shown:${businessKey}`;
+  const shownRef = useRef(new Set(safeJsonParse(localStorage.getItem(shownStorageKey), [])));
+
+  useEffect(() => { historyRef.current = history; }, [history]);
+  useEffect(() => { activeRef.current = activeEvent; }, [activeEvent]);
+  useEffect(() => { liveCallRef.current = liveCall; }, [liveCall]);
+  useEffect(() => {
+    shownRef.current = new Set(safeJsonParse(localStorage.getItem(shownStorageKey), []));
+  }, [shownStorageKey]);
+
+  useEffect(() => {
+    if (!session?.user?.id) return undefined;
+    let cancelled = false;
+    supabase.from('account_settings').select('preferences').eq('user_id', session.user.id).limit(1).maybeSingle()
+      .then(({ data, error }) => {
+        if (!cancelled && !error) setNestPreferences(normalizeNestPreferences(data?.preferences?.nest));
+      });
+    const channel = supabase.channel(`nest-preferences-${session.user.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'account_settings', filter: `business_id=eq.${workforce?.tenant?.business_id || businessId}` }, (payload) => {
+        setNestPreferences(normalizeNestPreferences(payload?.new?.preferences?.nest));
+      })
+      .subscribe();
+    const handlePreferencesUpdated = (event) => {
+      setNestPreferences(normalizeNestPreferences(event?.detail?.preferences?.nest));
+    };
+    window.addEventListener('sonar:preferences-updated', handlePreferencesUpdated);
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(channel);
+      window.removeEventListener('sonar:preferences-updated', handlePreferencesUpdated);
+    };
+  }, [session?.user?.id, workforce?.tenant?.business_id, businessId]);
+
+  const persistHistory = useCallback((events) => {
+    // History is in-memory only. Remove this application's legacy PHI cache.
+    try { localStorage.removeItem(historyStorageKey); } catch { /* storage is optional */ }
+  }, [historyStorageKey]);
+
+  const addToHistory = useCallback((event) => {
+    setHistory((current) => {
+      const next = [event, ...current.filter((item) => item.id !== event.id)].slice(0, MAX_HISTORY);
+      persistHistory(next);
+      return next;
+    });
+  }, [persistHistory]);
+
+  const markShown = useCallback((event) => {
+    const key = shownEventKey(event);
+    if (!key) return;
+    shownRef.current.add(key);
+    try {
+      localStorage.setItem(shownStorageKey, JSON.stringify([...shownRef.current].slice(-500)));
+    } catch {
+      // Local storage is optional; in-memory de-dupe still protects this mount.
+    }
+  }, [shownStorageKey]);
+
+  const enqueue = useCallback((incoming, { preview = false } = {}) => {
+    const notificationKey = incoming?.milestone_key || incoming?.event_type;
+    const preferenceGroup = NEST_NOTIFICATION_GROUP_BY_KEY[notificationKey] || incoming?.category;
+    const categoryEnabled = nestPreferences.enabled !== false
+      && nestPreferences.categories?.[preferenceGroup] !== false;
+    if (!preview && incoming?.category === 'workflows' && incoming?.event_type !== 'workflow_failed') return;
+    if (!preview && (!categoryEnabled || nestPreferences.notifications?.[notificationKey] === false)) return;
+    if (!incoming?.id || (!preview && seenRef.current.has(incoming.id))) return;
+    if (!preview && shownRef.current.has(shownEventKey(incoming))) return;
+    const event = {
+      priority: 'routine',
+      occurred_at: new Date().toISOString(),
+      ...incoming,
+      preview,
+    };
+    if (!preview) {
+      seenRef.current.add(event.id);
+      markShown(event);
+      addToHistory(event);
+    }
+
+    const currentActive = activeRef.current;
+    if (event.source === 'nest' && event.source_id) {
+      setQueue((current) => current.filter((queued) => queued.source_id !== event.source_id));
+      if (currentActive?.source_id === event.source_id && currentActive.source !== 'nest') {
+        setActiveEvent(event);
+        return;
+      }
+    }
+    if (event.priority === 'critical' && currentActive && PRIORITY[currentActive.priority] < PRIORITY.critical) {
+      setQueue((current) => [currentActive, ...current]);
+      setActiveEvent(event);
+      return;
+    }
+    if (!currentActive) {
+      setActiveEvent(event);
+      return;
+    }
+    setQueue((current) => {
+      const next = [...current, event];
+      return next.sort((a, b) => PRIORITY[b.priority] - PRIORITY[a.priority]);
+    });
+  }, [addToHistory, markShown, nestPreferences]);
+
+  const previewConcept = useCallback((concept, category) => {
+    const categoryDefinition = category;
+    const event = {
+      id: `preview:${concept.id}:${Date.now()}`,
+      category: categoryDefinition.id,
+      event_type: `preview_${categoryDefinition.id}`,
+      title: categoryDefinition.sample.title,
+      message: categoryDefinition.sample.message,
+      priority: categoryDefinition.sample.priority,
+      persistent: Boolean(categoryDefinition.sample.persistent),
+      occurred_at: categoryDefinition.sample.occurred_at || new Date().toISOString(),
+      concept_id: concept.id,
+      duration_ms: 7600,
+      preview: true,
+    };
+    // Studio previews are an independent visual layer: they replace the Nest
+    // immediately without entering history or interrupting real event queueing.
+    if (previewTimerRef.current) window.clearTimeout(previewTimerRef.current);
+    setPreviewEvent(event);
+    previewTimerRef.current = window.setTimeout(() => setPreviewEvent(null), event.duration_ms);
+  }, []);
+
+  const previewNotification = useCallback(({ key, label, category }) => {
+    if (previewTimerRef.current) window.clearTimeout(previewTimerRef.current);
+    const event = {
+      id: `preview:notification:${key}:${Date.now()}`,
+      ...previewNotificationFixture(key, label, category),
+      duration_ms: 7600,
+      preview: true,
+    };
+    setPreviewEvent(event);
+    previewTimerRef.current = window.setTimeout(() => setPreviewEvent(null), event.duration_ms);
+  }, []);
+
+  useEffect(() => () => {
+    if (previewTimerRef.current) window.clearTimeout(previewTimerRef.current);
+  }, []);
+
+  useEffect(() => {
+    if (voiceActive) return undefined;
+    if (!activeEvent) {
+      if (queue.length) {
+        const [next, ...rest] = queue;
+        setQueue(rest);
+        setActiveEvent(next);
+      }
+      return undefined;
+    }
+    if (timerRef.current) window.clearTimeout(timerRef.current);
+    timerRef.current = window.setTimeout(() => setActiveEvent(null), durationForEvent(activeEvent));
+    return () => {
+      if (timerRef.current) window.clearTimeout(timerRef.current);
+    };
+  }, [activeEvent, queue, voiceActive]);
+
+  useEffect(() => {
+    persistHistory([]);
+    const localEvents = [];
+    localEvents.forEach((event) => seenRef.current.add(event.id));
+    setHistory(localEvents.slice(0, MAX_HISTORY));
+    if (!session?.access_token) return;
+    let cancelled = false;
+    api.getNestHistory(40).then((response) => {
+      if (cancelled) return;
+      const remoteEvents = Array.isArray(response?.events) ? response.events.map(sanitizeHistoryEvent).filter(Boolean) : [];
+      const merged = [...localEvents, ...remoteEvents]
+        .filter((event, index, list) => list.findIndex((candidate) => candidate.id === event.id) === index)
+        .sort((a, b) => String(b.occurred_at || '').localeCompare(String(a.occurred_at || '')))
+        .slice(0, MAX_HISTORY);
+      merged.forEach((event) => seenRef.current.add(event.id));
+      merged.forEach(markShown);
+      setHistory(merged);
+      persistHistory(merged);
+    });
+    return () => { cancelled = true; };
+  }, [historyStorageKey, persistHistory, session?.access_token]);
+
+  useEffect(() => {
+    if (!businessId || !session?.access_token) return undefined;
+    const handle = (table) => (payload) => {
+      const normalized = normalizeRealtimePayload(table, payload, historyRef.current);
+      if (!normalized) return;
+      const activeCall = liveCallRef.current;
+      if (activeCall && ['appointments', 'people', 'payments'].includes(table)) {
+        const actionLabels = {
+          appointment_booked: 'Appointment created', appointment_rescheduled: 'Appointment updated',
+          appointment_cancelled: 'Appointment cancelled', appointment_updated: 'Appointment updated',
+          person_added: 'Customer added', payment_received: 'Payment received',
+        };
+        const label = actionLabels[normalized.event_type];
+        if (label) setLiveCallActions((current) => current.some((action) => action.id === normalized.id)
+          ? current : [...current, { id: normalized.id, type: normalized.event_type, label }].slice(-4));
+      }
+      const milestoneKeys = normalized.milestone_keys || (normalized.milestone_key ? [normalized.milestone_key] : []);
+      const alreadyClaimed = milestoneKeys.length > 0 && normalized.source_id
+        && historyRef.current.some((event) => (
+          event.source === 'nest'
+          && event.source_id === String(normalized.source_id)
+          && milestoneKeys.includes(event.event_type)
+        ));
+      if (!alreadyClaimed) enqueue(normalized);
+    };
+    let channel = supabase.channel(`nest-live-${businessId}-${session.user?.id || 'user'}`);
+    channel = channel
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'appointments', filter: `business_id=eq.${businessId}` }, handle('appointments'))
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'people', filter: `business_id=eq.${businessId}` }, handle('people'))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'payments', filter: `business_id=eq.${businessId}` }, handle('payments'))
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'hired_receptionists', filter: `business_id=eq.${businessId}` }, handle('hired_receptionists'))
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'businesses', filter: `id=eq.${businessId}` }, handle('businesses'))
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'nest', filter: `business_id=eq.${businessId}` }, handle('nest'))
+      .subscribe((status, error) => {
+        if (error) console.warn("NestRuntime.jsx:event_460");
+        else if (status === 'SUBSCRIBED') console.info('[Nest] Realtime connected');
+      });
+    return () => { supabase.removeChannel(channel); };
+  }, [businessId, enqueue, session?.access_token, session?.user?.id]);
+
+  useEffect(() => {
+    if (callsLoading) return;
+    const current = new Map((calls || []).map((call) => [String(call.id), normalizeStatus(callRow(call))]));
+    if (callsBaselineRef.current === null) {
+      callsBaselineRef.current = current;
+    } else {
+      const previous = callsBaselineRef.current;
+      (calls || []).forEach((call) => {
+        const id = String(call.id);
+        const status = current.get(id);
+        const priorStatus = previous.get(id);
+        if (TERMINAL_CALL_STATUSES.has(status) && priorStatus !== status && (ACTIVE_CALL_STATUSES.has(priorStatus) || !priorStatus)) {
+          enqueue(callLifecycleEvent(call, status));
+        }
+      });
+      callsBaselineRef.current = current;
+    }
+
+    const activeCall = (calls || []).find(isLiveCallRecord);
+    const callsEnabled = nestPreferences.enabled !== false
+      && nestPreferences.categories?.calls !== false
+      && nestPreferences.notifications?.call_active !== false;
+    if (!activeCall || !callsEnabled) {
+      setLiveCall(null);
+      setLiveCallActions([]);
+      setHiddenLiveCallId(null);
+      // A live event must never survive after the call-log source says there
+      // is no active call. This also clears legacy/stale call_active events
+      // that may already be occupying the Nest display queue.
+      setActiveEvent((current) => current?.event_type === 'call_active' ? null : current);
+      return;
+    }
+    const row = callRow(activeCall);
+    const direction = String(row.direction || activeCall.direction || 'incoming').toLowerCase();
+    setLiveCall({
+      id: `live-call:${activeCall.id}`,
+      category: 'calls',
+      event_type: 'call_active',
+      direction: direction.startsWith('out') ? 'outbound' : direction.startsWith('in') ? 'inbound' : 'unknown',
+      title: direction.startsWith('out') ? 'Outgoing call' : 'Incoming Call',
+      message: displayName(row) || activeCall.name || (direction.startsWith('out') ? 'Connecting' : 'Live now'),
+      priority: 'routine',
+      persistent: true,
+      occurred_at: row.started_at || row.created_at || new Date().toISOString(),
+      payload: row,
+    });
+    setHiddenLiveCallId((hiddenId) => hiddenId && hiddenId !== String(activeCall.id) ? null : hiddenId);
+  }, [calls, callsLoading, enqueue, nestPreferences]);
+
+  useEffect(() => {
+    if (!liveCall?.id) setLiveCallActions([]);
+  }, [liveCall?.id]);
+
+  useEffect(() => {
+    if (!tasklistState || typeof tasklistState !== 'object') return;
+    const completed = new Set();
+    Object.entries(tasklistState).forEach(([taskId, task]) => {
+      Object.entries(task?.subtasks || {}).forEach(([subtaskId, state]) => {
+        if (state?.completed === true) completed.add(`${taskId}:${subtaskId}`);
+      });
+    });
+    if (tasklistBaselineRef.current === null) {
+      tasklistBaselineRef.current = completed;
+      return;
+    }
+    const previouslyComplete = Object.values(tasklistBaselineRef.current).length > 0
+      && tasklistBaselineRef.current.size === completed.size
+      && [...completed].every((key) => tasklistBaselineRef.current.has(key));
+    const setupComplete = Object.values(tasklistState).length > 0
+      && Object.values(tasklistState).every((task) => task?.completed === true);
+    if (setupComplete && !previouslyComplete) {
+      api.claimNestMilestone('business_setup_completed').catch((error) => {
+        console.warn("NestRuntime.jsx:event_527");
+      });
+    }
+    completed.forEach((key) => {
+      if (!tasklistBaselineRef.current.has(key)) {
+        enqueue({
+          id: `task:${key}:${Date.now()}`, category: 'milestones', event_type: 'task_completed',
+          dedupe_key: `task:${key}`,
+          title: 'Setup task completed', message: key.split(':').slice(-1)[0].replaceAll('_', ' '),
+          priority: 'routine', occurred_at: new Date().toISOString(),
+        });
+      }
+    });
+    tasklistBaselineRef.current = completed;
+  }, [enqueue, tasklistState]);
+
+  useEffect(() => {
+    if (!session?.user?.id) return undefined;
+    const now = new Date();
+    const day = `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
+    const quoteKey = `nodemere:nest:quote:${businessKey}:${day}`;
+    if (localStorage.getItem(quoteKey)) return undefined;
+    const timer = window.setTimeout(() => {
+      localStorage.setItem(quoteKey, 'true');
+      enqueue({
+        id: `daily-quote:${businessKey}:${day}`,
+        category: 'messages', event_type: 'daily_quote', title: getDailyNestQuote(now), message: '',
+        priority: 'routine', duration_ms: 12000, occurred_at: now.toISOString(),
+      });
+    }, 1800);
+    return () => window.clearTimeout(timer);
+  }, [businessKey, enqueue, session?.user?.id]);
+
+  useEffect(() => {
+    const onKeyDown = (event) => {
+      if (import.meta.env.DEV && (event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === 'n') {
+        event.preventDefault();
+        setStudioOpen((open) => !open);
+      }
+      if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === 'h') {
+        event.preventDefault();
+        setHistoryOpen((open) => !open);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
+  const selectConcept = useCallback((categoryId, conceptId) => {
+    setSelectedConcepts((current) => {
+      const next = { ...current, [categoryId]: conceptId };
+      localStorage.setItem('nodemere:nest:concepts', JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
+  const togglePrivacy = useCallback(() => {
+    setPrivacyMode((current) => {
+      const next = !current;
+      localStorage.setItem('nodemere:nest:privacy', String(next));
+      return next;
+    });
+  }, []);
+
+  const markIntroStarted = useCallback(() => {
+    setIntroStarted(true);
+  }, []);
+
+  const visibleLiveCall = liveCall && hiddenLiveCallId !== String(liveCall.payload?.id || '').trim() ? liveCall : null;
+  const displayEvent = voiceActive ? null : (previewEvent || activeEvent || visibleLiveCall);
+  const hideCurrentNotification = useCallback(() => {
+    if (displayEvent?.event_type === 'call_active' && displayEvent.payload?.id) {
+      setHiddenLiveCallId(String(displayEvent.payload.id));
+      return;
+    }
+    if (displayEvent?.preview) {
+      setPreviewEvent(null);
+      return;
+    }
+    if (displayEvent) setActiveEvent(null);
+  }, [displayEvent]);
+  const selectedPreference = displayEvent ? selectedConcepts[displayEvent.category] : null;
+  const hasSavedPreference = selectedPreference !== null && typeof selectedPreference === 'object';
+  const selectedConceptId = hasSavedPreference ? selectedPreference.conceptId : selectedPreference;
+  const displayConcept = displayEvent
+    ? { ...getNestConcept(displayEvent.category, displayEvent.concept_id || selectedConceptId), motion: 'rise' }
+    : null;
+
+  const value = useMemo(() => ({
+    activeEvent,
+    displayEvent,
+    displayConcept,
+    liveCall,
+    liveCallActions,
+    introStarted,
+    markIntroStarted,
+    queueLength: queue.length,
+    history,
+    historyOpen,
+    setHistoryOpen,
+    studioOpen,
+    setStudioOpen,
+    voiceActive,
+    setVoiceActive,
+    privacyMode,
+    togglePrivacy,
+    nestSoundsMuted: nestPreferences.sounds_muted === true,
+    selectedConcepts,
+    selectConcept,
+    previewConcept,
+    previewNotification,
+    hideCurrentNotification,
+  }), [activeEvent, displayEvent, displayConcept, hideCurrentNotification, history, historyOpen, introStarted, liveCall, liveCallActions, markIntroStarted, nestPreferences.sounds_muted, previewConcept, previewEvent, previewNotification, privacyMode, queue.length, selectConcept, selectedConcepts, studioOpen, togglePrivacy, voiceActive]);
+
+  return <NestContext.Provider value={value}>{children}</NestContext.Provider>;
+};
+
+export const useNest = () => {
+  const context = useContext(NestContext);
+  if (!context) throw new Error('useNest must be used inside NestProvider');
+  return context;
+};

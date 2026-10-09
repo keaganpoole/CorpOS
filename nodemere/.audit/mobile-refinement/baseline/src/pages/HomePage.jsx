@@ -1,0 +1,899 @@
+// HomePage.jsx
+import React, { useState, useEffect, useRef } from 'react';
+import useLegacyAnimation from '../hooks/useLegacyAnimation';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import { motion, AnimatePresence, useInView } from 'framer-motion';
+import { CreditCard, FileUp, Globe2, Menu as MenuIcon, MessagesSquare, Mic, Phone, PhoneCall, PhoneOutgoing, ShieldCheck, X as XIcon, Check } from 'lucide-react';
+import SplashScreen from '../components/SplashScreen';
+import { getCookie } from '../utils/cookieUtils';
+import '../styles/HomePage.css';
+import logoImage from '@/assets/logo.png';
+
+import ph1 from '@/assets/ph1.png';
+import ph2 from '@/assets/ph2.png';
+import ph3 from '@/assets/ph3.png';
+import phonehelper1 from '@/assets/phonehelper1.png';
+import phonehelper2 from '@/assets/phonehelper2.png';
+
+import pgg1 from '@/assets/pgg1.png';
+import pgg20 from '@/assets/pgg20.png';
+import pgg3 from '@/assets/pgg3.png';
+import pgg4 from '@/assets/pgg4.png';
+import pgg5 from '@/assets/pgg5.png';
+import pgg6 from '@/assets/pgg6.png';
+import pgg7 from '@/assets/pgg7.png';
+import slimYahoo from '@/assets/t1-slim-yahoo.png';
+import slimHulu from '@/assets/t1-slim-hulu.png';
+import slimChime from '@/assets/t1-slim-chime.png';
+import slimBumble from '@/assets/t1-slim-bumble.png';
+import slimVerizon from '@/assets/t2-slim-verizon.png';
+import slimFacebook from '@/assets/t-slim-facebook.png';
+import expandedAmazon from '@/assets/t1-expanded-amazon.png';
+import expandedAnniversary from '@/assets/t1-expanded-anniversary.png';
+import expandedBirthday from '@/assets/t1-expanded-birthday.png';
+import expandedNetflix from '@/assets/t1-expanded-netflix.png';
+import expandedPhonepassword from '@/assets/t1-expanded-phonepassword.png';
+import expandedPlaystation from '@/assets/t1-expanded-playstation.png';
+import expandedSnapcha from '@/assets/t1-expanded-snapcha.png';
+import expandedSpectrum from '@/assets/t1-expanded-spectrum.png';
+import expandedTicketmaster from '@/assets/t1-expanded-ticketmaster.png';
+import expandedWifi from '@/assets/t1-expanded-wifi.png';
+import expandedX from '@/assets/t1-expanded-x.png';
+import TypingAnimation from '../components/TypingAnimation';
+import HomepageReceptionistCatalog from '../components/HomepageReceptionistCatalog';
+import CalendarShowcase, { RightFeatureList } from '../components/CalendarShowcase';
+import IntercomShowcase from '../components/IntercomShowcase';
+import EncryptionShowcase from '../components/EncryptionShowcase';
+import WorkWeekComparison from '../components/WorkWeekComparison';
+import JitterDebugOverlay from '../components/JitterDebugOverlay';
+import LegalFooter from '../components/LegalFooter';
+import useSectionScrollProgress from '../hooks/useSectionScrollProgress';
+
+const HERO_RECEPTIONIST_FEATURE_ITEMS = [
+  {
+    icon: <Phone className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:-translate-y-1" />,
+    title: '24/7 Call Handling',
+    copy: 'Keep your front desk running 24/7. While the competition wakes up to voicemails, you wake up to appointments already booked.',
+  },
+  {
+    icon: <MessagesSquare className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:scale-110" />,
+    title: 'Multiple Conversations',
+    copy: 'Handle multiple conversations simultaneously, making hold queues virtually nonexistent.',
+  },
+  {
+    icon: <PhoneOutgoing className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:translate-x-1 group-hover:-translate-y-1" />,
+    title: 'Outbound Calling',
+    copy: 'Have your AI receptionist place calls for reminders, confirmations, updates, and almost anything else you desire, without tying up your team.',
+  },
+  {
+    icon: <PhoneCall className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:-translate-y-1" />,
+    title: 'Live Handoff',
+    copy: 'When a caller needs a person, your receptionist briefs the right team member first, then merges everyone into the same call so they have context on the situation.',
+  },
+  {
+    icon: <CreditCard className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:rotate-3" />,
+    title: 'Payments',
+    copy: 'Take payments, collect deposits, send payment links, and handle billing questions right on the call.',
+  },
+  {
+    icon: <Mic className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:scale-110" />,
+    title: 'Voice Audition',
+    copy: 'Build a receptionist from the voice up. Fine-tune their accent, tone, and personality to make them the perfect fit for your front desk.',
+  },
+  {
+    icon: <FileUp className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:-translate-y-1" />,
+    title: 'Upload Documents',
+    copy: 'Allow your AI receptionist to request documents from the customer by sending them a secure upload link while on the call.',
+  },
+  {
+    icon: <Globe2 className="h-5 w-5 stroke-current overflow-visible transition-all duration-500 ease-out group-hover:rotate-12" />,
+    title: '30+ Languages',
+    copy: "Detect a caller's language in real-time and respond fluently without transfers, translators, or awkward misunderstandings.",
+  },
+];
+
+const FadingImageCollage = ({ images }) => {
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const ref = useRef(null);
+  const isInView = useInView(ref, { amount: 0.25 });
+
+  useEffect(() => {
+    if (!isInView || images.length <= 1) return undefined;
+
+    const interval = setInterval(() => {
+      setCurrentImageIndex((prevIndex) => (prevIndex + 1) % images.length);
+    }, 8000);
+
+    return () => clearInterval(interval);
+  }, [images.length, isInView]);
+
+  return (
+    <div ref={ref} className="relative w-full h-full overflow-hidden">
+      {images.map((image, index) => (
+        <motion.img
+          key={index}
+          src={image}
+          alt="Collage image"
+          className="absolute inset-0 w-full h-full object-contain"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: index === currentImageIndex ? 1 : 0 }}
+          transition={{ duration: 3.0, ease: "easeInOut" }}
+        />
+      ))}
+    </div>
+  );
+};
+const AnimatedImageGrid = ({ images }) => {
+  const ref = useRef(null);
+  const isInView = useInView(ref, { once: true, amount: 0.3 });
+
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: { opacity: 1, transition: { staggerChildren: 0.2 } },
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 50, scale: 0.8 },
+    visible: { opacity: 1, y: 0, scale: 1, transition: { type: "spring", stiffness: 100, damping: 10 } },
+  };
+
+  return (
+    <motion.div
+      ref={ref}
+      className="mt-12 grid grid-cols-1 md:grid-cols-2 gap-x-1 gap-y-4 justify-items-center mx-auto max-w-[680px]"
+      variants={containerVariants}
+      initial="hidden"
+      animate={isInView ? "visible" : "hidden"}
+    >
+      {images.map((src, index) => (
+        <motion.img
+          key={index}
+          src={src}
+          alt={`Screenshot ${index + 1}`}
+          className="w-full max-w-xs rounded-lg shadow-2xl drop-shadow-lg"
+          variants={itemVariants}
+          style={{ boxShadow: '0 10px 20px rgba(0,0,0,0.4), 0 6px 6px rgba(0,0,0,0.2)' }}
+        />
+      ))}
+    </motion.div>
+  );
+};
+
+const CyclingImageGrid = ({ allExpandedImages }) => {
+  const getRandomImages = (images, count) => {
+    const shuffled = [...images].sort(() => 0.5 - Math.random());
+    return shuffled.slice(0, count);
+  };
+
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [displayedImages, setDisplayedImages] = useState(() => {
+    const initialImageCount = window.innerWidth < 768 ? 1 : 2;
+    return getRandomImages(allExpandedImages, initialImageCount);
+  });
+  const ref = useRef(null);
+  const isInView = useInView(ref, { once: true, amount: 0.3 });
+
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      const imageCount = mobile ? 1 : 2;
+      if (displayedImages.length !== imageCount) {
+        setDisplayedImages(getRandomImages(allExpandedImages, imageCount));
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [allExpandedImages, displayedImages.length]);
+
+  useEffect(() => {
+    if (isInView && allExpandedImages.length > 0) {
+      const imageCount = isMobile ? 1 : 2;
+      if (displayedImages.length === 0 || displayedImages.length !== imageCount) {
+        setDisplayedImages(getRandomImages(allExpandedImages, imageCount));
+      }
+
+      const interval = setInterval(() => {
+        setDisplayedImages(getRandomImages(allExpandedImages, imageCount));
+      }, 5000);
+
+      return () => clearInterval(interval);
+    }
+  }, [isInView, allExpandedImages, isMobile, displayedImages.length]);
+
+  const imageVariants = {
+    enter: { opacity: 1, y: 0, scale: 1, transition: { type: "spring", stiffness: 100, damping: 10 } },
+    exit: { opacity: 0, y: -50, scale: 0.8, transition: { duration: 0.5 } },
+  };
+
+  return (
+    <motion.div
+      ref={ref}
+      className={`mt-12 grid ${isMobile ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2'} gap-x-1 gap-y-4 justify-items-center mx-auto max-w-[680px] relative h-[200px]`}
+    >
+      <div className="relative w-full max-w-xs h-full">
+        <AnimatePresence initial={false}>
+          {displayedImages[0] && (
+            <motion.img
+              key={displayedImages[0]}
+              src={displayedImages[0]}
+              alt="Cycling Screenshot 1"
+              className="absolute inset-0 w-full h-full object-contain rounded-lg shadow-2xl drop-shadow-lg max-w-sm"
+              variants={imageVariants}
+              initial={{ opacity: 0, y: 50, scale: 0.8 }}
+              animate="enter"
+              exit="exit"
+              style={{ boxShadow: '0 10px 20px rgba(0,0,0,0.4), 0 6px 6px rgba(0,0,0,0.2)' }}
+            />
+          )}
+        </AnimatePresence>
+      </div>
+
+      {!isMobile && (
+        <div className="relative w-full max-w-xs h-full">
+          <AnimatePresence initial={false}>
+            {displayedImages[1] && (
+              <motion.img
+                key={displayedImages[1]}
+                src={displayedImages[1]}
+                alt="Cycling Screenshot 2"
+                className="absolute inset-0 w-full h-full object-contain rounded-lg shadow-2xl drop-shadow-lg"
+                variants={imageVariants}
+                initial={{ opacity: 0, y: 50, scale: 0.8 }}
+                animate="enter"
+                exit="exit"
+                style={{ boxShadow: '0 10px 20px rgba(0,0,0,0.4), 0 6px 6px rgba(0,0,0,0.2)' }}
+              />
+            )}
+          </AnimatePresence>
+        </div>
+      )}
+    </motion.div>
+  );
+};
+
+const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+
+const StackedHeroShowcase = ({ sectionRef }) => {
+  const { rootRef, progress: sectionProgress } = useSectionScrollProgress({ mobileMinDelta: 0.0025 });
+  const stickyRef = useRef(null);
+  const jitterDebugEnabled = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('jitterDebug') === '1';
+  const jitterRenderCount = useRef(0);
+  if (jitterDebugEnabled) jitterRenderCount.current += 1;
+  const [isCompactFeatureViewport, setIsCompactFeatureViewport] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth < 1024 : false
+  );
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+
+    const updateViewport = () => {
+      setIsCompactFeatureViewport(window.innerWidth < 1024);
+    };
+
+    updateViewport();
+    window.addEventListener('resize', updateViewport);
+
+    return () => {
+      window.removeEventListener('resize', updateViewport);
+    };
+  }, []);
+
+  const receptionistStartProgress = 0.26;
+  const heroIntroExited = sectionProgress >= receptionistStartProgress;
+  const receptionistEntered = sectionProgress >= receptionistStartProgress;
+  const heroFeaturesEntered = sectionProgress >= 0.64;
+  const crmOpacity = heroIntroExited ? 0 : 1;
+  const receptionistOpacity = receptionistEntered ? (heroFeaturesEntered ? 0.11 : 1) : 0;
+  const receptionistBlur = heroFeaturesEntered ? 13 : 0;
+  const receptionistBrightness = heroFeaturesEntered ? 0.46 : 1;
+  const heroFeatureProgress = Math.min(1, Math.max(0, (sectionProgress - 0.64) / 0.3));
+  const heroFeatureOpacity = heroFeaturesEntered ? 1 : 0;
+  const jitterState = sectionProgress < 0.64 ? 'inactive' : heroFeatureProgress < 1 ? 'entering' : sectionProgress < 1 ? 'locked' : 'exiting';
+  const continuePastCatalog = () => {
+    const root = rootRef.current;
+    if (!root || typeof window === 'undefined') return;
+    const top = root.getBoundingClientRect().top + window.scrollY;
+    const distance = Math.max(root.offsetHeight - window.innerHeight, 1);
+    // Land clearly into the feature sequence so the catalog is fully exited.
+    window.scrollTo({ top: top + distance * 0.72, behavior: 'smooth' });
+  };
+
+  return (
+    <div ref={(el) => { rootRef.current = el; if (sectionRef) sectionRef.current = el; }} className="relative h-[280vh] bg-[#020202]"
+      data-visitor-section="hero"
+      data-visitor-section-index="0"
+      data-jitter-debug-root={jitterDebugEnabled ? 'hero' : undefined}
+      data-jitter-section-progress={jitterDebugEnabled ? sectionProgress : undefined}
+      data-jitter-feature-progress={jitterDebugEnabled ? heroFeatureProgress : undefined}
+      data-jitter-state={jitterDebugEnabled ? jitterState : undefined}
+      data-jitter-render-count={jitterDebugEnabled ? jitterRenderCount.current : undefined}
+      data-jitter-viewport={jitterDebugEnabled ? 'not-stored' : undefined}
+    >
+      <div ref={stickyRef} className="sticky top-0 h-screen overflow-hidden bg-[#020202]" data-jitter-debug-sticky={jitterDebugEnabled ? 'hero' : undefined}>
+        <div className="pointer-events-none absolute inset-0 opacity-[0.04] bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:48px_48px]" />
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.055),transparent_42%)]" />
+
+        <div
+          className={`absolute inset-0 z-20 flex items-center justify-center px-6 transition-[opacity,transform] duration-500 ease-out ${crmOpacity <= 0.01 ? 'pointer-events-none' : ''}`}
+          style={{
+            opacity: crmOpacity,
+            visibility: crmOpacity <= 0.01 ? 'hidden' : 'visible',
+            transform: `translateY(${heroIntroExited ? -12 : 0}px)`,
+          }}
+        >
+          <div className="relative z-10 mx-auto w-full max-w-[1300px] text-center md:px-10 lg:px-12">
+            <div className="mx-auto max-w-[1100px]">
+              <h2 className="pb-2 text-4xl font-semibold leading-[0.95] tracking-[-0.06em] md:text-7xl lg:text-[6.2rem]">
+                <span className="bg-gradient-to-b from-white via-zinc-100 to-zinc-500 bg-clip-text text-transparent">Welcome to the </span>
+                <span className="inline-block bg-gradient-to-r from-[var(--brandGradientStart)] to-[var(--brandGradientEnd)] bg-clip-text pr-[0.04em] text-transparent [-webkit-box-decoration-break:clone] [box-decoration-break:clone]">future</span>
+                <span className="bg-gradient-to-b from-white via-zinc-100 to-zinc-500 bg-clip-text text-transparent"> of the front desk</span>
+              </h2>
+              <div className="mx-auto mt-6 max-w-[820px] text-base font-semibold leading-[1.55] tracking-[-0.02em] text-[#d4d4d8] md:text-xl">Deploy the world's most advanced AI receptionists and transform your front desk into a 24/7 operation that answers calls, manages everyday front desk work, and doubles as an assistant your team can talk to and put to work.
+                
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div
+          className={`absolute inset-0 z-10 transition-[opacity,transform] duration-500 ease-out ${receptionistOpacity <= 0.01 ? 'pointer-events-none' : ''}`}
+          style={{
+            opacity: receptionistOpacity,
+            visibility: receptionistOpacity <= 0.01 ? 'hidden' : 'visible',
+            transform: `translateY(${receptionistEntered ? 0 : 18}px) scale(${heroFeaturesEntered ? 0.988 : 1})`,
+            filter: `blur(${receptionistBlur}px) brightness(${receptionistBrightness})`,
+          }}
+        >
+          <HomepageReceptionistCatalog active={receptionistEntered && !heroFeaturesEntered} onContinue={continuePastCatalog} />
+        </div>
+
+        <div
+          className={`absolute inset-0 z-30 flex items-center justify-center px-6 transition-[opacity,transform] duration-500 ease-out ${heroFeatureOpacity <= 0.01 ? 'pointer-events-none' : ''}`}
+          data-jitter-debug-overlay={jitterDebugEnabled ? 'hero' : undefined}
+          style={{
+            opacity: heroFeatureOpacity,
+            visibility: heroFeatureOpacity <= 0.01 ? 'hidden' : 'visible',
+            transform: `translateY(${heroFeaturesEntered ? 0 : 18}px)`,
+          }}
+        >
+          <div className="mx-auto w-full max-w-[1120px]">
+            <RightFeatureList
+              featureProgress={isCompactFeatureViewport ? heroFeatureProgress : (heroFeaturesEntered ? 1 : 0)}
+              items={HERO_RECEPTIONIST_FEATURE_ITEMS}
+              useScrollHighlight={isCompactFeatureViewport}
+              mobilePageSize={4}
+              mobilePageBreakpoint={1024}
+              mobileMaxItems={8}
+              debugId={jitterDebugEnabled ? 'hero' : null}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const BlinkedWord = ({ progress }) => {
+  const closingProgress = clamp(progress, 0, 1);
+  const smoothStep = (value) => value * value * (3 - 2 * value);
+  const easeInQuart = (value) => value * value * value * value;
+  let openAmount = 1;
+
+  if (closingProgress < 0.44) {
+    const eased = easeInQuart(closingProgress / 0.44);
+    openAmount = 1 - eased * 0.18;
+  } else if (closingProgress < 0.7) {
+    const eased = smoothStep((closingProgress - 0.44) / 0.26);
+    openAmount = 0.82 - eased * 0.5;
+  } else if (closingProgress < 0.88) {
+    const eased = smoothStep((closingProgress - 0.7) / 0.18);
+    openAmount = 0.32 + eased * 0.16;
+  } else {
+    const eased = smoothStep((closingProgress - 0.88) / 0.12);
+    openAmount = 0.48 - eased * 0.48;
+  }
+
+  const closingTension = smoothStep(clamp((closingProgress - 0.36) / 0.64, 0, 1));
+  const flutterStrength = Math.sin(closingProgress * Math.PI) * 0.018;
+  const flutterOffset = Math.sin(closingProgress * 54) * flutterStrength * closingTension;
+  const effectiveOpen = clamp(openAmount + flutterOffset, 0, 1);
+  const midY = 0.5;
+  const upperY = midY - effectiveOpen * 0.48;
+  const lowerY = midY + effectiveOpen * 0.48;
+  const jitterX = flutterOffset * 0.18;
+  const topLidHeight = clamp(upperY, 0, 0.5);
+  const bottomLidTop = clamp(lowerY, 0.5, 1);
+  const rimOpacity = smoothStep(clamp((closingProgress - 0.12) / 0.72, 0, 1));
+  const closingBlur = smoothStep(clamp((closingProgress - 0.68) / 0.24, 0, 1)) * 1.2;
+
+  return (
+    <span className="relative inline-block whitespace-nowrap align-baseline" aria-label="blinked">
+      <span
+        aria-hidden="true"
+        className="opacity-0"
+      >
+        blinked
+      </span>
+      <span
+        aria-hidden="true"
+        className="absolute inset-0 bg-gradient-to-r from-[var(--brandGradientStart)] to-[var(--brandGradientEnd)] bg-clip-text text-transparent"
+        style={{
+          filter: `blur(${closingBlur}px)`,
+          transform: `translateX(${jitterX}em)`,
+          transformOrigin: 'center'
+        }}
+      >
+        blinked
+      </span>
+      <span aria-hidden="true" className="absolute left-0 top-0 w-full bg-[#020202]" style={{ height: `${topLidHeight * 100}%` }} />
+      <span aria-hidden="true" className="absolute bottom-0 left-0 w-full bg-[#020202]" style={{ top: `${bottomLidTop * 100}%` }} />
+      <svg
+        className="pointer-events-none absolute inset-0 h-full w-full"
+        viewBox="0 0 1 1"
+        preserveAspectRatio="none"
+        aria-hidden="true"
+        style={{ opacity: rimOpacity }}
+      >
+        <path
+          d={`M 0,${midY} Q 0.5,${lowerY} 1,${midY}`}
+          fill="none"
+          stroke="#ffffff"
+          strokeWidth={effectiveOpen > 0.02 ? '0.006' : '0'}
+          strokeOpacity={0.28 * effectiveOpen}
+          style={{ filter: 'blur(0.5px)' }}
+        />
+        <path
+          d={`M 0,${midY} Q 0.5,${upperY} 1,${midY}`}
+          fill="none"
+          stroke="#000000"
+          strokeWidth="0.03"
+          strokeOpacity={0.65 * effectiveOpen}
+          style={{ filter: 'blur(4px)' }}
+        />
+      </svg>
+    </span>
+  );
+};
+
+const ComparisonShowcase = () => {
+  const { rootRef, progress: sectionProgress, direction } = useSectionScrollProgress({ mobileMinDelta: 0.0025 });
+  const jitterDebugEnabled = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('jitterDebug') === '1';
+  const jitterRenderCount = useRef(0);
+  if (jitterDebugEnabled) jitterRenderCount.current += 1;
+  const [mondayRevealComplete, setMondayRevealComplete] = useState(false);
+  const [cinematicStarted, setCinematicStarted] = useState(false);
+  const [blinkProgress, setBlinkProgress] = useState(0);
+  const [introExited, setIntroExited] = useState(false);
+  const [timelineStartProgress, setTimelineStartProgress] = useState(0.3);
+  const liveProgressRef = useRef(sectionProgress);
+  const cinematicStartedRef = useRef(false);
+
+  useEffect(() => {
+    liveProgressRef.current = sectionProgress;
+  }, [sectionProgress]);
+
+  useEffect(() => {
+    if (sectionProgress >= 0.025 && !cinematicStarted) {
+      setCinematicStarted(true);
+    }
+  }, [cinematicStarted, sectionProgress]);
+
+  useEffect(() => {
+    cinematicStartedRef.current = cinematicStarted;
+  }, [cinematicStarted]);
+
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root || typeof window === 'undefined') return undefined;
+
+    let frame = null;
+    const checkIntroPosition = () => {
+      frame = null;
+      if (cinematicStartedRef.current) return;
+      const rect = root.getBoundingClientRect();
+      const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 1;
+      if (rect.top <= viewportHeight * 0.08 && rect.bottom >= viewportHeight * 0.55) {
+        setCinematicStarted(true);
+      }
+    };
+    const scheduleCheck = () => {
+      if (frame === null) frame = window.requestAnimationFrame(checkIntroPosition);
+    };
+
+    scheduleCheck();
+    window.addEventListener('scroll', scheduleCheck, { passive: true });
+    window.addEventListener('resize', scheduleCheck);
+    window.visualViewport?.addEventListener('resize', scheduleCheck);
+
+    return () => {
+      if (frame !== null) window.cancelAnimationFrame(frame);
+      window.removeEventListener('scroll', scheduleCheck);
+      window.removeEventListener('resize', scheduleCheck);
+      window.visualViewport?.removeEventListener('resize', scheduleCheck);
+    };
+  }, [rootRef]);
+
+  useEffect(() => {
+    if (!cinematicStarted) return undefined;
+
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+      setBlinkProgress(1);
+      setTimelineStartProgress(Math.max(0.3, liveProgressRef.current));
+      setIntroExited(true);
+      return undefined;
+    }
+
+    const duration = 1400;
+    const startedAt = performance.now();
+    let frame = null;
+    let revealTimer = null;
+    const animateBlink = (now) => {
+      const progress = clamp((now - startedAt) / duration, 0, 1);
+      setBlinkProgress(progress);
+      if (progress < 1) {
+        frame = window.requestAnimationFrame(animateBlink);
+        return;
+      }
+      revealTimer = window.setTimeout(() => {
+        setTimelineStartProgress(Math.max(0.3, liveProgressRef.current));
+        setIntroExited(true);
+      }, 170);
+    };
+
+    frame = window.requestAnimationFrame(animateBlink);
+    return () => {
+      if (frame !== null) window.cancelAnimationFrame(frame);
+      if (revealTimer !== null) window.clearTimeout(revealTimer);
+    };
+  }, [cinematicStarted]);
+
+  const comparisonProgress = mondayRevealComplete
+    ? clamp((sectionProgress - timelineStartProgress) / Math.max(1 - timelineStartProgress, 0.01), 0, 1)
+    : 0;
+  const timelineProgress = clamp(comparisonProgress / 0.72, 0, 1);
+  const scrollStep = Math.min(6, Math.floor(timelineProgress * 7));
+  const finaleProgress = clamp((comparisonProgress - 0.72) / 0.28, 0, 1);
+  const jitterState = sectionProgress < 0.025
+    ? 'inactive'
+    : !introExited || comparisonProgress < 1
+      ? 'entering'
+      : sectionProgress < 1 ? 'locked' : 'exiting';
+
+  useEffect(() => {
+    if (!introExited || mondayRevealComplete) return undefined;
+
+    const releaseTimer = window.setTimeout(() => {
+      setMondayRevealComplete(true);
+    }, 2300);
+    return () => {
+      window.clearTimeout(releaseTimer);
+    };
+  }, [introExited, mondayRevealComplete]);
+
+  useEffect(() => {
+    if (sectionProgress < 0.02) {
+      setMondayRevealComplete(false);
+      setCinematicStarted(false);
+      setBlinkProgress(0);
+      setIntroExited(false);
+      setTimelineStartProgress(0.3);
+    }
+  }, [sectionProgress]);
+
+  return (
+    <section ref={rootRef} aria-labelledby="comparison-section-title" className="comparison-host content-section content-section--showcase dark-bg text-center relative h-[560vh]"
+      data-visitor-section="comparison"
+      data-visitor-section-index="4"
+      data-jitter-debug-root={jitterDebugEnabled ? 'comparison' : undefined}
+      data-jitter-section-progress={jitterDebugEnabled ? sectionProgress : undefined}
+      data-jitter-feature-progress={jitterDebugEnabled ? comparisonProgress : undefined}
+      data-jitter-state={jitterDebugEnabled ? jitterState : undefined}
+      data-jitter-render-count={jitterDebugEnabled ? jitterRenderCount.current : undefined}
+      data-jitter-viewport={jitterDebugEnabled ? 'not-stored' : undefined}
+    >
+      <div className="sticky top-0 h-screen overflow-hidden bg-[#020202]" data-jitter-debug-sticky={jitterDebugEnabled ? 'comparison' : undefined}>
+        <div
+          className={`absolute inset-0 z-20 flex items-center justify-center px-6 transition-[opacity,transform] duration-500 ease-out ${
+            introExited ? 'pointer-events-none' : ''
+          }`}
+          style={{
+            opacity: introExited ? 0 : 1,
+            visibility: introExited ? 'hidden' : 'visible',
+            transform: `translateY(${introExited ? -12 : 0}px)`,
+          }}
+        >
+          <div className="mx-auto max-w-6xl px-2 text-center sm:px-4">
+            <h2 id="comparison-section-title" className="homepage-copy-reveal is-visible mx-auto max-w-[1120px] text-3xl font-medium leading-snug text-white md:text-5xl lg:text-6xl">
+              What if your front desk never <BlinkedWord progress={blinkProgress} />?
+            </h2>
+          </div>
+        </div>
+
+        <div
+          className={`absolute inset-0 z-10 transition-[opacity,transform] duration-500 ease-out ${
+            !introExited ? 'pointer-events-none' : ''
+          }`}
+          data-jitter-debug-overlay={jitterDebugEnabled ? 'comparison' : undefined}
+          style={{
+            opacity: introExited ? 1 : 0,
+            visibility: introExited ? 'visible' : 'hidden',
+            transform: `translateY(${introExited ? 0 : 18}px)`,
+          }}
+        >
+          <WorkWeekComparison scrollStep={scrollStep} scrollDirection={direction} comparisonActive={introExited} finaleProgress={finaleProgress} jitterDebugEnabled={jitterDebugEnabled} />
+        </div>
+      </div>
+    </section>
+  );
+};
+
+const HomePage = () => {
+  const [showSplash, setShowSplash] = useState(true);
+  useLegacyAnimation();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [headerHasAppeared, setHeaderHasAppeared] = useState(false);
+  const heroRef = useRef(null);
+
+  useEffect(() => {
+    if (!heroRef.current) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry.isIntersecting) {
+          setHeaderHasAppeared(true);
+        }
+      },
+      { threshold: 0 }
+    );
+    observer.observe(heroRef.current);
+    return () => observer.disconnect();
+  }, []);
+  const { session, logout } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const jitterTest = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('jitterTest') : null;
+
+  const phoneHelperCollageImages = [phonehelper1, phonehelper2];
+  const slimImages = [slimYahoo, slimHulu, slimChime, slimBumble, slimVerizon, slimFacebook];
+
+  const allExpandedImages = [
+    expandedAmazon,
+    expandedAnniversary,
+    expandedBirthday,
+    expandedNetflix,
+    expandedPhonepassword,
+    expandedPlaystation,
+    expandedSnapcha,
+    expandedSpectrum,
+    expandedTicketmaster,
+    expandedWifi,
+    expandedX,
+  ];
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const srcParam = params.get('source');
+    const path = location.pathname.toLowerCase().replace(/\/$/, '');
+    
+    let newSource = (getCookie('source') || 'standard').toLowerCase();
+    let shouldUpdateCookie = false;
+
+    if (srcParam) {
+        const s = srcParam.toLowerCase();
+        if (s === 'sales') { newSource = 'sales'; shouldUpdateCookie = true; }
+        else if (['meta', 'facebook', 'instagram', 'tiktok', 'social'].includes(s)) { newSource = 'social'; shouldUpdateCookie = true; }
+    } else if (path.endsWith('/ios') || path.endsWith('/android')) {
+        newSource = 'sales';
+        shouldUpdateCookie = true;
+    }
+
+    if (shouldUpdateCookie) {
+        const d = new Date();
+        d.setTime(d.getTime() + (30 * 24 * 60 * 60 * 1000));
+        document.cookie = `source=${newSource}; expires=${d.toUTCString()}; path=/; SameSite=Lax${window.location.protocol === 'https:' ? '; Secure' : ''}`;
+    }
+  }, [location]);
+
+  const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
+
+  const cardImages = [pgg1, pgg20, pgg3, pgg4, pgg5, pgg6, pgg7];
+
+  const AnimatedBeautifulText = () => {
+    const word = "Reliable";
+    const letters = word.split('');
+    const textRef = useRef(null);
+    const isInView = useInView(textRef, { once: true, amount: 0.5 });
+    const [animationKey, setAnimationKey] = useState(0);
+
+    useEffect(() => {
+      if (isInView) {
+        setAnimationKey(prevKey => prevKey + 1);
+      }
+    }, [isInView]);
+
+    const getDelay = (index) => index * 50;
+
+    return (
+      <span ref={textRef} className="anim-text anim-vapor" key={animationKey}>
+        {letters.map((letter, index) => (
+          <span
+            key={index}
+            style={{ animationDelay: `${getDelay(index)}ms` }}
+          >
+            {letter === ' ' ? '\u00A0' : letter}
+          </span>
+        ))}
+      </span>
+    );
+  };
+
+  const RainingImages = () => {
+    const ref = useRef(null);
+    const isInView = useInView(ref, { amount: 0.2 });
+
+    const imageVariants = {
+      hidden: { y: -100, opacity: 0, rotate: 0 },
+      visible: (i) => ({
+        y: ["-10%", "110%"],
+        x: [0, Math.random() * 400 - 200, 0],
+        z: [Math.random() * -500, Math.random() * 500],
+        opacity: [0, 0.7, 0.7, 0],
+        scale: [0.5, 1.1, 1.1, 0.5],
+        rotateX: [0, Math.random() * 40 - 20, Math.random() * 40 - 20, 0],
+        rotateY: [0, Math.random() * 40 - 20, Math.random() * 40 - 20, 0],
+        rotateZ: [0, Math.random() * 30 - 15, Math.random() * 30 - 15, 0],
+        filter: ['blur(10px)', 'blur(0px)', 'blur(0px)', 'blur(10px)'],
+        boxShadow: '0 4px 8px rgba(0, 0, 0, 0.2)',
+        transition: {
+          delay: i * 0.2 + Math.random() * 0.5,
+          duration: 12 + Math.random() * 10,
+          ease: "easeInOut",
+          repeat: Infinity,
+          repeatDelay: 0,
+        },
+      }),
+    };
+
+    return (
+      <motion.div
+        ref={ref}
+        className="relative w-full h-[500px] mx-auto mt-10 overflow-hidden pointer-events-none"
+      >
+        {isInView && cardImages.map((image, index) => (
+          <motion.img
+            key={index}
+            src={image}
+            alt={`Account screenshot ${index + 1}`}
+            className="absolute"
+            style={{
+              zIndex: 1,
+              maxWidth: '320px',
+              maxHeight: '270px',
+              objectFit: 'contain',
+              pointerEvents: 'none',
+              left: `${Math.random() * 120 - 10}%`,
+              top: `-20%`,
+              borderRadius: '12px',
+            }}
+            variants={imageVariants}
+            initial="hidden"
+            animate="visible"
+            custom={index}
+          />
+        ))}
+      </motion.div>
+    );
+  };
+
+  return (
+    <div id="myHtmlContent" data-jitter-test={jitterTest || undefined}>
+      <AnimatePresence>
+        {showSplash && (
+          <motion.div
+            key="splash-screen"
+            initial={{ opacity: 1 }}
+            exit={{ opacity: 0, transition: { duration: 0.5 } }}
+            style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 9999, pointerEvents: 'none' }}
+          >
+            <SplashScreen onAnimationEnd={() => setShowSplash(false)} />
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <div className={`header${headerHasAppeared ? ' is-visible' : ''}`} data-visitor-click-section="header" data-visitor-click-section-index="-1">
+        <nav className="nav-content">
+          <img src={logoImage} alt="Nodemere" className="header-logo" />
+
+          {/* Desktop Navigation */}
+          <div className="hidden md:flex items-center space-x-6 ml-auto">
+            <Link to="/pricing" data-visitor-event="navigation_click" data-visitor-id="header-pricing" className="text-sm font-semibold text-white hover:text-gray-300">Pricing</Link>
+            {session ? (
+              <>
+                <button
+                  onClick={async () => { await logout(); navigate('/'); }}
+                  className="text-sm font-semibold text-white hover:text-gray-300"
+                >
+                  Logout
+                </button>
+                <Link to="/dashboard" className="text-sm font-semibold gradient-button dashboard-gradient-button btn-shine hover:opacity-90 transition-opacity">Dashboard</Link>
+              </>
+            ) : (
+              <>
+                <Link to="/auth" data-visitor-event="navigation_click" data-visitor-id="header-login" className="text-sm font-semibold text-white hover:text-gray-300">Login</Link>
+                <Link to="/auth" state={{ isSignUp: true }} data-visitor-event="cta_click" data-visitor-id="header-signup" className="text-sm font-semibold gradient-button btn-shine hover:opacity-90 transition-opacity">Sign Up</Link>
+              </>
+            )}
+          </div>
+
+          {/* Mobile Navigation */}
+          <div className="md:hidden flex items-center space-x-4 ml-auto">
+            {!session && (
+              <Link to="/auth" state={{ isSignUp: true }} data-visitor-event="cta_click" data-visitor-id="mobile-signup" className="text-sm font-semibold gradient-button btn-shine hover:opacity-90 transition-opacity">Sign Up</Link>
+            )}
+            <button onClick={toggleMenu} className="text-white hover:text-gray-300 focus:outline-none">
+              {isMenuOpen ? <XIcon size={24} /> : <MenuIcon size={24} />}
+            </button>
+          </div>
+        </nav>
+
+        <AnimatePresence>
+          {isMenuOpen && (
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.2 }}
+              className="md:hidden absolute top-full left-0 w-full bg-[#020202] shadow-lg py-4 z-50"
+            >
+              <div className="flex flex-col items-center space-y-4">
+                {session && (
+                  <Link to="/dashboard" className="text-base font-semibold text-white hover:text-gray-300" onClick={toggleMenu}>Dashboard</Link>
+                )}
+                <Link to="/pricing" data-visitor-event="navigation_click" data-visitor-id="mobile-pricing" className="text-base font-semibold text-white hover:text-gray-300" onClick={toggleMenu}>Pricing</Link>
+                {session ? (
+                  <button onClick={async () => { await logout(); navigate('/'); toggleMenu(); }} className="text-base font-semibold text-white hover:text-gray-300">Logout</button>
+                ) : (
+                  <Link to="/auth" data-visitor-event="navigation_click" data-visitor-id="mobile-login" className="text-base font-semibold text-white hover:text-gray-300" onClick={toggleMenu}>Login</Link>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      <main>
+        <StackedHeroShowcase sectionRef={heroRef} />
+
+        <section className="content-section content-section--showcase content-section--booking dark-bg text-center" data-visitor-section="calendar" data-visitor-section-index="1">
+          <CalendarShowcase />
+        </section>
+
+        <IntercomShowcase />
+
+        <section className="content-section content-section--showcase dark-bg text-center" data-visitor-section="people-crm" data-visitor-section-index="2">
+          <CalendarShowcase variant="people-crm" />
+        </section>
+
+        <section className="content-section content-section--showcase dark-bg text-center" data-visitor-section="live-monitoring" data-visitor-section-index="3">
+          <CalendarShowcase variant="live-monitoring" />
+        </section>
+
+        <ComparisonShowcase />
+
+        <section className="content-section content-section--showcase dark-bg text-center" data-visitor-section="scenarios" data-visitor-section-index="5">
+          <CalendarShowcase variant="scenarios" />
+        </section>
+
+        <section className="content-section content-section--showcase dark-bg text-center" data-visitor-section="security" data-visitor-section-index="6">
+          <EncryptionShowcase />
+        </section>
+
+      </main>
+      <LegalFooter />
+      <JitterDebugOverlay />
+    </div>
+  );
+};
+
+export default HomePage;

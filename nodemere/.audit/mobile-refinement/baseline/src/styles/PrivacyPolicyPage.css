@@ -1,0 +1,94 @@
+/* src/styles/PrivacyPolicyPage.css */
+
+.privacy-policy-container {
+  max-width: 900px; /* Slightly wider for better text flow */
+  margin: 40px auto;
+  padding: 30px;
+  background-color: black; /* Black background */
+  color: white; /* White text */
+  border-radius: 8px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5); /* More pronounced shadow */
+  line-height: 1.8; /* Increased line height for readability */
+  font-family: 'Inter', sans-serif;
+  font-size: 1.1em; /* Slightly larger base font size */
+}
+
+.privacy-policy-container h1,
+.privacy-policy-container h2,
+.privacy-policy-container h3 {
+  color: #ffffff;
+  margin-top: 2em; /* More space above headings */
+  margin-bottom: 1em;
+  line-height: 1.3;
+  font-weight: 600; /* Slightly bolder headings */
+}
+
+.privacy-policy-container h1 {
+  font-size: 2.8em;
+  border-bottom: 2px solid #7b8afe; /* Accent color for border */
+  padding-bottom: 0.6em;
+  margin-bottom: 1.2em;
+  text-align: center; /* Center align main title */
+}
+
+.privacy-policy-container h2 {
+  font-size: 2em;
+  border-bottom: 1px solid #444; /* Subtle border for subheadings */
+  padding-bottom: 0.4em;
+  margin-bottom: 1em;
+}
+
+.privacy-policy-container h3 {
+  font-size: 1.6em;
+}
+
+.privacy-policy-container p {
+  margin-bottom: 1.2em; /* More space between paragraphs */
+}
+
+.privacy-policy-container ul,
+.privacy-policy-container ol {
+  margin-left: 25px; /* Increased indent for lists */
+  margin-bottom: 1.2em;
+}
+
+.privacy-policy-container li {
+  margin-bottom: 0.6em;
+}
+
+.privacy-policy-container strong {
+  color: #ffffff;
+  font-weight: 700; /* Bolder strong text */
+}
+
+.privacy-policy-container a {
+  color: #7b8afe; /* Link color */
+  text-decoration: underline;
+}
+
+.privacy-policy-container a:hover {
+  color: #534eef; /* Hover color for links */
+}
+
+.privacy-policy-container.loading,
+.privacy-policy-container.error {
+  text-align: center;
+  padding: 50px;
+  font-size: 1.2em;
+  color: #e0e0e0; /* Ensure loading/error text is visible */
+}
+
+.privacy-policy-content hr {
+  border: 0;
+  height: 1px;
+  background: #444; /* Darker hr for contrast */
+  margin: 2.5em 0;
+}
+
+.privacy-policy-content blockquote {
+  border-left: 5px solid #7b8afe; /* Accent color for blockquote */
+  padding-left: 1.5em;
+  margin: 1.5em 0;
+  font-style: italic;
+  color: #a0a0a0;
+}

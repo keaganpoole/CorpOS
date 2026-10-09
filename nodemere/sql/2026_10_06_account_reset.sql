@@ -30,7 +30,7 @@ set search_path=''
 as $$
 declare
   v_business_id bigint;
-  table_name text;
+  v_table_name text;
 begin
   if target_user is null then
     raise exception 'A target user is required' using errcode='22023';
@@ -57,19 +57,19 @@ begin
   end if;
 
   if v_business_id is not null then
-    foreach table_name in array array[
+    foreach v_table_name in array array[
       'business_data_keys','business_retention_policy','voice_clone_consents',
       'people_field_definitions','verification_sessions','people_docs','requests','contracts','drop_ins','flow_executions','jobs',
       'scenario_events','call_logs','appointments','nest','intercom','intercom_usage_daily',
       'reviews','bugs','custom_voices','people_schema','appointments_schema','account_settings',
       'created_receptionists','hired_receptionists','scenarios','staff','services','people','purchased_numbers'
     ] loop
-      if to_regclass('public.' || table_name) is not null
+      if to_regclass('public.' || v_table_name) is not null
          and exists (
            select 1 from information_schema.columns c
-           where c.table_schema='public' and c.table_name=table_name and c.column_name='business_id'
+           where c.table_schema='public' and c.table_name=v_table_name and c.column_name='business_id'
          ) then
-        execute format('delete from public.%I where business_id = $1', table_name) using v_business_id;
+        execute format('delete from public.%I where business_id = $1', v_table_name) using v_business_id;
       end if;
     end loop;
 

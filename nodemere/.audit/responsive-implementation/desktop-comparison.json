@@ -1,0 +1,74 @@
+[
+  {
+    "page": "people",
+    "width": 1440,
+    "height": 1000,
+    "changedPixels": 0,
+    "changedPercent": 0,
+    "meanDelta": 0.00003125,
+    "maxDelta": 1
+  },
+  {
+    "page": "team",
+    "width": 1440,
+    "height": 1000,
+    "changedPixels": 0,
+    "changedPercent": 0,
+    "meanDelta": 0,
+    "maxDelta": 0
+  },
+  {
+    "page": "calendar",
+    "width": 1440,
+    "height": 1000,
+    "changedPixels": 0,
+    "changedPercent": 0,
+    "meanDelta": 0,
+    "maxDelta": 0
+  },
+  {
+    "page": "appointments",
+    "width": 1440,
+    "height": 1000,
+    "changedPixels": 1358,
+    "changedPercent": 0.09430555555555556,
+    "meanDelta": 0.024402083333333335,
+    "maxDelta": 54
+  },
+  {
+    "page": "settings",
+    "width": 1440,
+    "height": 1000,
+    "changedPixels": 0,
+    "changedPercent": 0,
+    "meanDelta": 0,
+    "maxDelta": 0
+  },
+  {
+    "page": "reports",
+    "width": 1440,
+    "height": 1000,
+    "changedPixels": 172688,
+    "changedPercent": 11.992222222222223,
+    "meanDelta": 7.097834722222222,
+    "maxDelta": 255
+  },
+  {
+    "page": "call-logs",
+    "width": 1440,
+    "height": 1000,
+    "changedPixels": 0,
+    "changedPercent": 0,
+    "meanDelta": 0,
+    "maxDelta": 0
+  },
+  {
+    "page": "scenarios",
+    "width": 1440,
+    "height": 1000,
+    "changedPixels": 74205,
+    "changedPercent": 5.153125,
+    "meanDelta": 7.735802083333334,
+    "maxDelta": 255
+  }
+]

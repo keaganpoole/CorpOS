@@ -1,0 +1,192 @@
+/* commission-modal-overlay */
+.commission-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  backdrop-filter: blur(5px);
+}
+
+/* commission-modal-content */
+.commission-modal-content {
+  background-color: rgba(26, 26, 26, 0.85); /* Translucent dark background */
+  border-radius: 12px;
+  padding: 30px;
+  position: relative;
+  width: 90%;
+  max-width: 700px;
+  box-shadow: none; /* No glow */
+  color: #e0e0e0; /* Light text color */
+  font-family: 'Inter', sans-serif; /* Consistent font */
+  animation: fadeInScale 0.3s ease-out forwards;
+  max-height: 80vh; /* Limit height for mobile */
+  overflow-y: auto; /* Scroll for overflow */
+}
+
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* commission-modal-close-button */
+.commission-modal-close-button {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  background: none;
+  border: none;
+  font-size: 28px;
+  color: #ffffff; /* White color for close button */
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.commission-modal-close-button:hover {
+  color: #fff;
+}
+
+/* commission-modal-title */
+.commission-modal-title {
+  color: #ffffff; /* White for title */
+  font-size: 1.5em;
+  margin-bottom: 25px;
+  text-align: center;
+  text-shadow: none; /* No text shadow */
+}
+
+/* commission-modal-status */
+.commission-modal-status {
+  text-align: center;
+  padding: 20px;
+  color: #bbb;
+}
+
+.commission-modal-status.error {
+  color: #ff6b6b; /* Red for errors */
+}
+
+/* commission-table-container */
+.commission-table-container {
+  margin-top: 20px;
+  overflow-x: auto; /* Enable horizontal scroll on small screens */
+}
+
+/* commission-table */
+.commission-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 15px;
+  min-width: 300px; /* Ensure table is not too narrow on mobile */
+}
+
+.commission-table th,
+.commission-table td {
+  border: 1px solid #333; /* Darker border */
+  padding: 10px 12px;
+  text-align: left;
+  color: #e0e0e0;
+  font-size: 0.85em; /* Slightly smaller table text */
+}
+
+.commission-table thead th {
+  background-color: #ffffff22; /* Light white background for headers */
+  color: #ffffff;
+  font-weight: bold;
+  text-transform: uppercase;
+  font-size: 0.8em; /* Slightly smaller header text */
+  letter-spacing: 0.05em;
+}
+
+.header-sub {
+  font-size: 0.7em;
+  opacity: 0.6;
+  font-weight: normal;
+  margin-top: 4px;
+  text-transform: none;
+}
+
+.header-emoji-accent {
+  font-size: 1.5em; /* Makes emojis 20% larger than their parent text */
+  vertical-align: middle; /* Aligns emojis nicely with text */
+}
+
+
+.plan-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.points-pair {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-display), sans-serif;
+}
+
+.points-divider {
+  opacity: 0.2;
+  font-size: 0.8em;
+}
+
+.commission-table tbody tr:nth-child(odd) {
+  background-color: #222; /* Slightly different background for odd rows */
+}
+
+.commission-table tbody tr:hover {
+  background-color: #333; /* Highlight on hover */
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .commission-modal-content {
+    padding: 20px;
+    width: 95%;
+  }
+
+  .commission-modal-title {
+    font-size: 1.5em;
+    margin-bottom: 20px;
+  }
+
+  .commission-table th,
+  .commission-table td {
+    padding: 10px;
+    font-size: 0.85em;
+  }
+}
+
+@media (max-width: 480px) {
+  .commission-modal-content {
+    border-radius: 8px;
+  }
+
+  .commission-modal-title {
+    font-size: 1.3em;
+    margin-bottom: 15px;
+  }
+
+  .commission-modal-close-button {
+    font-size: 24px;
+    top: 10px;
+    right: 10px;
+  }
+
+  .commission-table th,
+  .commission-table td {
+    padding: 8px;
+    font-size: 0.8em;
+  }
+}

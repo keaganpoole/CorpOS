@@ -17,7 +17,7 @@ import requests
 
 
 RESEND_SEND_URL = "https://api.resend.com/emails"
-EMAIL_KIND = Literal["verification", "document_upload", "workforce_invitation"]
+EMAIL_KIND = Literal["verification", "document_upload", "workforce_invitation", "account_reset"]
 
 
 class EmailDeliveryError(Exception):
@@ -70,6 +70,9 @@ def _email_copy(kind: EMAIL_KIND, business_name: str) -> tuple[str, str, str, st
     if kind == "workforce_invitation":
         return ("You have a Nodemere workforce invitation", "Accept invitation",
                 "Sign in using this email address to review your business invitation. Invitations expire after seven days.", "Workforce invitation")
+    if kind == "account_reset":
+        return ("Confirm your Nodemere account reset", "Reset account",
+                "Use this link to permanently clear your Nodemere workspace and return to onboarding. Your login and billing information will stay unchanged.", "Account reset requested")
     if kind == "verification":
         return (
             f"Verify your identity with {business_name}",

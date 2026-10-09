@@ -19,16 +19,16 @@ export const STATUS_OPTIONS = [
   { value: 'Pending', color: 'amber' },
   { value: 'Confirmed', color: 'cyan' },
   { value: 'Completed', color: 'emerald' },
-  { value: 'Missed', color: 'rose' },
-  { value: 'Cancelled', color: 'fuchsia' },
+  { value: 'Missed', color: 'orange' },
+  { value: 'Cancelled', color: 'red' },
 ];
 
 export const APPOINTMENT_STATUS_COLORS = {
   Pending: '#f59e0b',
   Confirmed: '#06b6d4',
   Completed: '#10b981',
-  Missed: '#f43f5e',
-  Cancelled: '#d946ef',
+  Missed: '#f97316',
+  Cancelled: '#ef4444',
 };
 
 export const SOURCE_OPTIONS = [

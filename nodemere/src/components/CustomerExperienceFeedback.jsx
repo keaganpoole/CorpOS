@@ -159,6 +159,7 @@ const CustomerExperienceFeedback = () => {
   const localKeyRef = useRef(null);
   const completionLockRef = useRef(false);
   const persistReviewRef = useRef(null);
+  const dismissalRef = useRef(null);
 
   const businessId = business?.id || null;
   const currentQuestionComplete = questionIsComplete(questionIndex, answers);
@@ -340,19 +341,23 @@ const CustomerExperienceFeedback = () => {
           || state === 'discount_granted'
           || localCompleted;
         const isDeclined = hasDeclinedReview || state === 'declined' || localDeclined;
-        const snoozedUntil = existingReview?.snoozed_until || (useLocalFallback ? localState?.snoozed_until : null);
+        const reviewSnoozedUntil = existingReviews
+          .map((item) => item.snoozed_until)
+          .filter(Boolean)
+          .sort((left, right) => new Date(right).getTime() - new Date(left).getTime())[0] || null;
+        const snoozedUntil = reviewSnoozedUntil || localState?.snoozed_until || null;
         const isSnoozed = snoozedUntil && new Date(snoozedUntil).getTime() > Date.now();
         const eligibleByUsage = Number(usageContext.people_count) >= 3;
         const eligibleByAccountAge = Number(nextContext.account_age_days) >= 15;
         const isEligible = eligibleByUsage || eligibleByAccountAge;
-        const shouldShow = !isCompleted && !isDeclined && isEligible && !isSnoozed;
+        const shouldShow = !dismissalRef.current && !isCompleted && !isDeclined && isEligible && !isSnoozed;
 
         if (shouldShow) {
           setView('invite');
           setQuestionIndex(0);
           setDirection(1);
           setIsOpen(true);
-          if (!reviewLookupFailed && persistReviewRef.current) {
+          if (!reviewLookupFailed && persistReviewRef.current && !dismissalRef.current) {
             const persistedAnswers = normalizeAnswers(storedAnswers);
             if (!existingReview) {
               await persistReviewRef.current('eligible', persistedAnswers, { context: nextContext });
@@ -385,13 +390,15 @@ const CustomerExperienceFeedback = () => {
   };
 
   const handleLater = async () => {
-    await persistReview('postponed', answers, { snoozed_until: addDays(new Date(), SNOOZE_DAYS) });
+    dismissalRef.current = 'postponed';
     setIsOpen(false);
+    await persistReview('postponed', answers, { snoozed_until: addDays(new Date(), SNOOZE_DAYS) });
   };
 
   const handleDecline = async () => {
-    await persistReview('declined', answers);
+    dismissalRef.current = 'declined';
     setIsOpen(false);
+    await persistReview('declined', answers);
   };
 
   const handleClose = async () => {

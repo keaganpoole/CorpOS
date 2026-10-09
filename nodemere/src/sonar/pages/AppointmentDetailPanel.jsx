@@ -21,6 +21,7 @@ const colorStyles = {
   blue: { dot: 'var(--brandGradientEnd)', className: 'bg-white/[0.04] text-zinc-300 border-white/[0.08]' },
   amber: { dot: '#f59e0b', className: 'bg-amber-500/10 text-amber-400 border-amber-500/20' },
   orange: { dot: '#f97316', className: 'bg-orange-500/10 text-orange-400 border-orange-500/20' },
+  red: { dot: '#ef4444', className: 'bg-red-500/10 text-red-400 border-red-500/20' },
   fuchsia: { dot: '#d946ef', className: 'bg-fuchsia-500/10 text-fuchsia-400 border-fuchsia-500/20' },
   rose: { dot: '#f43f5e', className: 'bg-rose-500/10 text-rose-400 border-rose-500/20' },
   indigo: { dot: '#6366f1', className: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' },

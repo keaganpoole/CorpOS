@@ -423,6 +423,7 @@ const InlineSelect = ({ value, options, onSave, type = 'select', optionColors = 
     blue: { bg: 'bg-white/[0.04]', text: 'text-zinc-300', border: 'border-white/[0.08]', dot: 'var(--brandGradientEnd)' },
     amber: { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/20', dot: '#f59e0b' },
     orange: { bg: 'bg-orange-500/10', text: 'text-orange-400', border: 'border-orange-500/20', dot: '#f97316' },
+    red: { bg: 'bg-red-500/10', text: 'text-red-400', border: 'border-red-500/20', dot: '#ef4444' },
     fuchsia: { bg: 'bg-fuchsia-500/10', text: 'text-fuchsia-400', border: 'border-fuchsia-500/20', dot: '#d946ef' },
     rose: { bg: 'bg-rose-500/10', text: 'text-rose-400', border: 'border-rose-500/20', dot: '#f43f5e' },
     indigo: { bg: 'bg-indigo-500/10', text: 'text-indigo-400', border: 'border-indigo-500/20', dot: '#6366f1' },
