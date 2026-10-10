@@ -240,7 +240,7 @@ export default function DropInsModal({ model, onClose }) {
   return createPortal(<div className="drop-ins-backdrop" style={{ '--di-background': `url("${dropInsAurora}")` }} onMouseDown={e => { if (e.target === e.currentTarget) navigate(onClose); }}>
     <motion.section ref={modal} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="drop-ins-title" className="drop-ins-modal" onKeyDown={handleKeys} initial={{ opacity: 0, y: reduced ? 0 : 20, scale: reduced ? 1 : .98 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: .24 }}>
       <header className="drop-ins-header">
-        <div className="drop-ins-heading"><div><p className="drop-ins-eyebrow">Give your receptionist a reason to reach out.</p><div className="drop-ins-title-row"><h2 id="drop-ins-title">Drop-ins<span className="drop-ins-title-dot">.</span></h2><button type="button" className="drop-ins-tips-button" onClick={() => setTipsOpen(true)} aria-label="Drop-ins tips" title="Drop-ins tips"><Lightbulb size={16} /></button></div></div></div>
+        <div className="drop-ins-heading"><div><p className="drop-ins-eyebrow">Create specific calling tasks for your receptionist</p><div className="drop-ins-title-row"><h2 id="drop-ins-title">Drop-ins<span className="drop-ins-title-dot">.</span></h2><button type="button" className="drop-ins-tips-button" onClick={() => setTipsOpen(true)} aria-label="Drop-ins tips" title="Drop-ins tips"><Lightbulb size={16} /></button></div></div></div>
         <div className="drop-ins-header-actions"><span className="drop-ins-header-feedback" role="status" aria-live="polite"><AnimatePresence mode="wait" initial={false}>{headerNotice && <motion.span key={`${headerNotice.text}-${headerNotice.failed}`} className={`drop-ins-header-status ${headerNotice.failed ? 'is-error' : ''}`} initial={{ opacity: 0, y: reduced ? 0 : 3 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: reduced ? 0 : -2 }} transition={{ duration: reduced ? 0 : .18 }}><span className="drop-ins-header-feedback-icon">{headerNotice.failed ? <X size={12} /> : <Check size={12} />}</span>{headerNotice.text}</motion.span>}</AnimatePresence></span><button type="button" className="drop-ins-icon-button" aria-label="Close drop-ins" onClick={() => navigate(onClose)}><X size={20} /></button></div>
       </header>
       <div className="drop-ins-body">
@@ -327,18 +327,18 @@ export default function DropInsModal({ model, onClose }) {
 
 function DropInsTipsModal({ onClose }) {
   const points = [
-    ['Start with the moment.', 'Choose when the conversation belongs in the calendar: before an appointment, after it, or when someone misses it.'],
-    ['Name the outcome.', 'Give the button a short name and a clear purpose so your receptionist knows exactly why to call.'],
-    ['Write the escalation.', 'Describe the objective in plain language. Appointment details are added automatically when the call starts.'],
+    ['Provide the right context', 'Include important details your receptionist should consider, especially special circumstances or instructions that could affect the outcome.'],
+    ['Keep it short and sweet', 'Skip the step-by-step procedures. Explain what you want accomplished and let your receptionist handle the conversation naturally. Focus on the outcome and clearly state anything that must or must not happen.'],
+    ['Up to speed', 'Relevant appointment details are provided automatically, so you can focus your instructions on what you want accomplished.'],
   ];
   return <motion.div className="drop-ins-tips-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onMouseDown={onClose}>
     <motion.div className="drop-ins-tips-modal" initial={{ opacity: 0, y: 16, scale: .98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 16, scale: .98 }} transition={{ duration: .18 }} onMouseDown={event => event.stopPropagation()}>
       <ModalSpectrumLine variant="tips" />
       <div className="drop-ins-tips-glow" aria-hidden="true" />
       <div className="drop-ins-tips-content">
-        <div className="drop-ins-tips-top"><div><div className="drop-ins-tips-kicker"><Lightbulb size={15} />Tips</div><h3>Make every drop-in count.</h3><p>Drop-ins give your receptionist a focused reason to call while keeping the appointment record familiar.</p></div><button type="button" className="drop-ins-tips-close" onClick={onClose} aria-label="Close drop-ins tips"><X size={17} /></button></div>
+        <div className="drop-ins-tips-top"><div><div className="drop-ins-tips-kicker"><Lightbulb size={15} />Tips</div><h3>How to use drop-ins</h3><p>Drop-ins are ready-to-use calling tasks that put your receptionists to work with a single click, all from within your Nodemere Calendar.</p></div><button type="button" className="drop-ins-tips-close" onClick={onClose} aria-label="Close drop-ins tips"><X size={17} /></button></div>
         <div className="drop-ins-tips-points">{points.map(([title, body], index) => <div className="drop-ins-tips-point" key={title}><span style={{ opacity: 1 - index * .14 }} /><div><strong>{title}</strong><p>{body}</p></div></div>)}</div>
-        <p className="drop-ins-tips-footer">A great drop-in is specific enough to guide the call and simple enough to understand at a glance.</p>
+        <p className="drop-ins-tips-footer">The best Drop-ins have a clear purpose, not a lengthy script. Just explain what you want done.</p>
       </div>
     </motion.div>
   </motion.div>;
