@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { CheckCircle2, Copy, Phone, Plus, Search, X } from 'lucide-react';
+import { CheckCircle2, Copy, Phone, Search, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import CubePreloader from './CubePreloader';
 
@@ -23,8 +23,6 @@ const PHONE_PROVIDERS = [
   { id: 'optimum-business', label: 'Optimum Business', category: 'Business phone', summary: 'Forward calls from your business line.', logo: '/provider-logos/optimum.ico', darkName: '#F2F2F2', lightName: '#222222' },
   { id: 'other', label: 'Other provider', category: 'More options', summary: 'Find your provider’s forwarding setting.' },
 ];
-
-const availableProviderId = (providerId) => PHONE_PROVIDERS.some((provider) => provider.id === providerId) ? providerId : '';
 
 const SLIDE = { choice: 0, number: 1, share: 2, provider: 3, test: 4, callerId: 5 };
 
@@ -278,7 +276,6 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
   const [callerIdStarting, setCallerIdStarting] = useState(false);
   const [callerIdReturnSlide, setCallerIdReturnSlide] = useState(SLIDE.test);
   const [verifyCallerIdEnabled, setVerifyCallerIdEnabled] = useState(false);
-  const [isAddingNewNumber, setIsAddingNewNumber] = useState(false);
   const [isReplacingTargetNumber, setIsReplacingTargetNumber] = useState(false);
   const verificationWatchCleanupRef = useRef(null);
   const handleClose = () => {
@@ -320,7 +317,7 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
   ];
   const modalTitle =
     slide === SLIDE.choice
-      ? 'How will customers call your receptionist?'
+      ? 'Connect a Line'
       : slide === SLIDE.number
       ? targetQualityState === 'running'
         ? 'Checking this number.'
@@ -350,7 +347,7 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
           ? connectionChoice === 'direct' ? 'Place a test call before sharing this number with customers.' : 'This number is connected. Continue to set up call forwarding.'
           : needsTargetNumberSelection
             ? connectionChoice === 'direct' ? 'Pick the number customers will call to reach your receptionist.' : 'Pick the receptionist number your business line will forward calls to.'
-            : connectionChoice === 'direct' ? 'You can share this number with customers now, or replace it.' : 'Choose the business line to connect to this receptionist number.'
+            : connectionChoice === 'direct' ? 'You can share this number with customers now, or replace it.' : 'Connect your saved business line to this receptionist number.'
       : slide === SLIDE.share
         ? connectionChoice === 'direct' ? 'Share this number with customers so they can call your receptionist directly.' : 'Keep this receptionist number handy for the next step.'
         : slide === SLIDE.provider
@@ -362,45 +359,18 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
             : `Verify ${sourceNumber || 'your business number'} so outbound calls can display it as the caller ID. This step is optional.`;
   const forwardingSteps = [
     {
-      label: 'Phone number setup',
+      label: 'Activation',
       title: modalTitle,
       description: slideDescription,
     },
   ];
   const normalizedSourceNumber = sourceNumber.trim();
-  const sourceOptions = [];
-  const seenNumbers = new Set();
-
-  if (businessPhone) {
-    seenNumbers.add(businessPhone);
-    sourceOptions.push({
-      id: 'business-phone',
-      entryId: null,
-      source_number: businessPhone,
-      source_label: 'Business Line',
-      provider: '',
-      status: 'draft',
-    });
-  }
-
-  for (const entry of savedEntries) {
-    if (!entry?.source_number || seenNumbers.has(entry.source_number)) continue;
-    seenNumbers.add(entry.source_number);
-    sourceOptions.push({
-      id: entry.id || entry.source_number,
-      entryId: entry.id || null,
-      source_number: entry.source_number,
-      source_label: entry.source_label || entry.source_number,
-      provider: entry.provider || '',
-      status: entry.status || 'draft',
-    });
-  }
-
-  const selectedExistingEntry = savedEntries.find((entry) => {
-    if (!entry?.source_number) return false;
-    if (entryId && entry.id === entryId) return true;
-    return entry.source_number === normalizedSourceNumber;
-  }) || null;
+  const matchingOriginalEntry = (entry) => businessPhone
+    && nationalForwardingNumber(entry?.source_number) === nationalForwardingNumber(businessPhone);
+  const selectedExistingEntry = businessPhone
+    ? savedEntries.find((entry) => entry?.id === entryId && matchingOriginalEntry(entry))
+      || savedEntries.find(matchingOriginalEntry) || null
+    : null;
   const selectedExistingEntryIsVerified = selectedExistingEntry?.status === 'verified'
     && Boolean(selectedExistingEntry.target_number)
     && nationalForwardingNumber(selectedExistingEntry.target_number) === nationalForwardingNumber(forwardingNumber);
@@ -421,30 +391,6 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
       return;
     }
     setCallerIdMessage('');
-  };
-
-  const selectSourceOption = (option) => {
-    setIsAddingNewNumber(false);
-    setEntryId(option.entryId || null);
-    setSourceNumber(option.source_number || '');
-    setSourceLabel(option.source_label || '');
-    setSelectedProviderId(availableProviderId(option.provider));
-    setForwardingStatus(option.status || 'draft');
-    const matchedEntry = savedEntries.find((entry) => entry?.id === option.entryId || entry?.source_number === option.source_number) || null;
-    applyCallerIdEntryState(matchedEntry);
-  };
-
-  const startAddingNewNumber = () => {
-    setIsAddingNewNumber(true);
-    setEntryId(null);
-    setSourceNumber('');
-    setSourceLabel('');
-    setForwardingStatus('draft');
-    setCallerIdStatus('not_started');
-    setCallerIdMessage('');
-    setCallerIdValidationCode('');
-    setSelectedProviderId('');
-    setError('');
   };
 
   const requestForwarding = async (endpoint, options = {}) => {
@@ -564,13 +510,18 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
         if (!active) return;
 
         const numbers = data?.forwarding_config?.numbers || [];
-        const currentEntry = data?.current_entry || null;
+        const originalBusinessPhone = data?.business_phone || '';
+        const matchesOriginalPhone = (entry) => originalBusinessPhone
+          && nationalForwardingNumber(entry?.source_number) === nationalForwardingNumber(originalBusinessPhone);
+        const currentEntry = matchesOriginalPhone(data?.current_entry)
+          ? data.current_entry
+          : numbers.find(matchesOriginalPhone) || null;
         const verifyCallerId = Boolean(data?.verify_caller_id);
 
         setBusinessId(data?.business_id || null);
         setSavedEntries(numbers);
         setBusinessName(data?.business_name || '');
-        setBusinessPhone(data?.business_phone || '');
+        setBusinessPhone(originalBusinessPhone);
         setTwilioNumber(data?.twilio_number || '');
         setTwilioNumberStatus(data?.twilio_number_status || '');
         setTwilioNumberLabel(data?.twilio_number_label || '');
@@ -587,21 +538,23 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
 
         if (currentEntry) {
           setEntryId(currentEntry.id || null);
-          setSourceNumber(currentEntry.source_number || data?.business_phone || '');
-          setSourceLabel(currentEntry.source_label || '');
-          setSelectedProviderId(availableProviderId(currentEntry.provider));
+          setSourceNumber(originalBusinessPhone);
+          setSourceLabel(currentEntry.source_label || 'Business Line');
+          setSelectedProviderId('');
+          setProviderPage(0);
+          setProviderSearch('');
           setForwardingStatus(currentEntry.status || 'draft');
           applyCallerIdEntryState(currentEntry);
-          setIsAddingNewNumber(false);
           setSlide(SLIDE.choice);
         } else {
           setEntryId(null);
-          setSourceNumber(data?.business_phone || '');
-          setSourceLabel(data?.business_phone ? 'Business Line' : '');
+          setSourceNumber(originalBusinessPhone);
+          setSourceLabel(originalBusinessPhone ? 'Business Line' : '');
           setSelectedProviderId('');
+          setProviderPage(0);
+          setProviderSearch('');
           setForwardingStatus('draft');
           applyCallerIdEntryState(null);
-          setIsAddingNewNumber(false);
           setSlide(SLIDE.choice);
         }
       } catch (err) {
@@ -738,7 +691,7 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
         body: JSON.stringify({
           ...(agent?.id ? { agent_id: String(agent.id) } : {}),
           entry_id: entryId || undefined,
-          source_number: sourceNumber.trim(),
+          source_number: businessPhone.trim(),
           source_label: sourceLabel.trim() || undefined,
           provider: selectedProvider.id,
           provider_label: selectedProvider.label,
@@ -775,7 +728,7 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
         method: 'POST',
         body: JSON.stringify({
           entry_id: entryId || undefined,
-          source_number: sourceNumber.trim() || undefined,
+          source_number: businessPhone.trim() || undefined,
           source_label: sourceLabel.trim() || undefined,
         }),
       });
@@ -826,7 +779,7 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
         return;
       }
       if (!normalizedSourceNumber) {
-        setError('Choose or enter the business number you want to forward.');
+        setError('Add your business phone number in Business Settings before setting up call forwarding.');
         return;
       }
       if (selectedExistingEntryIsVerified) {
@@ -852,6 +805,9 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
         return;
       }
       setError('');
+      setSelectedProviderId('');
+      setProviderPage(0);
+      setProviderSearch('');
       setSlide(SLIDE.provider);
       return;
     }
@@ -923,10 +879,11 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
   const renderSlide = () => {
     if (slide === SLIDE.choice) {
       const choices = [
-        { id: 'direct', title: targetLineReady ? 'Use your Nodemere number' : 'Get a new number', description: 'Give customers a Nodemere number to call your receptionist directly.' },
-        { id: 'forward', title: 'Keep your business number', description: 'Get a receptionist number and forward calls from the number customers already know.' },
+        { id: 'direct', title: targetLineReady ? 'New Number' : 'Get a new number', description: 'Choose a new phone number with your preferred area code.' },
+        { id: 'forward', title: 'Keep your number', description: 'Forward calls from the number customers already know.' },
       ];
       return (
+        <>
         <div className="grid gap-4 sm:grid-cols-2" role="group" aria-label="How to connect your phone number">
           {choices.map((choice, index) => {
             const active = connectionChoice === choice.id;
@@ -936,11 +893,19 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
                 type="button"
                 aria-label={`${choice.title}. ${choice.description}`}
                 aria-pressed={active}
-                onClick={() => { setConnectionChoice(choice.id); setError(''); setSlide(SLIDE.number); }}
+                onClick={() => {
+                  if (choice.id === 'forward' && !businessPhone.trim()) {
+                    setError('Add your business phone number in Business Settings before setting up call forwarding.');
+                    return;
+                  }
+                  setConnectionChoice(choice.id);
+                  setError('');
+                  setSlide(SLIDE.number);
+                }}
                 className="phone-choice-card flex min-h-[240px] flex-col rounded-[8px] border p-5 text-left sm:min-h-[360px] sm:p-7"
               >
                 <span className="relative z-10 flex items-start gap-3 sm:gap-6">
-                  <span aria-hidden="true" data-number={index + 1} className="phone-choice-card__number shrink-0 text-[48px] leading-none tracking-[-0.06em] sm:text-[72px]">
+                  <span aria-hidden="true" className="phone-choice-card__number shrink-0 text-[48px] leading-none tracking-[-0.06em] sm:text-[72px]">
                     {index + 1}
                   </span>
                   <span className="flex min-w-0 flex-col pt-1 sm:pt-2">
@@ -958,6 +923,8 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
             );
           })}
         </div>
+        {error && <p className="mt-4 text-center text-sm text-red-400" role="alert">{error}</p>}
+        </>
       );
     }
 
@@ -1141,69 +1108,15 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
             </div>
           )}
           {connectionChoice === 'forward' && <div className={`${targetLineReady ? 'mt-3 border-t border-white/[0.06] pt-3' : ''} min-w-0 space-y-2`}>
-            {sourceOptions.map((option) => {
-                const active = sourceNumber === option.source_number;
-                return (
-                  <button
-                    key={option.id}
-                    type="button"
-                    onClick={() => selectSourceOption(option)}
-                    className={`flex w-full items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-left transition ${
-                      active
-                        ? 'border-white/20 bg-white/[0.03] text-white'
-                        : 'border-white/[0.08] bg-white/[0.03] text-zinc-300 hover:border-white/[0.14] hover:text-white'
-                    }`}
-                  >
-                    <div className="min-w-0">
-                      <div className={`truncate text-sm font-semibold ${active ? 'text-white' : 'text-zinc-200'}`}>
-                        {option.source_label || option.source_number}
-                      </div>
-                      <div className={`mt-1 truncate text-xs ${active ? 'text-zinc-300' : 'text-zinc-500'}`}>
-                        {option.source_number}
-                      </div>
-                    </div>
-                    {option.status === 'verified' ? (
-                      <div className="shrink-0 rounded-full p-1 text-zinc-300">
-                        <CheckCircle2 size={14} />
-                      </div>
-                    ) : null}
-                  </button>
-                );
-              })}
-            <button
-              type="button"
-              onClick={startAddingNewNumber}
-              className={`mt-3 flex h-11 w-full items-center justify-center gap-2 rounded-2xl border text-sm font-semibold transition ${
-                isAddingNewNumber
-                  ? 'border-white/20 bg-white/[0.045] text-zinc-200'
-                  : 'border-dashed border-white/[0.12] bg-transparent text-zinc-400 hover:border-white/20 hover:text-white'
-              }`}
-            >
-              <Plus size={14} />
-              Use different business number
-            </button>
-            {isAddingNewNumber && (
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                <input
-                  type="text"
-                  value={sourceNumber}
-                  onChange={(event) => {
-                    setEntryId(null);
-                    setSourceNumber(event.target.value);
-                    setForwardingStatus('draft');
-                  }}
-                  placeholder="+1 (555) 123-4567"
-                  className="h-12 w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 text-sm text-white outline-none transition placeholder:text-zinc-700 focus:border-white/20 focus:bg-white/[0.055]"
-                />
-                <input
-                  type="text"
-                  value={sourceLabel}
-                  onChange={(event) => setSourceLabel(event.target.value)}
-                  placeholder="Front desk"
-                  className="h-12 w-full rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 text-sm text-white outline-none transition placeholder:text-zinc-700 focus:border-white/20 focus:bg-white/[0.055]"
-                />
+            <div className="flex w-full items-center justify-between gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.03] px-4 py-3">
+              <div className="min-w-0">
+                <div className="truncate text-sm font-semibold text-zinc-200">Business line</div>
+                <div className="mt-1 truncate text-xs text-zinc-500">
+                  {businessPhone || 'Add your business phone number in Business Settings to continue.'}
+                </div>
               </div>
-            )}
+              {selectedExistingEntry?.status === 'verified' && <CheckCircle2 size={14} className="shrink-0 text-zinc-300" />}
+            </div>
           </div>}
 
         </div>

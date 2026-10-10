@@ -3463,7 +3463,13 @@ const BusinessForwardingSettings = ({ authSession, businessPhone }) => {
       });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
-      setEntry(data?.current_entry || null);
+      const originalNumber = String(data?.business_phone || businessPhone || '').replace(/\D/g, '').slice(-10);
+      const matchesOriginal = (candidate) => originalNumber
+        && String(candidate?.source_number || '').replace(/\D/g, '').slice(-10) === originalNumber;
+      const matchingEntry = matchesOriginal(data?.current_entry)
+        ? data.current_entry
+        : (data?.forwarding_config?.numbers || []).find(matchesOriginal) || null;
+      setEntry(matchingEntry);
       setReceptionistNumber(data?.twilio_number_status === 'active' ? data?.twilio_number || '' : '');
     } catch (err) {
       console.error("SettingsPage.jsx:event_3090");
@@ -3509,7 +3515,7 @@ const BusinessForwardingSettings = ({ authSession, businessPhone }) => {
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <PhoneCall size={15} className="settings-icon" />
-                <h4 className="text-[13px] font-semibold text-zinc-100">Phone Number Connection</h4>
+                <h4 className="text-[13px] font-semibold text-zinc-100">Connect a Line</h4>
               </div>
               <p className="mt-2 max-w-2xl text-[12px] leading-5 text-zinc-500">
                 Use a dedicated receptionist number directly, or forward calls from your existing business line.
@@ -4118,7 +4124,7 @@ const SettingsPage = ({ mobileUsage, onMobileUpgrade }) => {
   const settingsSections = [
     { id: 'security', title: 'Workforce & Security', icon: Shield, iconClass: 'settings-icon', hint: 'Members and authenticators' },
     { id: 'business', title: 'Business Info', icon: Building2, iconClass: 'settings-icon', hint: 'Name, contact, and location' },
-    { id: 'forwarding', title: 'Connections', icon: PhoneCall, iconClass: 'settings-icon', hint: 'Call routing' },
+    { id: 'forwarding', title: 'Activation', icon: PhoneCall, iconClass: 'settings-icon', hint: 'Call routing' },
     { id: 'billing', title: 'Billing', icon: CreditCard, iconClass: 'settings-icon', hint: 'Plan, invoices, and payment' },
     { id: 'preferences', title: 'Preferences', icon: Shield, iconClass: 'settings-icon', hint: 'Permissions and controls' },
     { id: 'appointments', title: 'Hours', icon: Calendar, iconClass: 'settings-icon', hint: 'Business availability' },
