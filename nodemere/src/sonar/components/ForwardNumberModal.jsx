@@ -5,30 +5,252 @@ import { supabase } from '../lib/supabase';
 import CubePreloader from './CubePreloader';
 
 const PHONE_PROVIDERS = [
-  { id: 'verizon', label: 'Verizon' },
-  { id: 'att', label: 'AT&T' },
-  { id: 'tmobile', label: 'T-Mobile' },
-  { id: 'comcast', label: 'Comcast / Xfinity' },
-  { id: 'ringcentral', label: 'RingCentral' },
-  { id: 'google', label: 'Google Voice' },
-  { id: 'other', label: 'Other provider' },
+  { id: 'verizon', label: 'Verizon', category: 'Wireless', summary: 'Forward with a dialing code.', logo: '/provider-logos/verizon.ico', darkName: '#FF5A58', lightName: '#D90000' },
+  { id: 'att', label: 'AT&T', category: 'Wireless', summary: 'Set forwarding on your phone.', logo: '/provider-logos/att.ico', darkName: '#5BC4F1', lightName: '#007DBA' },
+  { id: 'tmobile', label: 'T-Mobile', category: 'Wireless', summary: 'Use short codes for each call type.', logo: '/provider-logos/tmobile.ico', darkName: '#FF5BB2', lightName: '#C40068' },
+  { id: 'xfinity-mobile', label: 'Xfinity Mobile', category: 'Wireless', summary: 'Forward from your mobile line.', logo: '/provider-logos/xfinity.ico', darkName: '#F5F5F5', lightName: '#161616' },
+  { id: 'comcast', label: 'Xfinity Voice', category: 'Home phone', summary: 'Set forwarding in the Xfinity app.', logo: '/provider-logos/xfinity.ico', darkName: '#F5F5F5', lightName: '#161616' },
+  { id: 'spectrum-mobile', label: 'Spectrum Mobile', category: 'Wireless', summary: 'Forward with a dialing code.', logo: '/provider-logos/spectrum.ico', darkName: '#63B7E6', lightName: '#00699C' },
+  { id: 'ringcentral', label: 'RingCentral', category: 'Phone system', summary: 'Use RingCentral call handling.', logo: '/provider-logos/ringcentral.ico', darkName: '#FF9A5D', lightName: '#C85412' },
+  { id: 'zoom-phone', label: 'Zoom Phone', category: 'Phone system', summary: 'Add an external forwarding number.', logo: '/provider-logos/zoom.ico', darkName: '#8AB7FF', lightName: '#1A6FD2' },
+  { id: 'visible', label: 'Visible', category: 'Wireless', summary: 'Forward all calls with a dialing code.', logo: '/provider-logos/visible.svg', darkName: '#F5F5F5', lightName: '#161616' },
+  { id: 'nextiva', label: 'Nextiva', category: 'Phone system', summary: 'Forward calls to your direct line.', logo: '/provider-logos/nextiva.png', darkName: '#79B5FF', lightName: '#0066CC' },
+  { id: '8x8', label: '8x8', category: 'Phone system', summary: 'Set forwarding in Admin Console.', logo: '/provider-logos/eightxeight.ico', darkName: '#FF7777', lightName: '#D52B32' },
+  { id: 'vonage-business', label: 'Vonage Business', category: 'Phone system', summary: 'Forward calls in your account.', logo: '/provider-logos/vonage.ico', darkName: '#FF9B69', lightName: '#D9531E' },
+  { id: 'ooma-office', label: 'Ooma Office', category: 'Phone system', summary: 'Forward calls from an extension.', logo: '/provider-logos/ooma.ico', darkName: '#8ECD75', lightName: '#548A37' },
+  { id: 'frontier', label: 'Frontier Phone', category: 'Home phone', summary: 'Forward calls from your phone line.', logo: '/provider-logos/frontier.ico', darkName: '#FF6686', lightName: '#D6003D' },
+  { id: 'cox-voice', label: 'Cox Voice', category: 'Home phone', summary: 'Choose all or unanswered calls.', logo: '/provider-logos/cox.ico', darkName: '#75D8E9', lightName: '#0084A6' },
+  { id: 'optimum-business', label: 'Optimum Business', category: 'Business phone', summary: 'Forward calls from your business line.', logo: '/provider-logos/optimum.ico', darkName: '#F2F2F2', lightName: '#222222' },
+  { id: 'other', label: 'Other provider', category: 'More options', summary: 'Find your provider’s forwarding setting.' },
 ];
+
+const availableProviderId = (providerId) => PHONE_PROVIDERS.some((provider) => provider.id === providerId) ? providerId : '';
+
+const PROVIDER_SUPPORT = {
+  tmobile: 'https://www.t-mobile.com/support/plans-features/self-service-short-codes',
+  verizon: 'https://www.verizon.com/support/knowledge-base-181139/',
+  att: 'https://www.att.com/support/article/wireless/KM1011513/',
+  'xfinity-mobile': 'https://www.xfinity.com/support/articles/how-to-use-call-forwarding',
+  comcast: 'https://www.xfinity.com/support/articles/forward-calls-with-call-forwarding/',
+  'spectrum-mobile': 'https://www.spectrum.net/support/mobile/spectrum-mobile-call-forwarding',
+  ringcentral: 'https://support.ringcentral.com/shared/content/app/setting-up-user-call-forwarding-in-the-ringcentral-app-desktop-a.html',
+  'zoom-phone': 'https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0069132',
+  visible: 'https://www.visible.com/content/value/visible/en/help/about-visible/plan-features.html',
+  nextiva: 'https://help.nextiva.com/article/call-forwarding-always-np3',
+  '8x8': 'https://help.8x8.com/docs/set-up-call-forwarding-in-8x8-admin-console',
+  'vonage-business': 'https://businesssupport.vonage.com/articles/Answer/Call-Forwarding-24813?lob=Essentials',
+  'ooma-office': 'https://support.ooma.com/office/yealink-ip-phone-with-programmable-buttons-use-guide/',
+  frontier: 'https://frontier.com/helpcenter/phone/calling-features',
+  'cox-voice': 'https://www.cox.com/residential/phone/learn/voice-features-and-settings.html',
+  'optimum-business': 'https://static.tvlistings.optimum.net/ool/static/prod/downloads/user-guides/en/CS-21683-Optimum-Business-Phone-East-Rebrand.pdf',
+};
+
+const nationalForwardingNumber = (value) => {
+  const digits = String(value || '').replace(/\D/g, '');
+  return digits.length === 11 && digits.startsWith('1') ? digits.slice(1) : digits;
+};
+
+const getProviderGuide = (providerId, mode, forwardingNumber) => {
+  const number = nationalForwardingNumber(forwardingNumber);
+  const destination = number.length === 10 ? number : forwardingNumber;
+  const missed = mode === 'missed';
+
+  switch (providerId) {
+    case 'tmobile':
+      return missed
+        ? {
+            steps: [
+              `No answer: dial **61*1${destination}#`,
+              `Busy: dial **67*1${destination}#`,
+              `Unreachable: dial **62*1${destination}#`,
+            ],
+            note: 'Press Call after each code and wait for confirmation.',
+          }
+        : {
+            steps: [
+              `Dial **21*1${destination}#`,
+              'Press Call and wait for confirmation.',
+            ],
+            note: 'All calls go straight to the receptionist.',
+          };
+    case 'verizon':
+      return {
+        steps: [
+          `Dial ${missed ? '*71' : '*72'}${destination}`,
+          'Press Call and wait for the confirmation beeps.',
+        ],
+        note: missed
+          ? 'Covers unanswered and busy calls.'
+          : 'All calls go straight to the receptionist.',
+      };
+    case 'att':
+      return {
+        steps: missed
+          ? [
+              'Open Call forwarding in Phone settings.',
+              `Choose When unanswered, enter ${destination}, and save.`,
+              'Add busy and unreachable rules if available.',
+            ]
+          : [
+              'Open Call forwarding in Phone settings.',
+              `Choose Always forward, enter ${destination}, and turn it on.`,
+            ],
+        note: missed
+          ? 'Available options vary by device.'
+          : 'Available options vary by device.',
+      };
+    case 'xfinity-mobile':
+      return {
+        steps: [
+          `Dial ${missed ? '*71' : '*72'}${destination}`,
+          'Press Call and wait for confirmation.',
+        ],
+        note: missed ? 'Unanswered calls forward after your phone rings.' : 'All calls forward immediately.',
+      };
+    case 'comcast':
+      return {
+        steps: [
+          'In the Xfinity app, open Services → Home Phone → View Xfinity Voice features → Call Forwarding.',
+          `Under Basic Call Forwarding, enter ${destination} and select Update.`,
+        ],
+        note: 'Basic Call Forwarding sends all calls.',
+      };
+    case 'spectrum-mobile':
+      return {
+        steps: [
+          `Dial ${missed ? '*71' : '*72'}${destination}`,
+          'Press Call and wait for the confirmation tone and message.',
+        ],
+        note: missed ? 'Covers busy and unanswered calls.' : 'All calls forward immediately.',
+      };
+    case 'ringcentral':
+      return {
+        steps: missed
+          ? [
+              'Open Settings → Phone → Call handling → Edit → Missed calls.',
+              `Forward to external number: enter ${destination} and save.`,
+            ]
+          : [
+              'Open Settings → Phone → Call handling.',
+              `Turn on Forward all calls, enter ${destination}, and save.`,
+            ],
+        note: missed ? 'Check work and after-hours schedules if you use both.' : 'This overrides normal call handling.',
+      };
+    case 'zoom-phone':
+      return {
+        steps: [
+          'In the Zoom web portal, open Zoom Phone → Settings.',
+          'Under Business Hours, edit Call Handling and choose Add Phone Number.',
+          `Enter ${destination} as the external number, then save.`,
+        ],
+        note: 'Requires a direct number and admin permission. Check Closed Hours separately.',
+      };
+    case 'visible':
+      return {
+        steps: [
+          `Dial *72${destination} on your Visible phone.`,
+          'Press Call and wait for confirmation.',
+        ],
+        note: 'All calls forward immediately. Visible’s *71 is for busy calls, not unanswered calls.',
+      };
+    case 'nextiva':
+      return {
+        steps: [
+          'Dial *72 on your Nextiva phone.',
+          `When prompted, enter ${destination}, then press #.`,
+          'Wait for the confirmation message.',
+        ],
+        note: 'Covers direct calls to your user line, not call groups or queues.',
+      };
+    case '8x8':
+      return {
+        steps: [
+          'In 8x8 Admin Console, edit your extension under Users.',
+          `Under Call forwarding rules, choose ${missed ? 'When User does not Answer' : 'Forward all Calls'}.`,
+          `Enter ${forwardingNumber} as the external number, then save.`,
+        ],
+        note: 'For ring groups or auto attendants, ask your admin to update the route.',
+      };
+    case 'vonage-business':
+      return {
+        steps: [
+          'In your Vonage online account, open Settings → Call Forwarding.',
+          `Select Forward All Calls, enter ${destination}, and save.`,
+        ],
+        note: 'For a main company number, an admin may need to update its call routing.',
+      };
+    case 'ooma-office':
+      return {
+        steps: [
+          'On your Ooma Office extension, dial *72.',
+          `At the prompt, enter ${destination} followed by #.`,
+        ],
+        note: 'This forwards an extension. An admin may need to update routing for a main number.',
+      };
+    case 'frontier':
+      return {
+        steps: [
+          'From your Frontier phone, dial *72.',
+          `Follow the prompts to forward calls to ${destination}.`,
+        ],
+        note: 'Feature availability varies by Frontier phone plan and area.',
+      };
+    case 'cox-voice':
+      return missed
+        ? {
+            steps: [
+              'From your Cox Voice phone, dial *92.',
+              `Follow the prompts for ring count, then enter ${destination}.`,
+            ],
+            note: 'This forwards unanswered calls. Busy-line forwarding is a separate setting.',
+          }
+        : {
+            steps: [
+              `From your Cox Voice phone, dial *72${destination}.`,
+              'Listen for the confirmation dial tone.',
+            ],
+            note: 'Cox Voice is now part of Spectrum.',
+          };
+    case 'optimum-business':
+      return {
+        steps: [
+          'From your Optimum Business phone, dial *72.',
+          `At the dial tone, enter ${destination}.`,
+          'If the destination answers, forwarding is active.',
+        ],
+        note: 'If unanswered, use the guide’s confirmation method. Continental US only.',
+      };
+    default:
+      return {
+        steps: [
+          'Open Call forwarding in your provider settings.',
+          `Choose missed or all calls, enter ${destination}, and save.`,
+        ],
+        note: 'Use your provider’s help page if these options differ.',
+      };
+  }
+};
 
 export const FORWARDING_API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
-const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => {
-  const [slide, setSlide] = useState(0);
-  const [loading, setLoading] = useState(true);
+const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, preview = false }) => {
+  const previewMode = import.meta.env.DEV && preview;
+  const [slide, setSlide] = useState(previewMode ? 2 : 0);
+  const [loading, setLoading] = useState(!previewMode);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [selectedProviderId, setSelectedProviderId] = useState('other');
+  const [selectedProviderId, setSelectedProviderId] = useState('');
+  const [forwardingMode, setForwardingMode] = useState('all');
+  const [providerPage, setProviderPage] = useState(0);
+  const [providerSearch, setProviderSearch] = useState('');
+  const [compactGuide, setCompactGuide] = useState(() => typeof window !== 'undefined' && window.innerWidth < 640);
   const [copied, setCopied] = useState(false);
   const [entryId, setEntryId] = useState(null);
   const [businessId, setBusinessId] = useState(null);
   const [businessName, setBusinessName] = useState('');
   const [businessPhone, setBusinessPhone] = useState('');
   const [twilioNumber, setTwilioNumber] = useState('');
-  const [twilioNumberStatus, setTwilioNumberStatus] = useState('');
+  const [twilioNumberStatus, setTwilioNumberStatus] = useState(previewMode ? 'active' : '');
   const [twilioNumberLabel, setTwilioNumberLabel] = useState('');
   const [canPurchaseNumber, setCanPurchaseNumber] = useState(true);
   const [availableTargetNumbers, setAvailableTargetNumbers] = useState([]);
@@ -42,9 +264,9 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
   const [targetQualityState, setTargetQualityState] = useState('idle');
   const [targetQualityMessage, setTargetQualityMessage] = useState('');
   const [targetQualityStep, setTargetQualityStep] = useState(0);
-  const [forwardingTargetNumber, setForwardingTargetNumber] = useState('');
+  const [forwardingTargetNumber, setForwardingTargetNumber] = useState(previewMode ? '+12025550147' : '');
   const [savedEntries, setSavedEntries] = useState([]);
-  const [sourceNumber, setSourceNumber] = useState('');
+  const [sourceNumber, setSourceNumber] = useState(previewMode ? '(202) 555-0100' : '');
   const [sourceLabel, setSourceLabel] = useState('');
   const [forwardingStatus, setForwardingStatus] = useState('draft');
   const [callerIdStatus, setCallerIdStatus] = useState('not_started');
@@ -63,8 +285,30 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
   const hasTargetNumber = Boolean(forwardingNumber);
   const targetLineReady = hasTargetNumber && String(twilioNumberStatus || '').toLowerCase() === 'active';
   const needsTargetNumberSelection = !targetLineReady || isReplacingTargetNumber;
-  const totalSlides = verifyCallerIdEnabled ? 4 : 3;
+  const totalSlides = verifyCallerIdEnabled ? 5 : 4;
   const selectedProvider = PHONE_PROVIDERS.find((provider) => provider.id === selectedProviderId) || PHONE_PROVIDERS[PHONE_PROVIDERS.length - 1];
+  const providerPageSize = compactGuide ? 1 : 3;
+  const providerSearchTerm = providerSearch.trim().toLowerCase();
+  const matchingProviders = PHONE_PROVIDERS.filter((provider) =>
+    `${provider.label} ${provider.category} ${provider.id === 'comcast' ? 'Comcast' : ''}`.toLowerCase().includes(providerSearchTerm));
+  const providerPageCount = Math.ceil(matchingProviders.length / providerPageSize);
+  const visibleProviders = matchingProviders.slice(providerPage * providerPageSize, (providerPage + 1) * providerPageSize);
+  const providerGuide = getProviderGuide(selectedProvider.id, forwardingMode, forwardingNumber);
+  const providerSupportUrl = selectedProvider.id === 'ringcentral' && forwardingMode === 'all'
+    ? 'https://support.ringcentral.com/content/dam/support/us/en/pdf/get-started/v2/RCA_Configuring_Your_Extensions_Call_Handling_Settings.pdf'
+    : PROVIDER_SUPPORT[selectedProvider.id];
+
+  useEffect(() => {
+    const updateGuideLayout = () => setCompactGuide(window.innerWidth < 640);
+    window.addEventListener('resize', updateGuideLayout);
+    return () => window.removeEventListener('resize', updateGuideLayout);
+  }, []);
+
+  useEffect(() => {
+    const selectedIndex = matchingProviders.findIndex((provider) => provider.id === selectedProviderId);
+    if (selectedIndex >= 0) setProviderPage(Math.floor(selectedIndex / providerPageSize));
+  }, [selectedProviderId, providerPageSize, providerSearch]);
+
   const targetQualitySteps = [
     'Reserving your number',
     'Checking call quality',
@@ -82,10 +326,12 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
       : slide === 1
         ? 'Copy this number.'
         : slide === 2
-          ? forwardingStatus === 'verified'
-            ? 'Forwarding verified.'
-            : 'Listening for your test call.'
-          : callerIdStatus === 'verified'
+          ? 'Turn on call forwarding.'
+          : slide === 3
+            ? forwardingStatus === 'verified'
+              ? 'Forwarding verified.'
+              : 'Listening for your test call.'
+            : callerIdStatus === 'verified'
             ? 'Caller ID verified.'
             : 'Use your business number for outbound calls.';
   const slideDescription =
@@ -98,12 +344,14 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
             ? 'Pick the receptionist number your business line will forward calls to.'
             : 'Your business line currently forwards to this active receptionist number. Replace it if you need a different line.'
       : slide === 1
-        ? `In your carrier or phone system settings, turn on call forwarding from ${sourceNumber || 'your business number'} to this receptionist number and save your changes.`
+        ? 'Keep this receptionist number handy for the next step.'
         : slide === 2
-          ? forwardingStatus === 'verified'
-            ? 'Your business line is connected and ready to route calls to your receptionist.'
-            : 'Place a quick test call so we can confirm the connection.'
-          : `Verify ${sourceNumber || 'your business number'} so outbound calls can display it as the caller ID. This step is optional.`;
+          ? `Choose who handles ${sourceNumber || 'your business number'} and follow the matching steps.`
+          : slide === 3
+            ? forwardingStatus === 'verified'
+              ? 'Your business line is connected and ready to route calls to your receptionist.'
+              : 'Place a test call using the forwarding option you just set up.'
+            : `Verify ${sourceNumber || 'your business number'} so outbound calls can display it as the caller ID. This step is optional.`;
   const forwardingSteps = [
     {
       label: 'Number forwarding',
@@ -170,9 +418,7 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
     setEntryId(option.entryId || null);
     setSourceNumber(option.source_number || '');
     setSourceLabel(option.source_label || '');
-    if (option.provider) {
-      setSelectedProviderId(option.provider);
-    }
+    setSelectedProviderId(availableProviderId(option.provider));
     setForwardingStatus(option.status || 'draft');
     const matchedEntry = savedEntries.find((entry) => entry?.id === option.entryId || entry?.source_number === option.source_number) || null;
     applyCallerIdEntryState(matchedEntry);
@@ -187,7 +433,7 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
     setCallerIdStatus('not_started');
     setCallerIdMessage('');
     setCallerIdValidationCode('');
-    setSelectedProviderId('other');
+    setSelectedProviderId('');
     setError('');
   };
 
@@ -304,6 +550,7 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
   };
 
   useEffect(() => {
+    if (previewMode) return undefined;
     let active = true;
 
     const loadForwardingState = async () => {
@@ -340,20 +587,20 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
           setEntryId(currentEntry.id || null);
           setSourceNumber(currentEntry.source_number || data?.business_phone || '');
           setSourceLabel(currentEntry.source_label || '');
-          setSelectedProviderId(currentEntry.provider || 'other');
+          setSelectedProviderId(availableProviderId(currentEntry.provider));
           setForwardingStatus(currentEntry.status || 'draft');
           applyCallerIdEntryState(currentEntry);
           setIsAddingNewNumber(false);
           if (currentEntry.status === 'pending_test') {
-            setSlide(2);
+            setSlide(3);
           } else if (
             verifyCallerId
             && currentEntry.status === 'verified'
             && currentEntry.caller_id_verification_status !== 'verified'
           ) {
-            setSlide(3);
+            setSlide(4);
           } else if (verifyCallerId && currentEntry.caller_id_verification_status === 'pending') {
-            setSlide(3);
+            setSlide(4);
           } else {
             setSlide(0);
           }
@@ -361,7 +608,7 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
           setEntryId(null);
           setSourceNumber(data?.business_phone || '');
           setSourceLabel(data?.business_phone ? 'Business Line' : '');
-          setSelectedProviderId('other');
+          setSelectedProviderId('');
           setForwardingStatus('draft');
           applyCallerIdEntryState(null);
           setIsAddingNewNumber(false);
@@ -381,7 +628,7 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
     return () => {
       active = false;
     };
-  }, [authSession?.access_token]);
+  }, [authSession?.access_token, previewMode]);
 
   useEffect(() => {
     if (!needsTargetNumberSelection || targetQualityState === 'running') {
@@ -406,8 +653,8 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
   }, [targetQualityState]);
 
   useEffect(() => {
-    const needsForwardingWatch = slide === 2 && forwardingStatus !== 'verified';
-    const needsCallerIdWatch = verifyCallerIdEnabled && slide === 3 && callerIdStatus === 'pending';
+    const needsForwardingWatch = slide === 3 && forwardingStatus !== 'verified';
+    const needsCallerIdWatch = verifyCallerIdEnabled && slide === 4 && callerIdStatus === 'pending';
     if ((!needsForwardingWatch && !needsCallerIdWatch) || !authSession?.access_token || !entryId || !businessId) {
       return undefined;
     }
@@ -433,11 +680,11 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
           }
           if (
             verifyCallerIdEnabled
-            && slide === 2
+            && slide === 3
             && matchingEntry.status === 'verified'
             && matchingEntry?.caller_id_verification_status !== 'verified'
           ) {
-            setSlide(3);
+            setSlide(4);
           }
         }
         applyCallerIdEntryState(matchingEntry);
@@ -554,6 +801,10 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
   };
 
   const goNext = async () => {
+    if (previewMode) {
+      setError('Preview only. No forwarding settings or phone numbers were changed.');
+      return;
+    }
     if (slide === 0 && needsTargetNumberSelection) {
       if (targetQualityState === 'passed') {
         setTargetQualityState('idle');
@@ -579,7 +830,7 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
         const saved = await saveForwarding({ status: 'verified' });
         if (saved) {
           if (verifyCallerIdEnabled && saved?.caller_id_verification_status !== 'verified') {
-            setSlide(3);
+            setSlide(4);
           } else {
             handleClose();
           }
@@ -592,18 +843,28 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
     }
 
     if (slide === 1) {
-      const saved = await saveForwarding({ status: 'pending_test', confirmedEnabled: true });
-      if (saved) setSlide(2);
+      setError('');
+      setSlide(2);
       return;
     }
 
     if (slide === 2) {
+      if (!selectedProviderId) {
+        setError('Choose who handles your business number to see the setup steps.');
+        return;
+      }
+      const saved = await saveForwarding({ status: 'pending_test', confirmedEnabled: true });
+      if (saved) setSlide(3);
+      return;
+    }
+
+    if (slide === 3) {
       if (forwardingStatus !== 'verified') {
         setError('Finish the quick test call first so we know forwarding is working.');
         return;
       }
       if (verifyCallerIdEnabled) {
-        setSlide(3);
+        setSlide(4);
         return;
       }
       handleClose();
@@ -614,6 +875,10 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
   };
 
   const goBack = () => {
+    if (previewMode) {
+      setError('Preview only. No forwarding settings or phone numbers were changed.');
+      return;
+    }
     if (slide === 0 && targetQualityState === 'passed') {
       setTargetQualityState('idle');
       setTargetQualityMessage('');
@@ -621,6 +886,12 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
       return;
     }
     setSlide((current) => Math.max(current - 1, 0));
+  };
+
+  const changeProviderPage = (page) => {
+    setProviderPage(page);
+    setSelectedProviderId('');
+    setError('');
   };
 
   const revealMoreTargetNumbers = (event) => {
@@ -903,6 +1174,159 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
     }
 
     if (slide === 2) {
+      const modeAvailable = !['comcast', 'zoom-phone', 'visible', 'nextiva', 'vonage-business', 'ooma-office', 'frontier', 'optimum-business'].includes(selectedProvider.id);
+      return (
+        <div>
+          <div className="mb-4 flex justify-end" role="search">
+            <div className="relative w-full sm:w-[260px]">
+              <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-700" />
+              <input
+                type="text"
+                aria-label="Search carriers"
+                value={providerSearch}
+                onChange={(event) => {
+                  setProviderSearch(event.target.value);
+                  setProviderPage(0);
+                  setSelectedProviderId('');
+                  setError('');
+                }}
+                placeholder="Search carriers..."
+                className="w-full rounded-xl border border-white/[0.06] bg-white/[0.02] py-2 pl-9 pr-8 text-[12px] text-zinc-300 outline-none placeholder:text-zinc-700 focus:!outline-none"
+              />
+              {providerSearch && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setProviderSearch('');
+                    setProviderPage(0);
+                  }}
+                  aria-label="Clear carrier search"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-700 transition-colors hover:text-white"
+                >
+                  <X size={11} />
+                </button>
+              )}
+            </div>
+          </div>
+          {matchingProviders.length === 0 ? (
+            <div className="flex h-[350px] items-center justify-center rounded-[26px] border border-white/[0.12] bg-white/[0.035] px-6 text-center text-sm text-zinc-500 sm:h-[392px]">
+              No carriers found. Try another name.
+            </div>
+          ) : (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3" role="group" aria-label="Choose phone provider">
+            {visibleProviders.map((provider) => {
+              const active = selectedProviderId === provider.id;
+              return (
+                <article
+                  key={provider.id}
+                  onClick={!active ? () => {
+                    setSelectedProviderId(provider.id);
+                    setError('');
+                  } : undefined}
+                  className={`flex h-[350px] min-w-0 flex-col rounded-[26px] border p-5 transition-colors sm:h-[392px] ${active
+                    ? 'border-white bg-white text-black'
+                    : 'cursor-pointer border-white/[0.12] bg-white/[0.035] text-white hover:border-white/30'}`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedProviderId(active ? '' : provider.id);
+                      setError('');
+                    }}
+                    aria-expanded={active}
+                    className="w-full text-left"
+                  >
+                    <span className={`inline-block text-[10px] font-semibold uppercase tracking-[0.14em] ${active
+                      ? 'text-black/55'
+                      : 'text-zinc-500'}`}>{provider.category}</span>
+                    <span className="mt-5 flex items-center gap-2.5 text-2xl font-semibold tracking-[-0.05em] sm:text-[26px]">
+                      <span style={provider.darkName ? { color: active ? provider.lightName : provider.darkName } : undefined}>{provider.label}</span>
+                      {provider.logo && <img src={provider.logo} alt="" aria-hidden="true" className="h-6 w-6 shrink-0 object-contain" />}
+                    </span>
+                  </button>
+
+                  {active ? (
+                    <div className="mt-5 flex min-h-0 flex-1 flex-col">
+                      {modeAvailable && (
+                        <div className="mb-4 flex flex-wrap gap-1.5" role="group" aria-label="Forwarding behavior">
+                          {[
+                            { id: 'all', label: 'All calls' },
+                            { id: 'missed', label: 'Missed' },
+                          ].map((mode) => (
+                            <button
+                              key={mode.id}
+                              type="button"
+                              onClick={() => setForwardingMode(mode.id)}
+                              aria-pressed={forwardingMode === mode.id}
+                              className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${forwardingMode === mode.id
+                                ? 'bg-black text-white'
+                                : 'bg-black/[0.06] text-black/60'}`}
+                            >
+                              {mode.label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {providerGuide.steps.length > 0 && (
+                        <ol className="space-y-2">
+                          {providerGuide.steps.map((step, index) => (
+                            <li key={step} className="flex gap-2 text-[13px] leading-5 text-black/80">
+                              <span className="shrink-0 font-bold text-black/40">{index + 1}.</span>
+                              <span className="min-w-0 break-words">{step}</span>
+                            </li>
+                          ))}
+                        </ol>
+                      )}
+                      <p className="mt-3 text-xs leading-5 text-black/55">{providerGuide.note}</p>
+                      {providerSupportUrl && (
+                        <a
+                          href={providerSupportUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-auto pt-3 text-xs font-semibold text-black/75 underline decoration-black/40 underline-offset-4 hover:text-black"
+                        >
+                          Official {provider.label} guide
+                        </a>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="mt-4 flex flex-1 flex-col justify-between">
+                      <p className="text-sm leading-5 text-zinc-500">{provider.summary}</p>
+                      <span className="text-xs font-semibold text-zinc-300">View setup →</span>
+                    </div>
+                  )}
+                </article>
+              );
+            })}
+          </div>
+          )}
+          {providerPageCount > 1 && <div className="mt-4 flex items-center justify-center gap-2" role="group" aria-label="Carrier pages">
+            {compactGuide ? (
+              <>
+                <button type="button" onClick={() => changeProviderPage(providerPage - 1)} disabled={providerPage === 0} className="px-2 py-1 text-xs text-zinc-300 disabled:opacity-30">Previous</button>
+                <span className="text-xs text-zinc-500">{providerPage + 1} of {providerPageCount}</span>
+                <button type="button" onClick={() => changeProviderPage(providerPage + 1)} disabled={providerPage === providerPageCount - 1} className="px-2 py-1 text-xs text-zinc-300 disabled:opacity-30">Next</button>
+              </>
+            ) : Array.from({ length: providerPageCount }, (_, index) => (
+              <button
+                key={index}
+                type="button"
+                onClick={() => changeProviderPage(index)}
+                aria-label={`Show carrier page ${index + 1} of ${providerPageCount}`}
+                aria-current={providerPage === index ? 'page' : undefined}
+                className={`h-7 w-7 rounded-full text-xs font-semibold transition ${providerPage === index
+                  ? 'bg-white text-black'
+                  : 'text-zinc-500 hover:bg-white/[0.08] hover:text-white'}`}
+              >
+                {index + 1}
+              </button>
+            ))}
+          </div>}
+        </div>
+      );
+    }
+
+    if (slide === 3) {
       const isVerified = forwardingStatus === 'verified';
       return (
       <div>
@@ -926,7 +1350,7 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
           <p className="mx-auto mt-3 max-w-sm text-sm leading-6 text-zinc-500">
             {isVerified
               ? `${sourceNumber || 'Your business number'} is now saved and marked as working with your dedicated business line.`
-              : `Place a quick test call to ${sourceNumber || 'your business line'} and we’ll verify the setup automatically.`}
+              : `Call ${sourceNumber || 'your business line'} from another phone. If you set up missed-call forwarding, let the business line ring unanswered. We’ll verify when the call reaches your receptionist.`}
           </p>
         </div>
 
@@ -1036,7 +1460,7 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
         animate={{ scale: 1, opacity: 1, y: 0 }}
         exit={{ scale: 0.96, opacity: 0, y: 18 }}
         onClick={(e) => e.stopPropagation()}
-        className="relative max-h-[calc(100vh-24px)] w-full max-w-[700px] overflow-hidden rounded-[34px] border border-white/[0.08] bg-[#070707]/95 shadow-[0_28px_90px_rgba(0,0,0,0.55)] backdrop-blur-xl"
+        className={`relative max-h-[calc(100vh-24px)] w-full overflow-hidden rounded-[34px] border border-white/[0.08] bg-[#070707]/95 shadow-[0_28px_90px_rgba(0,0,0,0.55)] backdrop-blur-xl ${slide === 2 ? 'max-w-[920px]' : 'max-w-[700px]'}`}
       >
         <div className="pointer-events-none absolute right-[-64px] top-[-80px] h-56 w-56 rounded-full bg-white/[0.035] blur-[70px]" />
 
@@ -1083,7 +1507,7 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
           </AnimatePresence>
 
           <div className="mt-5 space-y-3">
-            {slide === 2 && forwardingStatus === 'verified' && !verifyCallerIdEnabled && (
+            {slide === 3 && forwardingStatus === 'verified' && !verifyCallerIdEnabled && (
               <button
                 type="button"
                 onClick={goNext}
@@ -1104,7 +1528,8 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
                   || targetQualityState === 'running'
                   || (slide !== 0 && !hasTargetNumber)
                   || (slide === 0 && needsTargetNumberSelection && (!selectedTargetNumber || !canPurchaseNumber))
-                  || (slide === 2 && forwardingStatus !== 'verified')
+                  || (slide === 2 && !selectedProviderId)
+                  || (slide === 3 && forwardingStatus !== 'verified')
                 }
                 className="mx-auto block h-12 w-full max-w-[440px] rounded-full bg-white text-sm font-bold text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-40"
               >
@@ -1117,8 +1542,10 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved }) => 
                     : slide === 0 && selectedExistingEntryIsVerified
                       ? 'Use this number'
                     : slide === 1
-                      ? 'I turned forwarding on'
+                      ? 'Continue to instructions'
                       : slide === 2
+                        ? 'I turned forwarding on'
+                      : slide === 3
                         ? 'Continue'
                       : 'Continue'}
               </button>
