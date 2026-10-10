@@ -1412,22 +1412,26 @@ def purchase_specific_twilio_number_for_business(business: dict, phone_number: s
 
     purchased = purchase_response.json() or {}
     logging.info('main.purchase_specific_twilio_number_for_business.event_1066')
-    purchased_row = save_purchased_number_record(
-        int(business["id"]),
-        purchased.get("phone_number") or normalized_phone_number,
-        {
-            "friendly_name": purchased.get("friendly_name") or purchase_payload["FriendlyName"],
-            "provider": "twilio",
-            "status": "quality_checking",
-            "is_active": False,
-            "twilio_account_sid": twilio_account_sid,
-            "twilio_incoming_phone_number_sid": purchased.get("sid"),
-            "quality_check_status": "pending",
-            "quality_failure_reason": None,
-            "purchase_source": "modal",
-            "assigned_at": datetime.now(timezone.utc).isoformat(),
-        },
-    )
+    try:
+        purchased_row = save_purchased_number_record(
+            int(business["id"]),
+            purchased.get("phone_number") or normalized_phone_number,
+            {
+                "friendly_name": purchased.get("friendly_name") or purchase_payload["FriendlyName"],
+                "provider": "twilio",
+                "status": "quality_checking",
+                "is_active": False,
+                "twilio_account_sid": twilio_account_sid,
+                "twilio_incoming_phone_number_sid": purchased.get("sid"),
+                "quality_check_status": "pending",
+                "quality_failure_reason": None,
+                "purchase_source": "modal",
+                "assigned_at": datetime.now(timezone.utc).isoformat(),
+            },
+        )
+    except Exception:
+        release_twilio_number_by_sid(purchased.get("sid"))
+        raise
     updated_business = hydrate_business_with_purchased_number_data(business) or business
     return updated_business, purchased, purchased_row
 
@@ -1835,64 +1839,29 @@ def assign_elevenlabs_phone_number_to_inbound_agent(phone_number_id: str) -> boo
         return False
 
 
-def ensure_elevenlabs_phone_number_for_business(business: dict) -> dict:
-    phone_number = normalize_phone_number(business.get("twilio_number"))
-    if not phone_number:
-        return business
+def prepare_elevenlabs_phone_number_for_business(phone_number: str, label: str) -> Optional[str]:
+    """Import the purchased number and assign its inbound agent before activation."""
+    normalized_number = normalize_phone_number(phone_number)
+    if not normalized_number or not elevenlabs_agent_id_inbound:
+        return None
 
-    label = business.get("name") or business.get("twilio_number_label") or f"Business {business.get('id')}"
-    existing_phone = find_elevenlabs_phone_number(phone_number)
-    phone_number_id = existing_phone.get("phone_number_id") if existing_phone else None
-    logging.info('main.ensure_elevenlabs_phone_number_for_business.event_1569')
-
+    existing_phone = find_elevenlabs_phone_number(normalized_number)
+    phone_number_id = (existing_phone or {}).get("phone_number_id")
+    imported_now = False
     if not phone_number_id:
-        phone_number_id = import_elevenlabs_phone_number(phone_number, label)
-        if phone_number_id:
-            existing_phone = {
-                "phone_number_id": phone_number_id,
-                "phone_number": phone_number,
-                "assigned_agent": None,
-            }
-
+        phone_number_id = import_elevenlabs_phone_number(normalized_number, label)
+        imported_now = bool(phone_number_id)
     if not phone_number_id:
-        return business
+        return None
 
     assigned_agent_id = ((existing_phone or {}).get("assigned_agent") or {}).get("agent_id")
-    if elevenlabs_agent_id_inbound and assigned_agent_id != elevenlabs_agent_id_inbound:
-        assign_elevenlabs_phone_number_to_inbound_agent(phone_number_id)
+    if assigned_agent_id != elevenlabs_agent_id_inbound:
+        if not assign_elevenlabs_phone_number_to_inbound_agent(str(phone_number_id)):
+            if imported_now:
+                delete_elevenlabs_phone_number(str(phone_number_id))
+            return None
 
-    active_row = get_active_purchased_number_for_business(int(business["id"]), kind="assigned_line")
-    if active_row:
-        save_purchased_number_record(
-            int(business["id"]),
-            phone_number,
-            {
-                "friendly_name": label,
-                "status": "active",
-                "is_active": True,
-                "elevenlabs_phone_number_id": phone_number_id,
-                "quality_check_status": "passed",
-                "quality_failure_reason": None,
-                "quality_checked_at": datetime.now(timezone.utc).isoformat(),
-            },
-        )
-        deactivate_other_purchased_numbers(int(business["id"]), active_row.get("id"), kind="assigned_line")
-
-    updated_business = hydrate_business_with_purchased_number_data(business) or business
-
-    push_live_event(
-        "Dedicated Twilio number imported into ElevenLabs.",
-        actor="system",
-        severity="info",
-        event_type="elevenlabs_phone_number_ready",
-        payload={
-            "business_id": business.get("id"),
-            "twilio_number": phone_number,
-            "phone_number_id": phone_number_id,
-            "agent_id": elevenlabs_agent_id_inbound,
-        },
-    )
-    return updated_business
+    return str(phone_number_id)
 
 
 def ensure_twilio_number_is_configured_for_business(business: dict) -> dict:
@@ -17011,48 +16980,49 @@ async def claim_business_forwarding_number(
         previous_elevenlabs_phone_number_id = (
             previous_active_purchased_number or {}
         ).get("elevenlabs_phone_number_id")
-        updated_business, purchased, purchased_row = purchase_specific_twilio_number_for_business(
+        if previous_active_purchased_number and not previous_active_purchased_number.get("is_active"):
+            previous_elevenlabs_phone_number_id = None
+        _, purchased, _ = purchase_specific_twilio_number_for_business(
             business,
             payload.phone_number,
             payload.label or business.get("name") or "Dedicated forwarding line",
         )
         logging.info('main.claim_business_forwarding_number.event_13208')
 
-        elevenlabs_business = ensure_elevenlabs_phone_number_for_business(updated_business)
-        phone_number_id = elevenlabs_business.get("elevenlabs_phone_number_id") or find_elevenlabs_phone_number(
-            elevenlabs_business.get("twilio_number")
+        purchased_number = normalize_phone_number(purchased.get("phone_number") or payload.phone_number)
+        phone_number_id = prepare_elevenlabs_phone_number_for_business(
+            purchased_number,
+            payload.label or business.get("name") or "Dedicated receptionist line",
         )
-        if isinstance(phone_number_id, dict):
-            phone_number_id = phone_number_id.get("phone_number_id")
 
         if not phone_number_id:
             logging.warning('main.claim_business_forwarding_number.event_13147')
-            release_twilio_number_by_sid(purchased.get("sid"))
+            released = release_twilio_number_by_sid(purchased.get("sid"))
             save_purchased_number_record(
                 int(business["id"]),
-                purchased.get("phone_number") or payload.phone_number,
+                purchased_number,
                 {
                     "friendly_name": payload.label or business.get("name") or "Dedicated forwarding line",
-                    "status": "quality_failed",
+                    "status": "released" if released else "quality_failed",
                     "is_active": False,
                     "twilio_account_sid": twilio_account_sid,
                     "twilio_incoming_phone_number_sid": purchased.get("sid"),
                     "quality_check_status": "failed",
-                    "quality_failure_reason": "We couldn't finish preparing that number. Please choose another one.",
-                    "released_at": datetime.now(timezone.utc).isoformat(),
-                    "released_reason": "elevenlabs_import_failed",
+                    "quality_failure_reason": "We couldn't connect that number to the receptionist.",
+                    "released_at": datetime.now(timezone.utc).isoformat() if released else None,
+                    "released_reason": "elevenlabs_setup_failed" if released else None,
                 },
             )
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
-                detail="We couldn't finish preparing that number. Please choose another one.",
+                detail="We couldn't connect that number to the receptionist. Please try another one.",
             )
 
         activated_row = save_purchased_number_record(
             int(business["id"]),
-            elevenlabs_business.get("twilio_number"),
+            purchased_number,
             {
-                "friendly_name": payload.label or elevenlabs_business.get("name") or elevenlabs_business.get("twilio_number_label"),
+                "friendly_name": payload.label or business.get("name") or purchased_number,
                 "status": "active",
                 "is_active": True,
                 "twilio_account_sid": twilio_account_sid,
@@ -17086,8 +17056,8 @@ async def claim_business_forwarding_number(
 
         return {
             "ok": True,
-            "verified": True,
-            "message": "This number is ready to use. Continue to connect your business line.",
+            "provisioned": True,
+            "message": "This receptionist number is connected. Place a test call before sharing it.",
             "twilio_number": activated_business.get("twilio_number"),
             "twilio_number_label": activated_business.get("twilio_number_label"),
             "twilio_number_status": activated_business.get("twilio_number_status"),

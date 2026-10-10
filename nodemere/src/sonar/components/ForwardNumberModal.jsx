@@ -26,6 +26,8 @@ const PHONE_PROVIDERS = [
 
 const availableProviderId = (providerId) => PHONE_PROVIDERS.some((provider) => provider.id === providerId) ? providerId : '';
 
+const SLIDE = { choice: 0, number: 1, share: 2, provider: 3, test: 4, callerId: 5 };
+
 const PROVIDER_SUPPORT = {
   tmobile: 'https://www.t-mobile.com/support/plans-features/self-service-short-codes',
   verizon: 'https://www.verizon.com/support/knowledge-base-181139/',
@@ -235,7 +237,8 @@ export const FORWARDING_API_BASE_URL = import.meta.env.VITE_API_URL || 'http://l
 
 const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, preview = false }) => {
   const previewMode = import.meta.env.DEV && preview;
-  const [slide, setSlide] = useState(previewMode ? 2 : 0);
+  const [slide, setSlide] = useState(previewMode ? SLIDE.provider : SLIDE.choice);
+  const [connectionChoice, setConnectionChoice] = useState(null);
   const [loading, setLoading] = useState(!previewMode);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -273,6 +276,7 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
   const [callerIdMessage, setCallerIdMessage] = useState('');
   const [callerIdValidationCode, setCallerIdValidationCode] = useState('');
   const [callerIdStarting, setCallerIdStarting] = useState(false);
+  const [callerIdReturnSlide, setCallerIdReturnSlide] = useState(SLIDE.test);
   const [verifyCallerIdEnabled, setVerifyCallerIdEnabled] = useState(false);
   const [isAddingNewNumber, setIsAddingNewNumber] = useState(false);
   const [isReplacingTargetNumber, setIsReplacingTargetNumber] = useState(false);
@@ -285,7 +289,7 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
   const hasTargetNumber = Boolean(forwardingNumber);
   const targetLineReady = hasTargetNumber && String(twilioNumberStatus || '').toLowerCase() === 'active';
   const needsTargetNumberSelection = !targetLineReady || isReplacingTargetNumber;
-  const totalSlides = verifyCallerIdEnabled ? 5 : 4;
+  const totalSlides = connectionChoice === 'direct' ? 3 : verifyCallerIdEnabled ? 6 : 5;
   const selectedProvider = PHONE_PROVIDERS.find((provider) => provider.id === selectedProviderId) || PHONE_PROVIDERS[PHONE_PROVIDERS.length - 1];
   const providerPageSize = compactGuide ? 1 : 3;
   const providerSearchTerm = providerSearch.trim().toLowerCase();
@@ -315,19 +319,21 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
     'Connecting it to your receptionist',
   ];
   const modalTitle =
-    slide === 0
+    slide === SLIDE.choice
+      ? 'How will customers call your receptionist?'
+      : slide === SLIDE.number
       ? targetQualityState === 'running'
         ? 'Checking this number.'
         : targetQualityState === 'passed'
-          ? 'Number ready.'
+          ? 'Number connected.'
           : needsTargetNumberSelection
             ? 'Choose your receptionist number.'
-            : 'Connect your business line.'
-      : slide === 1
+            : connectionChoice === 'direct' ? 'Your receptionist number.' : 'Connect your business line.'
+      : slide === SLIDE.share
         ? 'Copy this number.'
-        : slide === 2
+        : slide === SLIDE.provider
           ? 'Turn on call forwarding.'
-          : slide === 3
+          : slide === SLIDE.test
             ? forwardingStatus === 'verified'
               ? 'Forwarding verified.'
               : 'Listening for your test call.'
@@ -335,26 +341,28 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
             ? 'Caller ID verified.'
             : 'Use your business number for outbound calls.';
   const slideDescription =
-    slide === 0
+    slide === SLIDE.choice
+      ? 'Choose whether to share a new number or keep using your existing business number.'
+      : slide === SLIDE.number
       ? targetQualityState === 'running'
         ? 'We’re checking the selected number before making it your active receptionist line.'
         : targetQualityState === 'passed'
-          ? 'This number is ready to use. Continue to connect your business line.'
+          ? connectionChoice === 'direct' ? 'Place a test call before sharing this number with customers.' : 'This number is connected. Continue to set up call forwarding.'
           : needsTargetNumberSelection
-            ? 'Pick the receptionist number your business line will forward calls to.'
-            : 'Your business line currently forwards to this active receptionist number. Replace it if you need a different line.'
-      : slide === 1
-        ? 'Keep this receptionist number handy for the next step.'
-        : slide === 2
+            ? connectionChoice === 'direct' ? 'Pick the number customers will call to reach your receptionist.' : 'Pick the receptionist number your business line will forward calls to.'
+            : connectionChoice === 'direct' ? 'You can share this number with customers now, or replace it.' : 'Choose the business line to connect to this receptionist number.'
+      : slide === SLIDE.share
+        ? connectionChoice === 'direct' ? 'Share this number with customers so they can call your receptionist directly.' : 'Keep this receptionist number handy for the next step.'
+        : slide === SLIDE.provider
           ? `Choose who handles ${sourceNumber || 'your business number'} and follow the matching steps.`
-          : slide === 3
+          : slide === SLIDE.test
             ? forwardingStatus === 'verified'
               ? 'Your business line is connected and ready to route calls to your receptionist.'
               : 'Place a test call using the forwarding option you just set up.'
             : `Verify ${sourceNumber || 'your business number'} so outbound calls can display it as the caller ID. This step is optional.`;
   const forwardingSteps = [
     {
-      label: 'Number forwarding',
+      label: 'Phone number setup',
       title: modalTitle,
       description: slideDescription,
     },
@@ -393,7 +401,9 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
     if (entryId && entry.id === entryId) return true;
     return entry.source_number === normalizedSourceNumber;
   }) || null;
-  const selectedExistingEntryIsVerified = selectedExistingEntry?.status === 'verified';
+  const selectedExistingEntryIsVerified = selectedExistingEntry?.status === 'verified'
+    && Boolean(selectedExistingEntry.target_number)
+    && nationalForwardingNumber(selectedExistingEntry.target_number) === nationalForwardingNumber(forwardingNumber);
   const applyCallerIdEntryState = (entry) => {
     const nextStatus = entry?.caller_id_verification_status || 'not_started';
     setCallerIdStatus(nextStatus);
@@ -521,29 +531,21 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
         }),
       });
 
-      if (data?.verified) {
+      if (data?.provisioned) {
         setTwilioNumber(data?.twilio_number || selectedTargetNumber.phone_number);
         setTwilioNumberStatus(data?.twilio_number_status || 'active');
         setTwilioNumberLabel(data?.twilio_number_label || selectedTargetNumber.friendly_name || '');
         setForwardingTargetNumber(data?.twilio_number || selectedTargetNumber.phone_number);
         setTargetQualityState('passed');
-        setTargetQualityMessage(data?.message || 'This receptionist number is ready to use.');
+        setTargetQualityMessage(data?.message || 'This receptionist number is connected. Place a test call before sharing it.');
         return;
       }
 
-      setTwilioNumber('');
-      setTwilioNumberStatus('quality_failed');
-      setTwilioNumberLabel('');
-      setForwardingTargetNumber('');
       setTargetQualityState('failed');
-      setTargetQualityMessage(data?.message || 'That number didn’t pass our quick quality check. Pick another one and we’ll try again.');
+      setTargetQualityMessage(data?.message || 'We couldn’t connect that number. Pick another one and try again.');
     } catch (err) {
-      setTwilioNumber('');
-      setTwilioNumberStatus('quality_failed');
-      setTwilioNumberLabel('');
-      setForwardingTargetNumber('');
       setTargetQualityState('failed');
-      setTargetQualityMessage(err.message || 'That number didn’t pass our quick quality check. Pick another one and we’ll try again.');
+      setTargetQualityMessage(err.message || 'We couldn’t connect that number. Pick another one and try again.');
     } finally {
       setSaving(false);
     }
@@ -591,19 +593,7 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
           setForwardingStatus(currentEntry.status || 'draft');
           applyCallerIdEntryState(currentEntry);
           setIsAddingNewNumber(false);
-          if (currentEntry.status === 'pending_test') {
-            setSlide(3);
-          } else if (
-            verifyCallerId
-            && currentEntry.status === 'verified'
-            && currentEntry.caller_id_verification_status !== 'verified'
-          ) {
-            setSlide(4);
-          } else if (verifyCallerId && currentEntry.caller_id_verification_status === 'pending') {
-            setSlide(4);
-          } else {
-            setSlide(0);
-          }
+          setSlide(SLIDE.choice);
         } else {
           setEntryId(null);
           setSourceNumber(data?.business_phone || '');
@@ -612,7 +602,7 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
           setForwardingStatus('draft');
           applyCallerIdEntryState(null);
           setIsAddingNewNumber(false);
-          setSlide(0);
+          setSlide(SLIDE.choice);
         }
       } catch (err) {
         if (active) {
@@ -631,7 +621,7 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
   }, [authSession?.access_token, previewMode]);
 
   useEffect(() => {
-    if (!needsTargetNumberSelection || targetQualityState === 'running') {
+    if (slide !== SLIDE.number || !needsTargetNumberSelection || targetQualityState === 'running') {
       return undefined;
     }
 
@@ -640,7 +630,7 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
     }, 220);
 
     return () => window.clearTimeout(timer);
-  }, [needsTargetNumberSelection, targetSearch, targetQualityState]);
+  }, [slide, needsTargetNumberSelection, targetSearch, targetQualityState]);
 
   useEffect(() => {
     if (targetQualityState !== 'running') return undefined;
@@ -653,8 +643,8 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
   }, [targetQualityState]);
 
   useEffect(() => {
-    const needsForwardingWatch = slide === 3 && forwardingStatus !== 'verified';
-    const needsCallerIdWatch = verifyCallerIdEnabled && slide === 4 && callerIdStatus === 'pending';
+    const needsForwardingWatch = slide === SLIDE.test && forwardingStatus !== 'verified';
+    const needsCallerIdWatch = verifyCallerIdEnabled && slide === SLIDE.callerId && callerIdStatus === 'pending';
     if ((!needsForwardingWatch && !needsCallerIdWatch) || !authSession?.access_token || !entryId || !businessId) {
       return undefined;
     }
@@ -680,11 +670,12 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
           }
           if (
             verifyCallerIdEnabled
-            && slide === 3
+            && slide === SLIDE.test
             && matchingEntry.status === 'verified'
             && matchingEntry?.caller_id_verification_status !== 'verified'
           ) {
-            setSlide(4);
+            setCallerIdReturnSlide(SLIDE.test);
+            setSlide(SLIDE.callerId);
           }
         }
         applyCallerIdEntryState(matchingEntry);
@@ -805,11 +796,18 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
       setError('Preview only. No forwarding settings or phone numbers were changed.');
       return;
     }
-    if (slide === 0 && needsTargetNumberSelection) {
+    if (slide === SLIDE.choice) {
+      if (!connectionChoice) return;
+      setError('');
+      setSlide(SLIDE.number);
+      return;
+    }
+    if (slide === SLIDE.number && (needsTargetNumberSelection || targetQualityState === 'passed')) {
       if (targetQualityState === 'passed') {
         setTargetQualityState('idle');
         setTargetQualityMessage('');
         setIsReplacingTargetNumber(false);
+        if (connectionChoice === 'direct') setSlide(SLIDE.share);
         return;
       }
       await claimSelectedTargetNumber();
@@ -817,11 +815,16 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
     }
 
     if (!hasTargetNumber) {
-      setError('Assign a receptionist number before setting up forwarding.');
+      setError('Choose a receptionist number before continuing.');
       return;
     }
 
-    if (slide === 0) {
+    if (slide === SLIDE.number) {
+      if (connectionChoice === 'direct') {
+        setError('');
+        setSlide(SLIDE.share);
+        return;
+      }
       if (!normalizedSourceNumber) {
         setError('Choose or enter the business number you want to forward.');
         return;
@@ -830,7 +833,8 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
         const saved = await saveForwarding({ status: 'verified' });
         if (saved) {
           if (verifyCallerIdEnabled && saved?.caller_id_verification_status !== 'verified') {
-            setSlide(4);
+            setCallerIdReturnSlide(SLIDE.number);
+            setSlide(SLIDE.callerId);
           } else {
             handleClose();
           }
@@ -838,33 +842,38 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
         return;
       }
       setError('');
-      setSlide(1);
+      setSlide(SLIDE.share);
       return;
     }
 
-    if (slide === 1) {
+    if (slide === SLIDE.share) {
+      if (connectionChoice === 'direct') {
+        handleClose();
+        return;
+      }
       setError('');
-      setSlide(2);
+      setSlide(SLIDE.provider);
       return;
     }
 
-    if (slide === 2) {
+    if (slide === SLIDE.provider) {
       if (!selectedProviderId) {
         setError('Choose who handles your business number to see the setup steps.');
         return;
       }
       const saved = await saveForwarding({ status: 'pending_test', confirmedEnabled: true });
-      if (saved) setSlide(3);
+      if (saved) setSlide(SLIDE.test);
       return;
     }
 
-    if (slide === 3) {
+    if (slide === SLIDE.test) {
       if (forwardingStatus !== 'verified') {
         setError('Finish the quick test call first so we know forwarding is working.');
         return;
       }
       if (verifyCallerIdEnabled) {
-        setSlide(4);
+        setCallerIdReturnSlide(SLIDE.test);
+        setSlide(SLIDE.callerId);
         return;
       }
       handleClose();
@@ -879,10 +888,19 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
       setError('Preview only. No forwarding settings or phone numbers were changed.');
       return;
     }
-    if (slide === 0 && targetQualityState === 'passed') {
+    if (slide === SLIDE.number && targetQualityState === 'passed') {
       setTargetQualityState('idle');
       setTargetQualityMessage('');
       setIsReplacingTargetNumber(Boolean(targetLineReady));
+      return;
+    }
+    if (slide === SLIDE.callerId) {
+      setSlide(callerIdReturnSlide);
+      return;
+    }
+    if (slide === SLIDE.number) {
+      setConnectionChoice(null);
+      setSlide(SLIDE.choice);
       return;
     }
     setSlide((current) => Math.max(current - 1, 0));
@@ -903,7 +921,47 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
   };
 
   const renderSlide = () => {
-    if (slide === 0) {
+    if (slide === SLIDE.choice) {
+      const choices = [
+        { id: 'direct', title: targetLineReady ? 'Use your Nodemere number' : 'Get a new number', description: 'Give customers a Nodemere number to call your receptionist directly.' },
+        { id: 'forward', title: 'Keep your business number', description: 'Get a receptionist number and forward calls from the number customers already know.' },
+      ];
+      return (
+        <div className="grid gap-4 sm:grid-cols-2" role="group" aria-label="How to connect your phone number">
+          {choices.map((choice, index) => {
+            const active = connectionChoice === choice.id;
+            return (
+              <button
+                key={choice.id}
+                type="button"
+                aria-label={`${choice.title}. ${choice.description}`}
+                aria-pressed={active}
+                onClick={() => { setConnectionChoice(choice.id); setError(''); setSlide(SLIDE.number); }}
+                className="phone-choice-card flex min-h-[240px] flex-col rounded-[8px] border p-5 text-left sm:min-h-[360px] sm:p-7"
+              >
+                <span className="relative z-10 flex items-start gap-3 sm:gap-6">
+                  <span aria-hidden="true" data-number={index + 1} className="phone-choice-card__number shrink-0 text-[48px] leading-none tracking-[-0.06em] sm:text-[72px]">
+                    {index + 1}
+                  </span>
+                  <span className="flex min-w-0 flex-col pt-1 sm:pt-2">
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.14em] opacity-60">
+                      {choice.id === 'direct' ? 'Direct line' : 'Call forwarding'}
+                    </span>
+                    <span className="mt-2 text-base font-semibold leading-5 tracking-[-0.04em] sm:mt-3 sm:text-lg sm:leading-6">{choice.title}</span>
+                  </span>
+                </span>
+                <span className="relative z-10 mt-4 max-w-[290px] text-[13px] leading-5 opacity-75 sm:mt-8 sm:text-sm sm:leading-6">{choice.description}</span>
+                <span className="relative z-10 mt-auto pt-4 text-xs font-semibold opacity-75 sm:pt-8">
+                  {active ? 'Selected' : 'Choose this option →'}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      );
+    }
+
+    if (slide === SLIDE.number) {
       if (needsTargetNumberSelection || targetQualityState !== 'idle') {
         if (targetQualityState === 'running' || targetQualityState === 'passed') {
           const passed = targetQualityState === 'passed';
@@ -919,7 +977,7 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
 
                 <p className="mx-auto mt-3 max-w-sm text-sm leading-6 text-zinc-500">
                   {passed
-                    ? targetQualityMessage || 'This receptionist number is ready to use.'
+                    ? targetQualityMessage || 'This receptionist number is connected. Place a test call before sharing it.'
                     : `We’re testing ${selectedTargetNumber?.phone_number || 'this number'} before switching your active receptionist number.`}
                 </p>
               </div>
@@ -999,8 +1057,8 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
                         }}
                         className={`flex w-full items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-left transition ${
                           active
-                            ? 'border-white/20 bg-white/[0.045] text-white'
-                            : 'border-white/[0.08] bg-transparent text-zinc-300 hover:border-white/[0.14] hover:text-white'
+                            ? 'border-white/20 bg-white/[0.03] text-white'
+                            : 'border-white/[0.08] bg-white/[0.03] text-zinc-300 hover:border-white/[0.14] hover:text-white'
                         }`}
                       >
                         <div className="min-w-0">
@@ -1049,7 +1107,7 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
       return (
         <div className="p-0">
           {targetLineReady && (
-            <div className="rounded-2xl border border-white/[0.08] bg-black/20 p-4">
+            <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4">
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
                   <div className="flex items-center gap-3">
@@ -1082,7 +1140,7 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
               </button>
             </div>
           )}
-          <div className={`${targetLineReady ? 'mt-3 border-t border-white/[0.06] pt-3' : ''} min-w-0 space-y-2`}>
+          {connectionChoice === 'forward' && <div className={`${targetLineReady ? 'mt-3 border-t border-white/[0.06] pt-3' : ''} min-w-0 space-y-2`}>
             {sourceOptions.map((option) => {
                 const active = sourceNumber === option.source_number;
                 return (
@@ -1092,8 +1150,8 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
                     onClick={() => selectSourceOption(option)}
                     className={`flex w-full items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-left transition ${
                       active
-                        ? 'border-white/20 bg-transparent text-white'
-                        : 'border-white/[0.08] bg-black/20 text-zinc-300 hover:border-white/[0.14] hover:text-white'
+                        ? 'border-white/20 bg-white/[0.03] text-white'
+                        : 'border-white/[0.08] bg-white/[0.03] text-zinc-300 hover:border-white/[0.14] hover:text-white'
                     }`}
                   >
                     <div className="min-w-0">
@@ -1146,15 +1204,15 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
                 />
               </div>
             )}
-          </div>
+          </div>}
 
         </div>
       );
     }
 
-    if (slide === 1) {
+    if (slide === SLIDE.share) {
       return (
-        <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/[0.12] px-5 py-4">
+        <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/[0.12] bg-white/[0.03] px-5 py-4">
             <div className="min-w-0">
               <p className="break-words text-3xl font-semibold tracking-[-0.04em] text-white">
                 {forwardingNumber || 'Number pending'}
@@ -1173,7 +1231,7 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
       );
     }
 
-    if (slide === 2) {
+    if (slide === SLIDE.provider) {
       const modeAvailable = !['comcast', 'zoom-phone', 'visible', 'nextiva', 'vonage-business', 'ooma-office', 'frontier', 'optimum-business'].includes(selectedProvider.id);
       return (
         <div>
@@ -1326,7 +1384,7 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
       );
     }
 
-    if (slide === 3) {
+    if (slide === SLIDE.test) {
       const isVerified = forwardingStatus === 'verified';
       return (
       <div>
@@ -1460,11 +1518,11 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
         animate={{ scale: 1, opacity: 1, y: 0 }}
         exit={{ scale: 0.96, opacity: 0, y: 18 }}
         onClick={(e) => e.stopPropagation()}
-        className={`relative max-h-[calc(100vh-24px)] w-full overflow-hidden rounded-[34px] border border-white/[0.08] bg-[#070707]/95 shadow-[0_28px_90px_rgba(0,0,0,0.55)] backdrop-blur-xl ${slide === 2 ? 'max-w-[920px]' : 'max-w-[700px]'}`}
+        className={`relative max-h-[calc(100vh-24px)] w-full overflow-hidden rounded-[34px] border border-white/[0.08] bg-[#070707]/95 shadow-[0_28px_90px_rgba(0,0,0,0.55)] backdrop-blur-xl ${slide === SLIDE.provider ? 'max-w-[920px]' : slide === SLIDE.choice ? 'max-w-[800px]' : 'max-w-[700px]'}`}
       >
         <div className="pointer-events-none absolute right-[-64px] top-[-80px] h-56 w-56 rounded-full bg-white/[0.035] blur-[70px]" />
 
-        <div className="relative p-6 sm:p-8">
+        <div className="relative max-h-[calc(100vh-24px)] overflow-y-auto p-6 sm:p-8">
           <div className="mb-6 flex items-start justify-between gap-5">
             <div className="min-w-0 flex-1">
               <div className="flex h-4 w-full items-center gap-3 pr-8">
@@ -1506,18 +1564,8 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
             </motion.div>
           </AnimatePresence>
 
-          <div className="mt-5 space-y-3">
-            {slide === 3 && forwardingStatus === 'verified' && !verifyCallerIdEnabled && (
-              <button
-                type="button"
-                onClick={goNext}
-                disabled={loading || saving || callerIdStarting}
-                className="mx-auto block h-12 w-full max-w-[440px] rounded-full bg-white text-sm font-bold text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Finish Setup
-              </button>
-            )}
-            {slide !== totalSlides - 1 && !(slide === 0 && targetQualityState === 'running') && (
+          {slide !== SLIDE.choice && <div className="mt-5 space-y-3">
+            {!(slide === SLIDE.number && targetQualityState === 'running') && (
               <button
                 type="button"
                 onClick={goNext}
@@ -1526,40 +1574,45 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
                   || saving
                   || callerIdStarting
                   || targetQualityState === 'running'
-                  || (slide !== 0 && !hasTargetNumber)
-                  || (slide === 0 && needsTargetNumberSelection && (!selectedTargetNumber || !canPurchaseNumber))
-                  || (slide === 2 && !selectedProviderId)
-                  || (slide === 3 && forwardingStatus !== 'verified')
+                  || (slide > SLIDE.number && !hasTargetNumber)
+                  || (slide === SLIDE.number && !needsTargetNumberSelection && !hasTargetNumber)
+                  || (slide === SLIDE.number && needsTargetNumberSelection && targetQualityState !== 'passed' && (!selectedTargetNumber || !canPurchaseNumber))
+                  || (slide === SLIDE.provider && !selectedProviderId)
+                  || (slide === SLIDE.test && forwardingStatus !== 'verified')
                 }
                 className="mx-auto block h-12 w-full max-w-[440px] rounded-full bg-white text-sm font-bold text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {saving
                   ? 'Saving…'
-                  : slide === 0 && needsTargetNumberSelection
+                  : slide === SLIDE.number && (needsTargetNumberSelection || targetQualityState === 'passed')
                     ? targetQualityState === 'passed'
                       ? 'Continue'
                       : 'Use this number'
-                    : slide === 0 && selectedExistingEntryIsVerified
+                    : slide === SLIDE.number && connectionChoice === 'forward' && selectedExistingEntryIsVerified
                       ? 'Use this number'
-                    : slide === 1
+                    : slide === SLIDE.share && connectionChoice === 'direct'
+                      ? 'Finish setup'
+                    : slide === SLIDE.share
                       ? 'Continue to instructions'
-                      : slide === 2
+                      : slide === SLIDE.provider
                         ? 'I turned forwarding on'
-                      : slide === 3
+                      : slide === SLIDE.test && verifyCallerIdEnabled
                         ? 'Continue'
+                      : slide === SLIDE.test || slide === SLIDE.callerId
+                        ? 'Finish setup'
                       : 'Continue'}
               </button>
             )}
             <button
               type="button"
-              onClick={slide === 0 && targetQualityState !== 'passed' ? handleClose : goBack}
+              onClick={goBack}
               disabled={saving}
               className="h-11 w-full rounded-full text-sm font-normal text-zinc-500 transition hover:text-white disabled:opacity-40"
             >
-              {slide === 0 && targetQualityState !== 'passed' ? 'Close' : 'Back'}
+              Back
             </button>
             {error && <p className="text-center text-sm text-red-400">{error}</p>}
-          </div>
+          </div>}
 
         </div>
       </motion.div>

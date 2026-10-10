@@ -85,6 +85,59 @@ body {
   -webkit-text-fill-color: transparent;
   color: transparent;
 }
+.phone-choice-card {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+  color: #f5f5f7;
+  transition: border-color 180ms ease;
+}
+.phone-choice-card__number {
+  position: relative;
+  font-weight: 400;
+  color: transparent;
+}
+.phone-choice-card:hover { border-color: rgba(255, 255, 255, 0.18); }
+.phone-choice-card__number::before,
+.phone-choice-card__number::after {
+  content: attr(data-number);
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  transition: opacity 300ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.phone-choice-card__number::before {
+  color: #f5f5f7;
+}
+.phone-choice-card__number::after {
+  background: linear-gradient(165deg, var(--brandGradientStart), var(--brandGradientEnd));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  opacity: 0;
+}
+.phone-choice-card:hover .phone-choice-card__number::before,
+.phone-choice-card:focus-visible .phone-choice-card__number::before,
+.phone-choice-card[aria-pressed='true'] .phone-choice-card__number::before {
+  opacity: 0;
+  transition-delay: 65ms;
+}
+.phone-choice-card:hover .phone-choice-card__number::after,
+.phone-choice-card:focus-visible .phone-choice-card__number::after,
+.phone-choice-card[aria-pressed='true'] .phone-choice-card__number::after {
+  opacity: 1;
+  transition-delay: 65ms;
+}
+.phone-choice-card[aria-pressed='true'] {
+  border-color: rgba(255, 255, 255, 0.18);
+}
+.phone-choice-card:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.65);
+  outline-offset: 4px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .phone-choice-card, .phone-choice-card__number::before, .phone-choice-card__number::after { transition: none; }
+}
 .brand-icon {
   color: var(--brandGradientStart);
   stroke: currentColor;

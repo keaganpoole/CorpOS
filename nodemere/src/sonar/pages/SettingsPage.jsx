@@ -3509,10 +3509,10 @@ const BusinessForwardingSettings = ({ authSession, businessPhone }) => {
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <PhoneCall size={15} className="settings-icon" />
-                <h4 className="text-[13px] font-semibold text-zinc-100">Business Number Forwarding</h4>
+                <h4 className="text-[13px] font-semibold text-zinc-100">Phone Number Connection</h4>
               </div>
               <p className="mt-2 max-w-2xl text-[12px] leading-5 text-zinc-500">
-                Set the forwarding number for this business once. All receptionist call handling uses this business-level setup.
+                Use a dedicated receptionist number directly, or forward calls from your existing business line.
               </p>
             </div>
             <button
@@ -3520,7 +3520,7 @@ const BusinessForwardingSettings = ({ authSession, businessPhone }) => {
               onClick={() => setShowModal(true)}
               className="settings-neutral-button shrink-0 rounded-xl px-4 py-2 text-[10px] font-black uppercase tracking-widest transition-all active:scale-95"
             >
-              {entry ? 'Manage' : 'Setup'}
+              {entry || receptionistNumber ? 'Manage' : 'Setup'}
             </button>
           </div>
 
@@ -3574,7 +3574,11 @@ const BusinessForwardingSettings = ({ authSession, businessPhone }) => {
         {showModal && (
           <ForwardNumberModal
             authSession={authSession}
-            onClose={() => setShowModal(false)}
+            onClose={() => {
+              setShowModal(false);
+              void loadForwardingState();
+              window.dispatchEvent(new Event('nodemere:phone-number-updated'));
+            }}
             onSaved={(savedEntry) => {
               setEntry(savedEntry || null);
               loadForwardingState();

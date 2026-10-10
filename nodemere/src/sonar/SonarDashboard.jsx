@@ -343,7 +343,8 @@ const TASKLIST_DEFINITIONS = [
       },
       {
         id: 'forward_business_line',
-        title: 'Forward your business line',
+        title: 'Forward your business line (optional)',
+        optional: true,
         videoUrl: TASKLIST_VIDEO_PLACEHOLDER,
         instructionTitle: 'Forward The Business Line',
         instruction:
@@ -514,7 +515,7 @@ const createTasklistState = ({ business = null, agents = [], staff = [], service
     return {
       ...tasklist,
       [task.id]: {
-        completed: task.subtasks.every((subtask) => subtaskStates[subtask.id]?.completed === true),
+        completed: task.subtasks.every((subtask) => subtask.optional || subtaskStates[subtask.id]?.completed === true),
         subtasks: subtaskStates,
       },
     };
@@ -1460,17 +1461,18 @@ const TasklistWidget = ({ tasklistState = null, onOpenIntro = null, onHide = nul
   }, [tasklist]);
 
   const completedCount = TASKLIST_DEFINITIONS.reduce((count, task) => (
-    count + task.subtasks.filter((subtask) => isSubtaskComplete(task.id, subtask.id)).length
+    count + task.subtasks.filter((subtask) => !subtask.optional && isSubtaskComplete(task.id, subtask.id)).length
   ), 0);
-  const totalCount = TASKLIST_DEFINITIONS.reduce((count, task) => count + task.subtasks.length, 0);
+  const totalCount = TASKLIST_DEFINITIONS.reduce((count, task) => count + task.subtasks.filter((subtask) => !subtask.optional).length, 0);
   const overallProgress = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
-  const activeTaskCompletedSubtasks = activeTask.subtasks.filter((subtask) => isSubtaskComplete(activeTask.id, subtask.id)).length;
-  const activeTaskCompletionRatio = activeTask.subtasks.length > 0 ? activeTaskCompletedSubtasks / activeTask.subtasks.length : 0;
+  const activeTaskRequiredSubtasks = activeTask.subtasks.filter((subtask) => !subtask.optional);
+  const activeTaskCompletedSubtasks = activeTaskRequiredSubtasks.filter((subtask) => isSubtaskComplete(activeTask.id, subtask.id)).length;
+  const activeTaskCompletionRatio = activeTaskRequiredSubtasks.length > 0 ? activeTaskCompletedSubtasks / activeTaskRequiredSubtasks.length : 0;
   const taskRingRadius = 13;
   const taskRingCircumference = 2 * Math.PI * taskRingRadius;
   const taskRingDashOffset = taskRingCircumference - (activeTaskCompletionRatio * taskRingCircumference);
   const nextIncompleteSubtask = TASKLIST_DEFINITIONS.flatMap((task) => (
-    task.subtasks.map((subtask) => ({ ...subtask, taskId: task.id }))
+    task.subtasks.filter((subtask) => !subtask.optional).map((subtask) => ({ ...subtask, taskId: task.id }))
   )).find((subtask) => !isSubtaskComplete(subtask.taskId, subtask.id));
   const isBusinessSetupTask = activeTask.id === 'business_setup';
   const isTwoColumnTask = isBusinessSetupTask || activeTask.id === 'first_receptionist';
@@ -1478,7 +1480,7 @@ const TasklistWidget = ({ tasklistState = null, onOpenIntro = null, onHide = nul
 
   const goToPreviousTask = () => setActiveTaskIndex((index) => Math.max(0, index - 1));
   const goToNextTask = () => setActiveTaskIndex((index) => Math.min(TASKLIST_DEFINITIONS.length - 1, index + 1));
-  const activeTaskComplete = activeTask.subtasks.every((subtask) => isSubtaskComplete(activeTask.id, subtask.id));
+  const activeTaskComplete = activeTaskRequiredSubtasks.every((subtask) => isSubtaskComplete(activeTask.id, subtask.id));
 
   return (
     <>
@@ -2486,7 +2488,11 @@ const SonarDashboard = () => {
   useEffect(() => {
     const reload = () => { void loadTasklistState(); };
     window.addEventListener('nodemere:authenticator-updated', reload);
-    return () => window.removeEventListener('nodemere:authenticator-updated', reload);
+    window.addEventListener('nodemere:phone-number-updated', reload);
+    return () => {
+      window.removeEventListener('nodemere:authenticator-updated', reload);
+      window.removeEventListener('nodemere:phone-number-updated', reload);
+    };
   }, [loadTasklistState]);
 
   useEffect(() => {
