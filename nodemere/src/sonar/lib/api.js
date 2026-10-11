@@ -8,6 +8,8 @@ import { receptionistHirePayload } from './receptionistHirePayload';
 const API_BASE = window.sonar?.apiUrl || import.meta.env.VITE_API_URL || '';
 const WS_URL = window.sonar?.wsUrl || import.meta.env.VITE_WS_URL || null;
 const API_TIMEOUT_MS = 15000;
+const CRM_READ_TIMEOUT_MS = 60000;
+const PEOPLE_WRITE_TIMEOUT_MS = 60000;
 const BUSINESS_PROFILE_TIMEOUT_MS = 45000;
 
 let authSessionRequest = null;
@@ -139,6 +141,7 @@ export const api = {
   getVoiceCatalog: ({ includeUnavailable = false, recheck = false } = {}) => strictGetJSON(`/api/voice-catalog?include_unavailable=${includeUnavailable ? 'true' : 'false'}&recheck=${recheck ? 'true' : 'false'}`),
   getVoiceCatalogVoice: (voiceId) => strictGetJSON(`/api/voice-catalog/${encodeURIComponent(voiceId)}`),
   getPeople: (limit = 500) => fetchJSON(`/api/sonar/people?limit=${limit}`),
+  getPeopleForCRM: (limit = 500) => strictGetJSON(`/api/sonar/people?limit=${limit}`, CRM_READ_TIMEOUT_MS),
   getPerson: (id) => fetchJSON(`/api/sonar/people/${encodeURIComponent(id)}`),
   getBusinessProfile: () => fetchJSON('/api/sonar/business/profile', BUSINESS_PROFILE_TIMEOUT_MS),
   updateBusinessProfile: (business) => putJSON('/api/sonar/business/profile', business),
@@ -151,6 +154,7 @@ export const api = {
   updateService: (id, service) => putJSON(`/api/sonar/services/${encodeURIComponent(id)}`, service),
   deleteService: (id) => deleteJSON(`/api/sonar/services/${encodeURIComponent(id)}`),
   getAppointments: (limit = 500) => fetchJSON(`/api/sonar/appointments?limit=${limit}`),
+  getAppointmentsForCRM: (limit = 500) => strictGetJSON(`/api/sonar/appointments?limit=${limit}`, CRM_READ_TIMEOUT_MS),
   getPayments: (limit = 100) => fetchJSON(`/api/sonar/payments?limit=${limit}`),
   getInvoices: (limit = 100) => fetchJSON(`/api/sonar/invoices?limit=${limit}`),
   createAppointment: (appointment) => postJSON('/api/sonar/appointments', appointment),
@@ -164,9 +168,9 @@ export const api = {
   },
   renamePersonDocument: (personId, documentId, fileName) => putJSON(`/api/sonar/people/${encodeURIComponent(personId)}/documents/${encodeURIComponent(documentId)}`, { file_name: fileName }),
   deletePersonDocument: (personId, documentId) => deleteJSON(`/api/sonar/people/${encodeURIComponent(personId)}/documents/${encodeURIComponent(documentId)}`),
-  createPerson: (person) => postJSON('/api/sonar/people', person),
-  updatePerson: (id, person) => putJSON(`/api/sonar/people/${encodeURIComponent(id)}`, person),
-  deletePerson: (id) => deleteJSON(`/api/sonar/people/${encodeURIComponent(id)}`),
+  createPerson: (person) => postJSON('/api/sonar/people', person, PEOPLE_WRITE_TIMEOUT_MS),
+  updatePerson: (id, person) => putJSON(`/api/sonar/people/${encodeURIComponent(id)}`, person, PEOPLE_WRITE_TIMEOUT_MS),
+  deletePerson: (id) => deleteJSON(`/api/sonar/people/${encodeURIComponent(id)}`, PEOPLE_WRITE_TIMEOUT_MS),
   getScenarios: () => fetchJSON('/api/sonar/scenarios'),
   createScenario: (scenario) => postJSON('/api/sonar/scenarios', scenario),
   updateScenario: (id, scenario) => putJSON(`/api/sonar/scenarios/${encodeURIComponent(id)}`, scenario),
@@ -233,23 +237,24 @@ async function postJSON(endpoint, body, timeoutMs = API_TIMEOUT_MS) {
     if (!res.ok) throw await parseApiError(res);
     return await res.json();
   } catch (err) {
-    console.error("api.js:event_150");
+    console.error(`api.js:event_150 ${endpoint} ${err?.status || ''} ${err?.message || String(err)}`);
     throw err;
   }
 }
 
-async function putJSON(endpoint, body) {
+async function putJSON(endpoint, body, timeoutMs = API_TIMEOUT_MS) {
+  const startedAt = performance.now();
   try {
     const headers = await buildAuthHeaders({ 'Content-Type': 'application/json' });
     const res = await fetchWithTimeout(`${API_BASE}${endpoint}`, {
       method: 'PUT',
       headers,
       body: JSON.stringify(body),
-    });
+    }, timeoutMs);
     if (!res.ok) throw await parseApiError(res);
     return await res.json();
   } catch (err) {
-    console.error("api.js:event_166");
+    console.error(`API PUT failed: ${endpoint}; status=${err?.status || 'network/timeout'}; elapsed=${Math.round(performance.now() - startedAt)}ms; ${err?.message || String(err)}`);
     throw err;
   }
 }
@@ -270,13 +275,13 @@ async function patchJSON(endpoint, body) {
   }
 }
 
-async function deleteJSON(endpoint) {
+async function deleteJSON(endpoint, timeoutMs = API_TIMEOUT_MS) {
   try {
     const headers = await buildAuthHeaders();
     const res = await fetchWithTimeout(`${API_BASE}${endpoint}`, {
       method: 'DELETE',
       headers,
-    });
+    }, timeoutMs);
     if (!res.ok) throw await parseApiError(res);
     return await res.json();
   } catch (err) {

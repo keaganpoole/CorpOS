@@ -158,20 +158,28 @@ const InlineText = ({ value, onSave, placeholder = '', className = '' }) => {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value || '');
   const ref = useRef(null);
+  const finishedRef = useRef(false);
   useEffect(() => { if (editing) ref.current?.focus(); }, [editing]);
-  useEffect(() => { setDraft(value || ''); }, [value]);
-  const save = () => { setEditing(false); onSave(draft.trim() || null); };
+  useEffect(() => { if (!editing) setDraft(value || ''); }, [value, editing]);
+  const startEditing = () => { finishedRef.current = false; setEditing(true); };
+  const save = () => {
+    if (finishedRef.current) return;
+    finishedRef.current = true;
+    setEditing(false);
+    const nextValue = draft.trim() || null;
+    if (nextValue !== (value || null)) onSave(nextValue);
+  };
   return editing ? (
     <input ref={ref} value={draft} onChange={(e) => setDraft(e.target.value)} onBlur={save}
-      onKeyDown={(e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(false); }}
+      onKeyDown={(e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') { finishedRef.current = true; setEditing(false); } }}
       onClick={(e) => e.stopPropagation()}
       className="w-full min-w-[60px] rounded-lg border border-white/[0.08] bg-white/[0.06] px-2 py-1 text-[12px] text-white transition-colors focus:border-white/[0.14] focus:!outline-none" />
   ) : (
     <span
       tabIndex={0}
-      onFocus={() => setEditing(true)}
-      onClick={(e) => { e.stopPropagation(); setEditing(true); }}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setEditing(true); }}
+      onFocus={startEditing}
+      onClick={(e) => { e.stopPropagation(); startEditing(); }}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') startEditing(); }}
       className={`inline-flex w-full min-w-[60px] cursor-pointer hover:text-white transition-colors ${className}`}>
       {value || (
         placeholder
@@ -648,7 +656,7 @@ const LeadCell = ({ colId, lead, dc, autoSave, onSelect, fieldConfig = {}, custo
   const customField = customFields.find((field) => field.key === colId);
   if (customField) {
     const value = getCustomValue(lead.custom_fields, colId);
-    const saveCustom = (nextValue) => autoSave(lead.id, 'custom_fields', setCustomFieldValue(lead.custom_fields, colId, nextValue));
+    const saveCustom = (nextValue) => autoSave(lead.id, 'custom_fields', { [colId]: nextValue });
     if (customField.type === 'docs') return <PersonDocumentsCell documents={documents} onOpen={(document) => onOpenDocuments?.(lead, document)} />;
     if (customField.type === 'boolean') return <InlineBoolean value={value} onSave={saveCustom} />;
     if (customField.type === 'number') return <InlineNumber value={value} onSave={saveCustom} />;
@@ -1776,9 +1784,14 @@ const LeadsTable = ({
 
   const handleDeleteRecords = async (ids) => {
     if (!ids.length) return;
-    await onDeleteMany(ids);
-    setSelectedIds((prev) => prev.filter((id) => !ids.includes(id)));
-    setContextMenu(null);
+    try {
+      await onDeleteMany(ids);
+      setSelectedIds((prev) => prev.filter((id) => !ids.includes(id)));
+    } catch (err) {
+      // The page displays the save error and restores any row that could not be deleted.
+    } finally {
+      setContextMenu(null);
+    }
   };
 
   const zoneLayouts = useMemo(() => {
@@ -1997,7 +2010,7 @@ const LeadsTable = ({
               const isRowBulkSelected = selectedIds.includes(lead.id);
               return (
                 <motion.div
-                  key={`frozen-${lead.id}`}
+                  key={`frozen-${lead._clientKey || lead.id}`}
                   initial={{ opacity: 0, y: 3 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: Math.min(idx * 0.012, 0.35) }}
@@ -2193,7 +2206,7 @@ const LeadsTable = ({
                     const isRowBulkSelected = selectedIds.includes(lead.id);
                     return (
                       <motion.div
-                        key={lead.id}
+                        key={lead._clientKey || lead.id}
                         initial={{ opacity: 0, y: 3 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: Math.min(idx * 0.012, 0.35) }}

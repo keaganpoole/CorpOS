@@ -148,20 +148,28 @@ const InlineText = ({ value, onSave, placeholder = '', className = '' }) => {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value || '');
   const ref = useRef(null);
+  const finishedRef = useRef(false);
   useEffect(() => { if (editing) ref.current?.focus(); }, [editing]);
-  useEffect(() => { setDraft(value || ''); }, [value]);
-  const save = () => { setEditing(false); onSave(draft.trim() || null); };
+  useEffect(() => { if (!editing) setDraft(value || ''); }, [value, editing]);
+  const startEditing = () => { finishedRef.current = false; setEditing(true); };
+  const save = () => {
+    if (finishedRef.current) return;
+    finishedRef.current = true;
+    setEditing(false);
+    const nextValue = draft.trim() || null;
+    if (nextValue !== (value || null)) onSave(nextValue);
+  };
   return editing ? (
     <input ref={ref} value={draft} onChange={(e) => setDraft(e.target.value)} onBlur={save}
-      onKeyDown={(e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(false); }}
+      onKeyDown={(e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') { finishedRef.current = true; setEditing(false); } }}
       onClick={(e) => e.stopPropagation()}
       className="bg-white/[0.06] border border-cyan-500/30 rounded-lg px-2 py-1 text-[12px] text-white focus:!outline-none w-full min-w-[60px]" />
   ) : (
     <span
       tabIndex={0}
-      onFocus={() => setEditing(true)}
-      onClick={(e) => { e.stopPropagation(); setEditing(true); }}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setEditing(true); }}
+      onFocus={startEditing}
+      onClick={(e) => { e.stopPropagation(); startEditing(); }}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') startEditing(); }}
       className={`inline-flex w-full min-w-[60px] cursor-pointer hover:text-white transition-colors ${className}`}>
       {value || (
         placeholder
@@ -1594,9 +1602,14 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
 
   const handleDeleteRecords = async (ids) => {
     if (!ids.length) return;
-    await onDeleteMany(ids);
-    setSelectedIds((prev) => prev.filter((id) => !ids.includes(id)));
-    setContextMenu(null);
+    try {
+      await onDeleteMany(ids);
+      setSelectedIds((prev) => prev.filter((id) => !ids.includes(id)));
+    } catch (err) {
+      // The page displays the save error and restores any row that could not be deleted.
+    } finally {
+      setContextMenu(null);
+    }
   };
 
   const zoneLayouts = useMemo(() => {
@@ -1806,7 +1819,7 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
               const isRowBulkSelected = selectedIds.includes(appointment.id);
               return (
                 <motion.div
-                  key={`frozen-${appointment.id}`}
+                  key={`frozen-${appointment._clientKey || appointment.id}`}
                   initial={{ opacity: 0, y: 3 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: Math.min(idx * 0.012, 0.35) }}
@@ -1974,7 +1987,7 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
                   const isRowBulkSelected = selectedIds.includes(appointment.id);
                   return (
                     <motion.div
-                      key={appointment.id}
+                      key={appointment._clientKey || appointment.id}
                       initial={{ opacity: 0, y: 3 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: Math.min(idx * 0.012, 0.35) }}

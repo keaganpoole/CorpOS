@@ -4349,12 +4349,12 @@ def normalize_people_payload_custom_fields(payload: dict, business_id: Optional[
     normalized = {**(payload or {})}
     custom_field_types = load_people_schema_types(business_id)
     merged_custom_fields = {
-        **((existing_custom_fields or {}) if isinstance(existing_custom_fields, dict) else {}),
-        **((normalized.get("custom_fields") or {}) if isinstance(normalized.get("custom_fields"), dict) else {}),
+        **({key: value for key, value in existing_custom_fields.items() if key != "custom_fields"} if isinstance(existing_custom_fields, dict) else {}),
+        **({key: value for key, value in normalized["custom_fields"].items() if key != "custom_fields"} if isinstance(normalized.get("custom_fields"), dict) else {}),
     }
 
     for key in list(normalized.keys()):
-        if not str(key).startswith("custom_"):
+        if key == "custom_fields" or not str(key).startswith("custom_"):
             continue
         merged_custom_fields[key] = coerce_people_custom_field_value(normalized.pop(key), custom_field_types.get(key))
 
@@ -12261,7 +12261,9 @@ async def create_sonar_person(payload: dict, current_user: dict = Depends(get_cu
         (business or {}).get("id") or insert_payload.get("business_id"),
     )
     response = supabase.table("people").insert(insert_payload).execute()
-    created = response.data[0] if response.data else insert_payload
+    if not response.data:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Person was not saved")
+    created = response.data[0]
     claim_nest_milestone(
         supabase,
         business_id=created.get("business_id") or (business or {}).get("id"),
@@ -12283,6 +12285,8 @@ async def create_sonar_person(payload: dict, current_user: dict = Depends(get_cu
 
 @app.put("/api/sonar/people/{person_id}", tags=["Sonar People"])
 async def update_sonar_person(person_id: str, payload: dict, current_user: dict = Depends(get_current_user)):
+    started_at = time.perf_counter()
+    stage = "lookup"
     try:
         business = load_business_by_user_id(business_owner_id(current_user))
         existing_query = supabase.table("people").select("*").eq("id", person_id)
@@ -12293,7 +12297,9 @@ async def update_sonar_person(person_id: str, payload: dict, current_user: dict 
         existing_response = existing_query.limit(1).execute()
         if not existing_response.data:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Person not found")
+        lookup_finished_at = time.perf_counter()
 
+        stage = "write"
         updates = {
             key: value
             for key, value in payload.items()
@@ -12306,19 +12312,38 @@ async def update_sonar_person(person_id: str, payload: dict, current_user: dict 
         )
         updates["updated_at"] = datetime.now(timezone.utc).isoformat()
 
-        supabase.table("people").update(updates).eq("id", person_id).execute()
-
-        refreshed_query = supabase.table("people").select("*").eq("id", person_id)
+        update_query = supabase.table("people").update(updates).eq("id", person_id)
         if business:
-            refreshed_query = refreshed_query.eq("business_id", business["id"])
+            update_query = update_query.eq("business_id", business["id"])
         else:
-            refreshed_query = refreshed_query.eq("user_id", business_owner_id(current_user))
-        refreshed_response = refreshed_query.limit(1).execute()
-        updated = refreshed_response.data[0] if refreshed_response.data else {**existing_response.data[0], **updates}
-    except HTTPException:
+            update_query = update_query.eq("user_id", business_owner_id(current_user))
+        update_response = update_query.execute()
+        write_finished_at = time.perf_counter()
+
+        if update_response.data:
+            updated = update_response.data[0]
+        else:
+            stage = "readback"
+            refreshed_query = supabase.table("people").select("*").eq("id", person_id)
+            if business:
+                refreshed_query = refreshed_query.eq("business_id", business["id"])
+            else:
+                refreshed_query = refreshed_query.eq("user_id", business_owner_id(current_user))
+            refreshed_response = refreshed_query.limit(1).execute()
+            if not refreshed_response.data:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Person not found after update")
+            updated = refreshed_response.data[0]
+        logging.info(
+            "CRM People save completed lookup_ms=%d write_ms=%d total_ms=%d",
+            round((lookup_finished_at - started_at) * 1000),
+            round((write_finished_at - lookup_finished_at) * 1000),
+            round((time.perf_counter() - started_at) * 1000),
+        )
+    except HTTPException as exc:
+        logging.warning("CRM People save rejected stage=%s status=%d elapsed_ms=%d", stage, exc.status_code, round((time.perf_counter() - started_at) * 1000))
         raise
     except Exception as exc:
-        logging.error('main.update_sonar_person.event_9419')
+        logging.exception("CRM People save failed stage=%s error_type=%s elapsed_ms=%d", stage, type(exc).__name__, round((time.perf_counter() - started_at) * 1000))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail='The request could not be completed',
@@ -12351,7 +12376,14 @@ async def delete_sonar_person(person_id: str, current_user: dict = Depends(get_c
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Person not found")
 
     deleted = existing_response.data[0]
-    supabase.table("people").delete().eq("id", person_id).execute()
+    delete_query = supabase.table("people").delete().eq("id", person_id)
+    if business:
+        delete_query = delete_query.eq("business_id", business["id"])
+    else:
+        delete_query = delete_query.eq("user_id", business_owner_id(current_user))
+    delete_response = delete_query.execute()
+    if not delete_response.data:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Person was not deleted")
     schedule_backend_scenario_execution("record_deleted", {
         "record_id": person_id,
         "person_id": person_id,
@@ -12648,40 +12680,71 @@ async def update_sonar_appointment(appointment_id: str, payload: dict, current_u
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found")
 
     updates = {}
-    if first_present(payload, "date", "appointment_date") is not None:
-        updates["date"] = normalize_appointment_date_value(first_present(payload, "date", "appointment_date"))
-    if first_present(payload, "time", "appointment_time") is not None:
-        updates["time"] = normalize_appointment_time_value(first_present(payload, "time", "appointment_time"))
-    if first_present(payload, "duration", "appointment_duration") is not None:
-        updates["duration"] = normalize_appointment_duration(first_present(payload, "duration", "appointment_duration"))
-    if first_present(payload, "status") is not None:
-        updates["status"] = normalize_appointment_status(first_present(payload, "status"))
-    if first_present(payload, "receptionist_id", "hired_receptionist_id") is not None:
-        updates["receptionist_id"] = int_or_none(first_present(payload, "receptionist_id", "hired_receptionist_id"))
-    if first_present(payload, "notes") is not None:
-        updates["notes"] = first_present(payload, "notes")
-    if first_present(payload, "person_id") is not None:
-        safe_person_id = safe_appointment_person_id(first_present(payload, "person_id"), business_id=(business or {}).get("id"))
-        if safe_person_id is not None:
-            updates["person_id"] = safe_person_id
-    if first_present(payload, "service_id") is not None:
-        safe_service_id = safe_appointment_service_id(first_present(payload, "service_id"), business_id=(business or {}).get("id"))
-        if safe_service_id is not None:
-            updates["service_id"] = safe_service_id
-    if first_present(payload, "staff_id") is not None:
-        safe_staff_id = safe_appointment_staff_id(
-            first_present(payload, "staff_id"),
-            business_id=(business or {}).get("id") or existing_response.data[0].get("business_id"),
-            require_active=False,
-        )
-        if safe_staff_id is not None:
-            updates["staff_id"] = safe_staff_id
+    existing = existing_response.data[0]
+    for field, alias, normalize in (
+        ("date", "appointment_date", normalize_appointment_date_value),
+        ("time", "appointment_time", normalize_appointment_time_value),
+        ("duration", "appointment_duration", normalize_appointment_duration),
+    ):
+        if field in payload or alias in payload:
+            value = payload[field] if field in payload else payload[alias]
+            if value is None or value == "":
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"{field} is required")
+            updates[field] = normalize(value)
+    if "status" in payload:
+        if not payload["status"]:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="status is required")
+        updates["status"] = normalize_appointment_status(payload["status"])
+    if "notes" in payload:
+        updates["notes"] = payload["notes"]
+    if "source" in payload:
+        updates["source"] = payload["source"]
+    if "receptionist_id" in payload or "hired_receptionist_id" in payload:
+        value = payload.get("receptionist_id", payload.get("hired_receptionist_id"))
+        updates["receptionist_id"] = int_or_none(value) if value not in (None, "") else None
+    for field, validator in (
+        ("person_id", safe_appointment_person_id),
+        ("service_id", safe_appointment_service_id),
+        ("staff_id", safe_appointment_staff_id),
+    ):
+        if field not in payload:
+            continue
+        value = payload[field]
+        if value in (None, ""):
+            updates[field] = None
+            continue
+        valid_id = validator(value, business_id=business["id"], **({"require_active": False} if field == "staff_id" else {}))
+        if valid_id is None:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"{field} was not found for this business")
+        updates[field] = valid_id
+    if "custom_fields" in payload:
+        if not isinstance(payload["custom_fields"], dict):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="custom_fields must be an object")
+        updates["custom_fields"] = {**(existing.get("custom_fields") or {}), **payload["custom_fields"]}
     if not updates:
-        return {"ok": True, "appointment": {"id": appointment_id, "action": "update_appointment", "skipped": True, "reason": "No valid appointment fields to update"}}
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No appointment fields to update")
+
+    if any(field in updates for field in ("date", "time", "duration", "staff_id")):
+        schedule_valid, schedule_reason, schedule_conflicts = validate_appointment_schedule(
+            business,
+            updates.get("date", existing["date"]),
+            updates.get("time", existing["time"]),
+            updates.get("duration", existing.get("duration") or 30),
+            staff_id=updates.get("staff_id", existing.get("staff_id")),
+            exclude_appointment_id=appointment_id,
+        )
+        if not schedule_valid:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail={"reason": schedule_reason, "conflicts": schedule_conflicts})
 
     updates["updated_at"] = datetime.now(timezone.utc).isoformat()
     response = supabase.table("appointments").update(updates).eq("id", appointment_id).eq("business_id", business["id"]).execute()
-    updated = response.data[0] if response.data else {**existing_response.data[0], **updates}
+    if response.data:
+        updated = response.data[0]
+    else:
+        refreshed = supabase.table("appointments").select("*").eq("id", appointment_id).eq("business_id", business["id"]).limit(1).execute().data
+        if not refreshed:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found after update")
+        updated = refreshed[0]
     if str(updated.get("status") or "").strip().lower() == "completed":
         claim_nest_milestone(
             supabase,
