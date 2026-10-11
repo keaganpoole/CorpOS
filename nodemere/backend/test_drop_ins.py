@@ -3,11 +3,9 @@ import asyncio
 import copy
 import json
 import os
-import re
 import unittest
 import requests
 from contextlib import ExitStack
-from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 from uuid import UUID, uuid4
@@ -15,7 +13,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from backend.authorization import ScopedClient, Tenant, tenant_scope
 from backend.drop_ins import build_router, run_identity
-from backend.drop_in_templates import for_industry, INDUSTRY_VISITS, STATUS_STARTERS, TEMPLATES
+from backend.drop_in_templates import for_industry, STATUS_STARTERS, TEMPLATES
 
 OWNER = '11111111-1111-4111-8111-111111111111'
 APPT = '22222222-2222-4222-8222-222222222222'
@@ -262,17 +260,15 @@ class DropInTests(unittest.TestCase):
         self.assertEqual(self.run_call(key).json()['status'], 'dispatch-unknown')
         self.assertEqual(self.run_call(key).json()['status'], 'dispatch-unknown')
         self.executor._call_customer.assert_awaited_once()
-    def test_catalog_covers_every_onboarding_industry(self):
-        extra = re.findall(r"^  '([^']+)': \{", (Path(__file__).parents[1] / 'src/data/onboardingIndustryTemplates.js').read_text(), re.M)
-        expected = {'Home Services','Real Estate','Automotive','Beauty & Wellness','Hospitality','Professional Services','Retail','Other General Business', *extra}
-        self.assertEqual(expected, set(INDUSTRY_VISITS))
+    def test_catalog_excludes_industry_specific_templates(self):
+        templates = for_industry('Home Services')
         self.assertEqual(len(TEMPLATES), len({x['key'] for x in TEMPLATES}))
-        self.assertTrue(all(t['category'] == 'All' for t in TEMPLATES if t['key'].endswith(('-follow', '-prepare'))))
-        for industry in expected:
-            templates = for_industry(industry)
-            self.assertEqual(len(templates), len(TEMPLATES))
-            self.assertTrue(any(t['name'] == 'Viewing Follow-Up' for t in templates))
-            self.assertTrue(all(not t['industries'] for t in templates))
+        self.assertEqual(len(templates), len(TEMPLATES))
+        self.assertFalse(any(t['category'] == 'All' for t in templates))
+        self.assertNotIn('Visit Preparation', {t['name'] for t in templates})
+        self.assertNotIn('HVAC Visit Reminder', {t['name'] for t in templates})
+        self.assertFalse(any(t['key'].endswith(('-follow', '-prepare')) for t in templates))
+        self.assertTrue(all(not t['industries'] for t in templates))
     def test_request_ids_are_bound_to_business_and_appointment(self):
         key = uuid4()
         self.assertNotEqual(run_identity(1, APPT, DROP, key), run_identity(2, APPT, DROP, key))

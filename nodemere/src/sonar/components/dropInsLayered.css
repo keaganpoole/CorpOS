@@ -101,8 +101,13 @@
 .drop-ins-modal .drop-ins-section-heading h3 { font-size: 22px; margin: 0 0 7px; }
 .drop-ins-modal .drop-ins-section-heading p:not(.drop-ins-eyebrow) { color: #a1a1aa; }
 .drop-ins-modal .drop-ins-heading-actions { display: flex; align-items: center; gap: 15px; flex-shrink: 0; }
-.drop-ins-modal .drop-ins-inline-sort { display: flex; align-items: center; gap: 7px; color: #8d8d96; font-size: 10px; white-space: nowrap; }
-.drop-ins-modal .drop-ins-inline-sort select { background: #111111; border: 1px solid #d4d4d826; border-radius: 7px; padding: 6px 8px; color: #a1a1aa; font-size: 10px; }
+.drop-ins-modal .drop-ins-list-search { position: relative; flex: 0 0 260px; width: 260px; }
+.drop-ins-modal .drop-ins-list-search > svg { position: absolute; left: 12px; top: 50%; width: 12px; height: 12px; color: #3f3f46; transform: translateY(-50%); pointer-events: none; }
+.drop-ins-modal .drop-ins-list-search input { box-sizing: border-box; width: 100%; padding: 8px 32px 8px 36px; border: 1px solid #ffffff0f; border-radius: 12px; background: #ffffff05; color: #d4d4d8; font-size: 12px; outline: none; transition: border-color .18s, background .18s; }
+.drop-ins-modal .drop-ins-list-search input::placeholder { color: #3f3f46; }
+.drop-ins-modal .drop-ins-list-search input:focus { border-color: #ffffff24; background: #ffffff08; }
+.drop-ins-modal .drop-ins-list-search > button { position: absolute; right: 9px; top: 50%; display: grid; place-items: center; padding: 4px; border: 0; background: transparent; color: #52525b; transform: translateY(-50%); }
+.drop-ins-modal .drop-ins-list-search > button:hover { color: #fafafa; }
 .drop-ins-modal .drop-ins-secondary { display: inline-flex; align-items: center; justify-content: center; height: 39px; padding: 0 16px; border: 1px solid #ffffff1c; border-radius: 100px; background: #ffffff08; color: #d4d4d8; font-size: 12px; font-weight: 600; transition: background .18s, border-color .18s, color .18s; }
 .drop-ins-modal .drop-ins-secondary:hover { background: #ffffff; border-color: #ffffff; color: #09090b; }
 .drop-ins-modal .drop-ins-templates-button { height: auto; padding: 6px 0; border: 0; border-radius: 0; background: transparent; color: #d4d4d8; font-size: 12px; font-weight: 600; }
@@ -134,7 +139,7 @@
 .drop-ins-modal .template-google .drop-ins-template-icon svg { filter: brightness(0) invert(.9); }
 .drop-ins-modal .drop-ins-template p { color: #a1a1aa; line-height: 1.65; margin-bottom: 15px; }
 .drop-ins-modal .drop-ins-template-bottom { color: #8d8d96; }
-.drop-ins-modal .drop-ins-list-toolbar, .drop-ins-modal .drop-ins-sort-note { color: #a1a1aa; }
+.drop-ins-modal .drop-ins-list-toolbar { color: #a1a1aa; }
 .drop-ins-modal .drop-ins-list-toolbar { justify-content: flex-end; }
 .drop-ins-modal .drop-ins-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .drop-ins-modal .drop-ins-list-toolbar select { background: #111111; border-color: #d4d4d826; }
@@ -466,6 +471,9 @@
 .drop-ins-modal .drop-in-chip-wrap.is-back .drop-in-chip { color: #a1a1aa; font-weight: 600; }
 
 @media (max-width: 760px) {
+  .drop-ins-modal .drop-ins-section-heading { align-items: flex-start; flex-direction: column; }
+  .drop-ins-modal .drop-ins-heading-actions { width: 100%; flex-wrap: wrap; justify-content: flex-start; }
+  .drop-ins-modal .drop-ins-list-search { flex: 1 1 100%; width: 100%; }
   .drop-ins-modal .drop-ins-tree-row { padding-right: 6px; }
   .drop-ins-modal .drop-ins-tree-row .drop-ins-row-actions { opacity: .8; }
   .drop-ins-modal .drop-ins-drag-handle { display: none; }

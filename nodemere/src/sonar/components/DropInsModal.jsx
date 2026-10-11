@@ -6,6 +6,7 @@ import { FcGoogle } from 'react-icons/fc';
 import { api } from '../lib/api';
 import { STATUS_OPTIONS } from '../lib/appointmentSchema';
 import { groupDropIns, stabilizeDropInGroups } from '../lib/dropInGrouping';
+import { availableDropInTemplates } from '../lib/dropInTemplateAvailability';
 import CirclePreloader from './CirclePreloader';
 import DropInAppointmentPreview from './DropInAppointmentPreview';
 import ModalSpectrumLine from '../../components/ModalSpectrumLine';
@@ -33,8 +34,8 @@ export default function DropInsModal({ model, onClose }) {
   const [templatesLoading, setTemplatesLoading] = useState(true);
   const [templateError, setTemplateError] = useState('');
   const [search, setSearch] = useState('');
+  const [listSearch, setListSearch] = useState('');
   const [category, setCategory] = useState('All');
-  const [sort, setSort] = useState('manual');
   const [busy, setBusy] = useState(false);
   const dotSaveJobs = useRef(new Map());
   const [pendingActive, setPendingActive] = useState(() => new Set());
@@ -69,15 +70,14 @@ export default function DropInsModal({ model, onClose }) {
     }
     return saved.sort(manual);
   }, [model.items, previewStatus, draft, view]);
-  const itemSort = sort === 'alpha' ? (a, b) => a.name.localeCompare(b.name) : sort === 'newest' ? (a, b) => b.created_at.localeCompare(a.created_at) : sort === 'used' ? (a, b) => (b.usage_count || 0) - (a.usage_count || 0) || manual(a, b) : manual;
-  const sortedItems = [...statusItems].sort(itemSort);
-  const sortedGroups = [...allGroups].sort((a, b) => {
-    if (sort === 'alpha') return a.primary.name.localeCompare(b.primary.name) || a.position - b.position;
-    if (sort === 'newest') return (b.firstCreatedAt || '').localeCompare(a.firstCreatedAt || '') || a.position - b.position;
-    if (sort === 'used') return b.firstUsageCount - a.firstUsageCount || a.position - b.position;
-    return a.position - b.position;
-  });
-  const applicableTemplates = templates.filter(t => t.statuses.includes(status));
+  const normalizedListSearch = listSearch.trim().toLocaleLowerCase();
+  const matchesListSearch = item => !normalizedListSearch ||
+    `${item.name} ${item.purpose || ''} ${item.prompt || ''}`.toLocaleLowerCase().includes(normalizedListSearch);
+  const sortedItems = statusItems.filter(matchesListSearch)
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }) || a.id.localeCompare(b.id));
+  const sortedGroups = allGroups.filter(group => group.rows.some(matchesListSearch))
+    .sort((a, b) => a.primary.name.localeCompare(b.primary.name, undefined, { sensitivity: 'base' }) || a.position - b.position);
+  const applicableTemplates = availableDropInTemplates(templates, model.items, status);
   const categories = ['All', ...new Set(applicableTemplates.map(t => t.category).filter(value => value && value !== 'All'))];
   const visibleTemplates = applicableTemplates.filter(t => (category === 'All' || t.category === category) && `${t.name} ${t.description} ${t.category}`.toLowerCase().includes(search.toLowerCase()));
 
@@ -260,30 +260,29 @@ export default function DropInsModal({ model, onClose }) {
           <AnimatePresence mode="wait" initial={false}>
             <motion.div key={view} initial={{ opacity: 0, x: reduced ? 0 : 14 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: reduced ? 0 : -10 }} transition={{ duration: .18 }}>
               {view === 'manage' && status === 'all' && <>
-                <div className="drop-ins-section-heading"><div><p className="drop-ins-eyebrow">ALL APPOINTMENTS</p><h3>Your drop-ins</h3><p>Choose which appointment statuses can use each drop-in.</p></div>{model.canManage && <div className="drop-ins-heading-actions"><label className="drop-ins-inline-sort">Sort <select aria-label="Sort drop-ins" value={sort} onChange={e => setSort(e.target.value)}><option value="manual">Manual</option><option value="used">Most Used</option><option value="alpha">Alphabetical</option><option value="newest">Newest</option></select></label><button type="button" className="drop-ins-primary" disabled={model.loading} onClick={() => { setStatus(previewStatus); setView('gallery'); setCategory('All'); }}>Add drop-in</button></div>}</div>
+                <div className="drop-ins-section-heading"><div><p className="drop-ins-eyebrow">ALL APPOINTMENTS</p><h3>Your drop-ins</h3><p>Choose which appointment statuses can use each drop-in.</p></div>{model.canManage && <div className="drop-ins-heading-actions"><div className="drop-ins-list-search"><Search size={12} aria-hidden="true" /><input aria-label="Search drop-ins" placeholder="Search drop-ins..." value={listSearch} onChange={e => setListSearch(e.target.value)} />{listSearch && <button type="button" aria-label="Clear drop-in search" onClick={() => setListSearch('')}><X size={11} /></button>}</div><button type="button" className="drop-ins-primary" disabled={model.loading} onClick={() => { setStatus(previewStatus); setView('gallery'); setCategory('All'); }}>Add drop-in</button></div>}</div>
                 {model.loading ? <div className="drop-ins-loading"><Loader2 className="animate-spin" size={22} />Loading your drop-ins…</div> : !allGroups.length ? <div className="drop-ins-no-results">No drop-ins yet. Select an appointment status to add one.</div> : <>
                   <div className="drop-ins-builder-note"><span>Lit dots show where each drop-in appears. Select a dot to add or remove it for that status.</span></div>
-                  <div className="drop-ins-list">{sortedGroups.map((group, index) => { const item = group.primary; const overrideKey = `group:${group.id}`; const enabled = activeOverrides[overrideKey] ?? group.rows.some(row => row.is_active); return <div key={group.id} className={`drop-ins-list-row ${enabled ? '' : 'is-inactive'}`}>
+                  <div className="drop-ins-list">{sortedGroups.length ? sortedGroups.map((group, index) => { const item = group.primary; const overrideKey = `group:${group.id}`; const enabled = activeOverrides[overrideKey] ?? group.rows.some(row => row.is_active); return <div key={group.id} className={`drop-ins-list-row ${enabled ? '' : 'is-inactive'}`}>
                     <span className="drop-ins-order-number">{index + 1}</span><div className="drop-ins-list-text"><h4>{item.name}</h4><p>{item.prompt}</p><span>{enabled ? 'Active' : 'Inactive'}{group.rows.some(row => row.usage_count > 0) ? ` · ${group.rows.reduce((sum, row) => sum + (row.usage_count || 0), 0)} calls started` : ''}</span></div>
                     <div className="drop-ins-row-actions"><AnimatePresence mode="wait" initial={false}>{confirmDelete === group.id ? <motion.div key="confirm" className="drop-ins-delete-inline" initial={{ opacity: 0, x: reduced ? 0 : 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: reduced ? 0 : -12 }} transition={{ duration: .16 }}><span>Remove from every status?</span><button type="button" disabled={busy} onClick={() => setConfirmDelete(null)}>Keep</button><button type="button" disabled={busy} onClick={() => { setConfirmDelete(null); perform(async () => { await Promise.all(group.rows.map(row => model.remove(row.id))); }, 'Drop-in removed'); }}>Remove</button></motion.div> : <motion.div key="actions" className="drop-ins-action-content" initial={{ opacity: 0, x: reduced ? 0 : 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: reduced ? 0 : -12 }} transition={{ duration: .16 }}><div className="drop-ins-card-statuses" aria-label={`Appointment statuses for ${item.name}`}>{STATUS_OPTIONS.map(option => { const key = option.value.toLowerCase(); const pendingKey = `${group.id}:${key}`; const assigned = dotOverrides[pendingKey] ?? Boolean(group.byStatus[key]); return <button key={key} type="button" className={`drop-ins-card-status-button status-${key} ${assigned ? 'is-assigned' : ''}`} aria-label={`${assigned ? 'Remove' : 'Add'} ${item.name} ${assigned ? 'from' : 'to'} ${key} appointments`} title={`${option.value}: ${assigned ? 'included' : 'not included'}`} aria-pressed={assigned} disabled={!model.canManage} onClick={() => toggleGroupStatus(group, key, assigned)}><span className="drop-ins-card-status-dot" /></button>; })}</div>
                       {model.canManage && <><button type="button" role="switch" aria-checked={enabled} aria-label={`Enable ${item.name} for assigned statuses`} className="drop-ins-switch" onClick={() => toggleActive(group.rows, enabled, overrideKey)}><span /></button><button type="button" className="drop-ins-icon-button" aria-label={`Edit ${item.name} for ${item.available_on_status} appointments`} title={`Edit ${item.available_on_status} copy`} disabled={pendingActive.has(overrideKey)} onClick={() => { setStatus(item.available_on_status); setPreviewStatus(item.available_on_status); edit(item); }}><Pencil size={15} /></button><button type="button" className="drop-ins-icon-button" aria-label={`Delete ${item.name} from all statuses`} disabled={pendingActive.has(overrideKey)} onClick={() => setConfirmDelete(group.id)}><Trash2 size={15} /></button></>}
                     </motion.div>}</AnimatePresence></div>
-                  </div>; })}</div>
+                  </div>; }) : <p className="drop-ins-no-results">No drop-ins match “{listSearch}”.</p>}</div>
                 </>}
               </>}
               {view === 'manage' && status !== 'all' && <>
-                <div className="drop-ins-section-heading"><div><p className="drop-ins-eyebrow">{status.toUpperCase()} APPOINTMENTS</p><h3>Your drop-ins</h3><p>{statusCopy[status]}</p></div>{model.canManage && <div className="drop-ins-heading-actions"><label className="drop-ins-inline-sort">Sort <select aria-label="Sort drop-ins" value={sort} onChange={e => setSort(e.target.value)}><option value="manual">Manual</option><option value="used">Most Used</option><option value="alpha">Alphabetical</option><option value="newest">Newest</option></select></label><button type="button" className="drop-ins-templates-button" onClick={() => { setView('gallery'); setCategory('All'); }}>Templates</button><button type="button" className="drop-ins-primary" onClick={() => { setView('gallery'); setCategory('All'); }} disabled={model.loading}>Add drop-in</button></div>}</div>
+                <div className="drop-ins-section-heading"><div><p className="drop-ins-eyebrow">{status.toUpperCase()} APPOINTMENTS</p><h3>Your drop-ins</h3><p>{statusCopy[status]}</p></div>{model.canManage && <div className="drop-ins-heading-actions"><div className="drop-ins-list-search"><Search size={12} aria-hidden="true" /><input aria-label="Search drop-ins" placeholder="Search drop-ins..." value={listSearch} onChange={e => setListSearch(e.target.value)} />{listSearch && <button type="button" aria-label="Clear drop-in search" onClick={() => setListSearch('')}><X size={11} /></button>}</div><button type="button" className="drop-ins-templates-button" onClick={() => { setView('gallery'); setCategory('All'); }}>Templates</button><button type="button" className="drop-ins-primary" onClick={() => { setView('gallery'); setCategory('All'); }} disabled={model.loading}>Add drop-in</button></div>}</div>
                 {model.loading ? <div className="drop-ins-loading"><Loader2 className="animate-spin" size={22} />Loading your drop-ins…</div> : !statusItems.length ? <div className="drop-ins-no-results">No drop-ins for {status} appointments.</div> : <>
-                  {sort !== 'manual' && <p className="drop-ins-sort-note"></p>}
                   <div className="drop-ins-builder-note"><span>Use the controls on each row to edit, enable, or remove calendar drop-ins.</span></div>
-                  <div className="drop-ins-list">{sortedItems.map(item => { const overrideKey = `row:${item.id}`; const enabled = activeOverrides[overrideKey] ?? item.is_active; return <div key={item.id} className={`drop-ins-list-row ${enabled ? '' : 'is-inactive'}`}>
-                    <span className="drop-ins-order-number">{statusItems.indexOf(item) + 1}</span><div className="drop-ins-list-text"><h4>{item.name}</h4><p>{item.prompt}</p><span>{enabled ? 'Active' : 'Inactive'}{item.usage_count > 0 ? ` · ${item.usage_count} calls started` : ''}</span></div>
+                  <div className="drop-ins-list">{sortedItems.length ? sortedItems.map((item, index) => { const overrideKey = `row:${item.id}`; const enabled = activeOverrides[overrideKey] ?? item.is_active; return <div key={item.id} className={`drop-ins-list-row ${enabled ? '' : 'is-inactive'}`}>
+                    <span className="drop-ins-order-number">{index + 1}</span><div className="drop-ins-list-text"><h4>{item.name}</h4><p>{item.prompt}</p><span>{enabled ? 'Active' : 'Inactive'}{item.usage_count > 0 ? ` · ${item.usage_count} calls started` : ''}</span></div>
                     {model.canManage && <div className="drop-ins-row-actions"><AnimatePresence mode="wait" initial={false}>{confirmDelete === item.id ? <motion.div key="confirm" className="drop-ins-delete-inline" initial={{ opacity: 0, x: reduced ? 0 : 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: reduced ? 0 : -12 }} transition={{ duration: .16 }}><span>Remove this drop-in?</span><button type="button" disabled={busy} onClick={() => setConfirmDelete(null)}>Keep</button><button type="button" disabled={busy} onClick={() => { setConfirmDelete(null); perform(async () => { await model.remove(item.id); }, 'Drop-in removed'); }}>Remove</button></motion.div> : <motion.div key="actions" className="drop-ins-action-content" initial={{ opacity: 0, x: reduced ? 0 : 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: reduced ? 0 : -12 }} transition={{ duration: .16 }}>
                       <button type="button" role="switch" aria-checked={enabled} aria-label={`Enable ${item.name}`} className="drop-ins-switch" onClick={() => toggleActive([item], enabled, overrideKey)}><span /></button>
                       <button type="button" className="drop-ins-icon-button" aria-label={`Edit ${item.name}`} disabled={pendingActive.has(overrideKey)} onClick={() => edit(item)}><Pencil size={15} /></button>
                       <button type="button" className="drop-ins-icon-button" aria-label={`Delete ${item.name}`} disabled={pendingActive.has(overrideKey)} onClick={() => setConfirmDelete(item.id)}><Trash2 size={15} /></button>
                     </motion.div>}</AnimatePresence></div>}
-                  </div>; })}</div>
+                  </div>; }) : listSearch ? <p className="drop-ins-no-results">No drop-ins match “{listSearch}”.</p> : <p className="drop-ins-no-results">No drop-ins for {status} appointments.</p>}</div>
                 </>}
               </>}
               {view === 'gallery' && <>
