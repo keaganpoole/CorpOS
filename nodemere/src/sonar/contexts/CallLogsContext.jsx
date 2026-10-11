@@ -119,18 +119,15 @@ export const CallLogsProvider = ({ children, normalizeCall, enabled = true }) =>
     const pollCallLogs = () => {
       if (cancelled) return;
       loadCallLogs({ force: true, silent: true });
-      pollingTimer = window.setTimeout(pollCallLogs, 5000);
+      pollingTimer = window.setTimeout(pollCallLogs, 2500);
     };
-    pollingTimer = window.setTimeout(pollCallLogs, 5000);
+    pollingTimer = window.setTimeout(pollCallLogs, 2500);
     const channel = supabase
       .channel(`call-logs-dashboard-cache-${userId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'call_logs', filter: `business_id=eq.${workforce?.tenant?.business_id}` }, scheduleRefresh)
       .subscribe((status, error) => {
-        if (error) {
-          console.warn("CallLogsContext.jsx:event_107");
-          return;
-        }
-        console.debug("CallLogsContext.jsx:event_110");
+        if (error) console.warn('[Nest calls] realtime subscription error', { status, message: error.message });
+        else if (import.meta.env.DEV) console.info('[Nest calls] realtime status', { status });
       });
 
     return () => {

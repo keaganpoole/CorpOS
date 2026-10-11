@@ -270,6 +270,7 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
   const [sourceNumber, setSourceNumber] = useState(previewMode ? '(202) 555-0100' : '');
   const [sourceLabel, setSourceLabel] = useState('');
   const [forwardingStatus, setForwardingStatus] = useState('draft');
+  const [verificationWatchError, setVerificationWatchError] = useState('');
   const [callerIdStatus, setCallerIdStatus] = useState('not_started');
   const [callerIdMessage, setCallerIdMessage] = useState('');
   const [callerIdValidationCode, setCallerIdValidationCode] = useState('');
@@ -278,6 +279,8 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
   const [verifyCallerIdEnabled, setVerifyCallerIdEnabled] = useState(false);
   const [isReplacingTargetNumber, setIsReplacingTargetNumber] = useState(false);
   const verificationWatchCleanupRef = useRef(null);
+  const onSavedRef = useRef(onSaved);
+  onSavedRef.current = onSaved;
   const handleClose = () => {
     verificationWatchCleanupRef.current?.();
     onClose();
@@ -331,9 +334,7 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
         : slide === SLIDE.provider
           ? 'Turn on call forwarding.'
           : slide === SLIDE.test
-            ? forwardingStatus === 'verified'
-              ? 'Forwarding verified.'
-              : 'Listening for your test call.'
+            ? forwardingStatus === 'verified' ? 'Forwarding verified.' : 'Listening for your test call.'
             : callerIdStatus === 'verified'
             ? 'Caller ID verified.'
             : 'Use your business number for outbound calls.';
@@ -394,14 +395,16 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
   };
 
   const requestForwarding = async (endpoint, options = {}) => {
-    if (!authSession?.access_token) {
+    const sessionResult = authSession?.access_token ? null : await supabase.auth.getSession().catch(() => null);
+    const accessToken = authSession?.access_token || sessionResult?.data?.session?.access_token;
+    if (!accessToken) {
       throw new Error('Please log in again before editing forwarding settings.');
     }
 
     const response = await fetch(`${FORWARDING_API_BASE_URL}${endpoint}`, {
       ...options,
       headers: {
-        Authorization: `Bearer ${authSession.access_token}`,
+        Authorization: `Bearer ${accessToken}`,
         ...(options.body ? { 'Content-Type': 'application/json' } : {}),
         ...(options.headers || {}),
       },
@@ -482,8 +485,13 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
         setTwilioNumberStatus(data?.twilio_number_status || 'active');
         setTwilioNumberLabel(data?.twilio_number_label || selectedTargetNumber.friendly_name || '');
         setForwardingTargetNumber(data?.twilio_number || selectedTargetNumber.phone_number);
-        setTargetQualityState('passed');
-        setTargetQualityMessage(data?.message || 'This receptionist number is connected. Place a test call before sharing it.');
+        if (connectionChoice === 'forward') {
+          setTargetQualityState('idle');
+          setTargetQualityMessage('');
+        } else {
+          setTargetQualityState('passed');
+          setTargetQualityMessage(data?.message || 'This receptionist number is connected. Place a test call before sharing it.');
+        }
         return;
       }
 
@@ -500,6 +508,8 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
   useEffect(() => {
     if (previewMode) return undefined;
     let active = true;
+    let retryTimer = null;
+    let retryAttempt = 0;
 
     const loadForwardingState = async () => {
       setLoading(true);
@@ -508,6 +518,7 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
       try {
         const data = await requestForwarding('/businesses/me/forwarding');
         if (!active) return;
+        retryAttempt = 0;
 
         const numbers = data?.forwarding_config?.numbers || [];
         const originalBusinessPhone = data?.business_phone || '';
@@ -559,10 +570,21 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
         }
       } catch (err) {
         if (active) {
-          setError(err.message || 'Failed to load forwarding settings.');
+          retryAttempt += 1;
+          const message = err.message || 'Failed to load forwarding settings.';
+          if (retryAttempt <= 8) {
+            setError('Reconnecting to load forwarding settings…');
+            const delay = Math.min(15000, 1000 * (2 ** Math.min(retryAttempt - 1, 4)));
+            retryTimer = window.setTimeout(() => {
+              retryTimer = null;
+              loadForwardingState();
+            }, delay);
+          } else {
+            setError(message);
+          }
         }
       } finally {
-        if (active) setLoading(false);
+        if (active && !retryTimer) setLoading(false);
       }
     };
 
@@ -570,6 +592,7 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
 
     return () => {
       active = false;
+      if (retryTimer) window.clearTimeout(retryTimer);
     };
   }, [authSession?.access_token, previewMode]);
 
@@ -598,71 +621,72 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
   useEffect(() => {
     const needsForwardingWatch = slide === SLIDE.test && forwardingStatus !== 'verified';
     const needsCallerIdWatch = verifyCallerIdEnabled && slide === SLIDE.callerId && callerIdStatus === 'pending';
-    if ((!needsForwardingWatch && !needsCallerIdWatch) || !authSession?.access_token || !entryId || !businessId) {
+    if (!needsForwardingWatch && !needsCallerIdWatch) {
       return undefined;
     }
 
     let active = true;
+    let refreshInFlight = false;
+    if (import.meta.env.DEV) console.info('[Forwarding verification] watch started', JSON.stringify({ businessId, entryId }));
 
     const refreshVerificationStatus = async () => {
+      if (refreshInFlight) return;
+      refreshInFlight = true;
+      const controller = new AbortController();
+      const timeout = window.setTimeout(() => controller.abort(), 10000);
       try {
-        const data = await requestForwarding('/businesses/me/forwarding');
+        const data = await requestForwarding('/businesses/me/forwarding', { signal: controller.signal });
         if (!active) return;
 
         const numbers = data?.forwarding_config?.numbers || [];
-        const currentEntry = data?.current_entry || null;
-        const matchingEntry = currentEntry?.id === entryId
-          ? currentEntry
+        const activeEntry = numbers.find((entry) => entry?.id === data?.forwarding_config?.active_number_id)
+          || data?.current_entry || null;
+        const activeEntryMatchesBusinessLine = activeEntry && (
+          activeEntry.id === entryId
+          || (businessPhone && nationalForwardingNumber(activeEntry.source_number) === nationalForwardingNumber(businessPhone))
+        );
+        const matchingEntry = activeEntryMatchesBusinessLine
+          ? activeEntry
           : numbers.find((entry) => entry?.id === entryId) || null;
+
+        if (import.meta.env.DEV) console.info('[Forwarding verification] poll', JSON.stringify({
+          businessId: data?.business_id,
+          activeEntryId: data?.forwarding_config?.active_number_id,
+          watchedEntryId: entryId,
+          matchedEntryId: matchingEntry?.id || null,
+          status: matchingEntry?.status || null,
+        }));
 
         setSavedEntries(numbers);
         if (matchingEntry?.status) {
+          if (matchingEntry.id && matchingEntry.id !== entryId) setEntryId(matchingEntry.id);
           setForwardingStatus(matchingEntry.status);
-          if (matchingEntry.status === 'verified' && onSaved) {
-            onSaved(matchingEntry);
+          setVerificationWatchError('');
+          if (matchingEntry.status === 'verified' && onSavedRef.current) {
+            onSavedRef.current(matchingEntry);
           }
-          if (
-            verifyCallerIdEnabled
-            && slide === SLIDE.test
-            && matchingEntry.status === 'verified'
-            && matchingEntry?.caller_id_verification_status !== 'verified'
-          ) {
-            setCallerIdReturnSlide(SLIDE.test);
-            setSlide(SLIDE.callerId);
-          }
+        } else if (needsForwardingWatch) {
+          setVerificationWatchError('We couldn’t find this forwarding setup. Close and reopen it to try again.');
         }
         applyCallerIdEntryState(matchingEntry);
-      } catch {
-        // Keep the listening state calm; a transient polling error should not interrupt setup.
+      } catch (err) {
+        if (import.meta.env.DEV) console.warn('[Forwarding verification] poll failed', err);
+        if (active && needsForwardingWatch) {
+          setVerificationWatchError('We couldn’t check your test call right now. We’re trying again.');
+        }
+      } finally {
+        window.clearTimeout(timeout);
+        refreshInFlight = false;
       }
     };
 
-    // Realtime is an optimization, not the source of truth. The backend checks
-    // Twilio for a recent inbound call during this request, so polling also
-    // recovers when the browser misses the Supabase UPDATE event.
+    // Keep one steady status check while this slide is open.
     refreshVerificationStatus();
-    const pollingTimer = window.setInterval(refreshVerificationStatus, 4000);
-
-    const channel = supabase
-      .channel(`business-forwarding-${businessId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'businesses',
-          filter: `id=eq.${businessId}`,
-        },
-        () => {
-          refreshVerificationStatus();
-        },
-      )
-      .subscribe();
+    const pollingTimer = window.setInterval(refreshVerificationStatus, 2500);
 
     const stopVerificationWatch = () => {
       active = false;
       window.clearInterval(pollingTimer);
-      supabase.removeChannel(channel);
     };
     verificationWatchCleanupRef.current = stopVerificationWatch;
 
@@ -672,7 +696,7 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
         verificationWatchCleanupRef.current = null;
       }
     };
-  }, [slide, authSession?.access_token, entryId, forwardingStatus, callerIdStatus, onSaved, businessId]);
+  }, [slide, authSession?.access_token, entryId, forwardingStatus, callerIdStatus, businessId, businessPhone, verifyCallerIdEnabled]);
 
   const copyForwardingNumber = async () => {
     if (!hasTargetNumber || typeof navigator === 'undefined' || !navigator.clipboard) return;
@@ -704,7 +728,16 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
       const numbers = data?.forwarding_config?.numbers || [];
       const entry = data?.entry || null;
 
+      if (import.meta.env.DEV) console.info('[Forwarding verification] save', {
+        businessId: data?.business_id,
+        entryId: entry?.id || null,
+        status: entry?.status || null,
+        confirmedEnabledAt: entry?.confirmed_enabled_at || null,
+      });
+
       setSavedEntries(numbers);
+      setVerificationWatchError('');
+      if (data?.business_id) setBusinessId(data.business_id);
       if (entry?.id) setEntryId(entry.id);
       if (entry?.status) setForwardingStatus(entry.status);
       applyCallerIdEntryState(entry);
@@ -1320,9 +1353,14 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
 
           <p className="mx-auto mt-3 max-w-sm text-sm leading-6 text-zinc-500">
             {isVerified
-              ? `${sourceNumber || 'Your business number'} is now saved and marked as working with your dedicated business line.`
-              : `Call ${sourceNumber || 'your business line'} from another phone. If you set up missed-call forwarding, let the business line ring unanswered. We’ll verify when the call reaches your receptionist.`}
+              ? `${sourceNumber || 'Your business number'} is connected and ready for calls.`
+              : forwardingMode === 'missed'
+              ? `Call ${sourceNumber || 'your business line'} from another phone and let it ring unanswered. We’ll verify when the call reaches your receptionist.`
+              : `Call ${sourceNumber || 'your business line'} from another phone. We’ll verify when the call reaches your receptionist.`}
           </p>
+          {!isVerified && verificationWatchError && (
+            <p role="status" className="mx-auto mt-3 max-w-sm text-sm text-amber-300">{verificationWatchError}</p>
+          )}
         </div>
 
         <div className="border-t border-white/[0.08] py-4">
