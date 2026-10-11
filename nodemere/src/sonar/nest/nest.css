@@ -227,10 +227,9 @@
 .nest-density-compact .nest-content { gap: 10px; }
 .nest-density-spacious .nest-content { gap: 20px; }
 
-.nest-dock-tools { position: absolute; right: 8px; top: 50%; z-index: 15; display: flex; align-items: center; gap: 2px; transform: translateY(-50%); pointer-events: auto; opacity: 0; transition: opacity 180ms ease; }
-.nest-dock:hover .nest-dock-tools, .nest-dock-tools:focus-within { opacity: 1; }
-.nest-dock-tools button { display: grid; place-items: center; width: 25px; height: 25px; border: 0; border-radius: 8px; color: rgba(255,255,255,.28); background: transparent; transition: color 160ms ease, background 160ms ease; }
-.nest-dock-tools button:hover { color: rgba(255,255,255,.72); background: rgba(255,255,255,.05); }
+.nest-toolbar-tools { display: flex; align-items: center; gap: 2px; margin-right: 8px; }
+.nest-toolbar-tools button { display: grid; place-items: center; width: 25px; height: 25px; border: 0; border-radius: 8px; color: rgba(255,255,255,.48); background: transparent; transition: color 160ms ease, background 160ms ease; }
+.nest-toolbar-tools button:hover, .nest-toolbar-tools button:focus-visible { color: rgba(255,255,255,.82); background: rgba(255,255,255,.05); }
 .nest-queue-count { display: grid; place-items: center; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; background: rgba(255,255,255,.08); color: rgba(255,255,255,.5); font-size: 8px; font-weight: 700; }
 .nest-live-call-receptionist { position: absolute; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
 .nest-live-call-banner { position: absolute; inset: 0 auto 0 0; width: 58%; background-position: 50% 34%; background-repeat: no-repeat; background-size: cover; opacity: .3; filter: saturate(.62) brightness(.78); transform: scale(1.03); }
@@ -493,6 +492,19 @@
 .nest-concept-actions button:last-child { margin-left: auto; }
 .nest-concept-actions button.is-selected { color: rgba(216,180,254,.9); background: rgba(139,92,246,.11); }
 
+@media (min-width: 1280px) {
+  .dashboard-header-actions .nest-toolbar-tools {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 180ms ease;
+  }
+  .sonar-dashboard-header:hover .nest-toolbar-tools,
+  .sonar-dashboard-header:focus-within .nest-toolbar-tools {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
 @media (max-width: 1279px) {
   .nest-dock { left: 224px; right: 176px; }
   .nest-dock.is-expanded { left: 82px; right: 76px; }
@@ -516,7 +528,6 @@
   .nest-content-eyebrow, .nest-content-secondary, .nest-content-metric, .nest-live-indicator { display: none; }
   .nest-content-primary { max-width: 176px; font-size: 18px !important; line-height: 1; }
   .nest-layout-return .nest-content-primary { max-width: 176px; font-size: 18px !important; line-height: 1; }
-  .nest-dock-tools { right: 38px; }
   .intercom-main { width: calc(100% - 118px); gap: 10px; }
   .intercom-picker { max-width: 100%; gap: 3px; padding-inline: 3px; }
   .intercom-picker.is-selecting { padding: 2px; gap: 2px; }

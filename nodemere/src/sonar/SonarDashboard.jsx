@@ -2066,6 +2066,7 @@ const SonarDashboard = () => {
   const [planLimitDetail, setPlanLimitDetail] = useState(null);
   const [showPlanChangePopup, setShowPlanChangePopup] = useState(false);
   const [nestStageExpanded, setNestStageExpanded] = useState(false);
+  const [nestToolsContainer, setNestToolsContainer] = useState(null);
   const tasklistPersistRef = useRef('');
   const userId = authSession?.user?.id || profile?.id || null;
 
@@ -2863,6 +2864,13 @@ const SonarDashboard = () => {
           <ScenariosPage
             onToolbarMetaChange={setScenariosToolbarMeta}
             hideInitialIntroNode={activePopup?.id === 'scenarios_intro'}
+            isActive={currentRoute === 'scenarios'}
+            onOpenIntegrations={(provider) => {
+              sessionStorage.setItem('sonar-settings-section', 'integrations');
+              sessionStorage.setItem('sonar-integration-provider', provider || '');
+              navigateDashboard('settings');
+              window.dispatchEvent(new CustomEvent('sonar:settings-section', { detail: 'integrations' }));
+            }}
           />
         );
       case 'live-monitoring':
@@ -2903,7 +2911,7 @@ const SonarDashboard = () => {
       <div className="drag-region fixed top-0 left-0 right-0 h-8 z-50 pointer-events-none" />
 
       {/* Toolbar */}
-      <header className={`sonar-dashboard-chrome shrink-0 h-14 border-b border-white/5 bg-[#020202] flex items-center px-10 z-30 relative ${nestStageExpanded ? 'nest-stage-expanded' : ''}`}>
+      <header className={`sonar-dashboard-chrome sonar-dashboard-header shrink-0 h-14 border-b border-white/5 bg-[#020202] flex items-center px-10 z-30 relative ${nestStageExpanded ? 'nest-stage-expanded' : ''}`}>
         <div className="absolute inset-0 pointer-events-none z-50 opacity-[0.03]">
           <div className="absolute inset-0 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%)] bg-[length:100%_4px]" />
         </div>
@@ -2951,34 +2959,39 @@ const SonarDashboard = () => {
           description="Source-aware project report"
         />
 
-        <NestDock mobile={isPhone && responsiveEnabled} businessAvatar={businessUsage?.avatar || ''} onStageChange={setNestStageExpanded} />
-        <div className="dashboard-account-controls ml-auto flex items-center">
-          <button
-            type="button"
-            onClick={() => {
-              setAccountMenuOpen(false);
-              setReportProblemOpen(true);
-            }}
-            className={`no-drag mr-2 hidden items-center gap-1.5 rounded-lg px-2.5 py-2 text-[10px] font-semibold tracking-[-0.01em] text-zinc-600 transition-all duration-300 hover:bg-white/[0.04] hover:text-zinc-300 lg:inline-flex ${nestStageExpanded ? 'pointer-events-none opacity-0' : ''}`}
-          >
-            <CircleQuestionMark size={14} />
-            <span>Report a problem</span>
-          </button>
-          <AccountDropdown
-            profile={profile}
-            usage={businessUsage}
-            isOpen={accountMenuOpen}
-            onToggle={() => setAccountMenuOpen((open) => !open)}
-            onClose={() => setAccountMenuOpen(false)}
-            onOpenSettings={() => {
-              setAccountMenuOpen(false);
-              navigateDashboard('settings');
-            }}
-            onUpgrade={() => {
-              setAccountMenuOpen(false);
-              requestStudioExit(() => { studioDirty.current = false; window.location.href = '/pricing'; });
-            }}
-          />
+        <NestDock mobile={isPhone && responsiveEnabled} businessAvatar={businessUsage?.avatar || ''} onStageChange={setNestStageExpanded} toolsContainer={nestToolsContainer} />
+        <div className="dashboard-header-actions no-drag relative z-20 ml-auto flex shrink-0 items-center">
+          <div ref={setNestToolsContainer} />
+          <div className="dashboard-account-controls flex items-center">
+            {!nestStageExpanded && (
+              <button
+                type="button"
+                onClick={() => {
+                  setAccountMenuOpen(false);
+                  setReportProblemOpen(true);
+                }}
+                className="no-drag mr-2 hidden items-center gap-1.5 rounded-lg px-2.5 py-2 text-[10px] font-semibold tracking-[-0.01em] text-zinc-600 transition-all duration-300 hover:bg-white/[0.04] hover:text-zinc-300 lg:inline-flex"
+              >
+                <CircleQuestionMark size={14} />
+                <span>Report a problem</span>
+              </button>
+            )}
+            <AccountDropdown
+              profile={profile}
+              usage={businessUsage}
+              isOpen={accountMenuOpen}
+              onToggle={() => setAccountMenuOpen((open) => !open)}
+              onClose={() => setAccountMenuOpen(false)}
+              onOpenSettings={() => {
+                setAccountMenuOpen(false);
+                navigateDashboard('settings');
+              }}
+              onUpgrade={() => {
+                setAccountMenuOpen(false);
+                requestStudioExit(() => { studioDirty.current = false; window.location.href = '/pricing'; });
+              }}
+            />
+          </div>
         </div>
       </header>
 

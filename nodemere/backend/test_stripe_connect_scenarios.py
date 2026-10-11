@@ -271,8 +271,8 @@ def verify_action_output(action: str, execution: dict, target: dict) -> dict:
         if not payment_intent_id:
             raise AssertionError("create_payment returned no PaymentIntent")
         intent = stripe.PaymentIntent.retrieve(payment_intent_id, **STRIPE_OPTIONS)
-        if intent.get("amount") != AMOUNT or intent.get("application_fee_amount") != 11:
-            raise AssertionError("create_payment amount or 1% fee mismatch")
+        if intent.get("amount") != AMOUNT or intent.get("application_fee_amount") != 33:
+            raise AssertionError("create_payment amount or 3% fee mismatch")
         result.update({"stripe_object": "payment_intent", "stripe_status": intent.get("status"), "application_fee": intent.get("application_fee_amount")})
     elif action == "send_payment_link":
         session_id = data.get("stripe_session_id")
@@ -323,7 +323,7 @@ def setup_send_invoice():
         days_until_due=7,
         auto_advance=False,
         pending_invoice_items_behavior="include",
-        application_fee_amount=11,
+        application_fee_amount=33,
         description="Stripe matrix invoice",
         metadata=metadata(),
         **STRIPE_OPTIONS,
@@ -491,7 +491,7 @@ def main():
         "stripe_test_mode": True,
         "connected_account": CONNECTED_ACCOUNT,
         "platform_account": PLATFORM_ACCOUNT,
-        "application_fee_percent": "1",
+        "application_fee_percent": "3",
         "results": results,
         "passed": sum(1 for item in results if item.get("passed")),
         "total": len(results),

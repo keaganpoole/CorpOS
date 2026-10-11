@@ -69,7 +69,7 @@ const HistoryPanel = () => {
   );
 };
 
-export default function NestDock({ onStageChange, businessAvatar = '', mobile = false }) {
+export default function NestDock({ onStageChange, businessAvatar = '', mobile = false, toolsContainer = null }) {
   const [intercomOpen, setIntercomOpen] = useState(false);
   const [conversationsOpen, setConversationsOpen] = useState(false);
   const {
@@ -119,23 +119,24 @@ export default function NestDock({ onStageChange, businessAvatar = '', mobile = 
           intercomOpening={intercomOpen}
         />
         <NestIntercom mobile={mobile} open={intercomOpen} onClose={closeIntercom} />
-        {!intercomOpen && (
-          <div className="nest-dock-tools no-drag">
-            {queueLength > 0 && <span className="nest-queue-count" title={`${queueLength} queued Nest events`}>{queueLength}</span>}
-            <button type="button" onClick={() => setConversationsOpen(true)} aria-label="Open voice conversations" title="Voice conversations">
-              <MessageCircle size={13} />
-            </button>
-            <button type="button" onClick={() => setHistoryOpen(true)} aria-label="Open Nest activity history" title="Nest history (Ctrl+Shift+H)">
-              <History size={13} />
-            </button>
-            {displayEvent && (
-              <button type="button" onMouseDown={hideCurrentNotification} onClick={hideCurrentNotification} aria-label="Hide current Nest notification" title="Hide current notification">
-                <EyeOff size={13} />
-              </button>
-            )}
-          </div>
-        )}
       </div>
+      {!intercomOpen && toolsContainer && createPortal(
+        <div className="nest-toolbar-tools no-drag">
+          {queueLength > 0 && <span className="nest-queue-count" title={`${queueLength} queued Nest events`}>{queueLength}</span>}
+          <button type="button" onClick={() => setConversationsOpen(true)} aria-label="Open voice conversations" title="Voice conversations">
+            <MessageCircle size={13} />
+          </button>
+          <button type="button" onClick={() => setHistoryOpen(true)} aria-label="Open Nest activity history" title="Nest history (Ctrl+Shift+H)">
+            <History size={13} />
+          </button>
+          {displayEvent && (
+            <button type="button" onMouseDown={hideCurrentNotification} onClick={hideCurrentNotification} aria-label="Hide current Nest notification" title="Hide current notification">
+              <EyeOff size={13} />
+            </button>
+          )}
+        </div>,
+        toolsContainer,
+      )}
       <HistoryPanel />
       <IntercomHistoryPanel businessAvatar={businessAvatar} open={conversationsOpen} onClose={() => setConversationsOpen(false)} />
       <NestAnimationStudio open={studioOpen} onClose={() => setStudioOpen(false)} />

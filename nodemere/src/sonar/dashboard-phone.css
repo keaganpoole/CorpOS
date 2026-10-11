@@ -44,7 +44,6 @@
   .sonar-dashboard-shell[data-responsive="true"] .dashboard-account-controls { display: none; }
   .sonar-dashboard-shell[data-responsive="true"] .nest-dock:not(.is-expanded) { left: 24px; right: 24px; width: auto; transform: none; }
   .sonar-dashboard-shell[data-responsive="true"] .nest-dock.is-expanded { left: 12px; right: 12px; }
-  .sonar-dashboard-shell[data-responsive="true"] .nest-dock-tools { right: 0; }
   .sonar-dashboard-shell[data-responsive="true"] .nest-content { max-width: calc(100% - 72px); gap: 9px; }
   .sonar-dashboard-shell[data-responsive="true"] .nest-content-copy { display: grid; grid-template-areas: 'primary metric' 'secondary metric'; gap: 3px 8px; justify-content: center; min-width: 0; }
   .sonar-dashboard-shell[data-responsive="true"] .nest-layout-return .nest-content-copy { display: flex; align-items: center; }

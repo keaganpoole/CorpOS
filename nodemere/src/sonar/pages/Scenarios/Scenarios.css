@@ -5681,8 +5681,8 @@
   .sb-json-import-textarea { min-height: 180px; }
   .sb-integrations-sidebar-inner, .sb-integrations-main { padding: 14px; }
   .sb-integrations-title, .sb-integrations-panel-title, .sb-integrations-finish-title { font-size: 20px; }
-  .sonar-dashboard-shell[data-responsive="true"]:has(.scenario-builder-page :is(.sb-selection-panel, .aether-logic-wrapper, .sb-variables-pane, .sb-mobile-logic-tabs)) .dashboard-mobile-nav,
-  .sonar-dashboard-shell[data-responsive="true"]:has(.scenarios-container :is(.save-scenario-modal-overlay, .sb-schedule-modal-overlay, .sb-notes-modal-overlay, .sb-json-modal-overlay, .sb-integrations-overlay, .delete-confirm-overlay)) .dashboard-mobile-nav { visibility: hidden; }
+  .sonar-dashboard-shell[data-responsive="true"]:has([aria-hidden="false"] .scenario-builder-page :is(.sb-selection-panel, .aether-logic-wrapper, .sb-variables-pane, .sb-mobile-logic-tabs)) .dashboard-mobile-nav,
+  .sonar-dashboard-shell[data-responsive="true"]:has([aria-hidden="false"] .scenarios-container :is(.save-scenario-modal-overlay, .sb-schedule-modal-overlay, .sb-notes-modal-overlay, .sb-json-modal-overlay, .delete-confirm-overlay)) .dashboard-mobile-nav { visibility: hidden; }
 }
 
 @keyframes sbPhoneSheetIn {

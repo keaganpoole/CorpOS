@@ -15,6 +15,7 @@ import {
   CalendarClock, Mail, PhoneCall, ListChecks, Upload, CalendarCheck, Pencil, Play, LogOut,
   ThumbsUp, ThumbsDown, Palette,
   Loader2, CreditCard,
+  PlugZap,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -27,6 +28,7 @@ import ReceptionistActionConfirmation from '../components/ReceptionistActionConf
 import CubePreloader from '../components/CubePreloader';
 import AccountLifecycleSection from '../components/AccountLifecycleSection';
 import BrandColorInput from '../components/BrandColorInput';
+import IntegrationsSettings from './IntegrationsSettings';
 import ModalSpectrumLine from '../../components/ModalSpectrumLine';
 import SnapDropdown from '../../components/SnapDropdown';
 import {
@@ -3673,6 +3675,7 @@ const SettingsPage = ({ mobileUsage, onMobileUpgrade }) => {
   const [scheduleHelpOpen, setScheduleHelpOpen] = useState(false);
   const [openNestNotificationGroups, setOpenNestNotificationGroups] = useState({});
   const [activeSection, setActiveSection] = useState('business');
+  const [integrationProvider, setIntegrationProvider] = useState(null);
   const { isPhone } = useDashboardViewport();
   const mobileSectionRef = useRef(null);
   useEffect(() => { if (isPhone) mobileSectionRef.current?.scrollTo({ top: 0 }); }, [activeSection, isPhone]);
@@ -3684,8 +3687,10 @@ const SettingsPage = ({ mobileUsage, onMobileUpgrade }) => {
   useEffect(() => {
     const select = (event) => {
       const section = event?.detail || sessionStorage.getItem('sonar-settings-section');
-      if (['account', 'billing'].includes(section)) setActiveSection(section);
+      if (['account', 'billing', 'integrations'].includes(section)) setActiveSection(section);
+      if (section === 'integrations') setIntegrationProvider(sessionStorage.getItem('sonar-integration-provider'));
       sessionStorage.removeItem('sonar-settings-section');
+      sessionStorage.removeItem('sonar-integration-provider');
     };
     select(); window.addEventListener('sonar:settings-section', select);
     return () => window.removeEventListener('sonar:settings-section', select);
@@ -4126,6 +4131,7 @@ const SettingsPage = ({ mobileUsage, onMobileUpgrade }) => {
     { id: 'business', title: 'Business Info', icon: Building2, iconClass: 'settings-icon', hint: 'Name, contact, and location' },
     { id: 'forwarding', title: 'Activation', icon: PhoneCall, iconClass: 'settings-icon', hint: 'Call routing' },
     { id: 'billing', title: 'Billing', icon: CreditCard, iconClass: 'settings-icon', hint: 'Plan, invoices, and payment' },
+    { id: 'integrations', title: 'Integrations', icon: PlugZap, iconClass: 'settings-icon', hint: 'Connect Gmail, Outlook, and Stripe' },
     { id: 'preferences', title: 'Preferences', icon: Shield, iconClass: 'settings-icon', hint: 'Permissions and controls' },
     { id: 'appointments', title: 'Hours', icon: Calendar, iconClass: 'settings-icon', hint: 'Business availability' },
     { id: 'services', title: 'Services & Pricing', icon: Tag, iconClass: 'settings-icon', hint: 'Offer catalog and rates' },
@@ -4144,6 +4150,8 @@ const SettingsPage = ({ mobileUsage, onMobileUpgrade }) => {
         return <BusinessForwardingSettings authSession={authSession} businessPhone={settings.business_phone} />;
       case 'billing':
         return <>{isPhone && <MobileUsageSummary usage={mobileUsage} onUpgrade={onMobileUpgrade} />}<BillingSettings profile={profile} /></>;
+      case 'integrations':
+        return <IntegrationsSettings preferredProvider={integrationProvider} />;
       case 'account':
         return (
           <AccountLifecycleSection

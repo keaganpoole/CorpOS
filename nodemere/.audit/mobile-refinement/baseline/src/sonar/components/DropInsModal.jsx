@@ -216,9 +216,9 @@ function DropInsTipsModal({ onClose }) {
       <ModalSpectrumLine variant="tips" />
       <div className="drop-ins-tips-glow" aria-hidden="true" />
       <div className="drop-ins-tips-content">
-        <div className="drop-ins-tips-top"><div><div className="drop-ins-tips-kicker"><Lightbulb size={15} />Tips</div><h3>Make every drop-in count.</h3><p>Drop-ins give your receptionist a focused reason to call while keeping the appointment record familiar.</p></div><button type="button" className="drop-ins-tips-close" onClick={onClose} aria-label="Close drop-ins tips"><X size={17} /></button></div>
+        <div className="drop-ins-tips-top"><div><div className="drop-ins-tips-kicker"><Lightbulb size={15} />Tips</div><h3>How to use drop-ins</h3><p>Drop-ins let you assign specific calling tasks to your receptionist, all within your existing calendar.</p></div><button type="button" className="drop-ins-tips-close" onClick={onClose} aria-label="Close drop-ins tips"><X size={17} /></button></div>
         <div className="drop-ins-tips-points">{points.map(([title, body], index) => <div className="drop-ins-tips-point" key={title}><span style={{ opacity: 1 - index * .14 }} /><div><strong>{title}</strong><p>{body}</p></div></div>)}</div>
-        <p className="drop-ins-tips-footer">A great drop-in is specific enough to guide the call and simple enough to understand at a glance.</p>
+        <p className="drop-ins-tips-footer">The best Drop-ins have a clear purpose, not a lengthy script. Just explain what you want done.</p>
       </div>
     </motion.div>
   </motion.div>;

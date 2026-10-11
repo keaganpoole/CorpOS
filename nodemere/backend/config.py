@@ -33,7 +33,7 @@ stripe_webhook_secret = os.environ.get("STRIPE_WEBHOOK_SECRET")
 stripe_connect_client_id = os.environ.get("STRIPE_CONNECT_CLIENT_ID")
 stripe_connect_test_client_id = os.environ.get("STRIPE_CONNECT_TEST_CLIENT_ID")
 stripe_connect_redirect_uri = os.environ.get("STRIPE_CONNECT_REDIRECT_URI")
-stripe_application_fee_percent = os.environ.get("STRIPE_APPLICATION_FEE_PERCENT", "1")
+stripe_application_fee_percent = os.environ.get("STRIPE_APPLICATION_FEE_PERCENT", "3")
 
 if TEST_MODE or STRIPE_REAL_TEST_MODE:
     stripe.api_key = STRIPE_TEST_SECRET_KEY

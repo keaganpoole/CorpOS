@@ -31,7 +31,7 @@ const plansConfig = [
         },
         features: [
             { label: "Everything in Pro", description: "Includes every Pro feature with more room to grow." },
-            { label: "Take Payments", description: "Includes a 1% platform fee on eligible AI-generated sales." },
+            { label: "Accept Payments", description: "Includes a 3% platform fee on eligible AI-generated sales." },
             { label: "Advanced AI Reasoning", description: "Gives receptionists stronger decision-making for more complex conversations." },
             { label: "Voice Studio", description: "Customize voice experience more deeply for your team and brand." },
             { label: "Professional Business Setup", description: "A dedicated onboarding specialist handles the setup, configuration, and optimization of your AI receptionist so it’s ready to start taking calls for your business." },
@@ -52,7 +52,7 @@ const plansConfig = [
             { label: "Everything in Essentials", description: "Starts with all Essentials features already included." },
             { label: "25 Receptionists", description: "Run a larger receptionist team for different roles or workflows." },
             { label: "AI Outbound Calling", description: "Place consented operational calls for follow-ups, reminders, and service updates." },
-            { label: "Take Payments", description: "Receptionists can take payments and send invoices. A 1% platform fee applies to eligible AI-generated sales." },
+            { label: "Accept Payments", description: "Receptionists can take payments and send invoices. A 3% platform fee applies to eligible AI-generated sales." },
             { label: "Unlock All Receptionists", description: "Full Access to the entire receptionist marketplace." },
             { label: "AI Texting Automation", description: "Not enabled at launch. Any future operational texting will require lawful consent and carrier approval." },
             { label: "Unlimited Contacts", description: "Keep your full contact list without contact-based restrictions." },
@@ -75,6 +75,7 @@ const plansConfig = [
             { label: "24/7 AI Inbound Call Handling", description: "Answer incoming calls around the clock without missing opportunities." },
             { label: "10 Scenarios", description: "Build up to ten workflows for calls, appointments, records, and more." },
             { label: "Appointment Booking", description: "Book, update, and manage appointments during live conversations." },
+            { label: "Accept Payments", description: "Receptionists can take payments and send invoices. A 3% platform fee applies to eligible AI-generated sales." },
             { label: "Store 1,000 Contacts", description: "Keep up to one thousand contacts in your CRM." },
             { label: "Live Call Monitoring", description: "Watch live call activity and follow what your system is doing." },
             { label: "Call Analytics", description: "See summaries and performance data from your calls." }
@@ -184,7 +185,7 @@ const PaymentTipsModal = ({ onClose }) => {
                 <div className="relative mt-7 space-y-4 text-sm leading-6 text-zinc-400">
                     {[
                         ['How it works.', 'Your AI receptionist learns what services you offer and uses that information to help customers pay over the phone.'],
-                        ['Platform fee.', 'Nodemere charges a 1% platform fee on successful, eligible sales generated through an AI receptionist and processed through a supported connected provider.'],
+                        ['Platform fee.', 'Nodemere charges a 3% platform fee on successful, eligible sales generated through an AI receptionist and processed through a supported connected provider.'],
                         ['What is excluded.', 'Taxes, tips, refunded payments, and disputed payments are excluded from the platform-fee calculation. Your provider’s processing fees are separate.'],
                     ].map(([title, body], index) => (
                         <div key={title} className="flex gap-3">
@@ -335,7 +336,7 @@ const PlanCard = ({ plan, cycle, isInitialLoad, index, currentUserPlan, subscrip
                         <span className="text-gray-400 ml-2">/ month</span>
                     </div>
                     <p className="relative top-2 text-center text-xs text-gray-500 h-5 mt-2">
-                        {cycle === 'annually' && price > 0 ? `Billed annually at $${(price * 12).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}/year` : ''}
+                        {cycle === 'annually' && price > 0 ? 'Billed annually' : ''}
                     </p>
                     <p ref={savingsRef} className="savings-text text-center text-xs font-semibold h-5">{'\u00A0'}</p>
                 </div>
@@ -391,9 +392,9 @@ const PlanCard = ({ plan, cycle, isInitialLoad, index, currentUserPlan, subscrip
                 </ul>
             </div>
             <div className="mt-8">
-                {['Pro', 'Ultra'].includes(plan.name) && (
+                {['Essentials', 'Pro', 'Ultra'].includes(plan.name) && (
                     <p className="relative top-2 mb-[6px] text-center text-[11px] text-gray-500">
-                        1% fee on eligible AI-generated sales.
+                        3% fee on eligible AI-generated sales.
                     </p>
                 )}
                 {hasOverages && (
@@ -658,7 +659,7 @@ const PricingPage = () => {
                 {!plansLoading && (
                     <>
                         <p className="mx-auto mt-7 max-w-3xl text-center text-xs leading-5 text-zinc-500">
-                            Payment feature pricing: a 1% platform fee applies to successful, eligible sales generated through an AI receptionist and processed through a supported connected payment provider. Taxes, tips, refunded payments, and disputed payments are excluded. Provider processing fees are separate.
+                            Payment feature pricing: a 3% platform fee applies to successful, eligible sales generated through an AI receptionist and processed through a supported connected payment provider. Taxes, tips, refunded payments, and disputed payments are excluded. Provider processing fees are separate.
                         </p>
                         <p className="mx-auto mt-3 max-w-3xl text-center text-xs leading-5 text-zinc-500">
                             By starting a subscription, you agree to the <Link to="/terms" className="underline underline-offset-2">Terms of Service</Link> and <Link to="/privacy-policy" className="underline underline-offset-2">Privacy Policy</Link>. Paid subscriptions renew automatically at the selected billing interval unless canceled before the next renewal date. You can request cancellation at <a href="mailto:support@nodemere.ai" className="underline underline-offset-2">support@nodemere.ai</a>.
