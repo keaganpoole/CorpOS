@@ -31,9 +31,10 @@ class DirectLineProvisioningTests(unittest.TestCase):
             patch.object(main, "assign_elevenlabs_phone_number_to_inbound_agent", return_value=False) as assign,
             patch.object(main, "delete_elevenlabs_phone_number", return_value=True) as delete,
         ):
-            result = main.prepare_elevenlabs_phone_number_for_business("+12025550112", "Test line")
+            with self.assertRaises(HTTPException) as caught:
+                main.prepare_elevenlabs_phone_number_for_business("+12025550112", "Test line")
 
-        self.assertIsNone(result)
+        self.assertEqual(caught.exception.status_code, 502)
         assign.assert_called_once_with("new-phone-id")
         delete.assert_called_once_with("new-phone-id")
 
@@ -45,9 +46,10 @@ class DirectLineProvisioningTests(unittest.TestCase):
             patch.object(main, "assign_elevenlabs_phone_number_to_inbound_agent", return_value=False),
             patch.object(main, "delete_elevenlabs_phone_number") as delete,
         ):
-            result = main.prepare_elevenlabs_phone_number_for_business("+12025550112", "Test line")
+            with self.assertRaises(HTTPException) as caught:
+                main.prepare_elevenlabs_phone_number_for_business("+12025550112", "Test line")
 
-        self.assertIsNone(result)
+        self.assertEqual(caught.exception.status_code, 502)
         import_number.assert_not_called()
         delete.assert_not_called()
 
@@ -128,7 +130,7 @@ class DirectLineClaimTests(unittest.IsolatedAsyncioTestCase):
         delete.assert_called_once_with("old-phone-id")
         self.assertEqual(result["twilio_number"], new_number)
         self.assertTrue(result["provisioned"])
-        self.assertEqual(result["quality_check_status"], "not_run")
+        self.assertEqual(result["quality_check_status"], "pending")
 
     async def test_failed_assignment_releases_new_number_and_preserves_old_line(self):
         business = {"id": 7, "name": "Example", "twilio_number": "+12025550111"}

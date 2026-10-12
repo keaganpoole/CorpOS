@@ -335,9 +335,7 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
           ? 'Turn on call forwarding.'
           : slide === SLIDE.test
             ? forwardingStatus === 'verified' ? 'Forwarding verified.' : 'Listening for your test call.'
-            : callerIdStatus === 'verified'
-            ? 'Caller ID verified.'
-            : 'Use your business number for outbound calls.';
+            : callerIdStatus === 'pending' ? 'Answer the call.' : 'Set up caller ID';
   const slideDescription =
     slide === SLIDE.choice
       ? 'Choose whether to share a new number or keep using your existing business number.'
@@ -357,7 +355,9 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
             ? forwardingStatus === 'verified'
               ? 'Your business line is connected and ready to route calls to your receptionist.'
               : 'Place a test call using the forwarding option you just set up.'
-            : `Verify ${sourceNumber || 'your business number'} so outbound calls can display it as the caller ID. This step is optional.`;
+            : callerIdStatus === 'pending'
+              ? `We’re calling ${sourceNumber || 'your business line'}. Enter the code below when prompted.`
+              : `Verify ${sourceNumber || 'your business number'} so outbound calls can display it as the caller ID. This step is optional.`;
   const forwardingSteps = [
     {
       label: 'Activation',
@@ -375,10 +375,17 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
   const selectedExistingEntryIsVerified = selectedExistingEntry?.status === 'verified'
     && Boolean(selectedExistingEntry.target_number)
     && nationalForwardingNumber(selectedExistingEntry.target_number) === nationalForwardingNumber(forwardingNumber);
-  const applyCallerIdEntryState = (entry) => {
-    const nextStatus = entry?.caller_id_verification_status || 'not_started';
+  const applyCallerIdEntryState = (entry, activeSourceNumber = sourceNumber) => {
+    const recordedPhoneNumber = nationalForwardingNumber(entry?.caller_id_phone_number);
+    const activePhoneNumber = nationalForwardingNumber(activeSourceNumber);
+    const callerIdStateMatchesActiveNumber = !recordedPhoneNumber
+      || !activePhoneNumber
+      || recordedPhoneNumber === activePhoneNumber;
+    const nextStatus = callerIdStateMatchesActiveNumber
+      ? entry?.caller_id_verification_status || 'not_started'
+      : 'not_started';
     setCallerIdStatus(nextStatus);
-    setCallerIdValidationCode(entry?.caller_id_validation_code || '');
+    setCallerIdValidationCode(callerIdStateMatchesActiveNumber ? entry?.caller_id_validation_code || '' : '');
     if (nextStatus === 'verified') {
       setCallerIdMessage('Your business number is ready to show as the outbound caller ID.');
       return;
@@ -555,7 +562,7 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
           setProviderPage(0);
           setProviderSearch('');
           setForwardingStatus(currentEntry.status || 'draft');
-          applyCallerIdEntryState(currentEntry);
+          applyCallerIdEntryState(currentEntry, originalBusinessPhone);
           setSlide(SLIDE.choice);
         } else {
           setEntryId(null);
@@ -668,7 +675,7 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
         } else if (needsForwardingWatch) {
           setVerificationWatchError('We couldn’t find this forwarding setup. Close and reopen it to try again.');
         }
-        applyCallerIdEntryState(matchingEntry);
+        applyCallerIdEntryState(matchingEntry, matchingEntry?.source_number || sourceNumber);
       } catch (err) {
         if (import.meta.env.DEV) console.warn('[Forwarding verification] poll failed', err);
         if (active && needsForwardingWatch) {
@@ -740,7 +747,7 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
       if (data?.business_id) setBusinessId(data.business_id);
       if (entry?.id) setEntryId(entry.id);
       if (entry?.status) setForwardingStatus(entry.status);
-      applyCallerIdEntryState(entry);
+      applyCallerIdEntryState(entry, entry?.source_number || sourceNumber);
       if (entry && onSaved) onSaved(entry);
 
       return entry;
@@ -767,7 +774,7 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
       });
 
       if (data?.entry) {
-        applyCallerIdEntryState(data.entry);
+        applyCallerIdEntryState(data.entry, data.entry?.source_number || businessPhone);
         if (onSaved) onSaved(data.entry);
       }
     } catch (err) {
@@ -1386,29 +1393,39 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
     const callerIdVerified = callerIdStatus === 'verified';
     const callerIdPending = callerIdStatus === 'pending';
     const callerIdFailed = callerIdStatus === 'failed';
+    if (callerIdPending) {
+      return (
+        <div>
+          <div className="relative flex min-h-[220px] flex-col items-center justify-center py-6 text-center">
+            <div className="relative mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full border border-white/[0.16] bg-white/[0.07]" aria-label="Verification call in progress">
+              <span className="absolute inset-0 rounded-full border border-white/[0.12] animate-ping" />
+              <Phone size={23} strokeWidth={2} className="relative text-white" />
+            </div>
+            <p className="mx-auto max-w-sm text-sm leading-6 text-zinc-400">Enter this code on your phone’s keypad when prompted.</p>
+            <p className="mt-5 text-3xl font-semibold tracking-[0.35em] text-white">
+              {callerIdValidationCode || '------'}
+            </p>
+          </div>
+
+          <div className="border-t border-white/[0.08] py-4">
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-500">Calling</span>
+              <div className="flex items-center gap-2" aria-hidden="true">
+                {[0, 1, 2].map((dot) => (
+                  <span key={dot} className="h-1.5 w-1.5 animate-pulse rounded-full bg-pink-300" style={{ animationDelay: `${dot * 160}ms` }} />
+                ))}
+              </div>
+            </div>
+          </div>
+          {error && <p className="text-center text-sm text-red-400" role="alert">{error}</p>}
+        </div>
+      );
+    }
+
     return (
       <div>
         <div className="space-y-4">
-          <div className="rounded-2xl border border-orange-300/15 bg-orange-300/[0.05] p-4 text-sm leading-6 text-orange-100/85">
-            <p className="font-semibold text-orange-100">Outbound AI calling is limited to documented, consented operational or customer-service calls.</p>
-            <p className="mt-1">Nodemere records and transcribes calls by default. Do not use this feature for telemarketing, political outreach, debt collection, or restricted industries. Every call must identify the business, disclose the AI assistant, and give any notice or opt-out required by law.</p>
-            <a href="/communications-notice" target="_blank" rel="noreferrer" className="mt-2 inline-block font-semibold text-white underline underline-offset-2">Read the communications notice</a>
-          </div>
-
-          {callerIdPending ? (
-            <div className="space-y-4 border-t border-white/[0.08] pt-4">
-              <div className="flex items-center gap-2 text-pink-200">
-                <Phone size={15} />
-                <span className="text-sm font-semibold">Verification call in progress</span>
-              </div>
-              <p className="text-sm leading-6 text-pink-100/90">
-                Answer the call to {sourceNumber || 'your business line'} and enter this code on the keypad.
-              </p>
-              <div className="border-t border-white/[0.08] px-4 py-4 text-center text-3xl font-semibold tracking-[0.35em] text-white">
-                {callerIdValidationCode || '------'}
-              </div>
-            </div>
-          ) : callerIdVerified ? (
+          {callerIdVerified ? (
             <div className="space-y-3 border-t border-white/[0.08] pt-4">
               <div className="flex items-center gap-2 text-emerald-200">
                 <CheckCircle2 size={15} />
@@ -1421,36 +1438,76 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
           ) : (
             <div className="space-y-3 border-t border-white/[0.08] pt-4">
               <p className="text-sm leading-6 text-zinc-500">
-                This is optional, but it helps outbound calls feel more like they’re coming from your business.
+                Choose whether outbound calls should display your business number as the caller ID.
               </p>
-              <button
-                type="button"
-                onClick={startCallerIdVerification}
-                disabled={callerIdStarting}
-                className="h-11 w-full rounded-full bg-white text-sm font-bold text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-              {callerIdStarting ? 'Starting verification…' : 'Verify this number'}
-              </button>
             </div>
           )}
 
           {callerIdFailed && callerIdMessage ? (
             <div className="rounded-[24px] border border-rose-400/20 bg-rose-400/[0.06] p-4">
               <p className="text-sm leading-6 text-rose-200">{callerIdMessage}</p>
-              <button
-                type="button"
-                onClick={startCallerIdVerification}
-                disabled={callerIdStarting}
-                className="mt-3 h-10 w-full rounded-full border border-white/[0.08] bg-white/[0.04] text-sm font-semibold text-white transition hover:border-white/[0.14] hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                {callerIdStarting ? 'Starting verification…' : 'Try again'}
-              </button>
             </div>
           ) : null}
 
           {!callerIdPending && callerIdMessage && !callerIdFailed && !callerIdVerified ? (
             <p className="text-sm leading-6 text-zinc-500">{callerIdMessage}</p>
           ) : null}
+
+          <div className="grid gap-4 sm:grid-cols-2" role="group" aria-label="Caller ID options">
+            {[
+              {
+                title: callerIdVerified
+                  ? 'Caller ID is ready'
+                  : callerIdFailed
+                      ? 'Try again'
+                      : 'Business number',
+                description: callerIdVerified
+                  ? `${sourceNumber || 'Your business number'} will show on outbound calls.`
+                  : 'Verify it so outbound calls show your existing business number.',
+                onClick: callerIdVerified ? undefined : startCallerIdVerification,
+                disabled: callerIdStarting || callerIdVerified,
+              },
+              {
+                title: callerIdVerified ? 'Finish setup' : 'Receptionist number',
+                description: callerIdVerified
+                  ? 'Continue to your forwarding setup.'
+                  : 'Outbound calls will show your receptionist’s number.',
+                onClick: handleClose,
+                disabled: false,
+              },
+            ].map((option, index) => (
+              <button
+                key={option.title}
+                type="button"
+                onClick={() => {
+                  if (previewMode) {
+                    setError('Preview only. No forwarding settings or phone numbers were changed.');
+                    return;
+                  }
+                  option.onClick?.();
+                }}
+                disabled={option.disabled}
+                className="phone-choice-card flex min-h-[200px] flex-col rounded-[8px] border p-5 text-left transition disabled:cursor-default disabled:opacity-60 sm:min-h-[240px] sm:p-7"
+              >
+                <span className="relative z-10 flex items-start gap-3 sm:gap-6">
+                  <span aria-hidden="true" className="phone-choice-card__number shrink-0 text-[48px] leading-none tracking-[-0.06em] sm:text-[72px]">
+                    {index + 1}
+                  </span>
+                  <span className="flex min-w-0 flex-col pt-1 sm:pt-2">
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.14em] opacity-60">
+                      {index === 0 ? 'Outbound caller ID' : 'Optional'}
+                    </span>
+                    <span className="mt-2 text-base font-semibold leading-5 tracking-[-0.04em] sm:mt-3 sm:text-lg sm:leading-6">{option.title}</span>
+                  </span>
+                </span>
+                <span className="relative z-10 mt-4 max-w-[290px] text-[13px] leading-5 opacity-75 sm:mt-8 sm:text-sm sm:leading-6">{option.description}</span>
+                <span className="relative z-10 mt-auto pt-4 text-xs font-semibold opacity-75 sm:pt-8">
+                  {option.disabled ? (callerIdVerified ? 'Verified' : callerIdStarting ? 'Starting verification…' : 'Waiting for verification') : index === 0 ? 'Choose this option →' : 'Finish setup →'}
+                </span>
+              </button>
+            ))}
+          </div>
+          {error && <p className="text-center text-sm text-red-400" role="alert">{error}</p>}
         </div>
       </div>
     );
@@ -1515,7 +1572,7 @@ const ForwardNumberModal = ({ agent = null, authSession, onClose, onSaved, previ
             </motion.div>
           </AnimatePresence>
 
-          {slide !== SLIDE.choice && <div className="mt-5 space-y-3">
+          {slide !== SLIDE.choice && slide !== SLIDE.callerId && <div className="mt-5 space-y-3">
             {!(slide === SLIDE.number && targetQualityState === 'running') && (
               <button
                 type="button"

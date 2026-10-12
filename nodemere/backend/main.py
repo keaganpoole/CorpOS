@@ -97,6 +97,7 @@ from .config import (
     elevenlabs_webhook_secret,
     elevenlabs_api_key,
     openai_api_key,
+    elevenlabs_agent_id_activation,
     elevenlabs_agent_id_inbound,
     elevenlabs_agent_id_outbound,
     elevenlabs_agent_id_intercom,
@@ -225,6 +226,8 @@ ROUTE_HIT_EXCLUDE_PATHS = {
 }
 scenario_engine: Optional[ScenarioEngine] = None
 PENDING_FORWARDING_VERIFICATION_TASKS: dict[str, asyncio.Task] = {}
+LAST_FORWARDING_STATUS_LOG: dict[str, tuple] = {}
+PENDING_CALLER_ID_SYNC_TASKS: dict[str, asyncio.Task] = {}
 BUSINESS_KNOWLEDGE_STARTUP_TASK: Optional[asyncio.Task] = None
 BUSINESS_KNOWLEDGE_WATCH_TASK: Optional[asyncio.Task] = None
 
@@ -765,17 +768,25 @@ def maybe_auto_verify_business_forwarding(
     if str(active_entry.get("status") or "").lower() != "pending_test":
         return None
 
+    if not assign_business_phone_number_to_agent(business, elevenlabs_agent_id_inbound):
+        logging.warning('main.maybe_auto_verify_business_forwarding.agent_restore_failed')
+        return None
+
     now = datetime.now(timezone.utc).isoformat()
     verified_entry = {
         **active_entry,
         "status": "verified",
-        "verified_at": active_entry.get("verified_at") or now,
+        "verified_at": now,
         "confirmed_enabled_at": active_entry.get("confirmed_enabled_at") or now,
         "updated_at": now,
     }
     numbers[active_index] = verified_entry
 
-    supabase.table("businesses").update({"forwarding_config": config}).eq("id", business["id"]).execute()
+    update_result = supabase.table("businesses").update({"forwarding_config": config}).eq("id", business["id"]).execute()
+    if not update_result.data:
+        logging.warning("forwarding.verify.persist_failed business_id=%s entry_id=%s", business["id"], verified_entry.get("id"))
+        return None
+    logging.info("forwarding.verify.persisted business_id=%s entry_id=%s status=verified", business["id"], verified_entry.get("id"))
 
     agent_id = verified_entry.get("agent_id")
     if agent_id:
@@ -811,6 +822,40 @@ def maybe_auto_verify_business_forwarding(
     )
 
     return verified_entry
+
+
+def is_pending_forwarding_test_call(business: Optional[dict], called_number: Optional[str]) -> bool:
+    """Allow the setup call through without consuming billable call minutes."""
+    if not business or not called_number:
+        return False
+
+    config = normalize_forwarding_config(business.get("forwarding_config"))
+    active_number_id = config.get("active_number_id")
+    active_entry = next(
+        (entry for entry in config.get("numbers", []) if entry.get("id") == active_number_id),
+        None,
+    )
+    if not active_entry or str(active_entry.get("status") or "").lower() != "pending_test":
+        return False
+
+    target_number = active_entry.get("target_number") or business.get("twilio_number")
+    return bool(
+        target_number
+        and set(build_phone_match_values(called_number))
+        & set(build_phone_match_values(target_number))
+    )
+
+
+def is_activation_agent_call(payload: Optional[dict]) -> bool:
+    """An in-flight activation call stays exempt after forwarding becomes verified."""
+    agent_id = first_present(
+        payload or {},
+        "agent_id",
+        "agentId",
+        "metadata.agent_id",
+        "conversation_initiation_client_data.agent_id",
+    )
+    return bool(elevenlabs_agent_id_activation and str(agent_id or "") == elevenlabs_agent_id_activation)
 
 
 def get_business_forwarding_target_number(business: Optional[dict]) -> str:
@@ -1565,19 +1610,41 @@ def parse_twilio_timestamp(value) -> Optional[datetime]:
             return None
 
 
+def forwarding_verification_started_at(entry: dict) -> Optional[datetime]:
+    """A retry cannot reuse a call from an earlier verification."""
+    timestamps = (
+        parse_optional_datetime(entry.get("confirmed_enabled_at")),
+        parse_optional_datetime(entry.get("verified_at")),
+    )
+    return max((value for value in timestamps if value), default=None)
+
+
+def forwarding_test_window_start(entry: dict, now: datetime) -> datetime:
+    """Include a call placed just before confirmation without reusing a verified call."""
+    grace_start = now - timedelta(seconds=90)
+    previous_verification = parse_optional_datetime(entry.get("verified_at"))
+    return max(grace_start, previous_verification) if previous_verification else grace_start
+
+
 def twilio_call_matches_inbound_verification(call: Optional[dict], target_number: Optional[str], started_at: Optional[datetime]) -> bool:
     if not call or not target_number:
         return False
     if not (set(build_phone_match_values(call.get("to"))) & set(build_phone_match_values(target_number))):
         return False
     direction = str(call.get("direction") or "").strip().lower()
-    if direction and "inbound" not in direction:
+    if "inbound" not in direction:
         return False
     created_at = parse_twilio_timestamp(call.get("date_created") or call.get("start_time") or call.get("date_updated"))
-    if started_at and created_at and created_at < started_at:
+    if not created_at or (started_at and created_at < started_at):
         return False
     status_value = str(call.get("status") or "").strip().lower()
-    return status_value in {"queued", "ringing", "in-progress", "completed", "busy", "no-answer"}
+    if status_value != "completed":
+        return False
+    try:
+        duration_seconds = int(str(call.get("duration") or "0").strip() or "0")
+    except (TypeError, ValueError):
+        duration_seconds = 0
+    return duration_seconds > 0
 
 
 async def watch_twilio_inbound_call_for_forwarding_verification(business_id: int, entry_id: str, target_number: str, started_at_iso: str, timeout_seconds: int = 240):
@@ -1586,10 +1653,13 @@ async def watch_twilio_inbound_call_for_forwarding_verification(business_id: int
     started_at = parse_optional_datetime(started_at_iso) or datetime.now(timezone.utc)
 
     if not twilio_account_sid or not auth or not target_number:
+        logging.warning("forwarding.verify.watch_unavailable business_id=%s entry_id=%s", business_id, entry_id)
         PENDING_FORWARDING_VERIFICATION_TASKS.pop(task_key, None)
         return
 
     try:
+        logging.info("forwarding.verify.watch_started business_id=%s entry_id=%s cutoff=%s", business_id, entry_id, started_at.isoformat())
+        last_observed_call = None
         deadline = time.monotonic() + timeout_seconds
         while time.monotonic() < deadline:
             business = load_business_by_id(business_id)
@@ -1605,7 +1675,12 @@ async def watch_twilio_inbound_call_for_forwarding_verification(business_id: int
             if str(active_entry.get("status") or "").lower() != "pending_test":
                 return
 
-            response = requests.get(
+            entry_started_at = forwarding_verification_started_at(active_entry)
+            if entry_started_at:
+                started_at = max(started_at, entry_started_at)
+
+            response = await asyncio.to_thread(
+                requests.get,
                 f"https://api.twilio.com/2010-04-01/Accounts/{twilio_account_sid}/Calls.json",
                 params={"To": normalize_phone_number(target_number) or target_number, "PageSize": 20},
                 auth=auth,
@@ -1613,19 +1688,41 @@ async def watch_twilio_inbound_call_for_forwarding_verification(business_id: int
             )
             response.raise_for_status()
             calls = (response.json() or {}).get("calls") or []
+            latest_call = calls[0] if calls else None
+            observed_call = (
+                (latest_call or {}).get("sid"),
+                (latest_call or {}).get("status"),
+                (latest_call or {}).get("duration"),
+                started_at,
+            )
+            if observed_call != last_observed_call:
+                logging.info(
+                    "forwarding.verify.call_seen business_id=%s entry_id=%s cutoff=%s call_suffix=%s created=%s status=%s duration=%s matches=%s",
+                    business_id, entry_id, started_at.isoformat(),
+                    str((latest_call or {}).get("sid") or "")[-6:],
+                    (latest_call or {}).get("date_created"),
+                    (latest_call or {}).get("status"),
+                    (latest_call or {}).get("duration"),
+                    twilio_call_matches_inbound_verification(latest_call, target_number, started_at),
+                )
+                last_observed_call = observed_call
 
             matched_call = next(
                 (call for call in calls if twilio_call_matches_inbound_verification(call, target_number, started_at)),
                 None,
             )
             if matched_call:
-                logging.info('main.watch_twilio_inbound_call_for_forwarding_verification.event_1247')
-                maybe_auto_verify_business_forwarding(business, called_number=target_number)
+                logging.info("forwarding.verify.call_matched business_id=%s entry_id=%s call_suffix=%s", business_id, entry_id, str(matched_call.get("sid") or "")[-6:])
+                if not maybe_auto_verify_business_forwarding(business, called_number=target_number):
+                    logging.warning("forwarding.verify.match_not_persisted business_id=%s entry_id=%s", business_id, entry_id)
+                    await asyncio.sleep(4)
+                    continue
                 return
 
             await asyncio.sleep(4)
-    except Exception as exc:
-        logging.warning('main.watch_twilio_inbound_call_for_forwarding_verification.event_1282')
+        logging.warning("forwarding.verify.watch_timed_out business_id=%s entry_id=%s", business_id, entry_id)
+    except Exception:
+        logging.exception("forwarding.verify.watch_failed business_id=%s entry_id=%s", business_id, entry_id)
     finally:
         PENDING_FORWARDING_VERIFICATION_TASKS.pop(task_key, None)
 
@@ -1645,7 +1742,12 @@ def schedule_twilio_inbound_forwarding_verification_watch(business_id: int, entr
     )
 
 
-def find_recent_twilio_inbound_call(target_number: Optional[str], *, within_hours: int = 24) -> Optional[dict]:
+def find_recent_twilio_inbound_call(
+    target_number: Optional[str],
+    *,
+    within_hours: int = 24,
+    started_at: Optional[datetime] = None,
+) -> Optional[dict]:
     auth = get_twilio_auth_tuple()
     normalized_target = normalize_phone_number(target_number)
     if not twilio_account_sid or not auth or not normalized_target:
@@ -1666,7 +1768,7 @@ def find_recent_twilio_inbound_call(target_number: Optional[str], *, within_hour
 
     cutoff = datetime.now(timezone.utc) - timedelta(hours=max(1, within_hours))
     for call in calls:
-        if not twilio_call_matches_inbound_verification(call, normalized_target, None):
+        if not twilio_call_matches_inbound_verification(call, normalized_target, started_at):
             continue
         created_at = parse_twilio_timestamp(call.get("date_created") or call.get("start_time") or call.get("date_updated"))
         if created_at and created_at < cutoff:
@@ -1688,7 +1790,8 @@ def maybe_auto_verify_business_forwarding_from_recent_twilio_call(business: Opti
     if str(active_entry.get("status") or "").lower() != "pending_test":
         return None
     target_number = active_entry.get("target_number") or business.get("twilio_number")
-    matched_call = find_recent_twilio_inbound_call(target_number)
+    started_at = forwarding_verification_started_at(active_entry)
+    matched_call = find_recent_twilio_inbound_call(target_number, started_at=started_at)
     if not matched_call:
         return None
     logging.info('main.maybe_auto_verify_business_forwarding_from_recent_twilio_call.event_1395')
@@ -1755,6 +1858,25 @@ def maybe_sync_business_caller_id_verification_from_twilio(business: Optional[di
     return numbers[active_index]
 
 
+def schedule_business_caller_id_sync(business: Optional[dict]) -> None:
+    if not business or business.get("id") is None:
+        return
+    task_key = str(business["id"])
+    existing = PENDING_CALLER_ID_SYNC_TASKS.get(task_key)
+    if existing and not existing.done():
+        return
+
+    async def sync_in_background():
+        try:
+            await asyncio.to_thread(maybe_sync_business_caller_id_verification_from_twilio, business)
+        except Exception:
+            logging.warning('main.schedule_business_caller_id_sync.event_1461')
+        finally:
+            PENDING_CALLER_ID_SYNC_TASKS.pop(task_key, None)
+
+    PENDING_CALLER_ID_SYNC_TASKS[task_key] = asyncio.create_task(sync_in_background())
+
+
 def find_elevenlabs_phone_number(phone_number: Optional[str]) -> Optional[dict]:
     headers = get_elevenlabs_headers()
     normalized = normalize_phone_number(phone_number)
@@ -1803,7 +1925,11 @@ def import_elevenlabs_phone_number(phone_number: str, label: str) -> Optional[st
         logging.info('main.import_elevenlabs_phone_number.event_1481')
         return phone_number_id
     except Exception as exc:
-        logging.warning('main.import_elevenlabs_phone_number.event_1437')
+        logging.warning(
+            'main.import_elevenlabs_phone_number.event_1437 status=%s response=%s',
+            getattr(locals().get('response'), 'status_code', None),
+            (getattr(locals().get('response'), 'text', '') or '')[:500],
+        )
         return None
 
 
@@ -1818,9 +1944,9 @@ def ensure_elevenlabs_outbound_caller_id(phone_number: str, label: str) -> Optio
     return import_elevenlabs_phone_number(normalized, label)
 
 
-def assign_elevenlabs_phone_number_to_inbound_agent(phone_number_id: str) -> bool:
+def assign_elevenlabs_phone_number_to_agent(phone_number_id: str, agent_id: Optional[str]) -> bool:
     headers = get_elevenlabs_headers()
-    if not headers or not phone_number_id or not elevenlabs_agent_id_inbound:
+    if not headers or not phone_number_id or not agent_id:
         return False
 
     try:
@@ -1828,7 +1954,7 @@ def assign_elevenlabs_phone_number_to_inbound_agent(phone_number_id: str) -> boo
         response = requests.patch(
             f"https://api.elevenlabs.io/v1/convai/phone-numbers/{phone_number_id}",
             headers=headers,
-            json={"agent_id": elevenlabs_agent_id_inbound},
+            json={"agent_id": agent_id},
             timeout=60,
         )
         response.raise_for_status()
@@ -1839,11 +1965,25 @@ def assign_elevenlabs_phone_number_to_inbound_agent(phone_number_id: str) -> boo
         return False
 
 
+def assign_business_phone_number_to_agent(business: Optional[dict], agent_id: Optional[str]) -> bool:
+    if not business or business.get("id") is None or not agent_id:
+        return False
+    purchased = get_active_purchased_number_for_business(int(business["id"]), kind="assigned_line")
+    phone_number_id = (purchased or {}).get("elevenlabs_phone_number_id")
+    return bool(phone_number_id and assign_elevenlabs_phone_number_to_agent(str(phone_number_id), agent_id))
+
+
+def assign_elevenlabs_phone_number_to_inbound_agent(phone_number_id: str) -> bool:
+    return assign_elevenlabs_phone_number_to_agent(phone_number_id, elevenlabs_agent_id_inbound)
+
+
 def prepare_elevenlabs_phone_number_for_business(phone_number: str, label: str) -> Optional[str]:
     """Import the purchased number and assign its inbound agent before activation."""
     normalized_number = normalize_phone_number(phone_number)
-    if not normalized_number or not elevenlabs_agent_id_inbound:
-        return None
+    if not normalized_number:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="The purchased phone number is invalid.")
+    if not elevenlabs_agent_id_inbound:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="The receptionist voice agent is not configured.")
 
     existing_phone = find_elevenlabs_phone_number(normalized_number)
     phone_number_id = (existing_phone or {}).get("phone_number_id")
@@ -1852,14 +1992,20 @@ def prepare_elevenlabs_phone_number_for_business(phone_number: str, label: str) 
         phone_number_id = import_elevenlabs_phone_number(normalized_number, label)
         imported_now = bool(phone_number_id)
     if not phone_number_id:
-        return None
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="The voice provider rejected the new phone number import.",
+        )
 
     assigned_agent_id = ((existing_phone or {}).get("assigned_agent") or {}).get("agent_id")
     if assigned_agent_id != elevenlabs_agent_id_inbound:
         if not assign_elevenlabs_phone_number_to_inbound_agent(str(phone_number_id)):
             if imported_now:
                 delete_elevenlabs_phone_number(str(phone_number_id))
-            return None
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="The voice provider could not assign the new phone number to the receptionist.",
+            )
 
     return str(phone_number_id)
 
@@ -3417,7 +3563,13 @@ async def require_internal_tool_authorization(request: Request):
     token = request.headers.get("x-nodemere-context")
     request.state.internal_claims = None
     scoped_path = request.scope.get("path", "")
-    if (scoped_path.startswith(("/api/tools/", "/api/call/")) or scoped_path == "/api/scenarios/resume") and not token:
+    # ElevenLabs' conversation-initiation webhook is authenticated with the
+    # shared internal secret, but it cannot send a Nodemere context token
+    # before the business is resolved. The call route safely derives that
+    # context from the called phone number instead. Keep every other internal
+    # route fail-closed when the signed context is absent.
+    is_elevenlabs_call_route = scoped_path == "/api/call/route"
+    if (scoped_path.startswith(("/api/tools/", "/api/call/")) or scoped_path == "/api/scenarios/resume") and not token and not is_elevenlabs_call_route:
         raise HTTPException(400, "A signed internal-tool business context is required")
     if token:
         claims = verify_internal_context(internal_tool_secret, token)
@@ -5825,12 +5977,16 @@ def upsert_active_call_log(call_payload: dict, *, user_id: Optional[str], busine
         if not existing and provider_call_sid:
             existing = supabase.table("call_logs").select("id").eq("provider_call_sid", str(provider_call_sid)).limit(1).execute().data or []
         if existing:
-            supabase.table("call_logs").update(row).eq("id", existing[0]["id"]).execute()
+            result = supabase.table("call_logs").update(row).eq("id", existing[0]["id"]).execute()
         else:
-            supabase.table("call_logs").insert(row).execute()
-    except Exception as exc:
+            result = supabase.table("call_logs").insert(row).execute()
+        logging.info(
+            "nest.call_log.live_saved business_id=%s call_suffix=%s operation=%s persisted=%s",
+            business_id, str(provider_call_sid or "")[-6:], "update" if existing else "insert", bool(result.data),
+        )
+    except Exception:
         # The call itself must continue even if NEST's live indicator cannot be persisted.
-        logging.warning('main.upsert_active_call_log.event_4889')
+        logging.exception("nest.call_log.live_save_failed business_id=%s call_suffix=%s", business_id, str(provider_call_sid or "")[-6:])
 
 
 def mark_call_log_failed(*, provider_call_sid: Optional[str], business_id: Optional[str], user_id: Optional[str], reason: str) -> None:
@@ -8010,24 +8166,36 @@ async def twilio_inbound_webhook(request: Request):
     from .authorization import scenario_tenant, tenant_scope
     call_tenant=scenario_tenant(getattr(supabase_admin,'raw',supabase_admin), {'business_id':business['id'],'user_id':resolved_user_id})
     mark("tenant_resolved")
-    inbound_open, inbound_reason = is_business_call_window_open(business, layer="inbound")
-    mark("business_call_window_checked")
-    if not inbound_open:
-        logging.info('main.twilio_inbound_webhook.event_6945')
-        return Response(
-            content="<Response><Say>Our receptionist is unavailable right now. Please call back during our available hours.</Say><Hangup/></Response>",
-            media_type="application/xml",
+    activation_test_call = is_pending_forwarding_test_call(business, to_number)
+    if activation_test_call and not elevenlabs_agent_id_activation:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="The activation test agent is not configured.",
         )
-    try:
-        enforce_call_minutes(str(resolved_user_id or ""), business, direction="inbound")
-        mark("call_minutes_checked")
-    except HTTPException as exc:
-        detail = exc.detail if isinstance(exc.detail, dict) else {}
-        logging.warning('main.twilio_inbound_webhook.event_6917')
-        return Response(
-            content="<Response><Say>We are unable to connect this call right now. Please contact the account owner.</Say><Hangup/></Response>",
-            media_type="application/xml",
-        )
+    if not activation_test_call:
+        inbound_open, inbound_reason = is_business_call_window_open(business, layer="inbound")
+        mark("business_call_window_checked")
+        if not inbound_open:
+            logging.info('main.twilio_inbound_webhook.event_6945')
+            return Response(
+                content="<Response><Say>Our receptionist is unavailable right now. Please call back during our available hours.</Say><Hangup/></Response>",
+                media_type="application/xml",
+            )
+    else:
+        mark("activation_test_call_bypassed_business_hours")
+    if not activation_test_call:
+        try:
+            enforce_call_minutes(str(resolved_user_id or ""), business, direction="inbound")
+            mark("call_minutes_checked")
+        except HTTPException as exc:
+            detail = exc.detail if isinstance(exc.detail, dict) else {}
+            logging.warning('main.twilio_inbound_webhook.event_6917')
+            return Response(
+                content="<Response><Say>We are unable to connect this call right now. Please contact the account owner.</Say><Hangup/></Response>",
+                media_type="application/xml",
+            )
+    else:
+        mark("setup_test_call_exempted_from_billing")
     receptionist = context.get("receptionist")
     if not receptionist:
         receptionist = find_inbound_receptionist_for_business(
@@ -8056,11 +8224,14 @@ async def twilio_inbound_webhook(request: Request):
         "receptionist_id": receptionist.get("id") if receptionist else None,
         "receptionist_name": get_receptionist_display_name(receptionist),
     }
-    asyncio.create_task(asyncio.to_thread(emit_scenario_trigger, "incoming_call", event_payload))
-    mark("scenario_trigger_scheduled")
+    if not activation_test_call:
+        asyncio.create_task(asyncio.to_thread(emit_scenario_trigger, "incoming_call", event_payload))
+        mark("scenario_trigger_scheduled")
+    else:
+        mark("activation_test_call_skipped_scenario_trigger")
 
     register_payload = {
-        "agent_id": elevenlabs_agent_id_inbound,
+        "agent_id": elevenlabs_agent_id_activation if activation_test_call and elevenlabs_agent_id_activation else elevenlabs_agent_id_inbound,
         "from_number": caller_identity,
         "to_number": to_number,
         "direction": "inbound",
@@ -8070,8 +8241,10 @@ async def twilio_inbound_webhook(request: Request):
                 "caller_number": caller_identity,
                 "business_id": str(business.get("id")) if business and business.get("id") is not None else None,
                 "business_name": business.get("name") if business else None,
+                "company_name": business.get("name") if business else None,
                 "receptionist_id": str(receptionist.get("id")) if receptionist and receptionist.get("id") is not None else None,
                 "receptionist_name": get_receptionist_display_name(receptionist),
+                "receptionist_personality": get_receptionist_personality_type(receptionist),
                 "personality_type": get_receptionist_personality_type(receptionist),
                 "elevenlabs_voice_id": receptionist.get("elevenlabs_voice_id") if receptionist else None,
                 "twilio_to_number": to_number,
@@ -8087,8 +8260,8 @@ async def twilio_inbound_webhook(request: Request):
     # Knowledge is synchronized in the background. Use the last successful
     # snapshot immediately; a missing or stale snapshot must never block the
     # Twilio-to-ElevenLabs transfer.
-    knowledge_snapshot = context.get("knowledge_snapshot")
-    if knowledge_snapshot is None:
+    knowledge_snapshot = None if activation_test_call else context.get("knowledge_snapshot")
+    if not activation_test_call and knowledge_snapshot is None:
         knowledge_snapshot = cached_business_knowledge(business.get("id"), elevenlabs_agent_id_inbound)
     mark("knowledge_snapshot_loaded")
     if knowledge_snapshot:
@@ -8177,7 +8350,6 @@ async def twilio_inbound_webhook(request: Request):
             receptionist=receptionist,
         )
     )
-    asyncio.create_task(asyncio.to_thread(maybe_auto_verify_business_forwarding, business, called_number=to_number))
     mark("twilio_response_returning")
     return Response(content=response.text, media_type="application/xml")
 
@@ -8401,14 +8573,19 @@ async def route_call_compat(request: Request, _internal: None = Depends(require_
     context = resolve_business_context(call_payload)
     business = context.get("business")
     resolved_user_id = context.get("user_id") or (business or {}).get("user_id")
-    inbound_open, inbound_reason = is_business_call_window_open(business, layer="inbound")
-    if not inbound_open:
-        return {
-            "ok": False,
-            "skipped": True,
-            "reason": inbound_reason or "Inbound receptionist is unavailable",
-        }
-    enforce_call_minutes(str(resolved_user_id or ""), business, direction="inbound")
+    activation_test_call = (
+        is_pending_forwarding_test_call(business, call_payload.get("to_number"))
+        or is_activation_agent_call(payload)
+    )
+    if not activation_test_call:
+        inbound_open, inbound_reason = is_business_call_window_open(business, layer="inbound")
+        if not inbound_open:
+            return {
+                "ok": False,
+                "skipped": True,
+                "reason": inbound_reason or "Inbound receptionist is unavailable",
+            }
+        enforce_call_minutes(str(resolved_user_id or ""), business, direction="inbound")
     receptionist = (
         (context.get("receptionist") if receptionist_direction_allows("inbound", (context.get("receptionist") or {}).get("direction")) else None)
         or find_inbound_receptionist_for_business(
@@ -8416,11 +8593,6 @@ async def route_call_compat(request: Request, _internal: None = Depends(require_
             context.get("user_id") or (business or {}).get("user_id"),
         )
     )
-    maybe_auto_verify_business_forwarding(
-        business,
-        called_number=call_payload.get("to_number"),
-    )
-
     event_payload = {
         **call_payload,
         "user_id": context.get("user_id"),
@@ -8438,7 +8610,7 @@ async def route_call_compat(request: Request, _internal: None = Depends(require_
         receptionist=receptionist,
     )
 
-    event = emit_scenario_trigger(call_payload["trigger_key"], event_payload)
+    event = None if activation_test_call else emit_scenario_trigger(call_payload["trigger_key"], event_payload)
     push_live_event(
         f"Call route trigger received ({call_payload['trigger_key']}).",
         actor="system",
@@ -8463,6 +8635,11 @@ async def route_call_compat(request: Request, _internal: None = Depends(require_
         "twilio_to_number": call_payload.get("to_number"),
         "twilio_call_sid": call_payload.get("call_id"),
         "docs_request_id": "",
+        # ElevenLabs expects the variable to exist even when the caller is
+        # not yet matched to a people record. Keep it blank rather than
+        # omitting it so first-time callers can still start a conversation.
+        "person_id": "",
+        "customer_name": "",
     }
     add_people_intake_dynamic_variables(dynamic_variables, business)
     add_escalation_dynamic_variables(dynamic_variables, business)
@@ -8486,7 +8663,7 @@ async def route_call_compat(request: Request, _internal: None = Depends(require_
         "ok": True,
         "message": "FastAPI call route compatibility endpoint handled the request.",
         "route": event_payload,
-        "event": event.get("event"),
+        "event": event.get("event") if isinstance(event, dict) else None,
         "type": "conversation_initiation_client_data",
         "dynamic_variables": dynamic_variables,
     }
@@ -9973,7 +10150,8 @@ async def legacy_server_tool(
         saved = response.data[0] if response.data else call_log
         claim_call_milestones(supabase, saved)
         record_call_nest_event(supabase, saved)
-        increment_business_usage_summary(call_log.get("business_id"), duration_seconds)
+        if not is_activation_agent_call({"agent_id": call_log.get("elevenlabs_agent_id")}):
+            increment_business_usage_summary(call_log.get("business_id"), duration_seconds)
         return {"ok": True, "call_log": saved}
 
     if normalized_tool == "transfer-call":
@@ -10312,16 +10490,6 @@ async def persist_elevenlabs_event(payload):
         business_id=(business_context.get("business") or {}).get("id"),
         user_id=business_context.get("user_id"),
     )
-    verification_called_number = call_log.get("to_number")
-    if not verification_called_number and str(call_log.get("direction") or "").lower() == "inbound":
-        verification_called_number = ((business_context.get("business") or {}).get("twilio_number"))
-        if verification_called_number:
-            logging.info('main.elevenlabs_post_call_webhook.event_8203')
-    maybe_auto_verify_business_forwarding(
-        business_context.get("business"),
-        called_number=verification_called_number,
-    )
-
     try:
         existing = [drop_in_log] if drop_in_log else []
         if not existing and call_log.get("conversation_id"):
@@ -10400,7 +10568,8 @@ async def persist_elevenlabs_event(payload):
     previous_duration_seconds = parse_usage_seconds(existing[0].get("duration_seconds")) if existing else 0
     saved_duration_seconds = parse_usage_seconds(saved.get("duration_seconds") or call_log.get("duration_seconds"))
     usage_business_id = saved.get("business_id") or call_log.get("business_id") or (existing[0].get("business_id") if existing else None)
-    increment_business_usage_summary(usage_business_id, max(0, saved_duration_seconds - (previous_duration_seconds or 0)))
+    if not is_activation_agent_call({"agent_id": call_log.get("elevenlabs_agent_id") or saved.get("elevenlabs_agent_id")}):
+        increment_business_usage_summary(usage_business_id, max(0, saved_duration_seconds - (previous_duration_seconds or 0)))
     if call_log.get("hired_receptionist_id"):
         refresh_receptionist_call_metrics(call_log.get("hired_receptionist_id"))
 
@@ -16934,11 +17103,28 @@ async def get_business_forwarding(
 
     try:
         business = get_business_record_for_user(current_user_id)
-        maybe_auto_verify_business_forwarding_from_recent_twilio_call(business)
-        business = get_business_record_for_user(current_user_id)
-        maybe_sync_business_caller_id_verification_from_twilio(business)
-        business = get_business_record_for_user(current_user_id)
         config = normalize_forwarding_config(business.get('forwarding_config'))
+        active_entry = get_active_forwarding_entry(config)
+        status_snapshot = (
+            (active_entry or {}).get("id"), (active_entry or {}).get("status"),
+            (active_entry or {}).get("confirmed_enabled_at"), (active_entry or {}).get("verified_at"),
+        )
+        status_key = str(business["id"])
+        if LAST_FORWARDING_STATUS_LOG.get(status_key) != status_snapshot:
+            logging.info(
+                "forwarding.verify.api_status business_id=%s entry_id=%s status=%s cutoff=%s verified_at=%s",
+                business["id"], *status_snapshot,
+            )
+            LAST_FORWARDING_STATUS_LOG[status_key] = status_snapshot
+        if active_entry and active_entry.get("id") and str(active_entry.get("status") or "").lower() == "pending_test":
+            schedule_twilio_inbound_forwarding_verification_watch(
+                int(business["id"]),
+                str(active_entry.get("id") or ""),
+                str(active_entry.get("target_number") or business.get("twilio_number") or ""),
+                str(active_entry.get("confirmed_enabled_at") or active_entry.get("updated_at") or ""),
+            )
+        elif active_entry and str(active_entry.get("status") or "").lower() == "verified":
+            schedule_business_caller_id_sync(business)
         purchase_limit = get_system_number_purchase_limit()
         purchase_count = get_business_number_purchase_count(business)
 
@@ -17095,7 +17281,7 @@ async def claim_business_forwarding_number(
                 "twilio_account_sid": twilio_account_sid,
                 "twilio_incoming_phone_number_sid": purchased.get("sid"),
                 "elevenlabs_phone_number_id": str(phone_number_id),
-                "quality_check_status": "not_run",
+                "quality_check_status": "pending",
                 "quality_checked_at": None,
                 "quality_failure_reason": None,
             },
@@ -17128,7 +17314,7 @@ async def claim_business_forwarding_number(
             "twilio_number": activated_business.get("twilio_number"),
             "twilio_number_label": activated_business.get("twilio_number_label"),
             "twilio_number_status": activated_business.get("twilio_number_status"),
-            "quality_check_status": "not_run",
+            "quality_check_status": "pending",
             "quality_checked_at": None,
             "twilio_number_quality_error": None,
             "elevenlabs_phone_number_id": str(phone_number_id),
@@ -17138,11 +17324,11 @@ async def claim_business_forwarding_number(
     except HTTPException:
         raise
     except Exception as exc:
-        logging.error('main.claim_business_forwarding_number.event_13282')
+        logging.exception('main.claim_business_forwarding_number.event_13282')
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to set up that phone number.",
-        )
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="We couldn't finish connecting that phone number. The provider setup did not complete, and no active receptionist number was saved.",
+        ) from exc
 
 
 @app.delete("/businesses/me/forwarding/number", tags=["Businesses"])
@@ -17344,13 +17530,15 @@ async def twilio_outgoing_caller_id_status(request: Request):
         matched_entry = None
 
         for index, entry in enumerate(numbers):
+            if str(entry.get("caller_id_verification_status") or "").lower() != "pending":
+                continue
             entry_call_sid = entry.get("caller_id_call_sid")
             entry_source_number = normalize_phone_number(entry.get("source_number"))
             if call_sid and entry_call_sid == call_sid:
                 matched_index = index
                 matched_entry = entry
                 break
-            if called_number and entry_source_number == called_number and str(entry.get("caller_id_verification_status") or "").lower() == "pending":
+            if called_number and entry_source_number == called_number:
                 matched_index = index
                 matched_entry = entry
                 break
@@ -17422,7 +17610,8 @@ async def update_business_forwarding(
     try:
         business = get_business_record_for_user(current_user_id)
         config = normalize_forwarding_config(business.get('forwarding_config'))
-        now = datetime.now(timezone.utc).isoformat()
+        now_dt = datetime.now(timezone.utc)
+        now = now_dt.isoformat()
         numbers = config["numbers"]
 
         existing_entry = None
@@ -17449,7 +17638,8 @@ async def update_business_forwarding(
         source_number_changed = normalize_phone_number((existing_entry or {}).get("source_number")) != normalize_phone_number(payload.source_number)
 
         if payload.confirmed_enabled:
-            confirmed_enabled_at = confirmed_enabled_at or now
+            if verified_at or not confirmed_enabled_at or str((existing_entry or {}).get("status") or "").lower() == "verified":
+                confirmed_enabled_at = forwarding_test_window_start(existing_entry or {}, now_dt).isoformat()
         elif payload.status == "draft":
             confirmed_enabled_at = None
 
@@ -17495,6 +17685,23 @@ async def update_business_forwarding(
 
         config["active_number_id"] = entry_id
 
+        agent_for_status = None
+        if next_status == "pending_test":
+            agent_for_status = elevenlabs_agent_id_activation
+            if not agent_for_status:
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail="The activation test agent is not configured.",
+                )
+        elif next_status == "verified":
+            agent_for_status = elevenlabs_agent_id_inbound
+
+        if agent_for_status and not assign_business_phone_number_to_agent(business, agent_for_status):
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="The voice provider could not prepare the receptionist for this forwarding step.",
+            )
+
         update_response = (
             supabase
             .table('businesses')
@@ -17504,7 +17711,19 @@ async def update_business_forwarding(
         )
 
         if not update_response.data:
+            previous_agent = (
+                elevenlabs_agent_id_activation
+                if str((existing_entry or {}).get("status") or "").lower() == "pending_test"
+                else elevenlabs_agent_id_inbound
+            )
+            if agent_for_status:
+                assign_business_phone_number_to_agent(business, previous_agent)
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to save forwarding settings")
+        logging.info(
+            "forwarding.verify.saved business_id=%s entry_id=%s previous_status=%s status=%s cutoff=%s previous_verified_at=%s",
+            business["id"], entry_id, (existing_entry or {}).get("status"), next_status,
+            confirmed_enabled_at, (existing_entry or {}).get("verified_at"),
+        )
         clear_inbound_call_boot_cache(business["id"])
 
         if payload.agent_id and next_status == "verified":
@@ -17545,7 +17764,7 @@ async def update_business_forwarding(
                 int(business["id"]),
                 str(next_entry["id"]),
                 str(next_entry["target_number"]),
-                now,
+                str(confirmed_enabled_at or now),
             )
 
         return {

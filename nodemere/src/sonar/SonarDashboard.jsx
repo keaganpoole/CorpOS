@@ -334,21 +334,12 @@ const TASKLIST_DEFINITIONS = [
     title: 'Connect a phone number',
     subtasks: [
       {
-        id: 'assign_receptionist_number',
-        title: 'Assign a phone number',
+        id: 'activate_front_desk',
+        title: 'Activate your front desk',
         videoUrl: TASKLIST_VIDEO_PLACEHOLDER,
-        instructionTitle: 'Connect A Phone Number',
+        instructionTitle: 'Activate Your Front Desk',
         instruction:
-          'Think of this as your receptionist’s direct line. It can receive incoming calls and, when outbound calling is enabled, give your receptionist a number to call customers from too.',
-      },
-      {
-        id: 'forward_business_line',
-        title: 'Forward your business line (optional)',
-        optional: true,
-        videoUrl: TASKLIST_VIDEO_PLACEHOLDER,
-        instructionTitle: 'Forward The Business Line',
-        instruction:
-          'Forwarding sends calls from your existing business line to your receptionist, so customers can reach the right front desk without changing the number they already know.',
+          'Connect a phone number so your AI receptionist can answer calls and put your front desk to work.',
       },
     ],
   },
@@ -442,23 +433,21 @@ const hasStaffName = (staff) => (
   hasText(staff?.full_name) || hasText(staff?.first_name) || hasText(staff?.last_name)
 );
 
-const getForwardingEntries = (business) => {
-  const config = parseJsonObject(business?.forwarding_config);
-  return Array.isArray(config.numbers) ? config.numbers : [];
-};
-
 const hasAssignedReceptionistNumber = (purchasedNumbers = []) => (
   (Array.isArray(purchasedNumbers) ? purchasedNumbers : []).some((number) => (
     number?.is_active !== false
     && String(number?.kind || 'assigned_line').toLowerCase() === 'assigned_line'
     && String(number?.status || '').toLowerCase() === 'active'
+    && ['passed', 'verified'].includes(String(number?.quality_check_status || '').toLowerCase())
     && hasText(number?.phone_number)
   ))
 );
 
-const hasVerifiedForwarding = (business) => (
-  getForwardingEntries(business).some((entry) => String(entry?.status || '').toLowerCase() === 'verified')
-);
+const hasVerifiedForwarding = (business) => {
+  const config = parseJsonObject(business?.forwarding_config);
+  return Array.isArray(config.numbers)
+    && config.numbers.some((entry) => String(entry?.status || '').toLowerCase() === 'verified');
+};
 
 const hasConfiguredIntakeField = (business, activeCustomFieldKeys = []) => {
   const config = parseJsonObject(business?.people_field_config);
@@ -497,8 +486,10 @@ const createTasklistState = ({ business = null, agents = [], staff = [], service
       setup_authenticator: authenticatorConfigured === true,
     },
     phone_setup: {
-      assign_receptionist_number: Boolean(business?.id && hasAssignedReceptionistNumber(purchasedNumbers)),
-      forward_business_line: Boolean(business?.id && hasVerifiedForwarding(business)),
+      activate_front_desk: Boolean(
+        business?.id
+        && (hasAssignedReceptionistNumber(purchasedNumbers) || hasVerifiedForwarding(business))
+      ),
     },
     intake_fields: {
       set_intake_field: Boolean(business?.id && hasConfiguredIntakeField(business, activeCustomFieldKeys)),
@@ -2423,7 +2414,7 @@ const SonarDashboard = () => {
           api.getServices(),
           supabase
             .from('purchased_numbers')
-            .select('phone_number,status,is_active,kind')
+            .select('phone_number,status,is_active,kind,quality_check_status')
             .eq('business_id', business.id),
           supabase
             .from('people_schema')
@@ -2892,7 +2883,7 @@ const SonarDashboard = () => {
 
   return (
     <AudioPlayerProvider>
-    <CallLogsProvider normalizeCall={normalizeCall} enabled={mountedRoutes.includes('call-logs')}>
+    <CallLogsProvider normalizeCall={normalizeCall}>
     <NestProvider
       businessId={staffBusinessId || businessUsage?.business_id || profile?.business_id}
       tasklistState={backendTasklistState}
