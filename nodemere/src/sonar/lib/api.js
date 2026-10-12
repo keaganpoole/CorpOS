@@ -10,6 +10,7 @@ const WS_URL = window.sonar?.wsUrl || import.meta.env.VITE_WS_URL || null;
 const API_TIMEOUT_MS = 15000;
 const CRM_READ_TIMEOUT_MS = 60000;
 const PEOPLE_WRITE_TIMEOUT_MS = 60000;
+const APPOINTMENT_WRITE_TIMEOUT_MS = 60000;
 const BUSINESS_PROFILE_TIMEOUT_MS = 45000;
 
 let authSessionRequest = null;
@@ -158,7 +159,7 @@ export const api = {
   getPayments: (limit = 100) => fetchJSON(`/api/sonar/payments?limit=${limit}`),
   getInvoices: (limit = 100) => fetchJSON(`/api/sonar/invoices?limit=${limit}`),
   createAppointment: (appointment) => postJSON('/api/sonar/appointments', appointment),
-  updateAppointment: (id, appointment) => putJSON(`/api/sonar/appointments/${encodeURIComponent(id)}`, appointment),
+  updateAppointment: (id, appointment) => putJSON(`/api/sonar/appointments/${encodeURIComponent(id)}`, appointment, APPOINTMENT_WRITE_TIMEOUT_MS),
   deleteAppointment: (id) => deleteJSON(`/api/sonar/appointments/${encodeURIComponent(id)}`),
   getPeopleDocuments: () => fetchJSON('/api/sonar/people/documents'),
   getPersonDocumentUrl: async (personId, documentId) => {
