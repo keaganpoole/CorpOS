@@ -29,6 +29,16 @@ const HOMEPAGE_TAG_COLORS = {
   Haircut: '#f472b6',
   Blowout: '#fbbf24',
 };
+const DEMO_ACTION_LANE_VARIANTS = {
+  hidden: { opacity: 0, x: -10, scale: 0.96 },
+  visible: { opacity: 1, x: 0, scale: 1, transition: { duration: 0.22, ease: [0.22, 1, 0.36, 1] } },
+  exit: { opacity: 0, x: -8, scale: 0.97, transition: { duration: 0.22, ease: [0.22, 1, 0.36, 1] } },
+};
+const DEMO_ACTION_LIST_VARIANTS = {
+  hidden: {},
+  visible: { transition: { delayChildren: 0.025, staggerChildren: 0.05 } },
+  exit: { transition: { staggerChildren: 0.03, staggerDirection: -1 } },
+};
 const MAGGIE_PREVIEW_RECEPTIONIST = {
   name: 'Maggie',
   avatar: 'https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/avatars/maggie.png',
@@ -225,6 +235,8 @@ function CalendarMonthViewBody({ data, className = '', selectedDate: selectedDat
   const [hasAnimatedDots, setHasAnimatedDots] = useState(false);
   const [expandedAppointmentId, setExpandedAppointmentId] = useState(null);
   const [activeAppointmentActionsId, setActiveAppointmentActionsId] = useState(null);
+  const [closingAppointmentActionsId, setClosingAppointmentActionsId] = useState(null);
+  const actionMenuCloseTimerRef = useRef(null);
   const [dropInsOpen, setDropInsOpen] = useState(false);
   const dropIns = useDropIns();
   const [callingAppointment, setCallingAppointment] = useState(null);
@@ -245,6 +257,27 @@ function CalendarMonthViewBody({ data, className = '', selectedDate: selectedDat
   const calendarGridRef = useRef(null);
   const avatarGuideShownRef = useRef(false);
   const avatarGuideTimersRef = useRef([]);
+
+  const openAppointmentActions = useCallback((appointmentId) => {
+    if (actionMenuCloseTimerRef.current) window.clearTimeout(actionMenuCloseTimerRef.current);
+    actionMenuCloseTimerRef.current = null;
+    setClosingAppointmentActionsId(null);
+    setActiveAppointmentActionsId(appointmentId);
+  }, []);
+
+  const closeAppointmentActions = useCallback((appointmentId) => {
+    if (actionMenuCloseTimerRef.current) window.clearTimeout(actionMenuCloseTimerRef.current);
+    setClosingAppointmentActionsId(appointmentId);
+    actionMenuCloseTimerRef.current = window.setTimeout(() => {
+      setActiveAppointmentActionsId(current => current === appointmentId ? null : current);
+      setClosingAppointmentActionsId(current => current === appointmentId ? null : current);
+      actionMenuCloseTimerRef.current = null;
+    }, 220);
+  }, []);
+
+  useEffect(() => () => {
+    if (actionMenuCloseTimerRef.current) window.clearTimeout(actionMenuCloseTimerRef.current);
+  }, []);
 
   const markCalendarPeekSeen = useCallback(async () => {
     try {
@@ -413,14 +446,14 @@ function CalendarMonthViewBody({ data, className = '', selectedDate: selectedDat
       queueGuideTimer(() => {
         if (cancelled) return;
         setAvatarGuide((current) => (current ? { ...current, phase: 'clicked' } : current));
-        setActiveAppointmentActionsId(appointmentId);
+        openAppointmentActions(appointmentId);
 
         setActiveAppointmentPrompt(null);
       }, reduceMotion ? 80 : 1180);
 
       queueGuideTimer(() => {
         if (cancelled) return;
-        setActiveAppointmentActionsId(null);
+        closeAppointmentActions(appointmentId);
         setAvatarGuide((current) => (current ? { ...current, phase: 'leaving' } : current));
       }, reduceMotion ? 1680 : 2860);
 
@@ -435,7 +468,7 @@ function CalendarMonthViewBody({ data, className = '', selectedDate: selectedDat
       avatarGuideTimersRef.current.forEach((timer) => window.clearTimeout(timer));
       avatarGuideTimersRef.current = [];
     };
-  }, [calendarPeekSeen, hasAnimatedDots, loading, markCalendarPeekSeen, selectedDateAppointments.length]);
+  }, [calendarPeekSeen, closeAppointmentActions, hasAnimatedDots, loading, markCalendarPeekSeen, openAppointmentActions, selectedDateAppointments.length]);
 
   useEffect(() => () => {
     avatarGuideTimersRef.current.forEach((timer) => window.clearTimeout(timer));
@@ -658,18 +691,19 @@ function CalendarMonthViewBody({ data, className = '', selectedDate: selectedDat
                   : null;
                 const promptPurpose = (activePromptAction?.purpose || activePromptAction?.name || '').toLowerCase();
                 const showAppointmentActions = activeAppointmentActionsId === appointment.id;
+                const showActionLane = showAppointmentActions || Boolean(activePromptAction);
+                const closingActionLane = closingAppointmentActionsId === appointment.id;
                 const toggleAppointmentActions = () => {
                   if (!hasAppointmentActions) return;
-                  setActiveAppointmentActionsId((current) => {
-                    const next = current === appointment.id ? null : appointment.id;
-                    setActiveAppointmentPrompt(null);
-                    return next;
-                  });
+                  if (showAppointmentActions) closeAppointmentActions(appointment.id);
+                  else openAppointmentActions(appointment.id);
+                  setActiveAppointmentPrompt(null);
                 };
                 return (
                   <div key={appointment.id} className="space-y-1">
                     <AppointmentRecord
-                      actionsOpen={showAppointmentActions} actionable={hasAppointmentActions}
+                      actionsOpen={showActionLane} actionable={hasAppointmentActions}
+                      actionMotionVariants={DEMO_ACTION_LANE_VARIANTS}
                       onToggleActions={toggleAppointmentActions} prompting={!!activePromptAction}
                       onDetails={() => setExpandedAppointmentId(current => current === appointment.id ? null : appointment.id)}
                       detailsLabel={`Appointment details for ${getCustomerName(appointment)}`}
@@ -691,7 +725,7 @@ function CalendarMonthViewBody({ data, className = '', selectedDate: selectedDat
                           <span className="appointment-record-detail-receptionist inline-flex h-4 items-center truncate text-[10px] font-medium leading-none text-zinc-400">{assignedReceptionistName}</span>
                         </>}
                       </>}
-                      actions={<AnimatePresence mode="wait" initial={false}>
+                      actions={<AnimatePresence mode="wait" propagate initial={false}>
                         {activePromptAction ? <motion.div key="action-prompt" initial={{ opacity: 0, x: -14, scale: .96 }} animate={{ opacity: 1, x: 0, scale: 1 }} exit={{ opacity: 0, x: -12, scale: .97 }} transition={{ duration: .28, ease: [.22, 1, .36, 1] }} style={{ willChange: 'transform, opacity' }} className="flex min-w-0 flex-1">
                           <div className="drop-in-confirm" onClick={e => e.stopPropagation()}>
                             <span title={`${appointment._receptionistName || 'Receptionist'} will call ${getCustomerFirstName(appointment)} to ${promptPurpose}?`}>
@@ -702,8 +736,8 @@ function CalendarMonthViewBody({ data, className = '', selectedDate: selectedDat
                             </button>
                             <button type="button" disabled={callingAppointment === appointment.id} onClick={() => setActiveAppointmentPrompt(null)}>Cancel</button>
                           </div>
-                        </motion.div> : <motion.div key="action-list" initial={{ opacity: 0, x: -14, scale: .96 }} animate={{ opacity: 1, x: 0, scale: 1 }} exit={{ opacity: 0, x: -12, scale: .97 }} transition={{ duration: .28, ease: [.22, 1, .36, 1] }} style={{ willChange: 'transform, opacity' }} className="flex min-w-0 flex-1">
-                          <DropInStrip items={appointmentActions} getChipClassName={action => action.name?.trim().toLowerCase() === 'cancel' ? 'is-cancel-action' : ''} onSelect={action => {
+                        </motion.div> : <motion.div key="action-list" variants={DEMO_ACTION_LIST_VARIANTS} initial="hidden" animate={closingActionLane ? 'exit' : 'visible'} exit="exit" className="flex min-w-0 flex-1">
+                          <DropInStrip items={appointmentActions} homepageReveal closing={closingActionLane} getChipClassName={action => action.name?.trim().toLowerCase() === 'cancel' ? 'is-cancel-action' : ''} onSelect={action => {
                             setActiveAppointmentPrompt({ appointmentId: appointment.id, action, requestId: crypto.randomUUID() });
                           }} />
                         </motion.div>}

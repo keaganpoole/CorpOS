@@ -4,10 +4,10 @@ import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import './dropIns.css';
 
 // The exact same measured, paginated controls power the Calendar and live guide.
-export default function DropInStrip({ items, onSelect, onDelete, highlightedId, emptyLabel = 'No active drop-ins', getTitle = item => item.name, getLabel = item => item.name, getChipClassName = () => '', reelKey, reelDirection = 1, itemSpacing = 0, chipGap = 7, measureKey = '' }) {
+export default function DropInStrip({ items, onSelect, onDelete, highlightedId, emptyLabel = 'No active drop-ins', getTitle = item => item.name, getLabel = item => item.name, getChipClassName = () => '', reelKey, reelDirection = 1, itemSpacing = 0, chipGap = 7, measureKey = '', homepageReveal = false, closing = false }) {
   const root = useRef(null);
   const measure = useRef(null);
-  const [pages, setPages] = useState([[]]);
+  const [pages, setPages] = useState(() => [items]);
   const [page, setPage] = useState(0);
   const reduced = useReducedMotion();
   const reels = reelKey !== undefined;
@@ -23,7 +23,10 @@ export default function DropInStrip({ items, onSelect, onDelete, highlightedId, 
         group.push(item); used += size + (group.length > 1 ? chipGap : 0);
       });
       if (group.length) next.push(group);
-      setPages(next.length ? next : [[]]);
+      const measuredPages = next.length ? next : [[]];
+      setPages(current => current.length === measuredPages.length && current.every((group, index) =>
+        group.length === measuredPages[index].length && group.every((item, itemIndex) => item.id === measuredPages[index][itemIndex].id)
+      ) ? current : measuredPages);
       setPage(current => Math.min(current, Math.max(0, next.length - 1)));
     };
     layout();
@@ -51,7 +54,10 @@ export default function DropInStrip({ items, onSelect, onDelete, highlightedId, 
     <div className="drop-in-strip-window">
       <AnimatePresence mode="wait" initial={false}>
         <motion.div key={reels ? `${reelKey}:${page}` : page} className="drop-in-strip-page" initial={{ opacity: 0, x: reels || reduced ? 0 : 12, y: reels && !reduced ? reelDirection * 12 : 0 }} animate={{ opacity: 1, x: 0, y: 0 }} exit={{ opacity: 0, x: reels || reduced ? 0 : -12, y: reels && !reduced ? reelDirection * -10 : 0 }} transition={{ duration: reduced ? .01 : reels ? .32 : .15, ease: [.22, 1, .36, 1] }}>
-          {(pages[page] || []).map(saved => items.find(item => item.id === saved.id)).filter(Boolean).map((x, index) => <motion.span className={`drop-in-chip-wrap ${x.isBack ? 'is-back' : ''}`} key={x.id} initial={reels && !reduced ? { opacity: 0, y: reelDirection * 5 } : false} animate={{ opacity: 1, y: 0 }} transition={{ duration: reduced ? .01 : .24, delay: reels && !reduced ? index * .035 : 0 }}>
+          {(pages[page] || []).map(saved => items.find(item => item.id === saved.id)).filter(Boolean).map((x, index, visibleItems) => <motion.span className={`drop-in-chip-wrap ${x.isBack ? 'is-back' : ''}`} key={x.id}
+            initial={homepageReveal ? { opacity: 0, x: -6, y: 1 } : reels && !reduced ? { opacity: 0, y: reelDirection * 5 } : false}
+            animate={homepageReveal ? closing ? { opacity: 0, x: -4, y: 0 } : { opacity: 1, x: 0, y: 0 } : { opacity: 1, y: 0 }}
+            transition={homepageReveal ? { duration: reduced ? .01 : closing ? .16 : .22, ease: closing ? [.4, 0, 1, 1] : [.22, 1, .36, 1], delay: reduced ? 0 : closing ? (visibleItems.length - 1 - index) * .03 : .025 + index * .05 } : { duration: reduced ? .01 : .24, delay: reels && !reduced ? index * .035 : 0 }}>
             <button type="button" title={getTitle(x)} aria-label={x.name || 'Name your drop-in'} className={`drop-in-chip ${highlightedId === x.id ? 'is-highlighted' : ''} ${getChipClassName(x)}`} onPointerDown={event => activate(event, x)} onClick={event => {
             // Pointer presses have already selected the action. Keep the native
             // click path for keyboard users.
