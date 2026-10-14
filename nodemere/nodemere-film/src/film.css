@@ -1,0 +1,25 @@
+/* Product styles are source snapshots. Only the video stage and deterministic
+   clock reset live here; selectors are scoped away from Remotion Studio. */
+.film-root {
+  font-family: var(--font-family-sans);
+  color: var(--color-white);
+}
+.film-root *,
+.film-root *::before,
+.film-root *::after {
+  box-sizing: border-box;
+  animation: none !important;
+  transition: none !important;
+}
+.film-root button {
+  font-family: inherit;
+  cursor: default;
+}
+.film-detail {
+  font-family: Inter, var(--font-family-sans), sans-serif;
+  --ns-muted: #96969c;
+  --ns-hairline: rgba(255, 255, 255, 0.1);
+}
+.film-detail .ns-primary {
+  border: 0;
+}

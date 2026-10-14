@@ -1,0 +1,2309 @@
+This is the complete creative direction and production brief for Codex, built from everything we've discussed. It includes the agreed feature sequences, cinematic treatment, motion design, visual identity, technical implementation, and the rules protecting Nodemere's existing design.
+
+It's intentionally detailed. The most important instruction is that Codex receives the entire vision upfront, but builds and perfects one section at a time.
+
+# NODEMERE
+
+# Cinematic Product Introduction
+
+## Complete Creative Direction & Production Brief for Codex + Remotion
+
+You are acting as the **creative director, senior motion designer, cinematographer, and lead Remotion developer** for a premium cinematic product introduction video for Nodemere.
+
+This is not a traditional advertisement, tutorial, screen recording, or explainer video.
+
+This is a sophisticated, visually striking introduction to Nodemere and its features, drawing inspiration from Apple's highest-quality product films, especially its kinetic typography, meticulous microanimations, beautifully choreographed interface presentations, cinematic camera movements, and precision in visual storytelling.
+
+The finished video must feel intentionally directed, exceptionally polished, and visually memorable.
+
+**Your objective is not simply to animate Nodemere's interface. Your objective is to present Nodemere as though a world-class motion design studio were revealing an extraordinary new product.**
+
+You have access to the Nodemere codebase. Study it extensively before building anything.
+
+The instructions below constitute the complete creative vision for the project.
+
+---
+
+# 1. THE MOST IMPORTANT RULE
+
+## Direct the product. Do not redesign the product.
+
+Think of Nodemere as an exceptionally beautiful, highly detailed luxury sports car that has already been meticulously designed and perfected.
+
+Your job is to create an extraordinary cinematic presentation of that car.
+
+You can change the camera angle, create dramatic close-ups, make the car float in an environment, present it from different perspectives, isolate details, move around it, and choreograph its appearance.
+
+**You cannot redesign the car itself.**
+
+This same principle applies to Nodemere.
+
+Nodemere already has sophisticated components, typography, colors, layouts, hover states, motion, microinteractions, animations, transitions, and other visual details.
+
+Many of these took substantial effort to develop and perfect.
+
+They must be preserved.
+
+### You are allowed to:
+
+- Move, rotate, tilt, scale, isolate, and position existing UI components within cinematic compositions.
+- Use three-dimensional perspective to make elements appear to float independently in space.
+- Create sophisticated camera movements around existing elements.
+- Magnify interfaces dramatically to emphasize important details.
+- Animate the appearance and disappearance of entire elements.
+- Reveal sections through cascading, staggered, masked, or spatial transitions when appropriate.
+- Temporarily adapt the outer dimensions of a component for video presentation when necessary.
+- Create new hero typography, icon animations, backgrounds, transitions, and visualizations specifically for the video.
+- Simulate product interactions using appropriate demonstration data.
+- Arrange components on a cinematic stage without reproducing all the surrounding dashboard chrome.
+- Use matching cuts and carefully designed transitions to connect different product features.
+
+### You must not:
+
+- Redesign existing UI components.
+- Change existing fonts, colors, borders, radii, shadows, gradients, internal spacing, or general layout.
+- Replace sophisticated existing animations with approximations.
+- Invent new versions of existing modals, panels, menus, or interactions.
+- Recreate complex visual components from memory when the real implementation exists.
+- Alter the underlying appearance of receptionist portraits or videos.
+- Introduce generic styling that makes Nodemere appear different from the real product.
+- Simplify complex interfaces merely because reproducing them accurately is inconvenient.
+
+**The outside can be cinematic. The inside must remain Nodemere.**
+
+If the original component has a particular flicker, ripple, cascade, gradient sweep, or transition, find and reuse the original implementation.
+
+Do not decide how you would animate it if that animation already exists.
+
+Study how Nodemere actually animates it.
+
+This rule is especially important for the Scenarios Builder, People CRM, Nest, Audition portraits, receptionist collection, calendar, and Drop-ins Builder.
+
+---
+
+# 2. CREATIVE VISION
+
+## The desired feeling
+
+The video should be:
+
+- Bold and dramatic.
+- Sophisticated and contemporary.
+- Extremely visually polished.
+- Cinematic and dimensional.
+- Beautifully restrained where restraint makes sense.
+- Energetic and attention-grabbing where impact is appropriate.
+- Deliberate and highly creative in its animation.
+- Consistent with Nodemere's visual identity.
+- Clearly understandable, even without narration.
+
+The goal is to produce something that feels considerably more refined than a typical SaaS launch video.
+
+We want the precision of Apple's product cinematography, translated into a software-first experience.
+
+### The Apple inspiration
+
+The reference is not Apple's hardware.
+
+Do not introduce mock iPhones, fabricated devices, or phone frames simply because Apple uses them.
+
+The inspiration is Apple's **cinematic design language**:
+
+- Beautifully controlled 3D perspective.
+- Elegant product isolation.
+- Dramatic scale transitions.
+- Close-ups of tiny details.
+- Sophisticated transformations between compositions.
+- Large, exquisitely animated typography.
+- Detailed, purpose-built icon animations.
+- Smooth, physical-feeling camera movement.
+- Excellent timing and easing.
+- Strategic visual contrast.
+- Thoughtful negative space.
+- Precise timing between quiet and impactful moments.
+
+The attached Apple reference recordings and charging-icon screenshot, if available to you, are inspiration for movement quality and craftsmanship, not instructions to recreate the content.
+
+The charging icon is particularly important as an example of restrained sophistication. Its internal fill animation makes the icon itself interesting without surrounding it with excessive effects.
+
+## Avoid generic AI-generated motion design
+
+We absolutely do not want the visual clichés commonly produced by AI coding agents.
+
+Avoid:
+
+- Excessive glow.
+- Random particle explosions.
+- Unnecessary orbiting shapes.
+- Constantly pulsing UI.
+- Generic bounce-in animations.
+- Cheap neon effects.
+- Overdone glassmorphism.
+- Unmotivated spinning elements.
+- Excessive floating decorations.
+- Repetitive scale-and-fade transitions.
+- Motion simply for the sake of motion.
+- Tacky or outdated visual effects.
+
+This does **not** mean everything should be subtle.
+
+We want ambitious animation that can command attention.
+
+But sophistication should come from composition, internal detail, choreography, timing, and precision, not from piling on decorative effects.
+
+**Be visually ambitious, not visually noisy.**
+
+---
+
+# 3. NODEMERE'S VISUAL IDENTITY
+
+Nodemere is fundamentally a dark-mode product.
+
+Its primary design language consists of:
+
+1. Near-black or black backgrounds.
+2. Soft white or light-gray typography.
+3. A restrained pink-to-purple brand gradient.
+
+These are descriptive references, not literal color values.
+
+## Find the real colors
+
+The Nodemere brand gradients and colors are defined in `index.css`.
+
+Inspect the existing project and identify the actual brand variables and styles.
+
+Use the authentic values.
+
+Do not invent replacement colors.
+
+### Video backgrounds
+
+Use predominantly black or nearly black backgrounds.
+
+The video should resemble a sophisticated dark cinematic stage.
+
+Some subtle gradients or lighting variations are acceptable when they enhance the composition, but do not overpower the product.
+
+Do not alternate to white backgrounds without a compelling creative reason.
+
+### Hero typography
+
+Large, bold, clean, highly legible.
+
+The majority of the text should be white or the project's existing off-white typography color.
+
+The Nodemere pink-purple gradient should be used sparingly, for specific emphasized elements.
+
+### Accent color philosophy
+
+One excellent opportunity for brand color is the animated icon incorporated into hero statements.
+
+The icon can feature the pink-purple gradient while the surrounding typography remains largely white.
+
+This creates a memorable visual identity without excessive color.
+
+Existing UI elements must retain their original colors, even if they differ from this simplified hero-statement palette.
+
+---
+
+# 4. HERO STATEMENTS
+
+Throughout the video, features should be introduced using large, isolated typographic moments.
+
+We will refer to these as **Hero Statements**.
+
+A Hero Statement is a cinematic title composition, often appearing against a dark background, that briefly tells viewers what they are about to see.
+
+For most feature sections, the Hero Statement should appear **before** the feature demonstration.
+
+We specifically chose this order because it gives the audience context before presenting a sophisticated interface.
+
+This prevents viewers from having to guess what they are looking at.
+
+However, the opening cold open is a deliberate exception.
+
+## Hero statement design
+
+Imagine:
+
+A black background.
+
+Beautifully arranged, enormous white typography.
+
+One intricately animated icon integrated directly into the statement.
+
+Perhaps a single word receives a subtle emphasis.
+
+No clutter.
+
+No unnecessary decoration.
+
+The composition should be instantly readable on desktop, tablet, and mobile.
+
+### Important: the icons are miniature works of motion design
+
+These icons are not basic SVGs that simply fade or bounce into view.
+
+Each icon should receive its own carefully choreographed reveal sequence.
+
+The icon's animation may contain several coordinated stages.
+
+For example, an icon might:
+
+1. Reveal its silhouette through an internal mask.
+2. Animate its internal geometry.
+3. Fill with a controlled brand gradient.
+4. Complete a subtle mechanical or physical transformation.
+5. Settle into its finished resting position.
+
+These stages should feel like one cohesive movement, not several unrelated tricks.
+
+Each icon should have a distinct animation tailored to its meaning.
+
+Examples:
+
+**Intercom / Phone:** A telephone symbol could assemble its internal contours, undergo a beautifully timed localized vibration, and settle.
+
+**Languages:** A language-related icon could transition between carefully crafted character forms or speech glyphs through internal shape transformations.
+
+**Payments:** A payment symbol could reveal its shape and smoothly transition into an approved or completed state.
+
+**Security:** A lock or cryptographic structure could assemble through intricately synchronized internal components, ending in a strong, perfectly aligned final form.
+
+The icon animation should be predominantly **self-contained**.
+
+Its sophistication should happen inside its shape and immediate boundaries.
+
+Do not surround it with excessive particle fields, rings, glowing debris, or unrelated effects.
+
+A small amount of light or glow is acceptable if visually justified.
+
+### Animation behavior
+
+Each hero icon should have one carefully developed reveal.
+
+Afterward, it should settle into a calm resting state.
+
+Do not leave every icon continuously animating.
+
+### Text wording
+
+Favor short, direct, meaningful product statements.
+
+The viewer should understand what the feature does.
+
+Avoid vague, abstract copy that sounds sophisticated but communicates nothing.
+
+For example:
+
+Prefer **"Create your own receptionist"** over **"One of a kind."**
+
+Use the approved wording specified later in this document wherever available.
+
+For unspecified statements, propose concise options and use provisional text until approved.
+
+---
+
+# 5. CINEMATOGRAPHY
+
+This is one of the defining elements of the entire video.
+
+Nodemere contains many dense interfaces.
+
+The Nest is very small.
+
+CRMs have numerous columns.
+
+The calendar contains relatively small appointment records.
+
+Scenario-building interfaces contain substantial detail.
+
+If these are displayed as ordinary screenshots, they will lose much of their appeal.
+
+**Cinematic magnification is essential.**
+
+## Extreme close-ups
+
+Use dramatic push-ins and controlled zooms that bring individual components, labels, buttons, records, or animations into sharp focus.
+
+For example:
+
+We begin with a large floating CRM table.
+
+The camera tilts slightly.
+
+Then it rapidly pushes toward a particular column.
+
+The column becomes enormous in the frame.
+
+The camera slowly tracks across its illuminated Zone.
+
+A user interaction occurs.
+
+The camera glides with the interaction.
+
+Then we pull back, shift perspective, and dive toward another part of the CRM.
+
+These movements should resemble physical cinematography.
+
+Not ordinary browser zooming.
+
+## Perspective
+
+Use sophisticated 3D transformations when they add value.
+
+Examples:
+
+- Slightly angled interface panels.
+- Gentle rotational movement.
+- Perspective changes during transitions.
+- Screens floating against the dark stage.
+- Moving between foreground and background elements.
+- Camera paths that move across or toward features.
+
+Avoid excessive perspective distortion that makes UI unreadable.
+
+## Every feature needs its own choreography
+
+Do not give every feature exactly the same sequence of:
+
+Fade in → zoom in → tilt → zoom out → fade out.
+
+The general cinematic language should be consistent, but each scene must have its own personality.
+
+Some shots should move quickly.
+
+Some should glide slowly.
+
+Some should remain nearly motionless while an existing Nodemere interaction performs.
+
+Some should pull dramatically backward.
+
+Some should reveal components through coordinated transitions.
+
+The camera should respond to the feature.
+
+**Use motion to direct attention.**
+
+---
+
+# 6. TECHNICAL PRODUCTION REQUIREMENTS
+
+## Production technology
+
+Use Remotion with React and TypeScript, integrated with the existing Nodemere project as appropriate.
+
+First inspect the repository, installed packages, available Remotion-related skills or plugins, existing components, styling, assets, and application architecture.
+
+Use appropriate libraries where they genuinely improve the result.
+
+Prefer a well-organized Remotion project with reusable primitives for:
+
+- Camera animation.
+- Perspective transformations.
+- Scene transitions.
+- Hero typography.
+- Icon animation.
+- Cinematic staging.
+- UI presentation.
+- Deterministic demonstration data.
+- Timeline management.
+
+Use frame-based deterministic timing.
+
+All animations must be reproducible when rendering arbitrary frames.
+
+Avoid relying on unpredictable real-time state, unmanaged timers, or live service calls during the final render.
+
+## Output
+
+Primary master:
+
+**3840 × 2160, 16:9, 60 fps.**
+
+Produce a high-quality 4K master suitable for YouTube and website embedding.
+
+If rendering resources make full 4K development inefficient, use lower-resolution previews during iteration and render the approved sequence at final resolution.
+
+Maintain sharp text, smooth motion, clean gradients, and excellent temporal consistency.
+
+## No audio
+
+**This production is completely silent.**
+
+Do not add:
+
+- Music.
+- Narration.
+- Sound effects.
+- UI clicks.
+- Telephone sounds.
+- Generated voices.
+- Audio snippets.
+
+Audio will be handled separately afterward.
+
+This includes the Intercom, Audition, language demonstrations, and Handoff sequence.
+
+Visual waveform animations and simulated transcripts are still allowed and encouraged.
+
+Do not rely on sound to make a scene understandable.
+
+## Absolutely no pixelation or blur from enlargement
+
+This requirement is non-negotiable.
+
+The video will contain dramatic close-ups.
+
+Do not simply take low-resolution screenshots and magnify them.
+
+Use the actual UI rendering wherever practical.
+
+Render DOM, text, SVGs, and vector-based elements at sufficient source resolution so that they remain sharp at the largest intended on-screen scale.
+
+Where a component must be enlarged, consider rendering it in a sufficiently large isolated composition rather than magnifying a small raster capture.
+
+Account for camera scaling, perspective, and the component's effective pixel density.
+
+For high-resolution assets, use original source files at adequate resolution.
+
+For receptionist videos or raster images, inspect their actual resolution before using extreme close-ups.
+
+Do not assume that 4K output automatically makes low-resolution source footage sharp.
+
+If an asset cannot withstand the intended magnification, obtain a better source, reduce the magnification, or adjust the framing without modifying the component's design.
+
+Do not apply aggressive sharpening as a substitute for real detail.
+
+At close-up scale, inspect for:
+
+- Pixelation.
+- Blurry text.
+- Raster artifacts.
+- Aliasing.
+- Distorted borders.
+- Soft icons.
+- Unreadable labels.
+- Damaged image quality.
+
+## Preserve Nodemere's real UI
+
+Whenever possible, import and reuse the actual React components and existing styles.
+
+Do not build visual imitations of components that already exist.
+
+If components depend on authentication, Supabase, ElevenLabs, telephony events, or application state, build isolated demonstration adapters that provide deterministic data while preserving the existing visual implementation.
+
+You may need to adapt the environment in which a component renders, but do not compromise its design.
+
+Keep production application behavior separate from video-only demonstration behavior.
+
+Do not mutate real customer data, trigger actual phone calls, send actual payments, or contact live customers while generating the video.
+
+Use fictional demonstration records.
+
+Never display sensitive production data.
+
+## Quality control
+
+Use Remotion previews, rendered frame captures, and browser-based inspection to evaluate the result.
+
+Inspect the scene at multiple points rather than assuming the code produces a good animation.
+
+Pay attention to:
+
+- Timing.
+- Easing.
+- Camera composition.
+- Visual hierarchy.
+- Text readability.
+- Sharpness.
+- Transition continuity.
+- Perspective distortion.
+- Existing component fidelity.
+
+The video should look excellent in motion, not merely in isolated screenshots.
+
+---
+
+# 7. PROPOSED FULL VIDEO ORDER
+
+This is the current preferred order.
+
+The overall vision should be established upfront, but exact durations and transitions can be refined during development.
+
+1. **Nest cold open** — Simulated Intercom conversation.
+2. **Receptionist Collection** — Dramatic cinematic collection reveal.
+3. **Audition** — Create a receptionist from scratch.
+4. **Calendar** — Beautiful appointment calendar and interactive appointment records.
+5. **Drop-ins Builder** — Create customized receptionist actions.
+6. **Conversation Network** — Multiple conversations, inbound/outbound calling, payments, languages, appointments, and follow-ups.
+7. **Live Handoff** — Visualize an AI receptionist transferring a conversation to human staff.
+8. **People CRM** — Custom columns, Zones, and animated Color Bars.
+9. **Scenarios Builder** — Triggers, actions, variables, branching, and scenario execution.
+10. **The Nest, full feature showcase** — Notifications and expanded Intercom demonstrations.
+11. **World-Class Encryption** — Dramatic security visualization.
+12. **Final Nodemere reveal** — Closing brand statement.
+
+The first three items are intended to flow together as one particularly strong opening act.
+
+The calendar and Drop-ins Builder are closely related but should receive distinct spotlight moments.
+
+The conversation network should come **after** the calendar and Drop-ins Builder.
+
+Encryption should appear near the end, immediately before the final brand close.
+
+The later Nest section is a more complete showcase. It should not unnecessarily repeat the opening teaser.
+
+Treat this as the approved working order, not a reason to ignore continuity improvements that can be reviewed during production.
+
+---
+
+# 8. SCENE ONE: THE NEST COLD OPEN
+
+## Importance
+
+The beginning of the video is exceptionally important.
+
+The first five seconds must receive disproportionate creative attention.
+
+A weak opening will undermine the entire production.
+
+We do not necessarily want to begin with something loud or overwhelming.
+
+The desired progression is:
+
+**Subtle introduction → intriguing human moment → extraordinary collection reveal.**
+
+## Opening composition
+
+Begin against Nodemere's dark cinematic environment.
+
+Introduce the actual Nest component.
+
+The Nest is normally a small, narrow, Dynamic Island-like element positioned in Nodemere's top toolbar.
+
+Because of its compact size, it must be presented substantially larger in the video.
+
+Do not show the full dashboard at a distance and expect the Nest to be visible.
+
+Instead, isolate and magnify the Nest using cinematic staging and camera movement.
+
+The actual Nest component must retain its internal design, styling, and animation.
+
+A video-specific outer container adaptation is acceptable where needed.
+
+For example, the compact Nest may smoothly expand downward to show its larger conversation state.
+
+## Simulated Intercom call
+
+Use an actual receptionist from the existing Nodemere receptionist catalog.
+
+Simulate the Intercom selecting that receptionist and initiating a call.
+
+The visual sequence should include:
+
+- The receptionist's real avatar or portrait.
+- The original Intercom call-state visuals.
+- The existing call animation.
+- The receptionist banner.
+- The live waveform.
+- The live transcript.
+
+The call is simulated for the video.
+
+Do not actually place a telephone call or require live ElevenLabs execution.
+
+## Conversation
+
+Use a very short, naturally conversational exchange.
+
+The receptionist's punchline should be something similar to:
+
+**"Oh, not much. Just chillin' at the front desk."**
+
+The line should feel casual, slightly unexpected, and human.
+
+Use an appropriate preceding caller prompt if needed to make the reply logical, but keep the interaction brief.
+
+Because this video is silent, the live transcript must communicate the exchange visually.
+
+The exact transcription wording can be refined while constructing the scene.
+
+## The big transition
+
+This is the first major cinematic moment in the production.
+
+When the receptionist's response appears, bring the camera dramatically closer.
+
+The text containing **"chillin' at the front desk"** should become a focal point.
+
+Push in extremely close until the conversation occupies much of the frame.
+
+Then use that movement to launch into an extraordinary transition into the Receptionist Collection.
+
+The transition should feel powerful, beautifully timed, and spatial.
+
+Do not use an ordinary fade or cheap digital explosion.
+
+The idea is that the camera propels us out of the intimate Intercom conversation and into the much larger world of Nodemere's receptionists.
+
+The collection reveal should be the true opening spectacle.
+
+Spend significant effort perfecting the choreography between these two moments.
+
+---
+
+# 9. SCENE TWO: RECEPTIONIST COLLECTION
+
+## The concept
+
+Nodemere contains a Receptionist Collection.
+
+This is a navigable, brick-like canvas of receptionist thumbnails.
+
+Users can pan around the canvas, explore receptionists, and select individual receptionists to view more information.
+
+This scene should make the collection feel enormous, beautiful, and full of personality.
+
+## Cinematic progression
+
+Start relatively close to a small cluster of receptionist thumbnails.
+
+The perspective should make these portraits feel impressive and substantial.
+
+Then rapidly pull the camera backward.
+
+As the camera retreats, reveal an increasingly large collection of receptionists.
+
+Use a snappy, well-eased camera movement.
+
+The feeling should be a sudden revelation of scale.
+
+The viewer should think:
+
+*There are so many different receptionists to choose from.*
+
+The collection is the primary spectacle.
+
+## Hero statement
+
+A large title should land at approximately the moment the full collection reveal settles.
+
+We previously decided that synchronized timing between the pullback and title would be more effective than introducing all the text too early.
+
+The final collection headline can be refined, but it should directly communicate choosing or discovering receptionists.
+
+Avoid vague statements.
+
+## Navigating the collection
+
+After the initial reveal, show some cinematic movement across the collection.
+
+For example:
+
+- A controlled lateral glide.
+- A subtle perspective shift.
+- A camera push toward an interesting receptionist.
+- A change in depth or framing.
+
+Do not simply display the collection as one static screenshot.
+
+## Selecting a receptionist
+
+Focus on one real receptionist card.
+
+Simulate selecting that receptionist.
+
+The actual Nodemere receptionist modal should open.
+
+This modal contains the receptionist video, appearance, personality information, and related details.
+
+**Preserve its existing typography, design, colors, spacing, and composition.**
+
+You may animate the modal's overall entrance or create a video-specific cascading reveal if doing so does not alter the underlying design.
+
+Allow viewers to appreciate the receptionist's appearance and details.
+
+Use existing video assets when available.
+
+---
+
+# 10. SCENE THREE: AUDITION
+
+## Narrative transition
+
+Audition should be integrated naturally with the Receptionist Collection.
+
+The collection demonstrates choosing an existing receptionist.
+
+Audition demonstrates creating one yourself.
+
+After showcasing the collection, transition to another hero statement.
+
+Suggested text:
+
+**"Or create your own."**
+
+Alternatively, use the more explicit:
+
+**"Create your own receptionist."**
+
+Clarity takes priority.
+
+## Audition overview
+
+Audition is Nodemere's custom receptionist creation studio.
+
+It is a multi-step flow in which the user chooses characteristics such as:
+
+- Name.
+- Gender.
+- Available appearance or background options.
+- Personality.
+- Tone.
+- Prompt customization.
+- Voice.
+- Receptionist image.
+
+The studio eventually generates three voice options through ElevenLabs, allows users to select a voice, and creates the receptionist.
+
+The completed receptionist appears in the Receptionist Collection.
+
+## Important visual element: dynamic portraits
+
+Audition features large, detailed portraits that change according to user selections.
+
+This is among its most important visual elements.
+
+Study the exact image implementation.
+
+The portraits must remain:
+
+- In their original positions.
+- At their intended relative dimensions.
+- Consistently aligned.
+- Visually faithful to the source assets.
+- Smoothly transitioned using the original implementation.
+
+The current portrait system was deliberately designed so that changing selections does not cause the portrait to jump or reposition.
+
+Preserve that behavior.
+
+**Do not recreate the faces, reinterpret them, or invent new face-blending transitions.**
+
+Use the existing assets and source behavior.
+
+## Camera treatment
+
+Audition is more like a beautifully designed form or studio.
+
+Do not force the same extreme zoom treatment used in the CRM.
+
+Instead, let the interface's own visual storytelling carry the sequence.
+
+Move between steps with elegant continuity.
+
+Use restrained perspective and transitions where appropriate.
+
+Spend extra attention on the portrait changes.
+
+They should feel like an impressive transformation taking place within an anchored composition.
+
+## Voice selection
+
+When the three generated voice options appear, show their existing play controls.
+
+Simulate selecting and previewing multiple voices.
+
+Their existing animated waveforms should play.
+
+There is no actual sound.
+
+The viewer should understand the interaction through the interface's visual response.
+
+Avoid reinventing the waveform.
+
+## Final creation moment
+
+Show the image-selection stage.
+
+Then demonstrate finalizing the receptionist.
+
+The newly created receptionist should transition into the existing Receptionist Collection.
+
+This creates a satisfying narrative loop.
+
+The viewer has moved from browsing receptionists to creating one of their own.
+
+---
+
+# 11. SCENE FOUR: THE CALENDAR
+
+## Primary focus
+
+Nodemere includes both a booking CRM table and a calendar.
+
+For this scene, prioritize the **calendar** rather than giving equal attention to the appointment CRM.
+
+The calendar is visually beautiful and provides a stronger centerpiece for this video.
+
+## Hero statement
+
+Use a direct statement about appointments or booking.
+
+Example:
+
+**"Appointments, handled."**
+
+This is provisional, not a finalized headline.
+
+Use the established hero typography and icon-animation language.
+
+## Calendar presentation
+
+Show the real calendar in an isolated, floating cinematic composition.
+
+Allow the audience to appreciate the design.
+
+Use a beautiful establishing angle before moving closer.
+
+The calendar uses small color-coded indicators to represent appointments and their statuses, such as:
+
+- Pending.
+- Confirmed.
+- Completed.
+- Cancelled.
+- Missed.
+
+Preserve the actual status colors and implementation.
+
+Do not invent substitute indicators.
+
+## Appointment records
+
+When a user selects a date, the calendar reveals its appointment records.
+
+These records are a major focus.
+
+They are relatively small in the real application, so use aggressive cinematic magnification to make them prominent.
+
+Do not remove them from their calendar context unnecessarily.
+
+Instead, render the calendar with enough source detail and move the camera toward the appointment record.
+
+The viewer should see the design clearly.
+
+## Drop-in action reveal
+
+Each appointment record can contain a receptionist avatar that reveals Drop-in actions.
+
+Simulate clicking the receptionist avatar.
+
+The existing action buttons should cascade horizontally.
+
+Preserve that exact animation.
+
+Example Drop-in actions may include rescheduling, thank-you calls, or other actions appropriate to the appointment's status.
+
+Select a visually effective status and action from the real implementation.
+
+## Inline confirmation
+
+When a Drop-in action is selected, an inline confirmation prompt appears.
+
+This is not a separate modal.
+
+Show this existing interaction naturally.
+
+The camera should stay close enough for the viewer to understand the action.
+
+## Money shot
+
+The key visual moment is the beautifully magnified appointment record, with its receptionist avatar and horizontally cascading Drop-in buttons.
+
+Let this interaction shine.
+
+Do not rush it.
+
+---
+
+# 12. SCENE FIVE: DROP-INS BUILDER
+
+This feature deserves its own dedicated sequence, even though it is part of the broader calendar experience.
+
+## Transition
+
+After showing Drop-ins working inside an appointment, move toward the calendar's Drop-ins button.
+
+Simulate selecting it.
+
+The existing Drop-ins Builder modal appears.
+
+The builder is a sophisticated configuration studio that allows users to create and assign actions to appointment statuses.
+
+## Hero statement
+
+Potential direction:
+
+**"Make it yours."**
+
+A more explicit line about customized appointment actions may be preferable if clarity requires it.
+
+Use a carefully crafted animated icon.
+
+## Demonstration
+
+Show the creation of a Google review Drop-in.
+
+For example:
+
+A business wants completed appointments to offer an action for requesting a Google review.
+
+Demonstrate:
+
+1. Opening the existing Drop-ins Builder.
+2. Configuring a Google review-related action.
+3. Associating the action with completed appointments.
+4. Finalizing the configuration.
+5. Returning to a completed appointment.
+6. Revealing the newly available Drop-in action.
+
+Use the actual controls and interaction flow found in the codebase.
+
+Do not invent a new builder UI.
+
+If the precise workflow differs, follow the real product.
+
+## Cinematography
+
+The builder modal can be shown independently from the full calendar interface.
+
+Use a subtle 3D presentation and selective close-ups on meaningful parts of the configuration process.
+
+Avoid lingering on every field.
+
+Present the experience as straightforward and powerful.
+
+The final payoff is showing the new action available inside an appointment.
+
+---
+
+# 13. SCENE SIX: THE CONVERSATION NETWORK
+
+## This is an original motion-graphics sequence
+
+Unlike the CRM or Scenarios Builder, this sequence does not need to recreate an existing product screen.
+
+It is a custom visualization of Nodemere's AI receptionist capabilities.
+
+It should therefore be one of the more creatively ambitious parts of the video.
+
+## Central concept
+
+Imagine a beautiful, living network of conversations.
+
+At its center is an actual Nodemere receptionist.
+
+Her video or portrait is contained within a circular mask.
+
+She is the central point of the network.
+
+From this receptionist, elegantly designed branches extend outward.
+
+At the ends of these branches are small circular customer avatars.
+
+Each customer represents an individual conversation.
+
+The overall structure is inspired by a tree, where the receptionist acts as the trunk or base and the customers act as leaves.
+
+However, this should not look like a literal cartoon tree.
+
+It should resemble a meticulously designed, abstract, intelligent conversation network.
+
+## Opening movement
+
+Start very close to the receptionist's face.
+
+The camera pulls back.
+
+A branch appears, connecting the receptionist to a customer.
+
+Another branch appears.
+
+Then another.
+
+As the number of conversations increases, the camera continues retreating to accommodate the growing structure.
+
+The movement should feel spatially intentional.
+
+Additional branches should emerge from the central structure, not unrealistically grow from customer avatars.
+
+The network becomes increasingly expansive.
+
+The result should be visually impressive, highly organized, and easy to understand.
+
+## Feature one: multiple conversations
+
+Approved hero text:
+
+**"One Receptionist. Multiple Conversations in Parallel."**
+
+This can be divided across lines for visual composition.
+
+The network should establish the receptionist simultaneously serving multiple customers.
+
+Do not claim unlimited conversations.
+
+There are actual system limits, and we do not want inaccurate messaging.
+
+## Inbound and outbound calls
+
+Some customer connections represent inbound calls.
+
+Others represent outbound calls.
+
+Use small, elegant directional indicators.
+
+For example:
+
+An arrow pointing toward the receptionist represents inbound.
+
+An arrow pointing away represents outbound.
+
+Make this visual distinction easy to understand.
+
+At an appropriate point, reveal:
+
+**"Inbound & Outbound Calls."**
+
+The indicators should integrate naturally into the network design.
+
+Avoid clutter.
+
+## Feature two: payments
+
+Approved hero text:
+
+**"Take Payments Right on the Phone."**
+
+Keep the conversation network visible.
+
+Introduce small, tasteful payment indicators next to selected customer avatars.
+
+These indicators should be beautifully designed and consistent with the rest of the sequence.
+
+Some can transition into a successful payment state.
+
+Avoid generic bouncing money symbols or cartoon coin animations.
+
+The effect should visually communicate that the receptionist can assist with payments during calls.
+
+Do not imply payment capabilities beyond those supported by Nodemere's actual implementation.
+
+## Feature three: languages
+
+Approved hero text:
+
+**"Auto-Detect and Speak 75+ Languages."**
+
+This is intended to represent the receptionist's ability to recognize language changes and respond in another supported language during a conversation.
+
+Verify the current supported language count and technical behavior against the actual Nodemere/ElevenLabs configuration before finalizing this claim.
+
+Transition the customer indicators into language-related visuals.
+
+Possible visual methods:
+
+- Small language indicators near different customers.
+- Country flags where appropriate.
+- Carefully chosen language glyphs.
+- A subtle localized transformation of text.
+
+Be mindful that languages do not always correspond directly to countries.
+
+The feature should feel multilingual and adaptive.
+
+No audio.
+
+## Feature four: appointment booking
+
+Suggested text:
+
+**"Book Appointments Automatically."**
+
+Alternatively:
+
+**"Turn Calls Into Appointments."**
+
+These are provisional.
+
+Use small calendar or confirmed-appointment indicators near relevant conversation nodes.
+
+Let the audience understand that appointments are being created while conversations are happening.
+
+## Feature five: automated follow-ups
+
+Suggested text:
+
+**"Follow Up Automatically."**
+
+Use the same network.
+
+Show selected conversations transitioning into a follow-up state.
+
+This could involve a carefully animated outgoing connection, subtle status change, or another purpose-built visualization.
+
+The motion should imply the receptionist reaching back out when appropriate.
+
+Avoid representing unsupported automatic behavior.
+
+## Continuity
+
+This entire segment should feel like one evolving visualization.
+
+Do not repeatedly rebuild or reset the tree between features.
+
+Instead:
+
+- Maintain the central receptionist.
+- Maintain the branching network.
+- Transform relevant overlays and labels.
+- Adjust camera framing as needed.
+- Give each message enough time to register.
+
+The headline changes while the network evolves.
+
+The user should feel that one receptionist can handle an impressive variety of responsibilities across many simultaneous conversations.
+
+## Important
+
+Do not overcrowd the visualization.
+
+Only the selected customer nodes need to demonstrate each feature.
+
+The overall network should remain refined, clean, and coherent.
+
+---
+
+# 14. SCENE SEVEN: LIVE HANDOFF
+
+## Concept
+
+Nodemere receptionists can contact a human staff member when a conversation requires human involvement.
+
+The receptionist can brief the staff member on the situation.
+
+The staff member can accept the handoff, and the calls can be connected.
+
+This is fundamentally an audio-based experience.
+
+Nodemere does not have a dedicated visual handoff interface that we need to reproduce.
+
+Therefore, create a purpose-built cinematic visualization.
+
+## Visual approach
+
+Use actual receptionist imagery from Nodemere.
+
+Place the AI receptionist in an isolated composition.
+
+Introduce a second portrait representing a human staff member.
+
+Use clean, sophisticated connection lines or communication indicators.
+
+The interaction should visually establish:
+
+1. A customer is speaking with the AI receptionist.
+2. The receptionist contacts a staff member.
+3. The receptionist provides a short briefing.
+4. The staff member accepts.
+5. The customer is connected to the staff member.
+
+Because the video has no audio, use concise, carefully animated dialogue captions or status text.
+
+For example:
+
+**"Sarah needs help rescheduling."**
+
+Then:
+
+**"Handoff accepted."**
+
+Use the actual product's supported handoff behavior as the source of truth.
+
+## Design requirements
+
+Maintain Nodemere's black stage, restrained typography, and pink-purple accents.
+
+This should feel visually connected to the conversation network rather than becoming an unrelated illustration.
+
+Do not fabricate a full product screen.
+
+The visualization is an intentional cinematic explanation, not a screenshot of an interface that does not exist.
+
+Keep the sequence relatively short.
+
+---
+
+# 15. SCENE EIGHT: PEOPLE CRM
+
+## Overview
+
+The People CRM is one of Nodemere's most visually polished and customizable interfaces.
+
+It contains powerful table customization capabilities, custom columns, Zones, Color Bars, and sophisticated presentation details.
+
+This section should take full advantage of cinematic close-ups.
+
+The interface is wide and dense.
+
+Displaying it only from a distance would waste its visual detail.
+
+## Hero statement
+
+Suggested direction:
+
+**"Your CRM. Your Rules."**
+
+Or another concise, direct statement about customization.
+
+This is provisional.
+
+## Initial table reveal
+
+Begin with the actual People CRM floating independently on the dark stage.
+
+Use the existing table data-cascade animation.
+
+Rows and cells should appear using their original reveal behavior.
+
+Do not recreate this animation.
+
+## Zones
+
+Zones are illuminated colored lines above groups of table columns.
+
+They allow users to visually organize sections of the CRM.
+
+The Nodemere homepage already contains a People CRM demonstration with a specific Zones animation.
+
+In that demonstration, the Zone colors flicker into illumination and then remain lit.
+
+**Find this exact demo and reuse its original animation.**
+
+Do not approximate the flicker.
+
+Do not invent a replacement timing curve.
+
+Do not create a new glow system.
+
+Reuse what is already perfected.
+
+## Zone money shot
+
+Once the CRM appears, begin an impressive cinematic camera move.
+
+Push dramatically toward a selected column.
+
+Bring the column header and Zone line into close view.
+
+The camera should become extremely close, while maintaining crisp text and graphics.
+
+Then simulate a user dragging a Zone across additional columns.
+
+As the user drags, the Zone extends across those columns.
+
+Use the real Zone interaction and visual feedback.
+
+Track the interaction with a slow, beautifully controlled camera movement.
+
+Then pull back enough to reveal the finished grouping.
+
+This is one of the People CRM's main hero moments.
+
+## Custom column creation
+
+Show that users can define their own CRM structure.
+
+The existing creation flow generally works like this:
+
+1. Select the plus button near the right side of the CRM.
+2. A cascading menu reveals available column types.
+3. The user selects a type, such as Yes/No, single-select, multi-select, or number.
+4. The new column appears.
+5. A configuration modal allows the user to configure the column.
+
+Verify the exact current behavior.
+
+Use the original dropdown cascade, configuration modal, and table layout.
+
+Do not recreate them.
+
+## Camera treatment
+
+Push in toward the column controls.
+
+Make the cascading menu easily readable.
+
+Simulate selecting a column type.
+
+Show the new column entering the table.
+
+Then reveal the original configuration modal.
+
+Focus only on the most visually interesting portion of the configuration.
+
+The scene should communicate flexibility without becoming a tutorial.
+
+## Color Bars
+
+The People CRM also supports Color Bars.
+
+These are colored vertical indicators positioned along the left side of records.
+
+Their color and animation can respond to rule-based conditions.
+
+Existing animations include effects such as sweep and pulse.
+
+Use the real implementation.
+
+Show several records with different Color Bar behaviors.
+
+A beautiful camera movement could slowly track down the left edge of the CRM while the existing Color Bar animations trigger.
+
+Do not invent new sweeps or pulses if the original animations are available.
+
+## Overall cinematography
+
+Use a combination of:
+
+- Wide establishing view.
+- Aggressive push-ins.
+- Slow lateral tracking shots.
+- Controlled perspective changes.
+- Pullbacks and re-entries into different parts of the table.
+
+The intention is to make the CRM feel like a beautifully engineered environment worth exploring.
+
+---
+
+# 16. SCENE NINE: SCENARIOS BUILDER
+
+## Extremely important preservation warning
+
+The Scenarios Builder is one of the most complex and meticulously designed components in Nodemere.
+
+It is a visual node-based workflow builder.
+
+Its design and behavior took months to develop.
+
+It contains detailed styling, precise spacing, sophisticated interactive elements, branching connections, variables, and execution animations.
+
+This component receives **extra preservation priority**.
+
+Study the original implementation thoroughly before attempting video integration.
+
+Do not recreate the builder using generic flowchart nodes.
+
+Do not approximate the node layout.
+
+Do not change node styling, edge design, spacing, typography, menus, or connection details.
+
+Do not replace real animations with invented ones.
+
+## General concept
+
+Show the actual Scenarios Builder as an impressive, navigable canvas.
+
+The builder supports elements such as:
+
+- Triggers.
+- Actions.
+- Conditional logic.
+- Branching.
+- Variables.
+- Workflow execution.
+
+The viewer should immediately understand that Nodemere offers serious automation capabilities.
+
+## Hero statement
+
+Suggested:
+
+**"Build Powerful Automations."**
+
+This wording is provisional.
+
+## Initial establishing shot
+
+Start wide enough to establish the node-based canvas.
+
+Use a subtle dimensional tilt if it enhances the presentation.
+
+The connections and nodes should be visibly recognizable.
+
+Then move closer.
+
+## Triggers and actions
+
+One of the strongest visual features is the list of available triggers and actions.
+
+Focus on a node.
+
+Show its real trigger or action selection interface.
+
+Move the camera down through the list in a carefully controlled glide.
+
+This can resemble the cinematic equivalent of scrolling through the available options.
+
+The purpose is to communicate the depth of what users can build.
+
+Do not fabricate triggers or actions.
+
+Select actual options from the current product.
+
+## Node creation
+
+Demonstrate choosing actions and placing nodes.
+
+Use the existing builder interactions.
+
+The camera may follow a newly created node and its connection to the rest of the scenario.
+
+Do not replace the actual connections with simplified illustrations.
+
+## Variables Pane
+
+The builder includes a Variables Pane containing variables associated with Nodemere data and tables.
+
+This is another visually interesting element.
+
+Show the Variables Pane.
+
+Move closer to the list of available values.
+
+Simulate selecting or inserting a variable into an appropriate field.
+
+Use the actual implementation.
+
+Keep the motion readable and deliberate.
+
+## Branching
+
+Show an attractive section of a scenario that includes multiple paths.
+
+Use camera framing to emphasize the complexity and flexibility of the system.
+
+A controlled pullback could reveal several connected branches at once.
+
+## Running the scenario
+
+The Scenarios Builder supports executing a scenario directly within the builder.
+
+When execution begins, it uses its existing visual animation.
+
+Find that original execution animation and reuse it.
+
+Do not invent a new node-lighting or progress-tracing system.
+
+Show the real scenario-run behavior.
+
+The camera can move to follow important parts of the execution, but the component's internal execution design must stay intact.
+
+## Overall direction
+
+Treat the entire Scenarios Builder as the showcase.
+
+It does not need a single isolated money shot.
+
+The combination of trigger lists, action selection, node placement, Variables Pane, branching, and scenario execution should create one polished, cohesive presentation.
+
+---
+
+# 17. SCENE TEN: THE NEST — FULL SHOWCASE
+
+The opening already introduced the Nest through a short Intercom interaction.
+
+Now return to the Nest and show more of its capabilities.
+
+This is the proper, fuller Nest feature sequence.
+
+Avoid treating it as a duplicate of the opening.
+
+## Nest design
+
+The Nest is a compact, Dynamic Island-like component in Nodemere's top toolbar.
+
+It is normally extremely short vertically.
+
+For video, it needs to be enlarged and given a visually prominent presentation.
+
+Do not simply show it tiny inside a full dashboard.
+
+## Cinematic presentation
+
+Use the existing component.
+
+Start with its compact appearance.
+
+Isolate it against the black stage or within a minimal, carefully framed portion of the dashboard.
+
+Use perspective and controlled camera movement.
+
+Allow the Nest to expand downward into a larger presentation container when appropriate.
+
+The goal is to make its existing interface readable while preserving its internal look and animations.
+
+## Subsection A: Real-time notifications
+
+The Nest displays real-time notifications.
+
+Each notification generally has two stages.
+
+For example:
+
+**Stage one:** Incoming Call.
+
+Then the first notification rises or transitions upward, revealing the more detailed content.
+
+**Stage two:** Caller information and call details, such as a name and call duration.
+
+The exact animation must come from the existing Nest implementation.
+
+Do not invent your own notification transition.
+
+### The incoming call moment
+
+This should be the most important notification.
+
+Use its real existing color-sweep animation.
+
+Allow the first-stage label to appear.
+
+Then reveal the second-stage information.
+
+Keep the camera close enough for the viewer to appreciate the motion.
+
+### Additional notifications
+
+Follow the incoming call with other actual notification types supported by the product.
+
+Examples may include:
+
+- New appointment.
+- New lead.
+- Milestone completed.
+
+Verify these against the existing implementation.
+
+Each notification should retain its normal two-stage behavior.
+
+There is no need to return to idle between every notification.
+
+Allow them to flow directly into one another.
+
+### Acceleration
+
+Begin at a pace that allows the viewer to appreciate the animations.
+
+Then gradually tighten the spacing between notifications.
+
+Build visual momentum.
+
+Do not speed up the internal notification animations in ways that distort their actual behavior.
+
+Instead, adjust the pacing and transitions between completed notification events.
+
+At the end of the sequence, the Nest can disappear cleanly into a large statement or transition.
+
+This should feel dramatic, not cluttered.
+
+## Subsection B: Intercom
+
+The Nest also contains Intercom, allowing users to choose a receptionist and communicate with them.
+
+The original interaction includes:
+
+- Receptionist selection.
+- Receptionist avatars.
+- Microphone activation.
+- Call initiation animation.
+- Receptionist banner.
+- Receptionist avatar.
+- Animated waveform.
+- Live conversation transcript.
+
+Use the real Intercom visuals.
+
+## Three simulated conversations
+
+Show three different receptionists from the actual Nodemere catalog.
+
+Each receptionist should use their actual associated visual assets.
+
+Use simulated conversation data, not real calls.
+
+The first may use Maggie if present in the current catalog.
+
+### Conversation one
+
+Demonstrate the receptionist helping with a task, such as coordinating with a staff member or checking information.
+
+Example transcript:
+
+"Yeah, let me get John on that for you."
+
+Use natural, believable dialogue and actual supported capabilities.
+
+### Conversation two
+
+Switch to a different receptionist.
+
+Show a short business-status or daily-overview exchange.
+
+### Conversation three
+
+Switch to another receptionist.
+
+Show a different, useful business-related interaction.
+
+Select a demonstration that reflects an actual supported capability.
+
+## Important transition behavior
+
+When switching between the three receptionist conversations:
+
+**Do not close and reopen the entire Intercom interface.**
+
+The Intercom container should stay put.
+
+Only the conversation-specific elements change.
+
+For example:
+
+- Receptionist banner.
+- Avatar.
+- Waveform state.
+- Transcript.
+- Relevant conversation details.
+
+Use sophisticated crossfades, directional reveals, or other suitable content-level transitions.
+
+Keep the overall frame continuous.
+
+The second and third conversations may transition slightly faster to build energy.
+
+## Intercom money shot
+
+The strongest visual moment is the active call state.
+
+Show the receptionist's banner and avatar, moving waveform, and live transcript together.
+
+Keep this composition prominent.
+
+Do not bury it inside the surrounding dashboard.
+
+---
+
+# 18. SCENE ELEVEN: WORLD-CLASS ENCRYPTION
+
+## Mood
+
+This sequence should feel unusually serious, intimidating, sophisticated, and powerful.
+
+Not horror.
+
+Not science-fiction nonsense.
+
+Not a generic cybersecurity stock-video animation.
+
+The viewer should feel that Nodemere takes security extremely seriously.
+
+## Hero statement
+
+Approved primary headline:
+
+**"World-Class Encryption."**
+
+Potential supporting text, subject to technical verification:
+
+**"Protected with the same AES-256 encryption standard approved by the U.S. government for classified information."**
+
+This is a proposed claim, not permission to publish an unverified statement.
+
+Before finalizing the text, inspect Nodemere's actual encryption implementation and supporting documentation.
+
+The existing security features have been described as:
+
+- AES-256-GCM.
+- Per-business keys.
+- Server-side key protection.
+- Key rotation.
+- Authentication failure on tampered ciphertext.
+
+Verify what is actually implemented.
+
+Distinguish the AES-256 algorithm from approval or compliance of the overall cryptographic system.
+
+Use precise and supportable wording for the government comparison.
+
+Do not imply that Nodemere itself is government-certified, FIPS-validated, or approved for classified data merely because it uses AES-256-GCM.
+
+If the original proposed subtitle cannot be substantiated as written, replace it with the closest accurate version and flag the change for review.
+
+## Creative visualization
+
+Unlike the product UI sections, encryption requires a custom cinematic visualization.
+
+Create something imposing and beautifully engineered.
+
+A possible concept:
+
+In a dark environment, a highly refined geometric security structure begins assembling.
+
+Internal layers move into alignment.
+
+Individual sections interlock with precise timing.
+
+The structure becomes sealed.
+
+The camera moves through an intricately arranged arrangement of protective layers, suggesting multiple boundaries between data and access.
+
+Then the camera pulls back.
+
+Additional isolated structures become visible.
+
+This visually suggests protected business-specific data compartments without literally or inaccurately depicting the encryption implementation.
+
+The visual should be abstract but intelligent.
+
+Possible visual motifs:
+
+- Layered protected structures.
+- Carefully interlocking geometry.
+- Separated compartments.
+- Precision-engineered locking mechanisms.
+- Strong, controlled symmetry.
+- Minimal pink-purple accent lighting.
+
+Avoid generic padlock stock imagery as the entire visual concept.
+
+Avoid meaningless streams of random hexadecimal characters.
+
+Avoid the familiar hooded-hacker aesthetic.
+
+Avoid huge glowing shields, particle explosions, and cheap circuitry backgrounds.
+
+## Motion philosophy
+
+The structure should feel solid and confidently engineered.
+
+Use deliberate choreography.
+
+Precise alignment is more effective here than frantic motion.
+
+The finished composition should communicate protection, isolation, and technical sophistication.
+
+End with the verified security claim clearly legible.
+
+---
+
+# 19. FINAL BRAND REVEAL
+
+After encryption, transition into a restrained but memorable Nodemere brand close.
+
+Return to the black visual environment.
+
+Allow the preceding sequence to clear.
+
+Present the authentic Nodemere logo or wordmark.
+
+Use the existing brand identity.
+
+Do not recreate the logo from scratch.
+
+The final animation should feel purposeful and conclusive.
+
+Avoid generic logo spins or excessive glow.
+
+The exact closing tagline has not been finalized.
+
+If a tagline is needed, propose options for approval rather than inventing a permanent brand slogan.
+
+The final frame should be clean enough to function as a memorable closing image.
+
+---
+
+# 20. TRANSITIONS BETWEEN FEATURES
+
+Transitions are just as important as the scenes themselves.
+
+The video should not feel like a slideshow of separate product features.
+
+Create strong visual relationships between neighboring scenes.
+
+Examples:
+
+### Nest → Collection
+
+Extreme push-in on the Intercom transcript, followed by a dramatic spatial transition into the receptionist collection.
+
+### Collection → Audition
+
+After browsing existing receptionists, transition to the statement "Or create your own."
+
+### Audition → Calendar
+
+Finish the creation reveal, then use a clean cinematic transition to introduce the calendar.
+
+### Calendar → Drop-ins Builder
+
+Move toward the calendar's Drop-ins control and open the actual builder.
+
+### Drop-ins Builder → Conversation Network
+
+Transition from an individual receptionist action into the broader idea of receptionists handling multiple conversations and responsibilities.
+
+### Conversation Network → Handoff
+
+Follow one customer connection out of the wider network and into a handoff involving a human staff member.
+
+### People CRM → Scenarios Builder
+
+Use the idea of structured customer information and variables as a natural thematic bridge into automation.
+
+### Scenarios Builder → Nest
+
+Move from configuring automation into the live operational experience represented by the Nest.
+
+### Nest → Security
+
+Allow the rapid notification sequence or final Intercom moment to resolve, clearing the stage for a distinctly more serious security statement.
+
+### Security → Brand Close
+
+Transition from the secure, fully assembled structure into a minimal Nodemere logo reveal.
+
+These are creative directions, not rigid instructions requiring the same camera trick for every transition.
+
+Give each transition its own choreography.
+
+---
+
+# 21. ANIMATION CRAFTSMANSHIP
+
+## Timing and easing
+
+The animation should feel as though it has been carefully refined by experienced motion designers.
+
+Avoid default linear movement.
+
+Use custom easing and spring behavior where appropriate.
+
+However, do not use exaggerated overshoot simply to make the motion feel expensive.
+
+Physicality and confidence are the priorities.
+
+## Camera behavior
+
+Movement should have:
+
+- A clear starting composition.
+- A defined destination.
+- A motivated camera path.
+- Controlled acceleration.
+- Appropriate deceleration.
+- Excellent framing throughout.
+
+Do not let the camera drift aimlessly.
+
+When the camera pushes into a feature, it should land precisely on the intended detail.
+
+When the camera pulls back, the composition should resolve cleanly.
+
+## Motion hierarchy
+
+The viewer should always understand what to watch.
+
+Do not simultaneously animate numerous competing elements unless the purpose is to communicate scale.
+
+For most moments, establish one dominant visual action.
+
+Secondary elements can support it.
+
+## Controlled visual complexity
+
+Some scenes, particularly the conversation network, may be quite complex.
+
+The solution is not to remove all complexity.
+
+The solution is to reveal it intelligently.
+
+Introduce information progressively.
+
+Allow viewers to process important changes.
+
+Use selective motion to keep attention focused.
+
+## Avoid repetition
+
+The video should share a coherent style, but not identical camera paths and transitions.
+
+The CRMs need extreme close-ups.
+
+Audition benefits from steady portrait transformations.
+
+The collection benefits from massive-scale revelation.
+
+The Nest benefits from close-up interaction and controlled expansion.
+
+Scenarios benefits from navigating a complex node canvas.
+
+Security benefits from deliberate structural choreography.
+
+Let the subject determine the movement.
+
+---
+
+# 22. MOBILE AND TABLET VIEWING
+
+Produce a single primary **16:9** video.
+
+Do not produce separate mobile and tablet versions at this stage.
+
+However, it must remain understandable on smaller displays.
+
+## Readability
+
+Hero typography should be large and high contrast.
+
+Keep essential visual information within reasonable composition-safe areas.
+
+When demonstrating dense UI, use dramatic close-ups so viewers can see important elements.
+
+Do not expect mobile viewers to read an entire CRM table at once.
+
+## Composition
+
+Wide compositions can be used for spectacle.
+
+For example, the conversation network can expand into a large structure.
+
+It is acceptable if individual customer avatars become small during the widest shot.
+
+The purpose of that shot is to communicate scale.
+
+The key details should have already been shown at readable sizes.
+
+## Testing
+
+Preview the actual 16:9 video at representative viewing sizes:
+
+- Desktop.
+- Tablet.
+- Smartphone.
+
+Test text readability, composition, and the clarity of each feature.
+
+Do not assume 4K output alone solves mobile readability.
+
+---
+
+# 23. VIDEO CONTENT AND ACCURACY
+
+Use actual Nodemere assets, components, and capabilities wherever available.
+
+This is a promotional demonstration, not a fictional redesign of the product.
+
+## Demonstration data
+
+Use fictional but realistic names, appointments, business records, and conversations.
+
+The receptionist collection should use actual receptionist records and associated visual assets.
+
+Use representative sample data for conversations and system events.
+
+Avoid random placeholder data that looks obviously synthetic.
+
+## Accuracy
+
+Verify the following before final production:
+
+- The supported language count.
+- The ability to switch languages during a call.
+- Inbound and outbound calling capabilities.
+- Simultaneous-conversation limitations.
+- Payment functionality.
+- Handoff functionality.
+- Appointment automation behavior.
+- Follow-up capabilities.
+- Security implementation and marketing claims.
+
+Do not make the product look capable of an action it does not actually support.
+
+If something is unsupported or uncertain, stop short of depicting it as a verified product capability and raise it for review.
+
+---
+
+# 24. PROJECT ARCHITECTURE
+
+Set up the project so that each feature sequence is independently editable, previewable, and renderable.
+
+For example, organize it around scene modules representing:
+
+- NestColdOpen
+- ReceptionistCollection
+- Audition
+- Calendar
+- DropInsBuilder
+- ConversationNetwork
+- Handoff
+- PeopleCRM
+- ScenariosBuilder
+- NestShowcase
+- Encryption
+- BrandClose
+
+Create reusable infrastructure for shared motion behavior, but avoid making all scenes depend on identical transition templates.
+
+Define a master composition that assembles the scenes in their intended order.
+
+Durations should be configurable and easy to refine.
+
+Avoid hardcoding assumptions that make later reordering difficult.
+
+## Source protection
+
+Do not make unnecessary changes to production Nodemere components or their CSS.
+
+Prefer video-specific wrappers, adapters, compositions, and fixtures.
+
+If changes to shared source code are unavoidable, explain why and keep them minimal, isolated, and non-destructive.
+
+The normal Nodemere website should remain visually and behaviorally unchanged.
+
+---
+
+# 25. WORKFLOW: BUILD ONE SECTION AT A TIME
+
+This is extremely important.
+
+**You are receiving the complete creative vision now, but you must not attempt to produce the entire video in one enormous implementation pass.**
+
+We want to refine and approve each feature sequence before proceeding.
+
+The intended process is:
+
+## Phase 1: Deep codebase inspection
+
+Study the current Nodemere implementation.
+
+Identify the exact locations of:
+
+- Brand colors and typography.
+- Receptionist Collection.
+- Receptionist modal.
+- Receptionist image and video assets.
+- Audition.
+- Calendar.
+- Drop-ins and Drop-ins Builder.
+- People CRM.
+- Zone animations.
+- Color Bar animations.
+- Scenarios Builder.
+- Trigger and action lists.
+- Variables Pane.
+- Scenario execution animation.
+- Nest.
+- Intercom.
+- Real-time notification animations.
+- Relevant security implementation.
+
+Locate reusable components and dependencies.
+
+Determine which parts can be directly rendered inside Remotion and which require isolated demonstration adapters.
+
+Study existing homepage demos where applicable.
+
+Do not assume how a feature works based only on this prompt.
+
+Inspect the implementation.
+
+## Phase 2: Establish the production system
+
+Set up Remotion, rendering, project structure, brand tokens, and the shared cinematic animation architecture.
+
+Validate that the actual Nodemere components can be rendered reliably.
+
+Use temporary technical test compositions if necessary.
+
+These are implementation tools, not the final scene designs.
+
+## Phase 3: Build the opening only
+
+Begin with:
+
+**Nest cold open → dramatic transition → Receptionist Collection reveal.**
+
+This is the highest-priority creative milestone.
+
+Produce a complete preliminary version of this opening, using the real components and appropriately simulated interaction data.
+
+Focus intensely on:
+
+- The Nest's visual fidelity.
+- Intercom transcript clarity.
+- The precise camera push-in.
+- The transition choreography.
+- The collection's dramatic reveal.
+- Exceptional source sharpness.
+- Smooth 60 fps movement.
+- A polished overall composition.
+
+This sequence must establish the visual standard for the rest of the production.
+
+## Phase 4: Render and review
+
+Render the opening.
+
+Review multiple frames and the full animation.
+
+Identify and correct:
+
+- Unconvincing transitions.
+- Generic animation.
+- Inaccurate UI.
+- Camera framing problems.
+- Unreadable text.
+- Blurry assets.
+- Timing problems.
+- Perspective distortion.
+- Styling mismatches.
+
+Do not declare it polished merely because the code works.
+
+The output must actually look polished.
+
+## Phase 5: Approval
+
+Present the opening for review before proceeding with the remainder of the video.
+
+Provide the preview and summarize any visual or technical limitations that remain.
+
+Wait for feedback.
+
+Do not automatically build all remaining scenes.
+
+## Phase 6: Continue sequentially
+
+Once the opening is approved, move to Audition.
+
+Then continue scene by scene in the specified order.
+
+Maintain visual continuity.
+
+Evaluate each new scene before proceeding to the next.
+
+## Phase 7: Final assembly
+
+Once individual sequences are approved:
+
+- Assemble the full timeline.
+- Refine transitions between sections.
+- Adjust pacing.
+- Evaluate the overall narrative.
+- Check for repetitive motion.
+- Review typography consistency.
+- Confirm all product claims.
+- Validate mobile readability.
+- Render the final 4K 60 fps master.
+
+The final project must remain editable.
+
+---
+
+# 26. CREATIVE AUTONOMY
+
+You have creative freedom within the design rules.
+
+You are expected to make strong decisions about:
+
+- Camera paths.
+- Timing.
+- Composition.
+- Spatial transitions.
+- Reveal choreography.
+- Purpose-built icon animations.
+- Hero typography treatment.
+- Visual continuity.
+- The appropriate amount of motion for a particular feature.
+
+Do not interpret this brief as instructions to mechanically execute only the exact camera motions listed.
+
+The descriptions explain the desired direction.
+
+You should improve the cinematography where a better execution is apparent.
+
+However, creative freedom does not extend to redesigning Nodemere's existing components, changing approved content without reason, inventing capabilities, or ignoring established constraints.
+
+**Be ambitious with cinematography. Be disciplined with product fidelity.**
+
+---
+
+# 27. FINAL QUALITY STANDARD
+
+The finished production should never feel like someone took screenshots of a website, added zoom effects, and called it a promo video.
+
+It should feel designed from the ground up as a cinematic experience.
+
+The product should be treated as an object worthy of detailed visual exploration.
+
+Its interfaces should appear dimensional, present, and beautifully illuminated by their own design.
+
+Its smallest details should become dramatic through expert camera work.
+
+Its interactions should feel satisfying and deliberate.
+
+Its large-scale visualizations should communicate capability without clutter.
+
+Its motion graphics should be remarkably well-crafted.
+
+Its typography should command attention.
+
+Its icon animations should be intricate, thoughtful, and self-contained.
+
+And its entire visual language should reflect Nodemere's premium dark-mode identity.
+
+Use the Apple inspiration as a benchmark for precision, intentionality, and visual sophistication, not as a template to copy.
+
+Most importantly:
+
+**Do not settle for something that merely works. Refine it until it looks exceptional.**
+
+---
+
+# 28. YOUR FIRST TASK
+
+Before writing the video itself:
+
+1. Inspect the Nodemere codebase and identify the components, visual assets, styles, and existing animations needed for the planned production.
+2. Check the project's available Remotion tooling and determine the best architecture for preserving authentic Nodemere UI while enabling cinematic camera movement.
+3. Establish a safe, isolated production environment that will not affect the working Nodemere application.
+4. Confirm the technical approach for rendering crisp, dramatically magnified UI in 4K.
+5. Create the initial implementation plan and proposed scene structure.
+
+Then begin implementing **only the Nest cold open and its transition into the Receptionist Collection**.
+
+Make this first sequence exceptional.
+
+Render it, inspect it, refine it, and present it for approval.
+
+Do not continue to the subsequent feature sequences until the opening has been reviewed.
+
+The entire brief is your creative north star.
+
+**The quality of the first few seconds should establish the standard for everything that follows.**
+
+One recommendation before handing this over: keep the first approval checkpoint exactly where the prompt places it, at the Nest-to-Collection reveal. That one sequence will tell us whether Codex has truly captured the visual sophistication you're after before it builds the rest of the production.

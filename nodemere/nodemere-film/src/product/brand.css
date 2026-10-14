@@ -1,0 +1,40 @@
+:root {
+  /* Centralized application branding */
+  --brandGradientStart: #ff32ac;
+  --brandGradientEnd: #8b5cf6;
+  --buttonBackground: #ffffff;
+  --buttonText: #000000;
+  --pageBackground: #020202;
+  --modalBloom: rgba(236, 72, 153, 0.07);
+  --modalBloomSecondary: rgba(139, 92, 246, 0.05);
+  --focusOutline: rgba(255, 255, 255, 0.18);
+  --iconColor: #d2d2d7;
+  --toggleColor: #10b981;
+
+  /* Base Theme Colors */
+  --color-black: #0b0c10; /* Darker, more modern black */
+  --color-dark-gray: #111216;
+  --color-white: #f5f5f7;
+  --color-medium-gray: #86868b;
+  --color-light-gray: #d2d2d7;
+
+  /* Accent & Status Colors */
+  --color-accent-blue: #5a5a5a;
+  --color-brand-pink: #ff32ac;
+  --color-brand-purple: #8b5cf6;
+  --color-status-won: #d4026c;
+  --color-status-interest: #20fe80;
+  --color-status-aware: #feeb20;
+  --color-status-dnc: #ff6565;
+  --color-status-default: #6b7280;
+
+  /* Custom Colors — Sonar Brand */
+  --color1: var(--brandGradientStart);
+  --color2: var(--brandGradientEnd);
+  --color3: #a855f7; /* vivid purple */
+
+  /* Font */
+  --font-family-sans:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial,
+    sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+}
