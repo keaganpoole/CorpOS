@@ -5,7 +5,7 @@ import { useAppointments } from '../hooks/useAppointments';
 import useDashboardViewport from '../hooks/useDashboardViewport';
 
 const CALENDAR_BASE_MIN_WIDTH = 34 * 16;
-const CALENDAR_MIN_WIDTH = Math.round(CALENDAR_BASE_MIN_WIDTH * 1.15);
+const CALENDAR_MIN_WIDTH = Math.round(CALENDAR_BASE_MIN_WIDTH * 1.15) + 64;
 const CALENDAR_DEFAULT_WIDTH = CALENDAR_MIN_WIDTH;
 const APPOINTMENTS_MIN_WIDTH = 32 * 16;
 const SPLIT_HANDLE_WIDTH = 12;

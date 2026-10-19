@@ -12,7 +12,7 @@ import DropInAppointmentPreview from './DropInAppointmentPreview';
 import ModalSpectrumLine from '../../components/ModalSpectrumLine';
 import './dropIns.css';
 import './dropInsLayered.css';
-import dropInsAurora from '../../assets/drop-ins-aurora-v2.webp';
+import './dropInsInline.css';
 
 const ICONS = { google: FcGoogle, calendar: CalendarDays, bell: Bell, heart: Heart, message: MessageCircle, repeat: Repeat2, receipt: Receipt, sparkles: Sparkles, phone: Phone };
 const statusCopy = {
@@ -23,10 +23,10 @@ const blank = (status) => ({ name: '', purpose: '', prompt: '', is_active: true,
 const manual = (a, b) => a.sort_order - b.sort_order || a.id.localeCompare(b.id);
 const isTimeoutMessage = value => /timed out|timeout/i.test(String(value || ''));
 
-export default function DropInsModal({ model, onClose }) {
-  const [status, setStatus] = useState('completed');
+export default function DropInsModal({ model, onClose, closeSignal, tipsOpen, onTipsClose }) {
+  const [status, setStatus] = useState('all');
   const [previewStatus, setPreviewStatus] = useState('completed');
-  const [view, setView] = useState('gallery');
+  const [view, setView] = useState('manage');
   const [draft, setDraft] = useState(null);
   const [baseline, setBaseline] = useState(null);
   const [previewCallLayer, setPreviewCallLayer] = useState(false);
@@ -47,8 +47,8 @@ export default function DropInsModal({ model, onClose }) {
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [previewDeleteTarget, setPreviewDeleteTarget] = useState(null);
   const [pendingNavigation, setPendingNavigation] = useState(null);
-  const [tipsOpen, setTipsOpen] = useState(false);
   const modal = useRef(null);
+  const lastCloseSignal = useRef(closeSignal);
   const previousGroups = useRef([]);
   const statusTabs = useRef(null);
   const [statusIndicator, setStatusIndicator] = useState({ left: 0, width: 0 });
@@ -85,6 +85,11 @@ export default function DropInsModal({ model, onClose }) {
     if (dirty) setPendingNavigation(() => action);
     else action();
   };
+  useEffect(() => {
+    if (closeSignal === lastCloseSignal.current) return;
+    lastCloseSignal.current = closeSignal;
+    navigate(onClose);
+  });
   const leaveEditor = next => { setDraft(null); setBaseline(null); setPreviewCallLayer(false); setView(next); setError(''); };
   const chooseTemplate = (t) => {
     const next = { ...blank(status), name: t?.name || '', purpose: t?.purpose || t?.name || '', prompt: t?.prompt || '' };
@@ -115,21 +120,8 @@ export default function DropInsModal({ model, onClose }) {
     const timer = setTimeout(() => setHeaderNotice(null), 2800);
     return () => clearTimeout(timer);
   }, [headerNotice, busy]);
-  useEffect(() => {
-    const previous = document.activeElement;
-    const overflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    modal.current?.focus();
-    return () => { document.body.style.overflow = overflow; previous?.focus?.(); };
-  }, []);
   const handleKeys = e => {
     if (e.key === 'Escape') { e.stopPropagation(); navigate(onClose); }
-    if (e.key === 'Tab') {
-      const elements = Array.from(modal.current.querySelectorAll('button:not(:disabled), input, textarea, select, [tabindex="0"]')).filter(x => x.getClientRects().length);
-      const first = elements[0], last = elements.at(-1);
-      if (e.shiftKey && (document.activeElement === first || document.activeElement === modal.current)) { e.preventDefault(); last?.focus(); }
-      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first?.focus(); }
-    }
   };
   const perform = async (action, message, onError) => {
     setBusy(true); setError('');
@@ -237,14 +229,11 @@ export default function DropInsModal({ model, onClose }) {
     perform(async () => { await model.remove(target.id); }, 'Drop-in removed');
   };
 
-  return createPortal(<div className="drop-ins-backdrop" style={{ '--di-background': `url("${dropInsAurora}")` }} onMouseDown={e => { if (e.target === e.currentTarget) navigate(onClose); }}>
-    <motion.section ref={modal} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="drop-ins-title" className="drop-ins-modal" onKeyDown={handleKeys} initial={{ opacity: 0, y: reduced ? 0 : 20, scale: reduced ? 1 : .98 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: .24 }}>
-      <header className="drop-ins-header">
-        <div className="drop-ins-heading"><div><p className="drop-ins-eyebrow">Create specific calling tasks for your receptionist</p><div className="drop-ins-title-row"><h2 id="drop-ins-title">Drop-ins<span className="drop-ins-title-dot">.</span></h2><button type="button" className="drop-ins-tips-button" onClick={() => setTipsOpen(true)} aria-label="Drop-ins tips" title="Drop-ins tips"><Lightbulb size={16} /></button></div></div></div>
-        <div className="drop-ins-header-actions"><span className="drop-ins-header-feedback" role="status" aria-live="polite"><AnimatePresence mode="wait" initial={false}>{headerNotice && <motion.span key={`${headerNotice.text}-${headerNotice.failed}`} className={`drop-ins-header-status ${headerNotice.failed ? 'is-error' : ''}`} initial={{ opacity: 0, y: reduced ? 0 : 3 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: reduced ? 0 : -2 }} transition={{ duration: reduced ? 0 : .18 }}><span className="drop-ins-header-feedback-icon">{headerNotice.failed ? <X size={12} /> : <Check size={12} />}</span>{headerNotice.text}</motion.span>}</AnimatePresence></span><button type="button" className="drop-ins-icon-button" aria-label="Close drop-ins" onClick={() => navigate(onClose)}><X size={20} /></button></div>
-      </header>
+  return <>
+    <motion.section ref={modal} tabIndex={-1} aria-label="Drop-ins" className="drop-ins-modal drop-ins-inline" onKeyDown={handleKeys} initial={reduced ? false : { opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={reduced ? { opacity: 0 } : { opacity: 0, x: 12 }} transition={{ duration: .22, ease: [.22, 1, .36, 1] }}>
+      <span className="sr-only" role="status" aria-live="polite">{headerNotice?.text || ''}</span>
       <div className="drop-ins-body">
-        <DropInAppointmentPreview items={previewItems} status={previewStatus} draft={view === 'editor' ? draft : null} showCallLayer={previewCallLayer} receptionist={model.previewReceptionist}
+        <DropInAppointmentPreview straight items={previewItems} status={previewStatus} draft={view === 'editor' ? draft : null} showCallLayer={previewCallLayer} receptionist={model.previewReceptionist}
           canManage={model.canManage && !model.loading}
           onDelete={model.canManage ? item => setPreviewDeleteTarget(item) : undefined}
           onAdd={() => navigate(() => { if (status === 'all') setStatus(previewStatus); leaveEditor('gallery'); setCategory('All'); })} />
@@ -260,7 +249,7 @@ export default function DropInsModal({ model, onClose }) {
           <AnimatePresence mode="wait" initial={false}>
             <motion.div key={view} initial={{ opacity: 0, x: reduced ? 0 : 14 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: reduced ? 0 : -10 }} transition={{ duration: .18 }}>
               {view === 'manage' && status === 'all' && <>
-                <div className="drop-ins-section-heading"><div><p className="drop-ins-eyebrow">ALL APPOINTMENTS</p><h3>Your drop-ins</h3><p>Choose which appointment statuses can use each drop-in.</p></div>{model.canManage && <div className="drop-ins-heading-actions"><div className="drop-ins-list-search"><Search size={12} aria-hidden="true" /><input aria-label="Search drop-ins" placeholder="Search drop-ins..." value={listSearch} onChange={e => setListSearch(e.target.value)} />{listSearch && <button type="button" aria-label="Clear drop-in search" onClick={() => setListSearch('')}><X size={11} /></button>}</div><button type="button" className="drop-ins-primary" disabled={model.loading} onClick={() => { setStatus(previewStatus); setView('gallery'); setCategory('All'); }}>Add drop-in</button></div>}</div>
+                <div className="drop-ins-section-heading"><div><p className="drop-ins-eyebrow">ALL DROP-INS</p><h3>Your drop-ins</h3><p>Keep upcoming visits on track.</p></div>{model.canManage && <div className="drop-ins-heading-actions"><div className="drop-ins-list-search"><Search size={12} aria-hidden="true" /><input aria-label="Search drop-ins" placeholder="Search drop-ins..." value={listSearch} onChange={e => setListSearch(e.target.value)} />{listSearch && <button type="button" aria-label="Clear drop-in search" onClick={() => setListSearch('')}><X size={11} /></button>}</div><button type="button" className="drop-ins-templates-button" onClick={() => { setStatus(previewStatus); setView('gallery'); setCategory('All'); }}>Templates</button><button type="button" className="drop-ins-primary" disabled={model.loading} onClick={() => { setStatus(previewStatus); setView('gallery'); setCategory('All'); }}>Add drop-in</button></div>}</div>
                 {model.loading ? <div className="drop-ins-loading"><Loader2 className="animate-spin" size={22} />Loading your drop-ins…</div> : !allGroups.length ? <div className="drop-ins-no-results">No drop-ins yet. Select an appointment status to add one.</div> : <>
                   <div className="drop-ins-builder-note"><span>Lit dots show where each drop-in appears. Select a dot to add or remove it for that status.</span></div>
                   <div className="drop-ins-list">{sortedGroups.length ? sortedGroups.map((group, index) => { const item = group.primary; const overrideKey = `group:${group.id}`; const enabled = activeOverrides[overrideKey] ?? group.rows.some(row => row.is_active); return <div key={group.id} className={`drop-ins-list-row ${enabled ? '' : 'is-inactive'}`}>
@@ -312,16 +301,16 @@ export default function DropInsModal({ model, onClose }) {
         </div>
       </div>
     </motion.section>
-    <AnimatePresence>
+    {createPortal(<AnimatePresence>
       {previewDeleteTarget ? <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[1000] flex items-center justify-center p-8 bg-black/80 backdrop-blur-md" onClick={() => !busy && setPreviewDeleteTarget(null)}>
         <motion.div initial={{ scale: .95, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: .95, opacity: 0, y: 20 }} onClick={event => event.stopPropagation()} className="w-full max-w-[400px] bg-[#0a0a0a] border border-white/[0.06] rounded-2xl overflow-hidden shadow-2xl">
           <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.04]"><span className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest">Delete Drop-in</span><button type="button" onClick={() => setPreviewDeleteTarget(null)} disabled={busy} className="p-1 rounded-lg text-zinc-600 hover:text-white hover:bg-white/[0.04] transition-all"><X size={14} /></button></div>
           <div className="p-6"><div className="flex items-center gap-4 mb-5"><div className="w-12 h-12 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center shrink-0"><Trash2 size={18} className="text-rose-400" /></div><div><p className="text-[13px] text-zinc-200 font-medium">Delete <span className="text-white font-bold">{previewDeleteTarget.name}</span>?</p><p className="text-[11px] text-zinc-600 mt-1">This action cannot be undone.</p></div></div><div className="flex items-center justify-end gap-3"><button type="button" onClick={() => setPreviewDeleteTarget(null)} disabled={busy} className="px-4 py-2 rounded-xl text-[11px] font-bold text-zinc-500 uppercase tracking-wider hover:text-zinc-300 hover:bg-white/[0.03] transition-all">Cancel</button><button type="button" onClick={deleteDropIn} disabled={busy} className="px-5 py-2 rounded-xl bg-rose-500 text-white text-[11px] font-black uppercase tracking-wider hover:bg-rose-400 transition-all shadow-[0_0_15px_rgba(239,68,68,0.3)] active:scale-95">{busy ? 'Deleting' : 'Delete'}</button></div></div>
         </motion.div>
       </motion.div> : null}
-      {tipsOpen ? <DropInsTipsModal onClose={() => setTipsOpen(false)} /> : null}
-    </AnimatePresence>
-  </div>, document.body);
+      {tipsOpen ? <DropInsTipsModal onClose={onTipsClose} /> : null}
+    </AnimatePresence>, document.body)}
+  </>;
 }
 
 function DropInsTipsModal({ onClose }) {

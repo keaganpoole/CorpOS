@@ -14,7 +14,7 @@ const COLORS = Object.fromEntries(
 );
 const ADD_DROP_IN_ITEM = { id: '__add_drop_in__', name: 'Add drop-in', isAdd: true };
 
-export default function DropInAppointmentPreview({ items, status, draft, showCallLayer = false, receptionist, onAdd, onDelete, canManage, studioNavigation = false }) {
+export default function DropInAppointmentPreview({ items, status, draft, showCallLayer = false, receptionist, onAdd, onDelete, canManage, studioNavigation = false, straight = false }) {
   const stage = useRef(null);
   const [scale, setScale] = useState(1);
   const [open, setOpen] = useState(true);
@@ -59,15 +59,19 @@ export default function DropInAppointmentPreview({ items, status, draft, showCal
     setSelectedAction(current => current ? items.find(x => x.id === current.id) || null : null);
   }, [items, studioNavigation]);
   useLayoutEffect(() => {
-    const resize = () => setScale(Math.min(1.65, Math.max(.45, ((stage.current?.clientWidth || 500) - 64) / 420)));
+    const resize = () => {
+      const stageWidth = stage.current?.clientWidth || 500;
+      const referenceWidth = straight ? Math.min(stageWidth + 36, 690) : stageWidth;
+      setScale(Math.min(1.65, Math.max(.45, (referenceWidth - 64) / 420)));
+    };
     resize();
     const observer = new ResizeObserver(resize);
     observer.observe(stage.current);
     return () => observer.disconnect();
-  }, []);
+  }, [straight]);
   useEffect(() => { if (reduced) { pointerX.set(0); pointerY.set(0); } }, [reduced, pointerX, pointerY]);
   const move = event => {
-    if (reduced || event.pointerType === 'touch') return;
+    if (straight || reduced || event.pointerType === 'touch') return;
     const recordRect = event.currentTarget.querySelector('.drop-in-preview-record')?.getBoundingClientRect();
     const overRecord = recordRect
       && event.clientX >= recordRect.left - 12 && event.clientX <= recordRect.right + 12
@@ -101,12 +105,12 @@ export default function DropInAppointmentPreview({ items, status, draft, showCal
     if (children.length || (studioNavigation && action.has_children)) { setReelDirection(1); setPath(value => [...value, action.id]); return; }
     setSelectedAction(action);
   };
-  return <aside className="drop-in-preview" aria-label="Appointment preview">
+  return <aside className={`drop-in-preview${straight ? ' is-straight' : ''}`} aria-label="Appointment preview">
     <div ref={stage} className="drop-in-preview-stage" onPointerMove={move} onPointerLeave={() => { pointerX.set(0); pointerY.set(0); }}>
       <div className="drop-in-preview-light" aria-hidden="true" />
       <div className="drop-in-preview-floor" aria-hidden="true" />
-      <div className="drop-in-preview-scale" style={{ transform: `scale(${scale})` }}>
-        <motion.div className="drop-in-preview-tilt" style={{ rotateX, rotateY }}>
+      <div className="drop-in-preview-scale" style={{ width: straight ? `${(stage.current?.clientWidth || 500) / scale}px` : undefined, transform: `scale(${scale})` }}>
+        <motion.div className="drop-in-preview-tilt" style={straight ? undefined : { rotateX, rotateY }}>
           <div className="drop-in-preview-object" data-actions-open={open}>
             {Array.from({ length: 7 }, (_, layer) => <div key={layer} aria-hidden="true" className="drop-in-preview-edge" style={{ transform: `translateZ(${layer * 2}px)` }} />)}
             <div className="drop-in-preview-face">

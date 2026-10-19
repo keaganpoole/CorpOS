@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import {
   Activity,
   Calendar as CalendarIcon,
@@ -7,6 +7,7 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  Lightbulb,
   Search,
 } from 'lucide-react';
 import { useAppointments } from '../hooks/useAppointments';
@@ -220,6 +221,7 @@ function getCurrentMonthInitialDate(appointmentsByDate, fallbackDate) {
 }
 
 function CalendarMonthViewBody({ data, className = '', selectedDate: selectedDateProp = null, onSelectedDateChange }) {
+  const reducedMotion = useReducedMotion();
   const { isPhone } = useDashboardViewport();
   const {
     allAppointments,
@@ -238,6 +240,8 @@ function CalendarMonthViewBody({ data, className = '', selectedDate: selectedDat
   const [closingAppointmentActionsId, setClosingAppointmentActionsId] = useState(null);
   const actionMenuCloseTimerRef = useRef(null);
   const [dropInsOpen, setDropInsOpen] = useState(false);
+  const [dropInsTipsOpen, setDropInsTipsOpen] = useState(false);
+  const [dropInsCloseSignal, setDropInsCloseSignal] = useState(0);
   const dropIns = useDropIns();
   const [callingAppointment, setCallingAppointment] = useState(null);
   const callLock = useRef(false);
@@ -547,14 +551,15 @@ function CalendarMonthViewBody({ data, className = '', selectedDate: selectedDat
   return (
     <div ref={calendarGridRef} className={`relative flex h-full min-h-0 w-full items-start justify-center bg-transparent p-4 pt-3 md:p-5 md:pt-4 2xl:p-5 2xl:pt-4 ${className}`.trim()}>
       <div className="relative flex h-full min-h-0 w-full flex-col overflow-hidden rounded-[28px] border border-white/[0.05] bg-[#0a0a0a] p-3 shadow-[0_22px_48px_-28px_rgba(0,0,0,0.8)] sm:p-4 md:p-5 lg:p-7 2xl:p-10">
-        <div className="mb-3 flex items-center justify-between gap-1 border-b border-white/5 pb-3 text-left md:mb-4 md:gap-2 md:pb-4 lg:mb-5 lg:pb-5 2xl:mb-6 2xl:pb-6">
+        <div className={`${dropInsOpen ? 'mb-0 2xl:mb-0' : 'mb-3 md:mb-4 lg:mb-5 2xl:mb-6'} flex items-center justify-between gap-1 border-b border-white/5 pb-3 text-left md:gap-2 md:pb-4 lg:pb-5 2xl:pb-6`}>
           <span className="flex min-w-0 items-center space-x-1.5 font-bold tracking-tight text-white text-[1rem] sm:text-[1.15rem] md:space-x-2 md:text-[1.35rem] lg:text-[1.75rem] 2xl:text-[2rem]">
             <CalendarIcon className="text-zinc-300" size={22} />
-            <span className="truncate">{MONTHS[month]} {year}</span>
+            <span className="truncate">{dropInsOpen ? 'Drop-ins' : `${MONTHS[month]} ${year}`}</span>
+            {dropInsOpen && <button type="button" className="ml-1 text-zinc-500 transition hover:text-white" aria-label="Drop-ins tips" title="Drop-ins tips" onClick={() => setDropInsTipsOpen(true)}><Lightbulb size={16} /></button>}
           </span>
 
           <div className="relative flex shrink-0 items-center gap-1" ref={detailFieldPickerRef}>
-            <button type="button" onClick={() => setDropInsOpen(true)} className="flex h-7 items-center gap-1 rounded-lg border border-white/[0.08] bg-white/[0.04] px-2 text-[10px] font-semibold text-zinc-300 transition hover:bg-white/[0.08] hover:text-white md:h-8 md:gap-1.5 md:px-3 md:text-[11px]">Drop-ins</button>
+            <button type="button" onClick={() => { if (dropInsOpen) setDropInsCloseSignal(current => current + 1); else setDropInsOpen(true); }} className="flex h-7 items-center gap-1 rounded-lg border border-white/[0.08] bg-white/[0.04] px-2 text-[10px] font-semibold text-zinc-300 transition hover:bg-white/[0.08] hover:text-white md:h-8 md:gap-1.5 md:px-3 md:text-[11px]">{dropInsOpen ? 'Back' : 'Drop-ins'}</button>
             <button
               type="button"
               onClick={() => setShowDetailFieldPicker((current) => !current)}
@@ -587,6 +592,10 @@ function CalendarMonthViewBody({ data, className = '', selectedDate: selectedDat
           </div>
         </div>
 
+        <AnimatePresence mode="wait" initial={false}>
+        {dropInsOpen ? (
+          <DropInsModal key="drop-ins" model={{ ...dropIns, previewReceptionist }} onClose={() => { setDropInsOpen(false); setDropInsTipsOpen(false); }} closeSignal={dropInsCloseSignal} tipsOpen={dropInsTipsOpen} onTipsClose={() => setDropInsTipsOpen(false)} />
+        ) : <motion.div key="calendar-month" initial={reducedMotion ? false : { opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} exit={reducedMotion ? { opacity: 0 } : { opacity: 0, x: -12 }} transition={{ duration: .22, ease: [.22, 1, .36, 1] }} className="min-h-0">
         <div className="mb-2 grid grid-cols-7 gap-2 text-center">
           {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, index) => (
             <span
@@ -639,7 +648,8 @@ function CalendarMonthViewBody({ data, className = '', selectedDate: selectedDat
               </button>
             );
           })}
-        </div>
+        </div></motion.div>}
+        </AnimatePresence>
 
         <div className="mt-5 flex min-h-0 flex-1 flex-col border-t border-white/5 pt-5 lg:mt-6 2xl:mt-8">
           <span className="mb-3 flex items-center space-x-1.5 text-[9px] font-bold tracking-widest text-zinc-400">
@@ -817,7 +827,6 @@ function CalendarMonthViewBody({ data, className = '', selectedDate: selectedDat
           </motion.div>
         )}
       </AnimatePresence>
-      {dropInsOpen && <DropInsModal model={{ ...dropIns, previewReceptionist }} onClose={() => setDropInsOpen(false)} />}
       <style>{`
         @keyframes demoCalendarCursorPress {
           0%, 100% {

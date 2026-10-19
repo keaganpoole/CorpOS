@@ -1,0 +1,51 @@
+/* The film's Drop-ins surface lives inside the calendar card. */
+.drop-ins-modal.drop-ins-inline {
+  container-type: inline-size;
+  position: relative;
+  z-index: auto;
+  width: 100%;
+  height: min(660px, 72%);
+  min-height: 0;
+  flex: 0 1 auto;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  --drop-ins-panel-bg: transparent;
+}
+.drop-ins-modal.drop-ins-inline::before { display: none; }
+.drop-ins-modal.drop-ins-inline .drop-ins-body,
+.drop-ins-modal.drop-ins-inline .drop-ins-controls,
+.drop-ins-modal.drop-ins-inline .drop-in-preview { background: transparent; }
+.drop-ins-modal.drop-ins-inline .drop-in-preview { flex: 0 0 clamp(110px, 14cqi, 180px); }
+.drop-ins-modal.drop-ins-inline .drop-in-preview-stage { width: calc(100% - 36px); min-height: 0; margin-inline: auto; place-items: start center; padding: 31px 0 8px; }
+.drop-ins-modal.drop-ins-inline .drop-in-preview.is-straight .drop-in-preview-object { transform: none; }
+.drop-ins-modal.drop-ins-inline .drop-ins-statuses { padding: 0 18px; gap: 16px; }
+.drop-ins-modal.drop-ins-inline .drop-ins-statuses > button { gap: 5px; padding: 12px 0; font-size: 10px; }
+.drop-ins-modal.drop-ins-inline .drop-ins-tab-count { font-size: 8px; padding: 1px 4px; }
+.drop-ins-modal.drop-ins-inline .drop-ins-status-indicator { display: none; }
+.drop-ins-modal.drop-ins-inline .drop-ins-workspace { padding: 16px 18px; }
+.drop-ins-modal.drop-ins-inline .drop-ins-section-heading { gap: 8px; margin-bottom: 14px; }
+.drop-ins-modal.drop-ins-inline .drop-ins-section-heading h3 { font-size: 18px; margin: 4px 0 6px; }
+.drop-ins-modal.drop-ins-inline .drop-ins-list-row { gap: 8px; padding: 10px 9px; }
+.drop-ins-modal.drop-ins-inline .drop-ins-list-text h4 { font-size: 12px; }
+.drop-ins-modal.drop-ins-inline .drop-ins-list-text p { font-size: 9px; line-height: 1.45; }
+.drop-ins-modal.drop-ins-inline .drop-ins-list-text > span { font-size: 8px; }
+.drop-ins-modal.drop-ins-inline .drop-ins-icon-button { width: 25px; height: 25px; }
+.drop-ins-modal.drop-ins-inline .drop-ins-list-search { flex-basis: 180px; width: 180px; }
+.drop-ins-modal.drop-ins-inline .drop-ins-heading-actions { gap: 10px; }
+.drop-ins-modal.drop-ins-inline .drop-ins-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.drop-ins-modal.drop-ins-inline .drop-ins-list-row { min-height: clamp(124px, 18cqi, 220px); }
+.drop-ins-modal.drop-ins-inline .drop-ins-section-heading p:not(.drop-ins-eyebrow),
+.drop-ins-modal.drop-ins-inline .drop-ins-builder-note,
+.drop-ins-modal.drop-ins-inline .drop-ins-field > label span { display: none; }
+
+@media (max-width: 760px) {
+  .drop-ins-modal.drop-ins-inline { height: 70%; border-radius: 0; }
+  .drop-ins-modal.drop-ins-inline .drop-ins-body { overflow: hidden; }
+  .drop-ins-modal.drop-ins-inline .drop-in-preview { flex-basis: 92px; }
+  .drop-ins-modal.drop-ins-inline .drop-ins-controls { flex: 1; overflow: hidden; }
+  .drop-ins-modal.drop-ins-inline .drop-in-preview-stage { width: calc(100% - 8px); }
+  .drop-ins-modal.drop-ins-inline .drop-ins-statuses { padding-inline: 4px; gap: 12px; }
+  .drop-ins-modal.drop-ins-inline .drop-ins-workspace { padding: 14px 4px; }
+}
