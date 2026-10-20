@@ -28,6 +28,7 @@ import FieldSettingsModal from './FieldSettingsModal';
 import ColorbarConfigModal from './ColorbarConfigModal';
 import CubePreloader from '../components/CubePreloader';
 import PersonDocumentsModal from '../components/PersonDocumentsModal';
+import ImportPeopleModal from './ImportPeopleModal';
 
 const ICONS = {
   building: Building2, user: User, briefcase: Briefcase, factory: Factory,
@@ -1153,6 +1154,7 @@ const LeadsTable = ({
   const [colorbarRules, setColorbarRules] = useState(() => demoMode ? sanitizeColorbarRuleList(demoInitialColorbarRules) : loadColorbarRules());
   const [settingsField, setSettingsField] = useState(null);
   const [showColorbarStudio, setShowColorbarStudio] = useState(false);
+  const [showImportPeople, setShowImportPeople] = useState(false);
   const [showColumnOptions, setShowColumnOptions] = useState(false);
   const [personDocuments, setPersonDocuments] = useState([]);
   const [documentViewer, setDocumentViewer] = useState(null);
@@ -2275,6 +2277,7 @@ const LeadsTable = ({
         renderDocuments={(person) => <button type="button" onClick={() => setDocumentViewer({ person, initialDocument: personDocumentsById.get(String(person.id))?.[0] })} className="mobile-documents-link">{personDocumentsById.get(String(person.id))?.[0]?.file_name || 'View documents'}{(personDocumentsById.get(String(person.id))?.length || 0) > 1 ? ` +${personDocumentsById.get(String(person.id)).length - 1}` : ''}</button>}
         sortContent={<SortBuilderPopover columns={columns} fieldConfig={fieldConfig} rules={viewSettings.sortRules || []} onChange={(sortRules) => updateViewSettings({ sortRules })} />}
         tools={<div className="mobile-crm-tools">
+          <button type="button" onClick={() => setShowImportPeople(true)}>Import people</button>
           <details><summary>Intake fields</summary><IntakeFieldsPopover columns={allDataColumns} fieldConfig={fieldConfig} onToggleField={setFieldIntakeEnabled} onEnableAll={() => setAllFieldsIntakeEnabled(true)} onDisableAll={() => setAllFieldsIntakeEnabled(false)} /></details>
           <details><summary>Visible fields</summary><ColumnsVisibilityPopover columns={allDataColumns} fieldConfig={fieldConfig} onSetHidden={setColumnHidden} onShowAll={() => setAllColumnsHidden(false)} onHideAll={() => setAllColumnsHidden(true)} /></details>
           <details><summary>Field settings</summary>{allDataColumns.map((column) => <button type="button" key={column.id} onClick={() => setSettingsField(column.id)}>{getColumnLabel(column, fieldConfig)}<Settings2 size={16} /></button>)}</details>
@@ -2303,6 +2306,8 @@ const LeadsTable = ({
         </div>
         <div className="flex-1" />
         <div className="flex items-center gap-2">
+          {!demoMode && <button type="button" onClick={() => setShowImportPeople(true)}
+            className="px-1 text-[12px] text-zinc-500 transition-colors hover:text-white">Import</button>}
           {onRefresh && (
             <button
               type="button"
@@ -2474,6 +2479,7 @@ const LeadsTable = ({
         {settingsField && (
           <FieldSettingsModal fieldKey={settingsField} fieldConfig={fieldConfig[settingsField] || {}} fieldMeta={getFieldDef(settingsField) || customFields.find((field) => field.key === settingsField)} onSave={(config) => handleFieldSave(settingsField, config)} onHide={LOCKED_SYSTEM_COLUMNS.has(settingsField) ? null : handleFieldHide} onClose={() => setSettingsField(null)} intakeEnabledCount={intakeEnabledCount} />
         )}
+        {showImportPeople && !demoMode && <ImportPeopleModal onClose={() => setShowImportPeople(false)} onImported={onRefresh} />}
         {documentViewer && (
           <PersonDocumentsModal
             person={documentViewer.person}

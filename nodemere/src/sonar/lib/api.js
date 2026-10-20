@@ -142,7 +142,18 @@ export const api = {
   getVoiceCatalog: ({ includeUnavailable = false, recheck = false } = {}) => strictGetJSON(`/api/voice-catalog?include_unavailable=${includeUnavailable ? 'true' : 'false'}&recheck=${recheck ? 'true' : 'false'}`),
   getVoiceCatalogVoice: (voiceId) => strictGetJSON(`/api/voice-catalog/${encodeURIComponent(voiceId)}`),
   getPeople: (limit = 500) => fetchJSON(`/api/sonar/people?limit=${limit}`),
-  getPeopleForCRM: (limit = 500) => strictGetJSON(`/api/sonar/people?limit=${limit}`, CRM_READ_TIMEOUT_MS),
+  getPeopleForCRM: (limit = 500, offset = 0) => strictGetJSON(`/api/sonar/people?limit=${limit}&offset=${offset}`, CRM_READ_TIMEOUT_MS),
+  previewPeopleImport: async (file) => {
+    const body = new FormData();
+    body.append('file', file);
+    const response = await fetchWithTimeout(`${API_BASE}/api/sonar/people/import/preview`, {
+      method: 'POST', headers: await buildAuthHeaders(), body,
+    }, 60000);
+    if (!response.ok) throw await parseApiError(response);
+    return response.json();
+  },
+  checkPeopleImport: (payload) => postJSON('/api/sonar/people/import/check', payload, 300000),
+  importPeopleBatch: (payload) => postJSON('/api/sonar/people/import/batch', payload, 120000),
   getPerson: (id) => fetchJSON(`/api/sonar/people/${encodeURIComponent(id)}`),
   getBusinessProfile: () => fetchJSON('/api/sonar/business/profile', BUSINESS_PROFILE_TIMEOUT_MS),
   updateBusinessProfile: (business) => putJSON('/api/sonar/business/profile', business),

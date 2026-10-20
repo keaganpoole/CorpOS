@@ -77,9 +77,12 @@ class UploadLimitMiddleware:
     def __init__(self,app,limit=11*1024*1024): self.app,self.limit=app,limit
     async def __call__(self,scope,receive,send):
         path=scope.get('path','')
-        if scope['type']!='http' or not (path.startswith(('/api/upload/','/api/contracts/')) or path.endswith('/avatar')):
+        import_path = path.startswith('/api/sonar/people/import/')
+        if scope['type']!='http' or not (path.startswith(('/api/upload/','/api/contracts/')) or path.endswith('/avatar') or import_path):
             return await self.app(scope,receive,send)
-        limit=151*1024*1024 if path.startswith('/api/contracts/') and path.endswith('/clone') else self.limit
+        limit=151*1024*1024 if path.startswith('/api/contracts/') and path.endswith('/clone') else (
+            25*1024*1024 if path.endswith('/import/check') else 4*1024*1024 if path.endswith('/import/batch') else self.limit
+        )
         from fastapi import HTTPException
         from starlette.responses import JSONResponse
         headers=dict(scope.get('headers',[]))

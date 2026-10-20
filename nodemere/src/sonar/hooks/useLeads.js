@@ -168,7 +168,13 @@ export function useLeads() {
     setLoading(true);
     setError(null);
     try {
-      const data = await api.getPeopleForCRM(500);
+      const data = [];
+      let page = [];
+      do {
+        page = await api.getPeopleForCRM(500, data.length);
+        if (!Array.isArray(page)) throw new Error('People data was not returned.');
+        data.push(...page);
+      } while (page.length === 500 && !abortRef.current);
       if (!Array.isArray(data)) throw new Error('People data was not returned.');
       if (!abortRef.current) {
         const loaded = data.map((row) => clientKeysRef.current.has(String(row.id))

@@ -1,5 +1,6 @@
 fastapi
 python-multipart
+openpyxl
 uvicorn
 stripe
 supabase

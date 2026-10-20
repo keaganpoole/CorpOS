@@ -174,6 +174,10 @@ from .intercom_knowledge import (
 )
 from .visitor_intelligence import build_visitor_intelligence_router, build_visitor_router, record_verified_billing_event
 from .nest_events import MILESTONE_KEYS, claim_call_milestones, claim_nest_milestone, claim_payment_milestones, get_nest_history, record_call_nest_event, record_nest_event
+from .people_import import (
+    CORE_FIELDS, IMPORT_MARKER, MAX_IMPORT_BYTES, MAX_IMPORT_ROWS,
+    identity_keys, import_fields, parse_people_import, prepare_people_import,
+)
 
 try:
     from elevenlabs.client import ElevenLabs
@@ -12010,15 +12014,117 @@ async def upload_staff_avatar(file: UploadFile = File(...), current_user=Depends
 
 
 @app.get("/api/sonar/people", tags=["Sonar People"])
-async def list_sonar_people(limit: int = 100, current_user: dict = Depends(get_current_user)):
+async def list_sonar_people(limit: int = 100, offset: int = 0, current_user: dict = Depends(get_current_user)):
     business = load_business_by_user_id(business_owner_id(current_user))
     query = supabase.table("people").select("*")
     if business:
         query = query.eq("business_id", business["id"])
     else:
         query = query.eq("user_id", business_owner_id(current_user))
-    response = query.order("created_at", desc=True).limit(max(1, min(limit, 500))).execute()
+    page_size = max(1, min(limit, 500))
+    page_start = max(0, offset)
+    response = query.order("created_at", desc=True).order("id", desc=True).range(page_start, page_start + page_size - 1).execute()
     return response.data or []
+
+
+def _people_import_scope(current_user: dict):
+    owner = business_owner_id(current_user)
+    business = require_business_for_user(owner)
+    plan = require_plan_access(owner, "contacts")
+    return owner, business, plan
+
+
+def _people_import_existing(owner: str, business_id: int):
+    """Page through the whole tenant, including encrypted contact fields."""
+    known_keys, known_markers = set(), set()
+    count = 0
+    offset = 0
+    while True:
+        query = supabase.table("people").select("id,email,phone,custom_fields")
+        query = query.eq("business_id", business_id) if business_id is not None else query.eq("user_id", owner)
+        page = query.order("id").range(offset, offset + 499).execute().data or []
+        for person in page:
+            known_keys.update(identity_keys(person))
+            custom = person.get("custom_fields")
+            if isinstance(custom, dict) and custom.get(IMPORT_MARKER):
+                known_markers.add(str(custom[IMPORT_MARKER]))
+        count += len(page)
+        if len(page) < 500:
+            break
+        offset += 500
+    return count, known_keys, known_markers
+
+
+@app.post("/api/sonar/people/import/preview", tags=["Sonar People"])
+async def preview_sonar_people_import(file: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
+    _, business, _ = _people_import_scope(current_user)
+    content = await file.read(MAX_IMPORT_BYTES + 1)
+    parsed = parse_people_import(content, file.filename or "")
+    return {
+        **parsed,
+        "fields": import_fields(load_people_schema_rows(str(business["id"]))),
+    }
+
+
+@app.post("/api/sonar/people/import/check", tags=["Sonar People"])
+async def check_sonar_people_import(payload: dict, current_user: dict = Depends(get_current_user)):
+    owner, business, plan = _people_import_scope(current_user)
+    fields = import_fields(load_people_schema_rows(str(business["id"])))
+    field_types = {field["key"]: field["type"] for field in fields}
+    count, known_keys, known_markers = _people_import_existing(owner, business["id"])
+    decisions, prepared = prepare_people_import(
+        payload.get("rows"), payload.get("file_hash"), field_types,
+        owner, business["id"], known_keys, known_markers,
+    )
+    limit = plan["entitlements"].get("max_contacts")
+    available = max(0, int(limit) - count) if limit is not None else None
+    return {
+        "decisions": decisions,
+        "ready": len(prepared),
+        "duplicate": sum(item["status"] == "duplicate" for item in decisions),
+        "invalid": sum(item["status"] == "invalid" for item in decisions),
+        "available": available,
+    }
+
+
+@app.post("/api/sonar/people/import/batch", tags=["Sonar People"])
+async def import_sonar_people_batch(payload: dict, current_user: dict = Depends(get_current_user)):
+    owner, business, plan = _people_import_scope(current_user)
+    rows = payload.get("rows")
+    if not isinstance(rows, list) or not 1 <= len(rows) <= 100:
+        raise HTTPException(400, "Send between 1 and 100 records per import batch.")
+    fields = import_fields(load_people_schema_rows(str(business["id"])))
+    field_types = {field["key"]: field["type"] for field in fields}
+    count, known_keys, known_markers = _people_import_existing(owner, business["id"])
+    decisions, prepared = prepare_people_import(
+        rows, payload.get("file_hash"), field_types,
+        owner, business["id"], known_keys, known_markers,
+    )
+    limit = plan["entitlements"].get("max_contacts")
+    if limit is not None and count + len(prepared) > int(limit):
+        raise HTTPException(402, {
+            "code": "plan_limit_reached", "resource": "contacts", "limit": int(limit), "current": count,
+            "message": "This import would exceed your plan's contact limit.",
+        })
+    if prepared:
+        # ProtectedClient encrypts every row before the server-side insert.
+        # Importing directly avoids firing record-created scenarios for old data.
+        columns = set().union(*(record.keys() for record in prepared))
+        insert_rows = [{column: record.get(column) for column in columns} for record in prepared]
+        try:
+            saved = supabase.table("people").insert(insert_rows).execute().data or []
+            if len(saved) != len(insert_rows):
+                raise RuntimeError("The import batch was not confirmed")
+        except Exception as exc:
+            logging.error("main.import_sonar_people_batch.insert_failed", extra={"row_count": len(prepared)})
+            raise HTTPException(500, "This batch could not be saved. No existing people were changed.") from exc
+    return {
+        "decisions": [
+            {**item, "status": "imported" if item["status"] == "ready" else item["status"]}
+            for item in decisions
+        ],
+        "imported": len(prepared),
+    }
 
 
 def serialize_sonar_person_document(row: dict, receptionist: Optional[dict] = None) -> dict:
