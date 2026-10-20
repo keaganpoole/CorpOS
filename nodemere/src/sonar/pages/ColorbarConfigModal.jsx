@@ -524,13 +524,10 @@ const ColorbarConfigModal = ({ onClose, onRulesChange, columns = [], customField
 
   return createPortal(
     <ResponsiveDialog phoneOnly aria-label="Colorbar Studio"
-      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       className="responsive-dialog colorbar-dialog fixed inset-0 z-[200] flex items-center justify-center bg-black/70"
       onClick={onClose}
     >
-      <motion.div
-        initial={{ opacity: 0, scale: 0.92, y: 16 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.92, y: 16 }}
-        transition={{ type: 'spring', damping: 28, stiffness: 350 }}
+      <div
         className="w-[520px] max-h-[80vh] bg-[#0d0d0f] border border-white/[0.06] rounded-2xl overflow-hidden shadow-[0_40px_80px_rgba(0,0,0,0.9)] flex flex-col"
         onClick={e => e.stopPropagation()}
       >
@@ -593,7 +590,7 @@ const ColorbarConfigModal = ({ onClose, onRulesChange, columns = [], customField
             </button>
           </div>
         </div>
-      </motion.div>
+      </div>
     </ResponsiveDialog>,
     document.body
   );
