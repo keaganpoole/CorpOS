@@ -2097,10 +2097,10 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
               Sort
             </TableControlButton>
             <TableControlButton plain ref={visibilityButtonRef} active={activeControl === 'visibility'} onClick={() => setActiveControl((current) => (current === 'visibility' ? null : 'visibility'))}>
-              Hide/Show Columns
+              Columns
             </TableControlButton>
             <TableControlButton plain ref={orderButtonRef} active={activeControl === 'order'} onClick={() => setActiveControl((current) => (current === 'order' ? null : 'order'))}>
-              Column Order
+              Order
             </TableControlButton>
             <TableControlButton plain ref={rowHeightButtonRef} active={activeControl === 'height'} onClick={() => setActiveControl((current) => (current === 'height' ? null : 'height'))}>
               Row Height

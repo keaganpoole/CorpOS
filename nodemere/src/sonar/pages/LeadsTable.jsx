@@ -2328,8 +2328,8 @@ const LeadsTable = ({
             <TableControlButton plain={!demoEntrance} ref={sortButtonRef} active={activeControl === 'sort' || (viewSettings.sortRules || []).length > 0} onClick={() => setActiveControl((current) => (current === 'sort' ? null : 'sort'))}>
               Sort
             </TableControlButton>
-            <TableControlButton plain={!demoEntrance} ariaLabel={demoEntrance ? undefined : 'Hide/Show Columns'} ref={visibilityButtonRef} active={activeControl === 'visibility'} onClick={() => setActiveControl((current) => (current === 'visibility' ? null : 'visibility'))}>
-              {demoEntrance ? 'Hide/Show Columns' : 'Fields'}
+            <TableControlButton plain={!demoEntrance} ariaLabel={demoEntrance ? undefined : 'Columns'} ref={visibilityButtonRef} active={activeControl === 'visibility'} onClick={() => setActiveControl((current) => (current === 'visibility' ? null : 'visibility'))}>
+              {demoEntrance ? 'Hide/Show Columns' : 'Columns'}
             </TableControlButton>
             <TableControlButton plain={!demoEntrance} ariaLabel={demoEntrance ? undefined : 'Column Order'} ref={orderButtonRef} active={activeControl === 'order'} onClick={() => setActiveControl((current) => (current === 'order' ? null : 'order'))}>
               {demoEntrance ? 'Column Order' : 'Order'}
