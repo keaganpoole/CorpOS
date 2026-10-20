@@ -1662,11 +1662,16 @@ const StaffAvailabilitySelector = ({ value, onChange }) => {
 
 const StaffCard = ({ staff, isSelected = false, onSelect, onEdit, onDelete, onToggleActive, compact = false }) => {
   const [avatarFailed, setAvatarFailed] = useState(false);
+  const [detailsExpanded, setDetailsExpanded] = useState(false);
   const availability = getStaffAvailabilitySummary(staff.working_hours);
   const borderClass = isSelected ? 'border-[color-mix(in_srgb,var(--brandGradientStart)_16%,transparent)] shadow-[0_0_14px_color-mix(in_srgb,var(--brandGradientStart)_2%,transparent)]' : 'border-white/[0.04]';
-  const cardSizeClass = compact ? 'h-[465px] min-h-[465px] max-h-[465px] w-[300px] min-w-[300px] max-w-[300px]' : 'h-[550px] min-h-[550px] max-h-[550px] w-[380px] min-w-[380px] max-w-[380px]';
+  const cardSizeClass = compact
+    ? `${detailsExpanded ? 'h-[465px] min-h-[465px] max-h-[465px]' : 'h-auto min-h-0 max-h-none'} w-[300px] min-w-[300px] max-w-[300px]`
+    : `${detailsExpanded ? 'h-[550px] min-h-[550px] max-h-[550px]' : 'h-auto min-h-0 max-h-none'} w-[380px] min-w-[380px] max-w-[380px]`;
   const imageHeightClass = compact ? 'h-[150px]' : 'h-[280px]';
-  const bodyClass = compact ? 'h-[315px] min-h-[315px] max-h-[315px] p-4 space-y-2.5' : 'h-[270px] min-h-[270px] max-h-[270px] p-6 space-y-3.5';
+  const bodyClass = compact
+    ? `${detailsExpanded ? 'h-[315px] min-h-[315px] max-h-[315px]' : ''} p-4 space-y-2.5`
+    : `${detailsExpanded ? 'h-[270px] min-h-[270px] max-h-[270px]' : ''} p-6 space-y-3.5`;
   const nameClass = compact ? 'text-xl' : 'text-2xl';
   const showAvatar = Boolean(staff.avatar) && !avatarFailed;
   const staffTypeLabel = staff.staff_type === 'both' ? 'Both' : staff.staff_type === 'transfer_contact' || staff.staff_type === 'authorized_representative' ? 'Manager' : 'Team Member';
@@ -1755,7 +1760,16 @@ const StaffCard = ({ staff, isSelected = false, onSelect, onEdit, onDelete, onTo
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-5 border-b border-white/[0.04] px-0.5 pb-3">
+        <button
+          type="button"
+          aria-expanded={detailsExpanded}
+          aria-controls={`staff-card-details-${staff.id}`}
+          onClick={(event) => {
+            event.stopPropagation();
+            setDetailsExpanded((expanded) => !expanded);
+          }}
+          className="grid w-full grid-cols-[1fr_1fr_auto] items-center gap-3 border-b border-white/[0.04] px-0.5 pb-3 text-left"
+        >
           <div className="min-w-0">
             <p className="mb-1.5 text-[8px] font-bold uppercase tracking-widest text-zinc-700">Staff Type</p>
             <p className="text-[11px] font-bold leading-none tracking-tight text-zinc-300">{staffTypeLabel}</p>
@@ -1764,9 +1778,11 @@ const StaffCard = ({ staff, isSelected = false, onSelect, onEdit, onDelete, onTo
             <p className="mb-1.5 text-[8px] font-bold uppercase tracking-widest text-zinc-700">Escalations</p>
             <p className="text-[11px] font-bold leading-none tracking-tight text-zinc-300">{hasEnabledScheduleHours(staff.escalation_hours) ? 'Active' : 'Inactive'}</p>
           </div>
-        </div>
+          {detailsExpanded ? <ChevronUp size={13} className="text-zinc-600" /> : <ChevronDown size={13} className="text-zinc-600" />}
+        </button>
 
-        <div className={`grid grid-cols-2 gap-x-5 gap-y-3 border-t border-white/[0.04] ${compact ? 'pt-2.5' : 'pt-3.5'}`}>
+        {detailsExpanded && <div id={`staff-card-details-${staff.id}`} className="space-y-3">
+        <div className="grid grid-cols-2 gap-x-5 gap-y-3">
           <div className="min-w-0">
             <p className="mb-1.5 flex items-center gap-1.5 text-[8px] font-bold uppercase tracking-widest text-zinc-700">
               <CalendarClock size={10} className="settings-icon" />
@@ -1811,6 +1827,7 @@ const StaffCard = ({ staff, isSelected = false, onSelect, onEdit, onDelete, onTo
             {staff.knowledge || 'No knowledge set'}
           </p>
         </div>
+        </div>}
       </div>
     </motion.div>
   );

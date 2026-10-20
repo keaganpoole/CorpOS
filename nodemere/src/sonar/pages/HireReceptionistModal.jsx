@@ -46,6 +46,7 @@ const HireReceptionistModal = ({
   onGalleryInteraction,
   interactive = true,
   portalDetail = false,
+  showPersonalityTypePill = false,
 }) => {
   const [receptionists, setReceptionists] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -342,6 +343,20 @@ const HireReceptionistModal = ({
                 <div className="ns-receptionist-preview-image">
                   {person.avatar_video ? <video src={avatarVideoUrl(person.avatar_video)} poster={person.avatar || undefined} autoPlay muted loop playsInline preload="metadata" aria-label={`${person.full_name || 'Receptionist'} video portrait`} /> : person.avatar ? <img src={person.avatar} alt={person.full_name || 'Receptionist'} style={person.source === 'created_receptionist' || person.created_receptionist_id != null ? { objectPosition: 'center top' } : undefined} /> : <div className="ns-gallery-placeholder"><User size={64}/></div>}
                   <div className="ns-receptionist-preview-image-wash" />
+                  {showPersonalityTypePill && catalogMbti(person) && (
+                    <button
+                      type="button"
+                      title={person.personality?.personality || 'Personality type'}
+                      aria-label={`Learn about ${catalogMbti(person)} personality type`}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setPersonalityPerson(person);
+                      }}
+                      className="absolute bottom-6 left-8 z-10 inline-flex items-center rounded-full border border-violet-300/20 bg-violet-300/10 px-2.5 py-1 text-[10px] font-bold tracking-[0.14em] text-violet-100/75 transition hover:border-violet-200/35 hover:bg-violet-300/15 hover:text-white"
+                    >
+                      {catalogMbti(person)}
+                    </button>
+                  )}
                 </div>
                 <div className="ns-receptionist-preview-body">
                   <div className={`ns-catalog-status-row${hideVoiceButton ? ' is-autoplay' : ''}${compactVoicePreview ? ' is-compact-preview' : ''}`}>
@@ -352,7 +367,7 @@ const HireReceptionistModal = ({
                   {description && (expandableDescription ? <div className="ns-catalog-description"><p className={`ns-receptionist-preview-copy${descriptionExpanded ? '' : ' is-collapsed'}`}>{description}</p><button type="button" aria-expanded={descriptionExpanded} onClick={() => setDescriptionExpanded(expanded => !expanded)}>{descriptionExpanded ? 'Show less' : 'Show more'}</button></div> : <p className="ns-receptionist-preview-copy">{description}</p>)}
                   <dl className={`ns-catalog-review-meta${isCreatedReceptionist(person) ? ' ns-catalog-review-meta-created' : ''}`}>
                     {person.age && <div><dt>Age</dt><dd>{String(person.age).match(/^\d+$/) ? `${person.age} years old` : person.age}</dd></div>}
-                    {catalogMbti(person) && <div><dt>Personality</dt><dd><button type="button" onClick={() => setPersonalityPerson(person)}>{catalogMbti(person)}</button></dd></div>}
+                    {!showPersonalityTypePill && catalogMbti(person) && <div><dt>Personality</dt><dd><button type="button" onClick={() => setPersonalityPerson(person)}>{catalogMbti(person)}</button></dd></div>}
                     {catalogAccentTraits(person).length > 0 && <div><dt>Accent</dt><dd>{catalogAccentTraits(person).join(' · ')}</dd></div>}
                   </dl>
                   {catalogCoreTraits(person).length > 0 && <div className="ns-catalog-review-traits"><span>Core traits</span><div>{catalogCoreTraits(person).map((trait, i) => <span key={i}>{trait}</span>)}</div></div>}

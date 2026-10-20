@@ -102,7 +102,7 @@ const ZoneColorPalette = ({ position, activeColor, onPreviewColor, onClearPrevie
   return createPortal(
     <div
       className="fixed z-[260]"
-      style={{ left: position.left, top: position.top - 52, transform: 'translateX(-50%)' }}
+      style={{ left: position.left, top: position.top - 52, transform: 'translateX(-50%)', fontFamily: "'Inter', sans-serif" }}
       data-zone-palette="true"
       onClick={(event) => event.stopPropagation()}
     >
@@ -361,7 +361,7 @@ const InlineBoolean = ({ value, onSave }) => {
   );
 };
 
-const InlineSelect = ({ value, options, onSave, type = 'select', optionColors = {} }) => {
+const InlineSelect = ({ value, options, onSave, type = 'select', optionColors = {}, valueTextClassName }) => {
   const [open, setOpen] = useState(false);
   const [menuPosition, setMenuPosition] = useState(null);
   const ref = useRef(null);
@@ -416,10 +416,11 @@ const InlineSelect = ({ value, options, onSave, type = 'select', optionColors = 
     return palettes[color] || palettes.zinc;
   };
   const currentStyle = styleFor(current);
+  const currentTextClassName = valueTextClassName || currentStyle.text;
   return (
     <div className="relative" ref={ref}>
       <button onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
-        className={`w-full min-h-[26px] inline-flex items-center justify-start gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-semibold tracking-[-0.02em] border ${currentStyle.bg} ${currentStyle.text} ${currentStyle.border}`}>
+        className={`w-full min-h-[26px] inline-flex items-center justify-start gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-semibold tracking-[-0.02em] border ${currentStyle.bg} ${currentTextClassName} ${currentStyle.border}`}>
         {current ? (
           <>
             <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: currentStyle.dot }} />
@@ -663,7 +664,7 @@ const LeadCell = ({ colId, lead, dc, autoSave, onSelect, fieldConfig = {}, custo
     if (customField.type === 'date') return <InlineDateOnly value={value} onSave={saveCustom} />;
     if (customField.type === 'select') return <InlineSelect value={value} options={customField.options || []} onSave={saveCustom} optionColors={fieldConfig[colId]?.optionColors || {}} />;
     if (customField.type === 'multi_select') return <InlineMultiSelect value={value} options={customField.options || []} onSave={saveCustom} optionColors={fieldConfig[colId]?.optionColors || {}} />;
-    return <InlineText value={value} onSave={saveCustom} className="block truncate text-[12px] font-semibold tracking-[-0.02em] text-zinc-400" placeholder="" />;
+    return <InlineText value={value} onSave={saveCustom} className="block truncate text-[12px] font-normal tracking-[-0.02em] text-zinc-400" placeholder="" />;
   }
 
   switch (colId) {
@@ -693,15 +694,15 @@ const LeadCell = ({ colId, lead, dc, autoSave, onSelect, fieldConfig = {}, custo
       return (
         <div className="min-w-0 overflow-hidden">
           <div className="flex items-center gap-1.5 min-w-0">
-            <InlineText value={lead.first_name} onSave={(v) => autoSave(lead.id, 'first_name', v)} className="block truncate text-[13px] font-semibold tracking-[-0.02em] leading-tight text-white" placeholder="First" />
-            <InlineText value={lead.last_name} onSave={(v) => autoSave(lead.id, 'last_name', v)} className="block truncate text-[13px] font-semibold tracking-[-0.02em] leading-tight text-white" placeholder="Last" />
+            <InlineText value={lead.first_name} onSave={(v) => autoSave(lead.id, 'first_name', v)} className="block truncate text-[12px] font-normal tracking-[-0.02em] leading-tight text-white" placeholder="First" />
+            <InlineText value={lead.last_name} onSave={(v) => autoSave(lead.id, 'last_name', v)} className="block truncate text-[12px] font-normal tracking-[-0.02em] leading-tight text-white" placeholder="Last" />
           </div>
           {!lead.first_name && !lead.last_name && <span className="text-[12px] text-zinc-700 italic">Untitled Person</span>}
         </div>
       );
-    case 'phone': return <InlineText value={lead.phone} onSave={(v) => autoSave(lead.id, 'phone', v)} className="block truncate text-[12px] font-semibold tracking-[-0.02em] text-zinc-400" placeholder="" />;
-    case 'email': return <InlineText value={lead.email} onSave={(v) => autoSave(lead.id, 'email', v)} className="block truncate text-[12px] font-semibold tracking-[-0.02em] text-zinc-400" placeholder="" />;
-    case 'source': return <InlineSelect value={lead.source} options={getConfiguredOptions('source', SOURCE_OPTIONS)} onSave={(v) => autoSave(lead.id, 'source', v)} optionColors={fieldConfig.source?.optionColors || {}} />;
+    case 'phone': return <InlineText value={lead.phone} onSave={(v) => autoSave(lead.id, 'phone', v)} className="block truncate text-[12px] font-normal tracking-[-0.02em] text-zinc-400" placeholder="" />;
+    case 'email': return <InlineText value={lead.email} onSave={(v) => autoSave(lead.id, 'email', v)} className="block truncate text-[12px] font-normal tracking-[-0.02em] text-zinc-400" placeholder="" />;
+    case 'source': return <InlineSelect value={lead.source} options={getConfiguredOptions('source', SOURCE_OPTIONS)} onSave={(v) => autoSave(lead.id, 'source', v)} optionColors={fieldConfig.source?.optionColors || {}} valueTextClassName="text-zinc-400" />;
     case 'preferred_contact_method': return <InlineSelect value={lead.preferred_contact_method} options={getConfiguredOptions('preferred_contact_method', CONTACT_METHOD_OPTIONS)} onSave={(v) => autoSave(lead.id, 'preferred_contact_method', v)} optionColors={fieldConfig.preferred_contact_method?.optionColors || {}} />;
     case 'last_call_status': return <InlineSelect value={lead.last_call_status} options={getConfiguredOptions('last_call_status', CALL_STATUS_OPTIONS)} onSave={(v) => autoSave(lead.id, 'last_call_status', v)} optionColors={fieldConfig.last_call_status?.optionColors || {}} />;
     case 'callback_due_at': return <InlineDate value={lead.callback_due_at} onSave={(v) => autoSave(lead.id, 'callback_due_at', v)} />;
@@ -712,12 +713,12 @@ const LeadCell = ({ colId, lead, dc, autoSave, onSelect, fieldConfig = {}, custo
       if (!field) return null;
       const value = lead[colId];
       if (field.type === 'boolean') return <InlineBoolean value={value} onSave={(v) => autoSave(lead.id, colId, v)} />;
-      if (field.type === 'currency') return field.editable ? <InlineCurrency value={value} onSave={(v) => autoSave(lead.id, colId, v)} /> : <span tabIndex={0} className="text-[12px] font-semibold tracking-[-0.02em] text-zinc-400 tabular-nums">{formatCurrency(value)}</span>;
-      if (field.type === 'number') return field.editable ? <InlineNumber value={value} onSave={(v) => autoSave(lead.id, colId, v)} min={field.min ?? 0} max={field.max ?? 999999} /> : <span tabIndex={0} className="text-[12px] font-semibold tracking-[-0.02em] text-zinc-400 tabular-nums">{value ?? ''}</span>;
+      if (field.type === 'currency') return field.editable ? <InlineCurrency value={value} onSave={(v) => autoSave(lead.id, colId, v)} /> : <span tabIndex={0} className="text-[12px] font-normal tracking-[-0.02em] text-zinc-400 tabular-nums">{formatCurrency(value)}</span>;
+      if (field.type === 'number') return field.editable ? <InlineNumber value={value} onSave={(v) => autoSave(lead.id, colId, v)} min={field.min ?? 0} max={field.max ?? 999999} /> : <span tabIndex={0} className="text-[12px] font-normal tracking-[-0.02em] text-zinc-400 tabular-nums">{value ?? ''}</span>;
       if (field.type === 'timestamp') return field.editable ? <InlineDate value={value} onSave={(v) => autoSave(lead.id, colId, v)} /> : <span tabIndex={0} className="text-[12px] font-semibold tracking-[-0.02em] text-zinc-500">{formatTimestamp(value)}</span>;
       if (field.type === 'select') return <InlineSelect value={value} options={getConfiguredOptions(colId, field.options || [])} onSave={(v) => autoSave(lead.id, colId, v)} optionColors={fieldConfig[colId]?.optionColors || {}} />;
       if (field.type === 'multi_select') return <InlineMultiSelect value={value} options={getConfiguredOptions(colId, field.options || [])} onSave={(v) => autoSave(lead.id, colId, v)} optionColors={fieldConfig[colId]?.optionColors || {}} />;
-      return <InlineText value={value} onSave={(v) => autoSave(lead.id, colId, v)} className="block truncate text-[12px] font-semibold tracking-[-0.02em] text-zinc-400" placeholder="" />;
+      return <InlineText value={value} onSave={(v) => autoSave(lead.id, colId, v)} className="block truncate text-[12px] font-normal tracking-[-0.02em] text-zinc-400" placeholder="" />;
     }
   }
 };
@@ -840,18 +841,22 @@ const savePeopleTableView = (view) => {
   } catch {}
 };
 
-const TableControlButton = React.forwardRef(({ active, children, onClick }, ref) => (
+const TableControlButton = React.forwardRef(({ active, children, onClick, plain = false, ariaLabel }, ref) => (
   <button
     ref={ref}
     type="button"
     onClick={onClick}
-    className={`inline-flex h-8 items-center gap-2 rounded-xl border px-3 text-[11px] font-semibold tracking-[-0.02em] transition-all ${
-      active
-        ? 'border-white/[0.12] bg-white/[0.06] text-white'
-        : 'border-white/[0.06] bg-white/[0.025] text-zinc-500 hover:border-white/[0.14] hover:bg-white/[0.05] hover:text-zinc-200'
-    }`}
+    aria-label={ariaLabel}
+    className={plain
+      ? 'inline-flex shrink-0 items-center gap-1 pr-[2px] text-[12px] font-semibold leading-none text-zinc-500 transition-colors duration-150 hover:text-zinc-400'
+      : `inline-flex h-8 items-center gap-2 rounded-xl border px-3 text-[11px] font-semibold tracking-[-0.02em] transition-all ${
+        active
+          ? 'border-white/[0.12] bg-white/[0.06] text-white'
+          : 'border-white/[0.06] bg-white/[0.025] text-zinc-500 hover:border-white/[0.14] hover:bg-white/[0.05] hover:text-zinc-200'
+      }`}
   >
     {children}
+    {plain && <ChevronDown size={12} strokeWidth={2.75} className="translate-y-px text-current" />}
   </button>
 ));
 TableControlButton.displayName = 'TableControlButton';
@@ -892,7 +897,7 @@ const FloatingPopover = ({ anchorRef, open, onClose, width = 280, children }) =>
           initial={{ opacity: 0, y: -4, scale: 0.96 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -4, scale: 0.96 }}
-          style={{ top: position.top, left: position.left, width }}
+          style={{ top: position.top, left: position.left, width, fontFamily: "'Inter', sans-serif" }}
           className="fixed z-[230] overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0a0a0a] shadow-[0_14px_36px_rgba(0,0,0,0.66)] [&_input:focus]:!outline-none [&_input:focus-visible]:!outline-none [&_input:focus]:!ring-0 [&_input:focus]:!shadow-none"
         >
           {children}
@@ -2295,9 +2300,6 @@ const LeadsTable = ({
             <Wand2 size={12} className="relative z-10 text-zinc-400 transition-colors group-hover/colorbar:rotate-12 group-hover/colorbar:text-white duration-300" />
             <span className="relative z-10">Colorbar</span>
           </button>
-          <TableControlButton ref={intakeButtonRef} active={activeControl === 'intake'} onClick={() => setActiveControl((current) => (current === 'intake' ? null : 'intake'))}>
-            Intake
-          </TableControlButton>
         </div>
         <div className="flex-1" />
         <div className="flex items-center gap-2">
@@ -2305,7 +2307,7 @@ const LeadsTable = ({
             <button
               type="button"
               onClick={onRefresh}
-              className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-md border border-white/[0.06] bg-white/[0.02] text-zinc-500 transition-colors hover:border-white/[0.10] hover:bg-white/[0.035] hover:text-white active:scale-95"
+              className="flex h-[34px] w-[34px] shrink-0 items-center justify-center text-zinc-500 transition-colors hover:text-white active:scale-95"
               aria-label="Refresh people"
               title="Refresh people"
             >
@@ -2322,18 +2324,21 @@ const LeadsTable = ({
 
       <div className="flex-1 px-6 pb-6 min-h-0">
         <div className="relative group/table h-full flex flex-col">
-          <div className={`mb-3 flex shrink-0 items-center gap-2 px-1 ${demoEntrance ? 'crm-demo-entrance-controls' : ''}`}>
-            <TableControlButton ref={sortButtonRef} active={activeControl === 'sort' || (viewSettings.sortRules || []).length > 0} onClick={() => setActiveControl((current) => (current === 'sort' ? null : 'sort'))}>
+          <div className={`flex shrink-0 items-center ${demoEntrance ? 'mb-3 gap-2 px-1 crm-demo-entrance-controls' : 'gap-[14px] px-6 pb-4 text-[12px] text-zinc-500'}`} style={demoEntrance ? undefined : { fontFamily: 'var(--font-family-sans)' }}>
+            <TableControlButton plain={!demoEntrance} ref={sortButtonRef} active={activeControl === 'sort' || (viewSettings.sortRules || []).length > 0} onClick={() => setActiveControl((current) => (current === 'sort' ? null : 'sort'))}>
               Sort
             </TableControlButton>
-            <TableControlButton ref={visibilityButtonRef} active={activeControl === 'visibility'} onClick={() => setActiveControl((current) => (current === 'visibility' ? null : 'visibility'))}>
-              Hide/Show Columns
+            <TableControlButton plain={!demoEntrance} ariaLabel={demoEntrance ? undefined : 'Hide/Show Columns'} ref={visibilityButtonRef} active={activeControl === 'visibility'} onClick={() => setActiveControl((current) => (current === 'visibility' ? null : 'visibility'))}>
+              {demoEntrance ? 'Hide/Show Columns' : 'Fields'}
             </TableControlButton>
-            <TableControlButton ref={orderButtonRef} active={activeControl === 'order'} onClick={() => setActiveControl((current) => (current === 'order' ? null : 'order'))}>
-              Column Order
+            <TableControlButton plain={!demoEntrance} ariaLabel={demoEntrance ? undefined : 'Column Order'} ref={orderButtonRef} active={activeControl === 'order'} onClick={() => setActiveControl((current) => (current === 'order' ? null : 'order'))}>
+              {demoEntrance ? 'Column Order' : 'Order'}
             </TableControlButton>
-            <TableControlButton ref={rowHeightButtonRef} active={activeControl === 'height'} onClick={() => setActiveControl((current) => (current === 'height' ? null : 'height'))}>
+            <TableControlButton plain={!demoEntrance} ref={rowHeightButtonRef} active={activeControl === 'height'} onClick={() => setActiveControl((current) => (current === 'height' ? null : 'height'))}>
               Row Height
+            </TableControlButton>
+            <TableControlButton plain={!demoEntrance} ref={intakeButtonRef} active={activeControl === 'intake'} onClick={() => setActiveControl((current) => (current === 'intake' ? null : 'intake'))}>
+              Intake
             </TableControlButton>
           </div>
           <div className="relative bg-[#0a0a0a]/80 backdrop-blur-xl border border-white/[0.06] rounded-[1.5rem] flex flex-col h-full overflow-hidden">

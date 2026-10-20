@@ -51,7 +51,7 @@ const PeoplePage = ({ hideTitle = false, onToolbarMetaChange = null }) => {
   };
 
   return (
-    <div className="flex h-full bg-[#020202] relative overflow-hidden">
+    <div className="flex h-full bg-[#020202] relative overflow-hidden" style={{ fontFamily: "'Inter', sans-serif" }}>
       {/* Error banner */}
       {error && (
         <div className="absolute top-0 left-0 right-0 z-50 bg-rose-500/10 border-b border-rose-500/20 px-8 py-2 flex items-center gap-3">

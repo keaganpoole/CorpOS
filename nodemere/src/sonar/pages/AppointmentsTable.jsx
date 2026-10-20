@@ -92,7 +92,7 @@ const ZoneColorPalette = ({ position, activeColor, onPreviewColor, onClearPrevie
   return createPortal(
     <div
       className="fixed z-[260]"
-      style={{ left: position.left, top: position.top - 52, transform: 'translateX(-50%)' }}
+      style={{ left: position.left, top: position.top - 52, transform: 'translateX(-50%)', fontFamily: "'Inter', sans-serif" }}
       data-zone-palette="true"
       onClick={(event) => event.stopPropagation()}
     >
@@ -344,7 +344,7 @@ const InlineTime = ({ value, onSave }) => {
     <div className="relative block w-full">
       <span
         onClick={(e) => { e.stopPropagation(); setDraft(value || ''); setEditing(true); }}
-        className="block w-full cursor-pointer truncate text-[12px] font-semibold tracking-[-0.02em] text-zinc-400 transition-colors hover:text-white"
+        className="block w-full cursor-pointer truncate text-[12px] font-normal tracking-[-0.02em] text-zinc-400 transition-colors hover:text-white"
       >
         {formatTime(value)}
       </span>
@@ -396,7 +396,7 @@ const InlineBoolean = ({ value, onSave }) => {
   );
 };
 
-const InlineSelect = ({ value, options, onSave, type = 'select', optionColors = {} }) => {
+const InlineSelect = ({ value, options, onSave, type = 'select', optionColors = {}, valueTextClassName }) => {
   const [open, setOpen] = useState(false);
   const [menuPosition, setMenuPosition] = useState(null);
   const ref = useRef(null);
@@ -448,6 +448,7 @@ const InlineSelect = ({ value, options, onSave, type = 'select', optionColors = 
     return palettes[color] || palettes.zinc;
   };
   const currentStyle = styleFor(current);
+  const currentTextClassName = valueTextClassName || currentStyle.text;
   const handleSave = (event, nextValue) => {
     event.preventDefault();
     event.stopPropagation();
@@ -458,7 +459,7 @@ const InlineSelect = ({ value, options, onSave, type = 'select', optionColors = 
   return (
     <div className="relative" ref={ref}>
       <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen(!open); }}
-        className={`w-full min-h-[26px] inline-flex items-center justify-start gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-semibold tracking-[-0.02em] border ${currentStyle.bg} ${currentStyle.text} ${currentStyle.border}`}>
+        className={`w-full min-h-[26px] inline-flex items-center justify-start gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-semibold tracking-[-0.02em] border ${currentStyle.bg} ${currentTextClassName} ${currentStyle.border}`}>
         {current ? (
           <>
             <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: currentStyle.dot }} />
@@ -477,6 +478,7 @@ const InlineSelect = ({ value, options, onSave, type = 'select', optionColors = 
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -4, scale: 0.96 }}
             style={{
+              fontFamily: "'Inter', sans-serif",
               left: menuPosition?.left ?? 0,
               top: menuPosition?.top,
               bottom: menuPosition?.bottom,
@@ -590,6 +592,7 @@ const InlineMultiSelect = ({ value, options, onSave, optionColors = {} }) => {
             exit={{ opacity: 0, y: 4, scale: 0.98 }}
             transition={{ duration: 0.12 }}
             style={{
+              fontFamily: "'Inter', sans-serif",
               left: menuPosition?.left ?? 0,
               top: menuPosition?.top,
               bottom: menuPosition?.bottom,
@@ -620,6 +623,7 @@ const InlineMultiSelect = ({ value, options, onSave, optionColors = {} }) => {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -4, scale: 0.96 }}
             style={{
+              fontFamily: "'Inter', sans-serif",
               left: menuPosition?.left ?? 0,
               top: menuPosition?.top,
               bottom: menuPosition?.bottom,
@@ -693,7 +697,7 @@ const InlineLookupSelect = ({ value, options = [], onSave, placeholder = 'Select
         onClick={(event) => { event.stopPropagation(); setOpen((next) => !next); }}
         className="w-full min-h-[26px] inline-flex items-center justify-between gap-2 px-2.5 py-1 rounded-lg text-[10px] font-semibold tracking-[-0.02em] border bg-white/[0.04] text-white border-white/[0.08]"
       >
-        <span className={`truncate ${current ? '' : 'text-zinc-600'}`}>{current?.label || placeholder}</span>
+        <span className={`truncate ${current ? 'text-zinc-400' : 'text-zinc-600'}`}>{current?.label || placeholder}</span>
         <ChevronDown size={10} className="shrink-0 text-zinc-600" />
       </button>
       {createPortal(
@@ -705,6 +709,7 @@ const InlineLookupSelect = ({ value, options = [], onSave, placeholder = 'Select
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -4, scale: 0.96 }}
               style={{
+                fontFamily: "'Inter', sans-serif",
                 left: menuPosition?.left ?? 0,
                 top: menuPosition?.top,
                 bottom: menuPosition?.bottom,
@@ -841,7 +846,7 @@ const AppointmentCell = ({ colId, appointment, dc, autoSave, onSelect, fieldConf
           <span className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/[0.08] bg-white/[0.04] text-[10px] font-bold text-zinc-300">
             {avatarSrc ? <img src={avatarSrc} alt="" className="h-full w-full object-cover" /> : avatarLabel}
           </span>
-          <span className={`truncate text-[11px] font-semibold tracking-[-0.02em] ${receptionist ? 'text-zinc-200' : 'text-zinc-500'}`}>
+          <span className="truncate text-[11px] font-semibold tracking-[-0.02em] text-zinc-400">
             {receptionistName}
           </span>
         </div>
@@ -852,13 +857,13 @@ const AppointmentCell = ({ colId, appointment, dc, autoSave, onSelect, fieldConf
       if (!field) return null;
       const value = appointment[colId];
       if (field.type === 'boolean') return <InlineBoolean value={value} onSave={(v) => autoSave(appointment.id, colId, v)} />;
-      if (field.type === 'number') return field.editable ? <InlineNumber value={value} onSave={(v) => autoSave(appointment.id, colId, v)} min={field.min ?? 0} max={field.max ?? 999999} /> : <span tabIndex={0} className="text-[12px] font-semibold tracking-[-0.02em] text-zinc-400 tabular-nums">{value ?? ''}</span>;
+      if (field.type === 'number') return field.editable ? <InlineNumber value={value} onSave={(v) => autoSave(appointment.id, colId, v)} min={field.min ?? 0} max={field.max ?? 999999} /> : <span tabIndex={0} className="text-[12px] font-normal tracking-[-0.02em] text-zinc-400 tabular-nums">{value ?? ''}</span>;
       if (field.type === 'timestamp') return field.editable ? <InlineDate value={value} onSave={(v) => autoSave(appointment.id, colId, v)} /> : <span tabIndex={0} className="text-[12px] font-semibold tracking-[-0.02em] text-zinc-500">{formatTimestamp(value)}</span>;
       if (field.type === 'date') return field.editable ? <InlineDateOnly value={value} onSave={(v) => autoSave(appointment.id, colId, v)} /> : <span tabIndex={0} className="text-[12px] font-semibold tracking-[-0.02em] text-zinc-500">{formatDate(value)}</span>;
-      if (field.type === 'time') return field.editable ? <InlineTime value={value} onSave={(v) => autoSave(appointment.id, 'time', v)} /> : <span tabIndex={0} className="text-[12px] font-semibold tracking-[-0.02em] text-zinc-500">{formatTime(value)}</span>;
-      if (field.type === 'select') return <InlineSelect value={value} options={getConfiguredOptions(colId, field.options || [])} onSave={(v) => autoSave(appointment.id, colId, v)} optionColors={fieldConfig[colId]?.optionColors || {}} />;
+      if (field.type === 'time') return field.editable ? <InlineTime value={value} onSave={(v) => autoSave(appointment.id, 'time', v)} /> : <span tabIndex={0} className="text-[12px] font-normal tracking-[-0.02em] text-zinc-500">{formatTime(value)}</span>;
+      if (field.type === 'select') return <InlineSelect value={value} options={getConfiguredOptions(colId, field.options || [])} onSave={(v) => autoSave(appointment.id, colId, v)} optionColors={fieldConfig[colId]?.optionColors || {}} valueTextClassName={colId === 'status' ? 'text-zinc-200' : undefined} />;
       if (field.type === 'multi_select') return <InlineMultiSelect value={value} options={getConfiguredOptions(colId, field.options || [])} onSave={(v) => autoSave(appointment.id, colId, v)} optionColors={fieldConfig[colId]?.optionColors || {}} />;
-      return <InlineText value={value} onSave={(v) => autoSave(appointment.id, colId, v)} className="block truncate text-[12px] font-semibold tracking-[-0.02em] text-zinc-400" placeholder="" />;
+      return <InlineText value={value} onSave={(v) => autoSave(appointment.id, colId, v)} className="block truncate text-[12px] font-normal tracking-[-0.02em] text-zinc-400" placeholder="" />;
     }
   }
 };
@@ -946,18 +951,21 @@ const saveAppointmentsTableView = (view) => {
   } catch {}
 };
 
-const TableControlButton = React.forwardRef(({ active, children, onClick }, ref) => (
+const TableControlButton = React.forwardRef(({ active, children, onClick, plain = false }, ref) => (
   <button
     ref={ref}
     type="button"
     onClick={onClick}
-    className={`inline-flex h-8 items-center gap-2 rounded-xl border px-3 text-[11px] font-semibold tracking-[-0.02em] transition-all ${
-      active
-        ? 'border-white/[0.12] bg-white/[0.06] text-white'
-        : 'border-white/[0.06] bg-white/[0.025] text-zinc-500 hover:border-white/[0.14] hover:bg-white/[0.05] hover:text-zinc-200'
-    }`}
+    className={plain
+      ? 'inline-flex shrink-0 items-center gap-1 pr-[2px] text-[12px] font-semibold leading-none text-zinc-500 transition-colors duration-150 hover:text-zinc-400'
+      : `inline-flex h-8 items-center gap-2 rounded-xl border px-3 text-[11px] font-semibold tracking-[-0.02em] transition-all ${
+        active
+          ? 'border-white/[0.12] bg-white/[0.06] text-white'
+          : 'border-white/[0.06] bg-white/[0.025] text-zinc-500 hover:border-white/[0.14] hover:bg-white/[0.05] hover:text-zinc-200'
+      }`}
   >
     {children}
+    {plain && <ChevronDown size={12} strokeWidth={2.75} className="translate-y-px text-current" />}
   </button>
 ));
 TableControlButton.displayName = 'TableControlButton';
@@ -2067,7 +2075,7 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
             <button
               type="button"
               onClick={onRefresh}
-              className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-md border border-white/[0.06] bg-white/[0.02] text-zinc-500 transition-colors hover:border-white/[0.10] hover:bg-white/[0.035] hover:text-white active:scale-95"
+              className="flex h-[34px] w-[34px] shrink-0 items-center justify-center text-zinc-500 transition-colors hover:text-white active:scale-95"
               aria-label="Refresh appointments"
               title="Refresh appointments"
             >
@@ -2084,17 +2092,17 @@ const AppointmentsTable = ({ appointments, loading, justAddedAppointmentIds = []
 
       <div className="flex-1 px-6 pb-6 min-h-0">
         <div className="relative group/table h-full flex flex-col">
-          <div className="mb-3 flex shrink-0 items-center gap-2 px-1">
-            <TableControlButton ref={sortButtonRef} active={activeControl === 'sort' || (viewSettings.sortRules || []).length > 0} onClick={() => setActiveControl((current) => (current === 'sort' ? null : 'sort'))}>
+          <div className="flex shrink-0 items-center gap-[14px] px-6 pb-4 text-[12px] text-zinc-500" style={{ fontFamily: 'var(--font-family-sans)' }}>
+            <TableControlButton plain ref={sortButtonRef} active={activeControl === 'sort' || (viewSettings.sortRules || []).length > 0} onClick={() => setActiveControl((current) => (current === 'sort' ? null : 'sort'))}>
               Sort
             </TableControlButton>
-            <TableControlButton ref={visibilityButtonRef} active={activeControl === 'visibility'} onClick={() => setActiveControl((current) => (current === 'visibility' ? null : 'visibility'))}>
+            <TableControlButton plain ref={visibilityButtonRef} active={activeControl === 'visibility'} onClick={() => setActiveControl((current) => (current === 'visibility' ? null : 'visibility'))}>
               Hide/Show Columns
             </TableControlButton>
-            <TableControlButton ref={orderButtonRef} active={activeControl === 'order'} onClick={() => setActiveControl((current) => (current === 'order' ? null : 'order'))}>
+            <TableControlButton plain ref={orderButtonRef} active={activeControl === 'order'} onClick={() => setActiveControl((current) => (current === 'order' ? null : 'order'))}>
               Column Order
             </TableControlButton>
-            <TableControlButton ref={rowHeightButtonRef} active={activeControl === 'height'} onClick={() => setActiveControl((current) => (current === 'height' ? null : 'height'))}>
+            <TableControlButton plain ref={rowHeightButtonRef} active={activeControl === 'height'} onClick={() => setActiveControl((current) => (current === 'height' ? null : 'height'))}>
               Row Height
             </TableControlButton>
           </div>

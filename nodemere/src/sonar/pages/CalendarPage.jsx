@@ -103,7 +103,7 @@ export default function CalendarPage({ onToolbarMetaChange = null }) {
   }, [appointmentsData.allAppointments, appointmentsData.loading, onToolbarMetaChange]);
 
   return (
-    <div className="calendar-page h-full overflow-hidden bg-[#020202] px-4 pb-5 pt-8 md:px-5 md:pb-5 md:pt-8">
+    <div className="calendar-page h-full overflow-hidden bg-[#020202] px-4 pb-5 pt-8 md:px-5 md:pb-5 md:pt-8" style={{ fontFamily: "'Inter', sans-serif" }}>
       <div
         ref={splitContainerRef}
         className="flex h-full min-h-0 flex-col overflow-hidden rounded-[28px] border border-white/[0.06] bg-[#020202] shadow-[0_32px_100px_-36px_rgba(0,0,0,0.92)] 2xl:flex-row"

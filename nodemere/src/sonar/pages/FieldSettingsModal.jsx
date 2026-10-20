@@ -31,15 +31,15 @@ const ICON_MAP = {
   aperture: Aperture, repeat: Repeat, navigation: Navigation,
 };
 
+const ICON_SELECTION_GRADIENT_ID = 'field-icon-selection-gradient';
+const iconSelectionGradientStroke = `url(#${ICON_SELECTION_GRADIENT_ID})`;
+
 const OPTION_COLORS = [
   '#10b981', '#06b6d4', '#3b82f6', '#6366f1', '#8b5cf6',
   '#a855f7', '#d946ef', '#ec4899', '#f43f5e', '#ef4444',
   '#f97316', '#f59e0b', '#eab308', '#84cc16', '#22c55e',
   '#71717a', '#a1a1aa', '#d4d4d8',
 ];
-
-const BRAND_GRADIENT_ID = 'field-settings-brand-gradient';
-const brandGradientStroke = `url(#${BRAND_GRADIENT_ID})`;
 
 const hexToRgba = (hex, alpha = 0.15) => {
   const value = hex?.replace('#', '') || '';
@@ -422,14 +422,6 @@ const FieldSettingsModal = ({
       className="responsive-dialog field-settings-dialog fixed inset-0 z-[200] flex items-center justify-center bg-black/70"
       onClick={onClose}
     >
-      <svg width="0" height="0" className="absolute">
-        <defs>
-          <linearGradient id={BRAND_GRADIENT_ID} x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="var(--brandGradientStart)" />
-            <stop offset="100%" stopColor="var(--brandGradientEnd)" />
-          </linearGradient>
-        </defs>
-      </svg>
       <motion.div
         initial={{ opacity: 0, scale: 0.92, y: 16 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -438,6 +430,14 @@ const FieldSettingsModal = ({
         className="flex h-[640px] w-[480px] flex-col rounded-2xl border border-white/[0.06] bg-[#0d0d0f] shadow-[0_40px_80px_rgba(0,0,0,0.9)] overflow-visible"
         onClick={(e) => e.stopPropagation()}
       >
+        <svg aria-hidden="true" className="pointer-events-none absolute h-0 w-0" focusable="false">
+          <defs>
+            <linearGradient id={ICON_SELECTION_GRADIENT_ID} x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#f4f4f5" />
+              <stop offset="100%" stopColor="#71717a" />
+            </linearGradient>
+          </defs>
+        </svg>
         <div className="flex items-center justify-between border-b border-white/[0.04] px-6 pt-5 pb-3">
           <div className="flex items-center gap-2.5">
             <div>
@@ -487,7 +487,7 @@ const FieldSettingsModal = ({
           ))}
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+        <div className={`flex-1 p-6 ${activeTab === 'name' ? '' : 'overflow-y-auto custom-scrollbar'}`}>
           <div className="space-y-5">
           {activeTab === 'name' && (
             <>
@@ -528,7 +528,7 @@ const FieldSettingsModal = ({
 
               <div>
                 <label className="mb-2 block text-[11px] font-semibold tracking-[-0.02em] text-zinc-600">Icon</label>
-                <div className="grid max-h-[180px] grid-cols-8 gap-1.5 overflow-y-auto p-1 custom-scrollbar">
+                <div className="grid grid-cols-8 gap-1.5 p-1">
                   {AVAILABLE_ICONS.map((iconName) => {
                     const IconComp = ICON_MAP[iconName];
                     if (!IconComp) return null;
@@ -539,11 +539,14 @@ const FieldSettingsModal = ({
                         onClick={() => setIcon(iconName)}
                         className={`flex items-center justify-center rounded-lg p-2 transition-all ${
                           isActive
-                            ? 'border border-white/[0.16] bg-white/[0.03]'
+                            ? 'border border-white/[0.16] bg-white/[0.03] text-zinc-100'
                             : 'border border-transparent bg-white/[0.02] text-zinc-600 hover:bg-white/[0.05] hover:text-zinc-300'
                         }`}
                       >
-                        <IconComp size={14} style={isActive ? { stroke: brandGradientStroke } : undefined} />
+                        <IconComp
+                          size={14}
+                          style={isActive ? { stroke: iconSelectionGradientStroke } : undefined}
+                        />
                       </button>
                     );
                   })}

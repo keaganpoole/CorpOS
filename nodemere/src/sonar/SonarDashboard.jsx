@@ -39,7 +39,6 @@ import {
   Star,
   Info,
   X,
-  Trash2,
   Webhook,
   CalendarFold,
   Phone,
@@ -928,7 +927,7 @@ const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = nul
             title={agent.stereotype === 'Studio Voice Design' ? 'Remove from team' : 'Delete receptionist'}
             className="w-7 h-7 flex items-center justify-center rounded-full bg-black/60 backdrop-blur-xl border border-rose-500/20 text-rose-500 hover:bg-rose-500/20 hover:border-rose-500/40 transition-all opacity-0 group-hover:opacity-100"
           >
-            <Trash2 size={13} />
+            <X size={13} />
           </button>
         </div>
 
@@ -1631,7 +1630,7 @@ const TasklistWidget = ({ tasklistState = null, onOpenIntro = null, onHide = nul
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.98 }}
             transition={{ duration: 0.18, ease: 'easeOut' }}
-            className="w-full overflow-hidden rounded-2xl border border-white/[0.08] bg-[#070707]/95 text-left shadow-[0_6px_18px_rgba(0,0,0,0.32),inset_0_1px_0_rgba(255,255,255,0.025)] backdrop-blur-xl transition hover:bg-white/[0.035]"
+            className="w-full overflow-hidden rounded-2xl border border-white/[0.08] bg-[#070707]/95 text-left shadow-[0_6px_18px_rgba(0,0,0,0.32),inset_0_1px_0_rgba(255,255,255,0.025)] backdrop-blur-xl transition hover:bg-white/[0.005]"
             aria-expanded={open}
           >
             <div className="flex h-9 items-center gap-3 px-3">

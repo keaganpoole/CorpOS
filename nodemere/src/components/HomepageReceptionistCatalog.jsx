@@ -103,6 +103,7 @@ export default function HomepageReceptionistCatalog({ active, onContinue }) {
       <div className="ns-persistent-wordmark homepage-catalog-wordmark" aria-label="Receptionist catalog">Receptionist <span>catalog</span></div>
       <HireReceptionistModal
         embedded
+        showPersonalityTypePill
         catalogRows={catalogRows}
         onHire={hire}
         autoPlayOnOpen

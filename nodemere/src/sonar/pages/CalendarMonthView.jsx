@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import {
   Activity,
-  Calendar as CalendarIcon,
   Check,
   ChevronDown,
   ChevronLeft,
@@ -553,13 +552,12 @@ function CalendarMonthViewBody({ data, className = '', selectedDate: selectedDat
       <div className="relative flex h-full min-h-0 w-full flex-col overflow-hidden rounded-[28px] border border-white/[0.05] bg-[#0a0a0a] p-3 shadow-[0_22px_48px_-28px_rgba(0,0,0,0.8)] sm:p-4 md:p-5 lg:p-7 2xl:p-10">
         <div className={`${dropInsOpen ? 'mb-0 2xl:mb-0' : 'mb-3 md:mb-4 lg:mb-5 2xl:mb-6'} flex items-center justify-between gap-1 border-b border-white/5 pb-3 text-left md:gap-2 md:pb-4 lg:pb-5 2xl:pb-6`}>
           <span className="flex min-w-0 items-center space-x-1.5 font-bold tracking-tight text-white text-[1rem] sm:text-[1.15rem] md:space-x-2 md:text-[1.35rem] lg:text-[1.75rem] 2xl:text-[2rem]">
-            <CalendarIcon className="text-zinc-300" size={22} />
             <span className="truncate">{dropInsOpen ? 'Drop-ins' : `${MONTHS[month]} ${year}`}</span>
-            {dropInsOpen && <button type="button" className="ml-1 text-zinc-500 transition hover:text-white" aria-label="Drop-ins tips" title="Drop-ins tips" onClick={() => setDropInsTipsOpen(true)}><Lightbulb size={16} /></button>}
+            {dropInsOpen && <button type="button" className="ml-2 inline-flex items-center self-center text-zinc-500 transition hover:text-white" aria-label="Drop-ins tips" title="Drop-ins tips" onClick={() => setDropInsTipsOpen(true)}><Lightbulb size={18} /></button>}
           </span>
 
           <div className="relative flex shrink-0 items-center gap-1" ref={detailFieldPickerRef}>
-            <button type="button" onClick={() => { if (dropInsOpen) setDropInsCloseSignal(current => current + 1); else setDropInsOpen(true); }} className="flex h-7 items-center gap-1 rounded-lg border border-white/[0.08] bg-white/[0.04] px-2 text-[10px] font-semibold text-zinc-300 transition hover:bg-white/[0.08] hover:text-white md:h-8 md:gap-1.5 md:px-3 md:text-[11px]">{dropInsOpen ? 'Back' : 'Drop-ins'}</button>
+            <button type="button" onClick={() => { if (dropInsOpen) setDropInsCloseSignal(current => current + 1); else setDropInsOpen(true); }} className="flex h-7 items-center gap-1 rounded-lg border border-white/[0.08] bg-white/[0.04] px-2 text-[10px] font-semibold text-zinc-300 transition hover:bg-white/[0.08] hover:text-white md:h-8 md:gap-1.5 md:px-3 md:text-[11px]">{dropInsOpen ? 'Calendar' : 'Drop-ins'}</button>
             <button
               type="button"
               onClick={() => setShowDetailFieldPicker((current) => !current)}
