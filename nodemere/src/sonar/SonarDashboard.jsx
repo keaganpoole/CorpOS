@@ -2534,7 +2534,8 @@ const SonarDashboard = () => {
   }, [loadArchivedAgents, refresh]);
 
   const enrichedAgents = (agents || []).map(a => {
-    const catalogVideo = a.catalog_id != null ? catalogVideoById[String(a.catalog_id)] : null;
+    const catalogVideo = (a.catalog_id != null ? catalogVideoById[String(a.catalog_id)] : null)
+      || (a.avatar_video ? avatarVideoUrl(a.avatar_video) : null);
     const scenario = agentScenarios[a.name?.toLowerCase?.() || ''];
     if (scenario) {
       return { ...a, catalog_video: catalogVideo, _scenario: scenario, scenario_name: scenario.name, scenario_id: scenario.id };
@@ -2696,7 +2697,12 @@ const SonarDashboard = () => {
                   </div>
                 ) : (
                   <TeamCards phone={isPhone}>
-                    {[...enrichedAgents].sort((a, b) => new Date(b.hired_at) - new Date(a.hired_at)).map(agent => {
+                    {[...enrichedAgents].sort((a, b) => {
+                      const aHasActiveRole = ['inbound', 'outbound', 'all'].includes(normalizeAgentDirection(a.direction));
+                      const bHasActiveRole = ['inbound', 'outbound', 'all'].includes(normalizeAgentDirection(b.direction));
+                      return Number(bHasActiveRole) - Number(aHasActiveRole)
+                        || new Date(b.hired_at) - new Date(a.hired_at);
+                    }).map(agent => {
                       const reactionsMap = {};
                       for (const r of (reactions || [])) reactionsMap[r.agent_name] = r;
                       return (
