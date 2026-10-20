@@ -6,7 +6,6 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  Lightbulb,
   Search,
 } from 'lucide-react';
 import { useAppointments } from '../hooks/useAppointments';
@@ -14,7 +13,7 @@ import { APPOINTMENT_FIELDS, APPOINTMENT_STATUS_COLORS, formatDate, formatTime, 
 import { supabase } from '../lib/supabase';
 import { api } from '../lib/api';
 import { useDropIns } from '../hooks/useDropIns';
-import DropInsModal from '../components/DropInsModal';
+import DropInsModal, { DropInsTipsButton } from '../components/DropInsModal';
 import DropInStrip from '../components/DropInStrip';
 import AppointmentRecord from '../components/AppointmentRecord';
 import CallLayerBorderOverlay from '../components/CallLayerBorderOverlay';
@@ -154,7 +153,7 @@ function CalendarDetailFieldsPopover({ fields, selectedFieldIds, onToggleField }
       initial={{ opacity: 0, y: -4, scale: 0.96 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: -4, scale: 0.96 }}
-      className="absolute right-[4.5rem] top-9 z-40 w-[250px] overflow-hidden rounded-2xl border border-white/[0.08] bg-[rgba(10,10,10,0.985)] shadow-[0_14px_36px_rgba(0,0,0,0.66)]"
+      className="absolute right-[4.5rem] top-9 z-40 w-[250px] overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0a0a0a] shadow-[0_14px_36px_rgba(0,0,0,0.66)]"
     >
       <div className="border-b border-white/[0.05] px-4 py-3">
         <p className="text-[12px] font-semibold tracking-[-0.03em] text-white">Appointment Details</p>
@@ -239,7 +238,6 @@ function CalendarMonthViewBody({ data, className = '', selectedDate: selectedDat
   const [closingAppointmentActionsId, setClosingAppointmentActionsId] = useState(null);
   const actionMenuCloseTimerRef = useRef(null);
   const [dropInsOpen, setDropInsOpen] = useState(false);
-  const [dropInsTipsOpen, setDropInsTipsOpen] = useState(false);
   const [dropInsCloseSignal, setDropInsCloseSignal] = useState(0);
   const dropIns = useDropIns();
   const [callingAppointment, setCallingAppointment] = useState(null);
@@ -553,7 +551,7 @@ function CalendarMonthViewBody({ data, className = '', selectedDate: selectedDat
         <div className={`${dropInsOpen ? 'mb-0 2xl:mb-0' : 'mb-3 md:mb-4 lg:mb-5 2xl:mb-6'} flex items-center justify-between gap-1 border-b border-white/5 pb-3 text-left md:gap-2 md:pb-4 lg:pb-5 2xl:pb-6`}>
           <span className="flex min-w-0 items-center space-x-1.5 font-bold tracking-tight text-white text-[1rem] sm:text-[1.15rem] md:space-x-2 md:text-[1.35rem] lg:text-[1.75rem] 2xl:text-[2rem]">
             <span className="truncate">{dropInsOpen ? 'Drop-ins' : `${MONTHS[month]} ${year}`}</span>
-            {dropInsOpen && <button type="button" className="ml-2 inline-flex items-center self-center text-zinc-500 transition hover:text-white" aria-label="Drop-ins tips" title="Drop-ins tips" onClick={() => setDropInsTipsOpen(true)}><Lightbulb size={18} /></button>}
+            {dropInsOpen && <DropInsTipsButton className="ml-2 inline-flex items-center self-center text-zinc-500 transition hover:text-white" />}
           </span>
 
           <div className="relative flex shrink-0 items-center gap-1" ref={detailFieldPickerRef}>
@@ -592,7 +590,7 @@ function CalendarMonthViewBody({ data, className = '', selectedDate: selectedDat
 
         <AnimatePresence mode="wait" initial={false}>
         {dropInsOpen ? (
-          <DropInsModal key="drop-ins" model={{ ...dropIns, previewReceptionist }} onClose={() => { setDropInsOpen(false); setDropInsTipsOpen(false); }} closeSignal={dropInsCloseSignal} tipsOpen={dropInsTipsOpen} onTipsClose={() => setDropInsTipsOpen(false)} />
+          <DropInsModal key="drop-ins" model={{ ...dropIns, previewReceptionist }} onClose={() => setDropInsOpen(false)} closeSignal={dropInsCloseSignal} />
         ) : <motion.div key="calendar-month" initial={reducedMotion ? false : { opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} exit={reducedMotion ? { opacity: 0 } : { opacity: 0, x: -12 }} transition={{ duration: .22, ease: [.22, 1, .36, 1] }} className="min-h-0">
         <div className="mb-2 grid grid-cols-7 gap-2 text-center">
           {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, index) => (

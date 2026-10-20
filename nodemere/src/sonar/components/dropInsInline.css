@@ -29,13 +29,14 @@
 .drop-ins-modal.drop-ins-inline .drop-ins-section-heading h3 { font-size: 18px; margin: 4px 0 6px; }
 .drop-ins-modal.drop-ins-inline .drop-ins-list-row { gap: 8px; padding: 10px 9px; }
 .drop-ins-modal.drop-ins-inline .drop-ins-list-text h4 { font-size: 12px; }
+.drop-ins-modal.drop-ins-inline .drop-ins-list-text h4 { margin-bottom: 8px; }
 .drop-ins-modal.drop-ins-inline .drop-ins-list-text p { font-size: 9px; line-height: 1.45; }
 .drop-ins-modal.drop-ins-inline .drop-ins-list-text > span { font-size: 8px; }
 .drop-ins-modal.drop-ins-inline .drop-ins-icon-button { width: 25px; height: 25px; }
 .drop-ins-modal.drop-ins-inline .drop-ins-list-search { flex-basis: 180px; width: 180px; }
 .drop-ins-modal.drop-ins-inline .drop-ins-heading-actions { gap: 10px; }
 .drop-ins-modal.drop-ins-inline .drop-ins-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.drop-ins-modal.drop-ins-inline .drop-ins-list-row { min-height: clamp(124px, 18cqi, 220px); }
+.drop-ins-modal.drop-ins-inline .drop-ins-list-row { min-height: clamp(140px, 20cqi, 160px); }
 .drop-ins-modal.drop-ins-inline .drop-ins-section-heading p:not(.drop-ins-eyebrow),
 .drop-ins-modal.drop-ins-inline .drop-ins-builder-note,
 .drop-ins-modal.drop-ins-inline .drop-ins-field > label span { display: none; }
@@ -49,3 +50,6 @@
   .drop-ins-modal.drop-ins-inline .drop-ins-statuses { padding-inline: 4px; gap: 12px; }
   .drop-ins-modal.drop-ins-inline .drop-ins-workspace { padding: 14px 4px; }
 }
+
+
+

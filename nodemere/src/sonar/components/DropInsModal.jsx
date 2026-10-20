@@ -23,7 +23,7 @@ const blank = (status) => ({ name: '', purpose: '', prompt: '', is_active: true,
 const manual = (a, b) => a.sort_order - b.sort_order || a.id.localeCompare(b.id);
 const isTimeoutMessage = value => /timed out|timeout/i.test(String(value || ''));
 
-export default function DropInsModal({ model, onClose, closeSignal, tipsOpen, onTipsClose }) {
+export default function DropInsModal({ model, onClose, closeSignal }) {
   const [status, setStatus] = useState('all');
   const [previewStatus, setPreviewStatus] = useState('completed');
   const [view, setView] = useState('manage');
@@ -253,7 +253,7 @@ export default function DropInsModal({ model, onClose, closeSignal, tipsOpen, on
                 {model.loading ? <div className="drop-ins-loading"><Loader2 className="animate-spin" size={22} />Loading your drop-ins…</div> : !allGroups.length ? <div className="drop-ins-no-results">No drop-ins yet. Select an appointment status to add one.</div> : <>
                   <div className="drop-ins-builder-note"><span>Lit dots show where each drop-in appears. Select a dot to add or remove it for that status.</span></div>
                   <div className="drop-ins-list">{sortedGroups.length ? sortedGroups.map((group, index) => { const item = group.primary; const overrideKey = `group:${group.id}`; const enabled = activeOverrides[overrideKey] ?? group.rows.some(row => row.is_active); return <div key={group.id} className={`drop-ins-list-row ${enabled ? '' : 'is-inactive'}`}>
-                    <span className="drop-ins-order-number">{index + 1}</span><div className="drop-ins-list-text"><h4>{item.name}</h4><p>{item.prompt}</p><span>{enabled ? 'Active' : 'Inactive'}{group.rows.some(row => row.usage_count > 0) ? ` · ${group.rows.reduce((sum, row) => sum + (row.usage_count || 0), 0)} calls started` : ''}</span></div>
+                    <span className="drop-ins-order-number">{index + 1}</span><div className="drop-ins-list-text"><h4>{item.name}</h4><p>{item.prompt}</p>{group.rows.some(row => row.usage_count > 0) && <span>{group.rows.reduce((sum, row) => sum + (row.usage_count || 0), 0)} calls started</span>}</div>
                     <div className="drop-ins-row-actions"><AnimatePresence mode="wait" initial={false}>{confirmDelete === group.id ? <motion.div key="confirm" className="drop-ins-delete-inline" initial={{ opacity: 0, x: reduced ? 0 : 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: reduced ? 0 : -12 }} transition={{ duration: .16 }}><span>Remove from every status?</span><button type="button" disabled={busy} onClick={() => setConfirmDelete(null)}>Keep</button><button type="button" disabled={busy} onClick={() => { setConfirmDelete(null); perform(async () => { await Promise.all(group.rows.map(row => model.remove(row.id))); }, 'Drop-in removed'); }}>Remove</button></motion.div> : <motion.div key="actions" className="drop-ins-action-content" initial={{ opacity: 0, x: reduced ? 0 : 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: reduced ? 0 : -12 }} transition={{ duration: .16 }}><div className="drop-ins-card-statuses" aria-label={`Appointment statuses for ${item.name}`}>{STATUS_OPTIONS.map(option => { const key = option.value.toLowerCase(); const pendingKey = `${group.id}:${key}`; const assigned = dotOverrides[pendingKey] ?? Boolean(group.byStatus[key]); return <button key={key} type="button" className={`drop-ins-card-status-button status-${key} ${assigned ? 'is-assigned' : ''}`} aria-label={`${assigned ? 'Remove' : 'Add'} ${item.name} ${assigned ? 'from' : 'to'} ${key} appointments`} title={`${option.value}: ${assigned ? 'included' : 'not included'}`} aria-pressed={assigned} disabled={!model.canManage} onClick={() => toggleGroupStatus(group, key, assigned)}><span className="drop-ins-card-status-dot" /></button>; })}</div>
                       {model.canManage && <><button type="button" role="switch" aria-checked={enabled} aria-label={`Enable ${item.name} for assigned statuses`} className="drop-ins-switch" onClick={() => toggleActive(group.rows, enabled, overrideKey)}><span /></button><button type="button" className="drop-ins-icon-button" aria-label={`Edit ${item.name} for ${item.available_on_status} appointments`} title={`Edit ${item.available_on_status} copy`} disabled={pendingActive.has(overrideKey)} onClick={() => { setStatus(item.available_on_status); setPreviewStatus(item.available_on_status); edit(item); }}><Pencil size={15} /></button><button type="button" className="drop-ins-icon-button" aria-label={`Delete ${item.name} from all statuses`} disabled={pendingActive.has(overrideKey)} onClick={() => setConfirmDelete(group.id)}><Trash2 size={15} /></button></>}
                     </motion.div>}</AnimatePresence></div>
@@ -265,7 +265,7 @@ export default function DropInsModal({ model, onClose, closeSignal, tipsOpen, on
                 {model.loading ? <div className="drop-ins-loading"><Loader2 className="animate-spin" size={22} />Loading your drop-ins…</div> : !statusItems.length ? <div className="drop-ins-no-results">No drop-ins for {status} appointments.</div> : <>
                   <div className="drop-ins-builder-note"><span>Use the controls on each row to edit, enable, or remove calendar drop-ins.</span></div>
                   <div className="drop-ins-list">{sortedItems.length ? sortedItems.map((item, index) => { const overrideKey = `row:${item.id}`; const enabled = activeOverrides[overrideKey] ?? item.is_active; return <div key={item.id} className={`drop-ins-list-row ${enabled ? '' : 'is-inactive'}`}>
-                    <span className="drop-ins-order-number">{index + 1}</span><div className="drop-ins-list-text"><h4>{item.name}</h4><p>{item.prompt}</p><span>{enabled ? 'Active' : 'Inactive'}{item.usage_count > 0 ? ` · ${item.usage_count} calls started` : ''}</span></div>
+                    <span className="drop-ins-order-number">{index + 1}</span><div className="drop-ins-list-text"><h4>{item.name}</h4><p>{item.prompt}</p>{item.usage_count > 0 && <span>{item.usage_count} calls started</span>}</div>
                     {model.canManage && <div className="drop-ins-row-actions"><AnimatePresence mode="wait" initial={false}>{confirmDelete === item.id ? <motion.div key="confirm" className="drop-ins-delete-inline" initial={{ opacity: 0, x: reduced ? 0 : 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: reduced ? 0 : -12 }} transition={{ duration: .16 }}><span>Remove this drop-in?</span><button type="button" disabled={busy} onClick={() => setConfirmDelete(null)}>Keep</button><button type="button" disabled={busy} onClick={() => { setConfirmDelete(null); perform(async () => { await model.remove(item.id); }, 'Drop-in removed'); }}>Remove</button></motion.div> : <motion.div key="actions" className="drop-ins-action-content" initial={{ opacity: 0, x: reduced ? 0 : 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: reduced ? 0 : -12 }} transition={{ duration: .16 }}>
                       <button type="button" role="switch" aria-checked={enabled} aria-label={`Enable ${item.name}`} className="drop-ins-switch" onClick={() => toggleActive([item], enabled, overrideKey)}><span /></button>
                       <button type="button" className="drop-ins-icon-button" aria-label={`Edit ${item.name}`} disabled={pendingActive.has(overrideKey)} onClick={() => edit(item)}><Pencil size={15} /></button>
@@ -308,8 +308,16 @@ export default function DropInsModal({ model, onClose, closeSignal, tipsOpen, on
           <div className="p-6"><div className="flex items-center gap-4 mb-5"><div className="w-12 h-12 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center shrink-0"><Trash2 size={18} className="text-rose-400" /></div><div><p className="text-[13px] text-zinc-200 font-medium">Delete <span className="text-white font-bold">{previewDeleteTarget.name}</span>?</p><p className="text-[11px] text-zinc-600 mt-1">This action cannot be undone.</p></div></div><div className="flex items-center justify-end gap-3"><button type="button" onClick={() => setPreviewDeleteTarget(null)} disabled={busy} className="px-4 py-2 rounded-xl text-[11px] font-bold text-zinc-500 uppercase tracking-wider hover:text-zinc-300 hover:bg-white/[0.03] transition-all">Cancel</button><button type="button" onClick={deleteDropIn} disabled={busy} className="px-5 py-2 rounded-xl bg-rose-500 text-white text-[11px] font-black uppercase tracking-wider hover:bg-rose-400 transition-all shadow-[0_0_15px_rgba(239,68,68,0.3)] active:scale-95">{busy ? 'Deleting' : 'Delete'}</button></div></div>
         </motion.div>
       </motion.div> : null}
-      {tipsOpen ? <DropInsTipsModal onClose={onTipsClose} /> : null}
     </AnimatePresence>, document.body)}
+  </>;
+}
+
+export function DropInsTipsButton({ className = '' }) {
+  const [open, setOpen] = useState(false);
+  const close = () => setOpen(false);
+  return <>
+    <button type="button" className={className} aria-label="Drop-ins tips" title="Drop-ins tips" onClick={() => setOpen(true)}><Lightbulb size={18} /></button>
+    {createPortal(open ? <DropInsTipsModal onClose={close} /> : null, document.body)}
   </>;
 }
 
@@ -319,15 +327,14 @@ function DropInsTipsModal({ onClose }) {
     ['Keep it short and sweet', 'Skip the step-by-step procedures. Explain what you want accomplished and let your receptionist handle the conversation naturally. Focus on the outcome and clearly state anything that must or must not happen.'],
     ['Up to speed', 'Relevant appointment details are provided automatically, so you can focus your instructions on what you want accomplished.'],
   ];
-  return <motion.div className="drop-ins-tips-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onMouseDown={onClose}>
-    <motion.div className="drop-ins-tips-modal" initial={{ opacity: 0, y: 16, scale: .98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 16, scale: .98 }} transition={{ duration: .18 }} onMouseDown={event => event.stopPropagation()}>
+  return <div className="drop-ins-tips-backdrop" onMouseDown={onClose}>
+    <div className="drop-ins-tips-modal" onMouseDown={event => event.stopPropagation()}>
       <ModalSpectrumLine variant="tips" />
-      <div className="drop-ins-tips-glow" aria-hidden="true" />
       <div className="drop-ins-tips-content">
         <div className="drop-ins-tips-top"><div><div className="drop-ins-tips-kicker"><Lightbulb size={15} />Tips</div><h3>How to use drop-ins</h3><p>Drop-ins are ready-to-use calling tasks that put your receptionists to work with a single click, all from within your Nodemere Calendar.</p></div><button type="button" className="drop-ins-tips-close" onClick={onClose} aria-label="Close drop-ins tips"><X size={17} /></button></div>
         <div className="drop-ins-tips-points">{points.map(([title, body], index) => <div className="drop-ins-tips-point" key={title}><span style={{ opacity: 1 - index * .14 }} /><div><strong>{title}</strong><p>{body}</p></div></div>)}</div>
         <p className="drop-ins-tips-footer">The best Drop-ins have a clear purpose, not a lengthy script. Just explain what you want done.</p>
       </div>
-    </motion.div>
-  </motion.div>;
+    </div>
+  </div>;
 }

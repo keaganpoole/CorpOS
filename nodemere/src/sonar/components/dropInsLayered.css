@@ -132,12 +132,14 @@
 .drop-ins-modal .drop-ins-categories button.is-current { color: #f4f4f5; background: transparent; border-color: transparent; }
 .drop-ins-modal .drop-ins-gallery { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .drop-ins-modal .drop-ins-template-loading { display: grid; place-items: center; min-height: clamp(180px, 30dvh, 280px); width: 100%; }
-.drop-ins-modal .drop-ins-template { padding: 16px; min-height: 170px; background: #111111e6; border-color: #d4d4d81c; border-radius: 15px; }
+.drop-ins-modal .drop-ins-template { display: grid; grid-template-columns: minmax(0, 1fr) 26px; grid-template-rows: 34px auto 1fr auto; padding: 16px; min-height: 170px; background: #111111e6; border-color: #d4d4d81c; border-radius: 15px; }
 .drop-ins-modal .drop-ins-template:hover { background: #ffffff08; border-color: #ffffff45; box-shadow: 0 0 22px #ffffff05; }
-.drop-ins-modal .drop-ins-template-top { margin-bottom: 10px; flex-wrap: wrap; }
-.drop-ins-modal .drop-ins-template-icon { width: 34px; height: 34px; border-radius: 10px; color: #e4e4e7; background: #ffffff08; }
+.drop-ins-modal .drop-ins-template-top { display: contents; }
+.drop-ins-modal .drop-ins-template-icon { grid-column: 2; grid-row: 1; justify-self: end; width: 26px; height: 26px; border: 0; border-radius: 0; color: #e4e4e7; background: transparent; }
 .drop-ins-modal .template-google .drop-ins-template-icon svg { filter: brightness(0) invert(.9); }
-.drop-ins-modal .drop-ins-template p { color: #a1a1aa; line-height: 1.65; margin-bottom: 15px; }
+.drop-ins-modal .drop-ins-template h4 { grid-column: 1; grid-row: 1; align-self: center; text-align: left; font-size: 13px; font-weight: 500; line-height: 1.15; letter-spacing: -.01em; }
+.drop-ins-modal .drop-ins-template p { grid-column: 1 / -1; grid-row: 2; color: #a1a1aa; font-size: 10px; line-height: 1.6; margin: 8px 0 15px; }
+.drop-ins-modal .drop-ins-template-bottom { grid-column: 1 / -1; grid-row: 4; }
 .drop-ins-modal .drop-ins-template-bottom { color: #8d8d96; }
 .drop-ins-modal .drop-ins-list-toolbar { color: #a1a1aa; }
 .drop-ins-modal .drop-ins-list-toolbar { justify-content: flex-end; }
