@@ -237,6 +237,7 @@
   body[data-nodemere-responsive="true"] .report-problem-modal .min-h-\[300px\] { min-height: 200px; padding: 20px 0 0; }
   .sonar-dashboard-shell[data-responsive="true"] .settings-page-scope > header { padding: 10px 16px 6px; }
   .sonar-dashboard-shell[data-responsive="true"] .settings-mobile-section select { height: 38px; min-height: 38px; border-radius: 9px; }
+  .sonar-dashboard-shell[data-responsive="true"] .settings-section-chevron { transform: translateX(-4px); }
   .mobile-settings-save { flex-shrink: 0; padding: 10px 16px; background: #080808; border-top: 1px solid #ffffff0a; }
   .mobile-settings-save button { width: 100%; }
   .mobile-settings-save [role="alert"] { color: #fda4af; font-size: 12px; margin-bottom: 8px; }

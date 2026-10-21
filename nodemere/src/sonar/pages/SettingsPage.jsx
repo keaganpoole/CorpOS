@@ -648,7 +648,7 @@ const Section = ({ title, icon: Icon, color, children, defaultOpen = false }) =>
         <span className="text-[13px] font-bold text-white uppercase tracking-wider flex-1 text-left">
           {title}
         </span>
-        {open ? <ChevronUp size={14} className="text-zinc-600" /> : <ChevronDown size={14} className="text-zinc-600" />}
+        {open ? <ChevronUp size={14} className="settings-section-chevron text-zinc-600" /> : <ChevronDown size={14} className="settings-section-chevron text-zinc-600" />}
       </button>
       <AnimatePresence initial={false}>
         {open && (
