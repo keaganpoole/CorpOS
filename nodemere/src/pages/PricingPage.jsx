@@ -323,7 +323,7 @@ const PlanCard = ({ plan, cycle, isInitialLoad, index, currentUserPlan, subscrip
             <div className="flex-grow">
                 <div className="flex justify-between items-start">
                     <h3 className="text-xl font-bold text-white">{plan.name}</h3>
-                    {plan.isRecommended && <span className="text-xs font-semibold pricing-recommended-text" style={{ '--animation-delay': `${Math.random() * 2}s` }}>Recommended</span>}
+                    {plan.isRecommended && <span className="text-[13px] font-bold tracking-[0.01em] pricing-recommended-text" style={{ '--animation-delay': `${Math.random() * 2}s` }}>Recommended</span>}
                 </div>
                 <p className="text-gray-400 mt-2">{plan.description}</p>
                 {plan.scopeNote && <p className="mt-3 text-xs leading-5 text-gray-500">{plan.scopeNote}</p>}
@@ -446,7 +446,7 @@ const PricingPage = () => {
     const [plansError, setPlansError] = useState('');
     const [plansLoading, setPlansLoading] = useState(true);
     const [isTestMode, setIsTestMode] = useState(false);
-    const [activeMobilePlan, setActiveMobilePlan] = useState(0);
+    const [carouselEdges, setCarouselEdges] = useState({ previous: false, next: false });
     const mobilePlanTrackRef = useRef(null);
     const pillBgRef = useRef(null);
     const annualBtnRef = useRef(null);
@@ -576,31 +576,55 @@ const PricingPage = () => {
         };
     });
 
-    const updateActiveMobilePlan = () => {
+    const updateCarouselEdges = () => {
         const track = mobilePlanTrackRef.current;
         if (!track) return;
-        const cards = Array.from(track.children);
-        const trackCenter = track.getBoundingClientRect().left + track.clientWidth / 2;
-        const closestIndex = cards.reduce((closest, card, index) => {
-            const bounds = card.getBoundingClientRect();
-            const distance = Math.abs(bounds.left + bounds.width / 2 - trackCenter);
-            return distance < closest.distance ? { index, distance } : closest;
-        }, { index: 0, distance: Infinity }).index;
-        setActiveMobilePlan(closestIndex);
+        const maxScrollLeft = Math.max(0, track.scrollWidth - track.clientWidth);
+        const previous = track.scrollLeft > 2;
+        const next = track.scrollLeft < maxScrollLeft - 2;
+        setCarouselEdges((current) => current.previous === previous && current.next === next ? current : { previous, next });
     };
 
-    const showMobilePlan = (index) => {
+    const moveCarousel = (direction) => {
         const track = mobilePlanTrackRef.current;
-        const card = track?.children[index];
+        const card = track?.children[0];
         if (!track || !card) return;
-        const trackBounds = track.getBoundingClientRect();
-        const cardBounds = card.getBoundingClientRect();
-        track.scrollTo({
-            left: track.scrollLeft + cardBounds.left + cardBounds.width / 2 - trackBounds.left - track.clientWidth / 2,
+        const trackStyle = window.getComputedStyle(track);
+        const gap = Number.parseFloat(trackStyle.columnGap || trackStyle.gap) || 0;
+        track.scrollBy({
+            left: direction * (card.getBoundingClientRect().width + gap),
             behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
         });
-        setActiveMobilePlan(index);
     };
+
+    const focusCarouselCard = (event) => {
+        const track = mobilePlanTrackRef.current;
+        if (!track || !window.matchMedia('(max-width: 1023px)').matches) return;
+        if (event.target.closest('button, a, input, select, textarea, [role="button"]')) return;
+        const card = event.target.closest('.plan-card');
+        if (!card || !track.contains(card)) return;
+
+        const trackRect = track.getBoundingClientRect();
+        const cardRect = card.getBoundingClientRect();
+        const trackCenter = trackRect.left + track.clientLeft + track.clientWidth / 2;
+        const offset = cardRect.left + cardRect.width / 2 - trackCenter;
+        if (Math.abs(offset) < 1) return;
+
+        track.scrollTo({
+            left: track.scrollLeft + offset,
+            behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+        });
+    };
+
+    useEffect(() => {
+        const track = mobilePlanTrackRef.current;
+        if (!track) return undefined;
+        updateCarouselEdges();
+        window.addEventListener('resize', updateCarouselEdges);
+        return () => {
+            window.removeEventListener('resize', updateCarouselEdges);
+        };
+    }, [plansToDisplay.length]);
 
     return (
         <div className="pricing-page-bg text-gray-300 antialiased min-h-screen flex flex-col">
@@ -638,20 +662,14 @@ const PricingPage = () => {
                         <div className="py-10 text-sm text-gray-500">{plansError}</div>
                     ) : (
                         <>
-                            <div className="pricing-mobile-carousel-nav sm:hidden" aria-label="Pricing plan navigation">
-                                <button type="button" onClick={() => showMobilePlan(activeMobilePlan - 1)} disabled={activeMobilePlan === 0} aria-label="Previous plan" className="pricing-mobile-carousel-arrow">
-                                    <ChevronLeft size={19} aria-hidden="true" />
-                                </button>
-                                <span className="pricing-mobile-carousel-position" aria-live="polite">
-                                    {plansToDisplay[activeMobilePlan]?.name || 'Plan'} <span className="text-zinc-500">{activeMobilePlan + 1} / {plansToDisplay.length}</span>
-                                </span>
-                                <button type="button" onClick={() => showMobilePlan(activeMobilePlan + 1)} disabled={activeMobilePlan >= plansToDisplay.length - 1} aria-label="Next plan" className="pricing-mobile-carousel-arrow">
-                                    <ChevronRight size={19} aria-hidden="true" />
-                                </button>
-                            </div>
-                            <p className="pricing-mobile-swipe-hint sm:hidden">Swipe left or right to compare</p>
-                            <div ref={mobilePlanTrackRef} onScroll={updateActiveMobilePlan} className="pricing-plan-track inline-grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 py-4" aria-label="Pricing plans">
-                                {plansToDisplay.map((plan, index) => <PlanCard key={plan.name} plan={plan} cycle={cycle} isInitialLoad={isInitialLoad} index={index} currentUserPlan={currentUserPlan} subscriptionStatus={subscriptionStatus} isTestMode={isTestMode} />)}
+                            <div className="pricing-carousel-shell">
+                                {carouselEdges.previous && <div className="pricing-carousel-edge pricing-carousel-edge--left lg:hidden" aria-hidden="true" />}
+                                {carouselEdges.next && <div className="pricing-carousel-edge pricing-carousel-edge--right lg:hidden" aria-hidden="true" />}
+                                <div ref={mobilePlanTrackRef} onClick={focusCarouselCard} onScroll={updateCarouselEdges} className="pricing-plan-track inline-grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 py-4" aria-label="Pricing plans">
+                                    {plansToDisplay.map((plan, index) => <PlanCard key={plan.name} plan={plan} cycle={cycle} isInitialLoad={isInitialLoad} index={index} currentUserPlan={currentUserPlan} subscriptionStatus={subscriptionStatus} isTestMode={isTestMode} />)}
+                                </div>
+                                {carouselEdges.previous && <button type="button" onClick={() => moveCarousel(-1)} aria-label="Previous pricing plans" className="pricing-carousel-arrow pricing-carousel-arrow--left lg:hidden"><ChevronLeft size={22} strokeWidth={2.5} aria-hidden="true" /></button>}
+                                {carouselEdges.next && <button type="button" onClick={() => moveCarousel(1)} aria-label="Next pricing plans" className="pricing-carousel-arrow pricing-carousel-arrow--right lg:hidden"><ChevronRight size={22} strokeWidth={2.5} aria-hidden="true" /></button>}
                             </div>
                         </>
                     )}

@@ -307,7 +307,9 @@ p:not(.comparison-human-statement):not(.comparison-ai-statement) {
 /* --- PRICING PAGE STYLES --- */
 .pricing-page-bg { background-color: var(--pageBackground); }
 .pricing-page-bg .gradient-text { background: linear-gradient(90deg, var(--color1), var(--color2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-fill-color: transparent; }
-.pricing-recommended-text { background: linear-gradient(90deg, var(--brandGradientStart), var(--brandGradientEnd)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-fill-color: transparent; }
+.pricing-recommended-text { background: linear-gradient(90deg, #ffffff 0%, #e4e4e7 55%, #a1a1aa 100%); background-size: 200% 100%; background-position: 100% 50%; animation: pricing-recommended-gradient 4s ease-in-out infinite; -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-fill-color: transparent; text-shadow: none; filter: drop-shadow(0 0 2px rgb(228 228 231 / 16%)); }
+@keyframes pricing-recommended-gradient { 0%, 100% { background-position: 100% 50%; } 50% { background-position: 0% 50%; } }
+@media (prefers-reduced-motion: reduce) { .pricing-recommended-text { animation: none; } }
 .savings-gradient-text { background: linear-gradient(90deg, var(--brandGradientStart), var(--brandGradientEnd)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-fill-color: transparent; }
 .pricing-page-bg .gradient-bg { background: var(--buttonBackground); }
 .pricing-neutral-button {
@@ -317,33 +319,45 @@ p:not(.comparison-human-statement):not(.comparison-ai-statement) {
 .plan-card { transition: transform 0.3s ease; position: relative; overflow: visible; }
 .plan-card:not(.current-plan-glow):hover { transform: translateY(-5px); }
 .plan-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; border-radius: 1rem; border: 2px solid transparent; background: linear-gradient(90deg, var(--brandGradientStart), var(--brandGradientEnd)) border-box; -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0); -webkit-mask-composite: destination-out; mask-composite: exclude; opacity: 0; transition: opacity 0.3s ease-in-out; pointer-events: none; }
+@property --pricing-border-angle { syntax: '<angle>'; initial-value: 65deg; inherits: false; }
+@keyframes pricing-border-orbit { to { --pricing-border-angle: 425deg; } }
+.plan-card:not(.current-plan-glow)::before { background: conic-gradient(from var(--pricing-border-angle), var(--brandGradientStart), var(--brandGradientEnd), var(--brandGradientStart)) border-box; animation: pricing-border-orbit 14s linear infinite; animation-play-state: paused; }
+.plan-card:not(.current-plan-glow):hover::before { animation-play-state: running; }
+@media (prefers-reduced-motion: reduce) { .plan-card:not(.current-plan-glow)::before { animation: none; } }
 .plan-card:hover::before { opacity: 1; }
 .current-plan-glow { box-shadow: 0 0 30px var(--color1); transform: translateY(-5px); }
 .current-plan-glow::before { opacity: 1; animation: pulse-glow 3s infinite ease-in-out; }
-@media (max-width: 639px) {
-  .pricing-mobile-carousel-nav {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    max-width: 300px;
-    margin: 0 auto;
+@media (max-width: 1023px) {
+  .pricing-carousel-shell { position: relative; }
+  .pricing-carousel-edge {
+    position: absolute;
+    z-index: 2;
+    top: 16px;
+    bottom: 16px;
+    width: 68px;
+    pointer-events: none;
   }
-  .pricing-mobile-carousel-arrow {
+  .pricing-carousel-edge--left { left: 0; background: linear-gradient(90deg, rgb(2 2 2 / 78%), rgb(2 2 2 / 0%)); }
+  .pricing-carousel-edge--right { right: 0; background: linear-gradient(270deg, rgb(2 2 2 / 78%), rgb(2 2 2 / 0%)); }
+  .pricing-carousel-arrow {
+    position: absolute;
+    z-index: 3;
+    top: 50%;
     display: grid;
     place-items: center;
-    width: 42px;
-    height: 42px;
-    border: 1px solid #52525b;
+    width: 44px;
+    height: 44px;
+    transform: translateY(-50%);
+    border: 1px solid rgb(228 228 231 / 48%);
     border-radius: 9999px;
     color: #f4f4f5;
-    background: #18181b;
-    transition: background-color 160ms ease, opacity 160ms ease;
+    background: rgb(24 24 27 / 96%);
+    box-shadow: 0 3px 12px rgb(0 0 0 / 38%), inset 0 1px 0 rgb(255 255 255 / 8%);
+    transition: background-color 160ms ease, border-color 160ms ease, transform 160ms ease;
   }
-  .pricing-mobile-carousel-arrow:disabled { opacity: 0.3; }
-  .pricing-mobile-carousel-arrow:not(:disabled):active { background: #3f3f46; }
-  .pricing-mobile-carousel-position { color: #f4f4f5; font-size: 13px; font-weight: 600; }
-  .pricing-mobile-carousel-position span { margin-left: 6px; font-size: 11px; font-weight: 400; }
-  .pricing-mobile-swipe-hint { margin: 2px 0 0 !important; color: #a1a1aa; font-size: 11px; }
+  .pricing-carousel-arrow:hover { border-color: rgb(244 244 245 / 70%); background: rgb(39 39 42 / 98%); }
+  .pricing-carousel-arrow--left { left: 12px; }
+  .pricing-carousel-arrow--right { right: 12px; }
   .pricing-plan-track {
     display: flex;
     width: 100%;
@@ -364,6 +378,14 @@ p:not(.comparison-human-statement):not(.comparison-ai-statement) {
     scroll-snap-align: center;
     scroll-snap-stop: always;
   }
+}
+@media (min-width: 640px) and (max-width: 1023px) {
+  .pricing-plan-track { padding-left: 24px; padding-right: max(24px, calc((100% - 300px) / 2)); }
+}
+@media (max-width: 639px) {
+  .pricing-carousel-arrow { width: 48px; height: 48px; border: 0; background: transparent; box-shadow: none; }
+  .pricing-carousel-arrow:hover { border-color: transparent; background: transparent; }
+  .pricing-carousel-arrow svg { width: 26px; height: 26px; }
 }
 @keyframes pulse-glow { 0%, 100% { box-shadow: 0 0 30px var(--color1); } 50% { box-shadow: 0 0 45px var(--color2); } 100% { box-shadow: 0 0 30px var(--color1); } }
 .btn-shine { position: relative; overflow: hidden; }
