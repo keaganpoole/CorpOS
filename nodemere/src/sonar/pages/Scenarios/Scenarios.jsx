@@ -3021,7 +3021,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
             ...(String(val).includes('{{') ? { color: 'transparent' } : {}),
             ...(varsPane.visible && varsPane.active && hoveredTableColor && fieldKey === varsPane.fieldKey ? {
               borderColor: hoveredTableColor,
-              boxShadow: `0 0 0 1px ${hoveredTableColor}`,
+              boxShadow: `0 0 0 0.5px ${hoveredTableColor}`,
             } : {}),
           }}
         />
@@ -3132,7 +3132,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
             ...(String(value).includes('{{') ? { color: 'transparent' } : {}),
             ...(varsPane.visible && varsPane.active && hoveredTableColor && varsPane.fieldKey === fieldKey ? {
               borderColor: hoveredTableColor,
-              boxShadow: `0 0 0 1px ${hoveredTableColor}`,
+              boxShadow: `0 0 0 0.5px ${hoveredTableColor}`,
             } : {}),
           }}
         />
@@ -5777,7 +5777,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
                                       ...(rawVal.includes('{{') || rawVal.includes('\x1E') ? { color: 'transparent' } : {}),
                                       ...(varsPane.visible && varsPane.active && hoveredTableColor && field.key === varsPane.fieldKey ? {
                                         borderColor: hoveredTableColor,
-                                        boxShadow: `0 0 0 1px ${hoveredTableColor}`,
+                                        boxShadow: `0 0 0 0.5px ${hoveredTableColor}`,
                                         '--hover-glow-color': `${hoveredTableColor}`,
                                         '--hover-glow-color-strong': `${hoveredTableColor}66`,
                                       } : {}),
@@ -5812,7 +5812,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
                                     ...(rawVal.includes('{{') ? { color: 'transparent' } : {}),
                                     ...(varsPane.visible && varsPane.active && hoveredTableColor && field.key === varsPane.fieldKey ? {
                                       borderColor: hoveredTableColor,
-                                      boxShadow: `0 0 0 1px ${hoveredTableColor}`,
+                                      boxShadow: `0 0 0 0.5px ${hoveredTableColor}`,
                                       '--hover-glow-color': `${hoveredTableColor}`,
                                       '--hover-glow-color-strong': `${hoveredTableColor}66`,
                                     } : {}),
@@ -5843,7 +5843,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
                                     ...(rawVal.includes('{{') ? { color: 'transparent' } : {}),
                                     ...(varsPane.visible && varsPane.active && hoveredTableColor && field.key === varsPane.fieldKey ? {
                                       borderColor: hoveredTableColor,
-                                      boxShadow: `0 0 0 1px ${hoveredTableColor}`,
+                                      boxShadow: `0 0 0 0.5px ${hoveredTableColor}`,
                                       '--hover-glow-color': `${hoveredTableColor}`,
                                       '--hover-glow-color-strong': `${hoveredTableColor}66`,
                                     } : {}),
@@ -5888,7 +5888,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
                                 ...(actionConfig.record_id?.includes('{{') ? { color: 'transparent' } : {}),
                                 ...(varsPane.visible && varsPane.active && hoveredTableColor && 'record_id' === varsPane.fieldKey ? {
                                   borderColor: hoveredTableColor,
-                                  boxShadow: `0 0 0 1px ${hoveredTableColor}`,
+                                  boxShadow: `0 0 0 0.5px ${hoveredTableColor}`,
                                 } : {}),
                               }}
                             />
@@ -5951,7 +5951,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
                                 ...(appointmentConfig.person_id?.includes('{{') ? { color: 'transparent' } : {}),
                                 ...(varsPane.visible && varsPane.active && hoveredTableColor && varsPane.fieldKey === 'person_id' ? {
                                   borderColor: hoveredTableColor,
-                                  boxShadow: `0 0 0 1px ${hoveredTableColor}`,
+                                  boxShadow: `0 0 0 0.5px ${hoveredTableColor}`,
                                 } : {}),
                               }}
                             />
@@ -5978,7 +5978,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
                                 ...(appointmentConfig.service_id?.includes('{{') ? { color: 'transparent' } : {}),
                                 ...(varsPane.visible && varsPane.active && hoveredTableColor && varsPane.fieldKey === 'service_id' ? {
                                   borderColor: hoveredTableColor,
-                                  boxShadow: `0 0 0 1px ${hoveredTableColor}`,
+                                  boxShadow: `0 0 0 0.5px ${hoveredTableColor}`,
                                 } : {}),
                               }}
                             />
@@ -6018,7 +6018,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
                                 ...(appointmentConfig.staff_id?.includes('{{') ? { color: 'transparent' } : {}),
                                 ...(varsPane.visible && varsPane.active && hoveredTableColor && varsPane.fieldKey === 'staff_id' ? {
                                   borderColor: hoveredTableColor,
-                                  boxShadow: `0 0 0 1px ${hoveredTableColor}`,
+                                  boxShadow: `0 0 0 0.5px ${hoveredTableColor}`,
                                 } : {}),
                               }}
                             />
@@ -6059,7 +6059,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
                                 ...(appointmentConfig.appointment_id?.includes('{{') ? { color: 'transparent' } : {}),
                                 ...(varsPane.visible && varsPane.active && hoveredTableColor && varsPane.fieldKey === 'appointment_id' ? {
                                   borderColor: hoveredTableColor,
-                                  boxShadow: `0 0 0 1px ${hoveredTableColor}`,
+                                  boxShadow: `0 0 0 0.5px ${hoveredTableColor}`,
                                 } : {}),
                               }}
                             />
@@ -6144,7 +6144,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
                                 ...(appointmentConfig.notes?.includes('{{') ? { color: 'transparent' } : {}),
                                 ...(varsPane.visible && varsPane.active && hoveredTableColor && varsPane.fieldKey === 'notes' ? {
                                   borderColor: hoveredTableColor,
-                                  boxShadow: `0 0 0 1px ${hoveredTableColor}`,
+                                  boxShadow: `0 0 0 0.5px ${hoveredTableColor}`,
                                 } : {}),
                               }}
                             />
@@ -6445,8 +6445,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
         )}
 
         {/* Variables pane — rendered outside selection panel (overflow: hidden clips it otherwise) */}
-        {(['actionConfig', 'appointmentConfig', 'scheduleConfig'].includes(panelStage) || (isPhone && panelStage === 'triggerConfig')) && (
-          <VariablesPane
+        <VariablesPane
             showClose={isPhone}
             visible={varsPane.visible && (!isPhone || mobileVariablesOpen)}
             targetFieldKey={varsPane.fieldKey}
@@ -6465,8 +6464,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
               left: Math.max(10, (panelStyle.left || 0) - 272 - 8),
               height: 800,
             }}
-          />
-        )}
+        />
 
         {logicPanel && (
           <>

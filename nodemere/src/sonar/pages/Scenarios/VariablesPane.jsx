@@ -1092,7 +1092,7 @@ const SearchRecordsOutput = ({ currentNodeId, nodes, edges, onInsertVariable, on
 };
 
 // Previous Node Variables — shows output variables from previous nodes in the flow
-const PreviousNodeVars = ({ currentNodeId, nodes, edges, onInsertVariable, onTableHover }) => {
+const PreviousNodeVars = ({ currentNodeId, nodes, edges, onInsertVariable, onTableHover, isOpen, onHasOutputVariables }) => {
   const [expandedNodes, setExpandedNodes] = useState({});
 
   // Find previous nodes in execution order
@@ -1148,18 +1148,22 @@ const PreviousNodeVars = ({ currentNodeId, nodes, edges, onInsertVariable, onTab
 
   const prevNodes = getPreviousNodes();
 
-  if (prevNodes.length === 0) {
+  useEffect(() => {
+    onHasOutputVariables?.(prevNodes.length > 0);
+  }, [prevNodes.length, onHasOutputVariables]);
+
+  if (!isOpen || prevNodes.length === 0) {
     return null;
   }
 
   return (
-    <>
+    <div className="sb-vars-previous-outputs">
+      <div className="sb-vars-previous-outputs-title">Available from previous steps</div>
       {prevNodes.map((prev) => {
         const NodeIcon = prev.icon;
-        const isPeopleVariableSet = String(prev.label || '').toLowerCase() === 'people';
-        const color = isPeopleVariableSet ? '#32f0d9' : (prev.isIteratorNode ? '#f472b6' : '#a78bfa');
-        const responseBg = isPeopleVariableSet ? 'rgba(50,240,217,0.08)' : 'rgba(167,139,250,0.08)';
-        const responseBorder = isPeopleVariableSet ? 'rgba(50,240,217,0.2)' : 'rgba(167,139,250,0.2)';
+        const color = '#a1a1aa';
+        const responseBg = 'rgba(161,161,170,0.07)';
+        const responseBorder = 'rgba(161,161,170,0.17)';
         const isExpanded = expandedNodes[prev.nodeId] !== false;
         const hasOutput = prev.outputData != null;
         const sourceName = prev.isStripeResponse ? 'Stripe' : null;
@@ -1182,15 +1186,6 @@ const PreviousNodeVars = ({ currentNodeId, nodes, edges, onInsertVariable, onTab
             <button
               type="button"
               className="sb-vars-table-header sb-vars-table-header--response"
-              style={prev.isIteratorNode ? {
-                background: 'rgba(244,114,182,0.08)',
-                borderColor: 'rgba(244,114,182,0.2)',
-                boxShadow: 'none',
-              } : {
-                background: responseBg,
-                borderColor: responseBorder,
-                boxShadow: `inset 0 0 0 1px ${responseBorder}, inset 3px 0 0 ${color}`,
-              }}
               onClick={() => setExpandedNodes(p => ({ ...p, [prev.nodeId]: !isExpanded }))}
             >
               <span className="sb-vars-table-chevron">
@@ -1280,7 +1275,7 @@ const PreviousNodeVars = ({ currentNodeId, nodes, edges, onInsertVariable, onTab
           </div>
         );
       })}
-    </>
+    </div>
   );
 };
 
@@ -1293,8 +1288,14 @@ const VariablesPane = ({ visible, fieldLabel, onInsertVariable, onTableHover, on
   const [searchStates, setSearchStates] = useState({});
   const [editingTables, setEditingTables] = useState({});
   const [activeSources, setActiveSources] = useState({});
+  const [hasPreviousOutputs, setHasPreviousOutputs] = useState(false);
+  const [showPreviousOutputs, setShowPreviousOutputs] = useState(false);
   const [activeReceptionist, setActiveReceptionist] = useState(null);
+  const [activeReceptionistLoadedKey, setActiveReceptionistLoadedKey] = useState('');
   const [customFieldsReady, setCustomFieldsReady] = useState(false);
+  const [recordsLoading, setRecordsLoading] = useState(false);
+  const [recordsNodeId, setRecordsNodeId] = useState('');
+  const [sourceFadeComplete, setSourceFadeComplete] = useState(false);
   const searchTimers = useRef({});
   const searchInputRefs = useRef({});
   const seenSourceLabelsRef = useRef(new Set());
@@ -1324,36 +1325,51 @@ const VariablesPane = ({ visible, fieldLabel, onInsertVariable, onTableHover, on
 
   useEffect(() => {
     if (!visible || !customFieldsReady) return;
+    let cancelled = false;
     // Determine trigger key for filtering available tables
     const triggerKey = findTriggerKeyForNode(currentNodeId, nodes, edges);
     const available = getAvailableTables(triggerKey, currentNode || null);
+    setRecordsLoading(true);
     const fetchAll = async () => {
-      const fetched = await Promise.all(available.map(async (table) => [table.key, await table.fetch()]));
-      const results = Object.fromEntries(fetched);
-      const indices = Object.fromEntries(available.map((table) => [table.key, 0]));
-      setRecords(results);
-      setActiveIndex(indices);
-      setExpanded((prev) => {
-        const next = { ...prev };
-        available.forEach((table) => {
-          if (typeof next[table.key] !== 'boolean') {
-            next[table.key] = true;
-          }
+      try {
+        const fetched = await Promise.all(available.map(async (table) => [table.key, await table.fetch()]));
+        if (cancelled) return;
+        const results = Object.fromEntries(fetched);
+        const indices = Object.fromEntries(available.map((table) => [table.key, 0]));
+        setRecords(results);
+        setRecordsNodeId(currentNodeId);
+        setActiveIndex(indices);
+        setExpanded((prev) => {
+          const next = { ...prev };
+          available.forEach((table) => {
+            if (typeof next[table.key] !== 'boolean') {
+              next[table.key] = true;
+            }
+          });
+          return next;
         });
-        return next;
-      });
+      } catch (error) {
+        scenarioLog('warn', '[VariablesPane] Could not load table records:', error?.message || error);
+      } finally {
+        if (!cancelled) setRecordsLoading(false);
+      }
     };
     fetchAll();
+    return () => { cancelled = true; };
   }, [visible, currentNodeId, customFieldsReady, findTriggerKeyForNode(currentNodeId, nodes, edges), focusedTableKey]);
+
+  const isTablesLoading = visible && (!customFieldsReady || recordsLoading);
 
   const receptionistSelectionKey = [
     currentNodeId,
+    findNearestUpstreamCallNode(currentNodeId, nodes, edges)?.id || '',
     findNearestUpstreamCallNode(currentNodeId, nodes, edges)?.actionConfig?.assigned_receptionist || '',
   ].join(':');
 
   useEffect(() => {
     let cancelled = false;
-    if (!visible) return undefined;
+    const upstreamCallNode = findNearestUpstreamCallNode(currentNodeId, nodes, edges);
+    if (!visible && !upstreamCallNode) return undefined;
 
     const loadActiveReceptionist = async () => {
       try {
@@ -1505,6 +1521,8 @@ const VariablesPane = ({ visible, fieldLabel, onInsertVariable, onTableHover, on
       } catch (error) {
         scenarioLog('error', '[VariablesPane] loadActiveReceptionist:error', error);
         if (!cancelled) setActiveReceptionist(null);
+      } finally {
+        if (!cancelled) setActiveReceptionistLoadedKey(receptionistSelectionKey);
       }
     };
 
@@ -1588,6 +1606,23 @@ const VariablesPane = ({ visible, fieldLabel, onInsertVariable, onTableHover, on
   })();
 
   const showFromCall = hasCallNodeBefore && !isPhoneCallTrigger && !isCallAction;
+  const isReceptionistLoading = showFromCall && activeReceptionistLoadedKey !== receptionistSelectionKey;
+  const isSourceLoading = isTablesLoading || isReceptionistLoading;
+
+  useEffect(() => {
+    if (isSourceLoading) {
+      setSourceFadeComplete(false);
+      return undefined;
+    }
+    if (!visible) return undefined;
+
+    const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+    const fadeDuration = prefersReducedMotion ? 0 : 320;
+    const timer = setTimeout(() => setSourceFadeComplete(true), fadeDuration);
+    return () => clearTimeout(timer);
+  }, [isSourceLoading, visible, currentNodeId]);
+
+  const showTableValues = visible && !isSourceLoading && sourceFadeComplete && recordsNodeId === currentNodeId;
   const searchOutputsByTable = useMemo(
     () => getUpstreamSearchOutputsByTable(currentNodeId, nodes, edges),
     [currentNodeId, nodes, edges]
@@ -1781,6 +1816,20 @@ const VariablesPane = ({ visible, fieldLabel, onInsertVariable, onTableHover, on
       <div className="sb-vars-header">
         <span className="sb-vars-title">Variables</span>
         {fieldLabel && <span className="sb-vars-field-label">for {fieldLabel}</span>}
+        {hasPreviousOutputs && (
+          <button
+            type="button"
+            className={`sb-vars-previous-toggle${showPreviousOutputs ? ' sb-vars-previous-toggle--active' : ''}`}
+            aria-expanded={showPreviousOutputs}
+            aria-label={showPreviousOutputs ? 'Hide previous step outputs' : 'Show previous step outputs'}
+            title={showPreviousOutputs ? 'Hide previous step outputs' : 'Show previous step outputs'}
+            onClick={() => setShowPreviousOutputs((open) => !open)}
+          >
+            <Layers size={11} />
+            <span>Outputs</span>
+            {showPreviousOutputs ? <ChevronDown size={10} /> : <ChevronUp size={10} />}
+          </button>
+        )}
         {showClose && <button type="button" className="sb-vars-close" aria-label="Close variables" onClick={onClose}><X size={17} /></button>}
       </div>
 
@@ -1791,6 +1840,8 @@ const VariablesPane = ({ visible, fieldLabel, onInsertVariable, onTableHover, on
           edges={edges}
           onInsertVariable={onInsertVariable}
           onTableHover={onTableHover}
+          isOpen={showPreviousOutputs}
+          onHasOutputVariables={setHasPreviousOutputs}
         />
 
         {availableTables.map((table) => {
@@ -1808,11 +1859,13 @@ const VariablesPane = ({ visible, fieldLabel, onInsertVariable, onTableHover, on
           const sourceBg = table.colorBg;
           const sourceBorder = table.colorBorder;
           const receptionistName = activeReceptionist?.first_name?.trim() || activeReceptionist?.full_name?.trim();
-          const sourceLabel = activeSource === 'search'
-            ? 'Search'
-            : showingAgent
-              ? (receptionistName || 'Receptionist')
-              : 'Trigger';
+          const sourceLabel = isSourceLoading
+            ? 'Loading'
+            : activeSource === 'search'
+              ? 'Search'
+              : showingAgent
+                ? (receptionistName || 'Receptionist')
+                : 'Trigger';
           const tableRecords = activeSource === 'search'
             ? (searchSource?.records || [])
             : (records[table.key] || []);
@@ -1831,7 +1884,7 @@ const VariablesPane = ({ visible, fieldLabel, onInsertVariable, onTableHover, on
           }
           const sourceSweepKey = `${sourceStateKey(table.key)}::${activeSource}`;
           const shouldSweepSource = !seenSourceLabelsRef.current.has(sourceSweepKey);
-          const showReceptionistArt = showingAgent && !!activeReceptionist?.banner_url;
+          const showReceptionistArt = !isSourceLoading && showingAgent && !!activeReceptionist?.banner_url;
 
           return (
             <div
@@ -1898,10 +1951,14 @@ const VariablesPane = ({ visible, fieldLabel, onInsertVariable, onTableHover, on
                     )}
                     {(hasAgentData || searchSource) && (
                       <span className="sb-vars-table-source">
-                        <span className="sb-vars-table-source-prefix">via</span>
                         <span
-                          className={`sb-vars-table-source-name${shouldSweepSource ? ' sb-vars-table-source-name--sweep' : ''}`}
+                          className={`sb-vars-table-source-prefix${isSourceLoading ? ' sb-vars-table-source-prefix--loading' : ' sb-vars-table-source-prefix--fade-in'}`}
+                          aria-hidden={isSourceLoading}
+                        >via</span>
+                        <span
+                          className={`sb-vars-table-source-name${isSourceLoading ? ' sb-vars-table-source-name--loading' : shouldSweepSource ? ' sb-vars-table-source-name--sweep' : ''}`}
                           style={{ color: sourceColor }}
+                          aria-live="polite"
                         >
                           {sourceLabel}
                         </span>
@@ -1917,10 +1974,14 @@ const VariablesPane = ({ visible, fieldLabel, onInsertVariable, onTableHover, on
                     <span className="sb-vars-table-icon" style={{ color: sourceColor }}><TableIcon size={11} /></span>
                     <span className="sb-vars-table-label" style={{ textAlign: 'left', flex: 1 }}>{table.label}</span>
                     <span className="sb-vars-table-source">
-                      <span className="sb-vars-table-source-prefix">via</span>
                       <span
-                        className={`sb-vars-table-source-name${shouldSweepSource ? ' sb-vars-table-source-name--sweep' : ''}`}
+                        className={`sb-vars-table-source-prefix${isSourceLoading ? ' sb-vars-table-source-prefix--loading' : ' sb-vars-table-source-prefix--fade-in'}`}
+                        aria-hidden={isSourceLoading}
+                      >via</span>
+                      <span
+                        className={`sb-vars-table-source-name${isSourceLoading ? ' sb-vars-table-source-name--loading' : shouldSweepSource ? ' sb-vars-table-source-name--sweep' : ''}`}
                         style={{ color: sourceColor }}
+                        aria-live="polite"
                       >
                         {sourceLabel}
                       </span>
@@ -1932,7 +1993,7 @@ const VariablesPane = ({ visible, fieldLabel, onInsertVariable, onTableHover, on
                 )}
               </div>
 
-              {isExpanded && (
+              {isExpanded && showTableValues && (
                 <div
                   key={`${table.key}-${activeSource}`}
                   className={`sb-vars-fields sb-vars-source-panel ${isSearching ? 'sb-vars-fields-tuning' : ''} ${showingAgent ? 'sb-vars-source-panel--agent' : ''}`}
