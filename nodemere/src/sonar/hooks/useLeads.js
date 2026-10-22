@@ -31,7 +31,9 @@ const TRIMMED_TEXT_FIELDS = new Set([
 ]);
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
-const sortPeople = (rows, key, direction) => [...rows].sort((left, right) => {
+const sortPeople = (rows, key, direction) => {
+  if (!key) return rows;
+  return [...rows].sort((left, right) => {
   const a = left?.[key];
   const b = right?.[key];
   if (a == null && b == null) return 0;
@@ -41,7 +43,8 @@ const sortPeople = (rows, key, direction) => [...rows].sort((left, right) => {
     ? a - b
     : String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' });
   return direction === 'asc' ? comparison : -comparison;
-});
+  });
+};
 
 const timestampMs = (value) => {
   const time = Date.parse(value || '');
@@ -120,7 +123,7 @@ export function useLeads() {
   const [selectedId, setSelectedId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [sourceFilter, setSourceFilter] = useState('All');
-  const [sortBy, setSortBy] = useState('updated_at');
+  const [sortBy, setSortBy] = useState(null);
   const [sortDir, setSortDir] = useState('desc');
   const abortRef = useRef(false);
   const pendingInsertPlacementRef = useRef(new Map());
@@ -512,6 +515,12 @@ export function useLeads() {
     }
   };
 
+  const clearSort = (key) => {
+    if (sortBy !== key) return;
+    setSortBy(null);
+    setSortDir('desc');
+  };
+
   return {
     leads: filteredLeads,
     allLeads: sortedLeads,
@@ -528,6 +537,7 @@ export function useLeads() {
     sortBy,
     sortDir,
     handleSort,
+    clearSort,
     createLead,
     updateLead,
     deleteLead,

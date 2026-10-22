@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from 'react';
 import MobileRecords from '../components/MobileRecords';
+import MobileSheet from '../components/MobileSheet';
 import useDashboardViewport from '../hooks/useDashboardViewport';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Search, Plus, ChevronUp, ChevronDown, X, Building2, Check, GripVertical, Settings2, Wand2, RefreshCw,
+  Search, Plus, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Filter, X, Building2, Check, GripVertical, Settings2, Wand2, RefreshCw,
   User, Phone, Mail, Flag, Compass, Clock, Tag, Search as SearchIcon, FileText, Activity,
   Users, MapPin, Map as MapIcon, Shield, DollarSign, Target, Navigation, Type, Hash, CalendarDays, Trash2,
   ToggleLeft, Repeat, Wrench, Briefcase, Factory, TrendingUp, Globe, Calendar, MessageSquare, Gauge,
@@ -622,10 +623,10 @@ const DraggableHeader = ({
       {col.label ? (
         <button onClick={() => col.sortKey && onSort(col.sortKey)}
           title={displayName}
-          className="ml-1 flex min-w-0 flex-1 items-center gap-1.5 whitespace-nowrap text-[11px] font-semibold tracking-[-0.02em] text-zinc-500 hover:text-zinc-300 transition-colors">
+          className="ml-1 flex min-w-0 items-center gap-1.5 whitespace-nowrap text-[11px] font-semibold tracking-[-0.02em] text-zinc-500 hover:text-zinc-300 transition-colors">
           {IconComp && <IconComp size={10} className="shrink-0 text-zinc-700" />}
           <span className="min-w-0 truncate">{displayName}</span>
-          {sortBy === col.sortKey && (sortDir === 'asc' ? <ChevronUp size={9} className="shrink-0" /> : <ChevronDown size={9} className="shrink-0" />)}
+          {col.sortKey && sortBy === col.sortKey && (sortDir === 'asc' ? <ChevronUp size={9} className="shrink-0" /> : <ChevronDown size={9} className="shrink-0" />)}
         </button>
       ) : <div className="w-full" />}
       {col.id !== 'avatar' && col.label && <button onClick={(e) => { e.stopPropagation(); onFieldSettings(col.id); }} className="shrink-0 p-1 rounded text-zinc-800 hover:text-white hover:bg-white/5 transition-all opacity-0 group-hover/header:opacity-100"><Settings2 size={10} /></button>}
@@ -751,7 +752,9 @@ const buildColumns = (customFields = [], fieldConfig = {}) => [
     id: field.key,
     label: field.label,
     type: field.type,
-    width: field.tableWidth || {
+    width: field.type === 'boolean'
+      ? `${Math.max(parseFloat(field.tableWidth) || 0, 140)}px`
+      : field.tableWidth || {
       boolean: '110px',
       text: '180px',
       number: '120px',
@@ -759,7 +762,7 @@ const buildColumns = (customFields = [], fieldConfig = {}) => [
       select: '140px',
       multi_select: '220px',
     }[field.type] || '160px',
-    sortKey: null,
+    sortKey: field.type === 'docs' ? null : field.key,
     custom: true,
   })),
 ];
@@ -776,13 +779,13 @@ const getColumnLabel = (column, fieldConfig = {}) => fieldConfig[column.id]?.nam
 const isIntakeEnabled = (fieldConfig, key) => Boolean(fieldConfig?.[key]?.intakeEnabled);
 
 const getIntakeTone = (count) => {
-  if (count >= 8) {
+  if (count >= 7) {
     return {
       text: 'text-rose-300',
       badge: 'border-rose-500/30 bg-rose-500/12 text-rose-300',
     };
   }
-  if (count >= 6) {
+  if (count >= 5) {
     return {
       text: 'text-amber-200',
       badge: 'border-amber-500/30 bg-amber-500/12 text-amber-200',
@@ -816,7 +819,9 @@ const getAllDataColumns = (customFields = [], fieldConfig = {}) => [
     id: field.key,
     label: field.label,
     type: field.type,
-    width: field.tableWidth || {
+    width: field.type === 'boolean'
+      ? `${Math.max(parseFloat(field.tableWidth) || 0, 140)}px`
+      : field.tableWidth || {
       boolean: '110px',
       text: '180px',
       number: '120px',
@@ -843,19 +848,19 @@ const savePeopleTableView = (view) => {
   } catch {}
 };
 
-const TableControlButton = React.forwardRef(({ active, children, onClick, plain = false, ariaLabel }, ref) => (
+const TableControlButton = React.forwardRef(({ active, children, onClick, plain = false, ariaLabel, className = '' }, ref) => (
   <button
     ref={ref}
     type="button"
     onClick={onClick}
     aria-label={ariaLabel}
     className={plain
-      ? 'inline-flex shrink-0 items-center gap-1 pr-[2px] text-[12px] font-semibold leading-none text-zinc-500 transition-colors duration-150 hover:text-zinc-400'
+      ? `inline-flex shrink-0 items-center gap-1 pr-[2px] text-[12px] font-semibold leading-none text-zinc-500 transition-colors duration-150 hover:text-zinc-400 ${className}`
       : `inline-flex h-8 items-center gap-2 rounded-xl border px-3 text-[11px] font-semibold tracking-[-0.02em] transition-all ${
         active
           ? 'border-white/[0.12] bg-white/[0.06] text-white'
           : 'border-white/[0.06] bg-white/[0.025] text-zinc-500 hover:border-white/[0.14] hover:bg-white/[0.05] hover:text-zinc-200'
-      }`}
+      } ${className}`}
   >
     {children}
     {plain && <ChevronDown size={12} strokeWidth={2.75} className="translate-y-px text-current" />}
@@ -916,6 +921,82 @@ const ControlPopoverHeader = ({ title, caption }) => (
   </div>
 );
 
+const SortFieldPicker = ({ value, columns, fieldConfig, onChange }) => {
+  const [open, setOpen] = useState(false);
+  const [menuPosition, setMenuPosition] = useState(null);
+  const ref = useRef(null);
+  const menuRef = useRef(null);
+  const selectedColumn = columns.find((column) => column.id === value);
+  const selectedLabel = selectedColumn ? getColumnLabel(selectedColumn, fieldConfig) : value;
+  const updateMenuPosition = useCallback(() => {
+    const rect = ref.current?.getBoundingClientRect();
+    if (!rect) return;
+    const width = Math.max(rect.width, 170);
+    setMenuPosition({
+      left: Math.min(rect.left, window.innerWidth - width - 8),
+      top: rect.bottom + 6,
+      width,
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    updateMenuPosition();
+    const handlePointerDown = (event) => {
+      if (ref.current?.contains(event.target) || menuRef.current?.contains(event.target)) return;
+      setOpen(false);
+    };
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+    const update = () => updateMenuPosition();
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('resize', update);
+    window.addEventListener('scroll', update, true);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('resize', update);
+      window.removeEventListener('scroll', update, true);
+    };
+  }, [open, updateMenuPosition]);
+
+  return (
+    <div className="min-w-0 flex-1" ref={ref}>
+      <button type="button" onClick={(event) => { event.stopPropagation(); setOpen((current) => !current); }}
+        className="w-full min-h-[30px] inline-flex items-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.04] px-2.5 py-1 text-left text-[10px] font-semibold tracking-[-0.02em] text-zinc-300 transition-colors hover:bg-white/[0.06] hover:text-white">
+        <span className="min-w-0 flex-1 truncate">{selectedLabel}</span>
+        <ChevronDown size={11} className="shrink-0 text-zinc-500" />
+      </button>
+      {createPortal(
+        <AnimatePresence>
+          {open && (
+            <motion.div ref={menuRef} initial={{ opacity: 0, y: -4, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -4, scale: 0.96 }}
+              style={{ left: menuPosition?.left ?? 0, top: menuPosition?.top ?? 0, width: menuPosition?.width ?? 170 }}
+              className="fixed z-[280] overflow-hidden rounded-xl border border-white/[0.08] bg-[#0a0a0a] py-1 shadow-[0_10px_28px_rgba(0,0,0,0.48)]"
+              onClick={(event) => event.stopPropagation()}>
+              {columns.map((column, index) => {
+                const label = getColumnLabel(column, fieldConfig);
+                const active = column.id === value;
+                return (
+                  <motion.button key={column.id} type="button" initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: index * 0.02 }}
+                    onClick={() => { setOpen(false); if (!active) onChange(column.id); }}
+                    className={`flex w-full items-center gap-2 px-3 py-2 text-left text-[11px] font-semibold tracking-[-0.02em] transition-colors hover:bg-white/[0.06] ${active ? 'text-white' : 'text-zinc-400'}`}>
+                    <span className="min-w-0 flex-1 truncate">{label}</span>
+                    {active && <Check size={11} className="ml-auto shrink-0 text-white" />}
+                  </motion.button>
+                );
+              })}
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
+    </div>
+  );
+};
+
 const SortBuilderPopover = ({ columns, fieldConfig, rules, onChange }) => {
   const sortableColumns = columns.filter((column) => !['select', 'avatar'].includes(column.id));
   const addRule = () => {
@@ -948,9 +1029,7 @@ const SortBuilderPopover = ({ columns, fieldConfig, rules, onChange }) => {
               <button type="button" onClick={() => moveRule(index, -1)} className="text-zinc-700 hover:text-white disabled:opacity-20" disabled={index === 0}><ChevronUp size={11} /></button>
               <button type="button" onClick={() => moveRule(index, 1)} className="text-zinc-700 hover:text-white disabled:opacity-20" disabled={index === rules.length - 1}><ChevronDown size={11} /></button>
             </div>
-            <select value={rule.field} onChange={(event) => updateRule(index, { field: event.target.value })} className="min-w-0 flex-1 bg-transparent text-[11px] font-semibold tracking-[-0.02em] text-zinc-300 outline-none">
-              {sortableColumns.map((column) => <option key={column.id} value={column.id} className="bg-[#0a0a0a]">{getColumnLabel(column, fieldConfig)}</option>)}
-            </select>
+            <SortFieldPicker value={rule.field} columns={sortableColumns} fieldConfig={fieldConfig} onChange={(field) => updateRule(index, { field })} />
             <button type="button" onClick={() => updateRule(index, { direction: rule.direction === 'asc' ? 'desc' : 'asc' })} className="w-[78px] rounded-xl px-3 py-2 text-left text-[11px] font-semibold tracking-[-0.02em] text-zinc-300 transition-colors hover:bg-white/[0.04] hover:text-white">
               {rule.direction === 'asc' ? 'Asc' : 'Desc'}
             </button>
@@ -1009,7 +1088,7 @@ const IntakeFieldsPopover = ({ columns, fieldConfig, onToggleField, onEnableAll,
 
   return (
     <div>
-      <ControlPopoverHeader title="Intake" caption="Choose which fields the inbound agent should prioritize." />
+      <ControlPopoverHeader title="Intake" caption="Choose which fields the receptionist should prioritize." />
       <div className="border-b border-white/[0.05] p-3">
         <div className="intake-count-summary mb-3 flex items-center justify-between gap-3 rounded-xl border border-white/[0.06] bg-white/[0.025] px-3 py-2.5">
           <div>
@@ -1017,7 +1096,7 @@ const IntakeFieldsPopover = ({ columns, fieldConfig, onToggleField, onEnableAll,
             <div className={`mt-1 text-[18px] font-semibold tracking-[-0.04em] ${tone.text}`}>{enabledCount}</div>
           </div>
           <div className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold tracking-[-0.02em] ${tone.badge}`}>
-            {enabledCount >= 8 ? 'Too many' : enabledCount >= 6 ? 'Watch count' : 'In range'}
+            {enabledCount >= 7 ? 'Overloaded' : enabledCount >= 5 ? 'Caution' : 'Good'}
           </div>
         </div>
         <div className="relative">
@@ -1025,14 +1104,17 @@ const IntakeFieldsPopover = ({ columns, fieldConfig, onToggleField, onEnableAll,
           <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search intake fields..." className="w-full rounded-xl border border-white/[0.06] bg-white/[0.025] py-2 pl-8 pr-3 text-[11px] font-semibold tracking-[-0.02em] text-zinc-300 outline-none placeholder:text-zinc-700 focus:!outline-none" />
         </div>
         <p className="mt-2 text-[10px] leading-relaxed text-zinc-500">
-          Leaner intake usually performs better. Keeping this list under six fields helps the agent stay focused and keeps token usage tighter.
+          Leaner intake usually performs better. Keeping this list under five fields helps the agent handle procedures.
         </p>
         <div className="mt-2 flex gap-2">
           <button type="button" onClick={onEnableAll} className="flex-1 rounded-lg border border-white/[0.06] px-2 py-1.5 text-[11px] font-semibold tracking-[-0.02em] text-zinc-400 hover:text-white">Enable All</button>
           <button type="button" onClick={onDisableAll} className="flex-1 rounded-lg border border-white/[0.06] px-2 py-1.5 text-[11px] font-semibold tracking-[-0.02em] text-zinc-400 hover:text-white">Clear All</button>
         </div>
       </div>
-      <div className="max-h-[320px] overflow-y-auto custom-scrollbar p-2">
+      <div
+        className="custom-scrollbar p-2"
+        style={filtered.length >= 8 ? { maxHeight: '256px', overflowY: 'auto' } : undefined}
+      >
         {filtered.map((column) => {
           const enabled = isIntakeEnabled(fieldConfig, column.id);
           const locked = column.id === 'phone';
@@ -1119,6 +1201,7 @@ const LeadsTable = ({
   sortBy,
   sortDir,
   onSort,
+  onClearSort,
   onCreateInline,
   onDeleteMany,
   totalCount,
@@ -1140,6 +1223,8 @@ const LeadsTable = ({
 }) => {
   const { isPhone } = useDashboardViewport();
   const phoneView = responsive && !demoMode && isPhone;
+  const [mobileControl, setMobileControl] = useState(null);
+  const [mobileToolbarPage, setMobileToolbarPage] = useState(0);
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [viewSettings, setViewSettings] = useState(() => ({
     rowHeight: 3,
@@ -1152,6 +1237,7 @@ const LeadsTable = ({
   const [customFields, setCustomFields] = useState(() => demoMode ? demoInitialCustomFields : []);
   const [fieldConfig, setFieldConfig] = useState(() => demoMode ? { ...DEFAULT_FIELD_CONFIG, ...(demoInitialFieldConfig || {}) } : loadFieldConfig());
   const [columns, setColumns] = useState(() => buildColumns(demoMode ? demoInitialCustomFields : [], demoMode ? { ...DEFAULT_FIELD_CONFIG, ...(demoInitialFieldConfig || {}) } : DEFAULT_FIELD_CONFIG));
+  const columnOrderRef = useRef(columns.map((column) => column.id));
   const [colorbarRules, setColorbarRules] = useState(() => demoMode ? sanitizeColorbarRuleList(demoInitialColorbarRules) : loadColorbarRules());
   const [settingsField, setSettingsField] = useState(null);
   const [showColorbarStudio, setShowColorbarStudio] = useState(false);
@@ -1226,6 +1312,26 @@ const LeadsTable = ({
     });
   }, [demoMode]);
 
+  const updateSortRules = (sortRules) => {
+    updateViewSettings({ sortRules });
+    if (sortBy && !sortRules.some((rule) => rule.field === sortBy)) onClearSort?.(sortBy);
+  };
+
+  const handleHeaderSort = (key) => {
+    const rules = viewSettings.sortRules || [];
+    const existingRule = rules.find((rule) => rule.field === key);
+    const direction = existingRule
+      ? (existingRule.direction === 'asc' ? 'desc' : 'asc')
+      : sortBy === key
+        ? (sortDir === 'asc' ? 'desc' : 'asc')
+        : 'asc';
+    updateSortRules([
+      { id: existingRule?.id || `header_sort_${key}`, field: key, direction },
+      ...rules.filter((rule) => rule.field !== key),
+    ]);
+    if (!isCustomFieldKey(key)) onSort?.(key);
+  };
+
   useEffect(() => {
     if (demoMode) return undefined;
     let active = true;
@@ -1252,17 +1358,18 @@ const LeadsTable = ({
   useEffect(() => {
     setColumns((prev) => {
       const built = buildColumns(customFields, fieldConfig);
-      const prevOrder = prev.map((col) => col.id);
-      const byId = new Map(built.map((col) => [col.id, col]));
-      const next = [];
-      prevOrder.forEach((id) => {
-        if (byId.has(id)) {
-          next.push(byId.get(id));
-          byId.delete(id);
-        }
+      const allBuilt = buildColumns(customFields, {});
+      const allById = new Map(allBuilt.map((column) => [column.id, column]));
+      const order = columnOrderRef.current.filter((id) => allById.has(id));
+      prev.forEach((column) => {
+        if (allById.has(column.id) && !order.includes(column.id)) order.push(column.id);
       });
-      byId.forEach((col) => next.push(col));
-      return next;
+      allBuilt.forEach((column) => {
+        if (!order.includes(column.id)) order.push(column.id);
+      });
+      columnOrderRef.current = order;
+      const byId = new Map(built.map((col) => [col.id, col]));
+      return order.filter((id) => byId.has(id)).map((id) => byId.get(id));
     });
   }, [customFields, fieldConfig]);
 
@@ -1559,6 +1666,13 @@ const LeadsTable = ({
       const [moved] = next.splice(fromIndex, 1);
       if (!moved) return prev;
       next.splice(toIndex, 0, moved);
+      const previousVisibleIds = new Set(prev.map((column) => column.id));
+      let visibleIndex = 0;
+      const reorderedAll = columnOrderRef.current.map((id) => (
+        previousVisibleIds.has(id) ? next[visibleIndex++]?.id ?? id : id
+      ));
+      while (visibleIndex < next.length) reorderedAll.push(next[visibleIndex++].id);
+      columnOrderRef.current = reorderedAll;
       if (!demoMode && businessId) {
         const orderedCustomKeys = next.filter((col) => col.custom).map((col) => col.id);
         updateCustomFieldPositions(businessId, orderedCustomKeys).catch((err) => {
@@ -1574,6 +1688,8 @@ const LeadsTable = ({
   }, [businessId, demoMode]);
 
   const resetColumnOrder = useCallback(() => {
+    const allColumns = buildColumns(customFields, {});
+    columnOrderRef.current = allColumns.map((column) => column.id);
     setColumns(buildColumns(customFields, fieldConfig));
   }, [customFields, fieldConfig]);
 
@@ -1866,9 +1982,9 @@ const LeadsTable = ({
       key={col.id}
       col={col}
       index={index}
-      sortBy={sortBy}
-      sortDir={sortDir}
-      onSort={onSort}
+      sortBy={viewSettings.sortRules?.[0]?.field || null}
+      sortDir={viewSettings.sortRules?.[0]?.direction || null}
+      onSort={handleHeaderSort}
       onDragStart={handleDragStart}
       onDragOver={handleDragOver}
       onDrop={handleDrop}
@@ -2266,7 +2382,7 @@ const LeadsTable = ({
 
   return (
     <div className={`dashboard-crm-table flex-1 flex flex-col min-w-0 h-full ${demoEntrance ? 'crm-demo-entrance-table' : ''}`}>
-      {responsive && !demoMode && <MobileRecords active={phoneView}
+      {responsive && !demoMode && <MobileRecords active={phoneView} rowHeight={density}
         records={sortedLeads} loading={loading} totalCount={totalCount}
         fields={[...TABLE_COLUMNS, ...customFields.map((field) => ({ ...field, custom: true }))]}
         visibleFields={columns.map((column) => column.id)} config={fieldConfig}
@@ -2274,18 +2390,46 @@ const LeadsTable = ({
         sourceFilter={sourceFilter} onSourceFilter={onSourceFilterChange} sourceOptions={SOURCE_OPTIONS}
         onCreate={onCreateRecord} onUpdate={onSaveRecord} onDelete={onDeleteMany}
         renderColorbar={renderColorbar} onColorbar={() => setShowColorbarStudio(true)}
+        renderMobileControls={({ setPanel, stateFilter, sourceFilter: mobileSourceFilter }) => <div className="crm-mobile-toolbar-strip crm-mobile-toolbar-strip--people">
+          <AnimatePresence mode="wait" initial={false}>
+            {mobileToolbarPage === 0 ? <motion.div key="table-controls" className="crm-mobile-toolbar-page" initial={{ x: '-100%', opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: '-100%', opacity: 0 }} transition={{ duration: .2, ease: [.22, 1, .36, 1] }}>
+              <TableControlButton plain active={mobileControl === 'sort' || (viewSettings.sortRules || []).length > 0} onClick={() => setMobileControl('sort')}>Sort</TableControlButton>
+              <TableControlButton plain active={mobileControl === 'visibility'} onClick={() => setMobileControl('visibility')}>Columns</TableControlButton>
+              <TableControlButton plain active={mobileControl === 'order'} onClick={() => setMobileControl('order')}>Order</TableControlButton>
+              <TableControlButton plain active={mobileControl === 'height'} onClick={() => setMobileControl('height')}>Row Height</TableControlButton>
+              <TableControlButton plain className="crm-mobile-toolbar-intake-wide-only" active={mobileControl === 'intake'} onClick={() => setMobileControl('intake')}>Intake</TableControlButton>
+              <TableControlButton plain className="crm-mobile-toolbar-filter-wide-only" active={stateFilter !== 'all' || mobileSourceFilter !== 'All'} onClick={() => setPanel('Filter')}><Filter size={13} />Filter</TableControlButton>
+              <TableControlButton plain className="crm-mobile-toolbar-colorbar-wide-only" onClick={() => setShowColorbarStudio(true)}>Colorbar</TableControlButton>
+              <TableControlButton plain className="crm-mobile-toolbar-extra-wide-only" onClick={() => setPanel('CRM tools')}>Fields</TableControlButton>
+              <button type="button" className="crm-mobile-toolbar-next" aria-label="Show more People CRM controls" title="More controls" onClick={() => setMobileToolbarPage(1)}><ChevronRight size={16} /></button>
+            </motion.div> : <motion.div key="more-controls" className="crm-mobile-toolbar-page" initial={{ x: '100%', opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: '100%', opacity: 0 }} transition={{ duration: .2, ease: [.22, 1, .36, 1] }}>
+              <button type="button" className="crm-mobile-toolbar-back" aria-label="Back to People CRM table controls" title="Back" onClick={() => setMobileToolbarPage(0)}><ChevronLeft size={16} /></button>
+              <TableControlButton plain className="crm-mobile-toolbar-intake-narrow-only" active={mobileControl === 'intake'} onClick={() => setMobileControl('intake')}>Intake</TableControlButton>
+              <TableControlButton plain className="crm-mobile-toolbar-filter-narrow-only" active={stateFilter !== 'all' || mobileSourceFilter !== 'All'} onClick={() => setPanel('Filter')}><Filter size={13} />Filter</TableControlButton>
+              <TableControlButton plain className="crm-mobile-toolbar-colorbar-narrow-only" onClick={() => setShowColorbarStudio(true)}>Colorbar</TableControlButton>
+              <TableControlButton plain className="crm-mobile-toolbar-mid-only" onClick={() => setPanel('CRM tools')}>Fields</TableControlButton>
+            </motion.div>}
+          </AnimatePresence>
+        </div>}
         addFieldContent={<div className="mobile-crm-tools"><p>Add a custom field to People.</p>{[...column_options, ...specialColumnOptions].map((option) => <button type="button" key={option.type} onClick={() => handleCreateColumn(option.type)}>{option.label}<Plus size={16} /></button>)}</div>}
         renderDocuments={(person) => <button type="button" onClick={() => setDocumentViewer({ person, initialDocument: personDocumentsById.get(String(person.id))?.[0] })} className="mobile-documents-link">{personDocumentsById.get(String(person.id))?.[0]?.file_name || 'View documents'}{(personDocumentsById.get(String(person.id))?.length || 0) > 1 ? ` +${personDocumentsById.get(String(person.id)).length - 1}` : ''}</button>}
-        sortContent={<SortBuilderPopover columns={columns} fieldConfig={fieldConfig} rules={viewSettings.sortRules || []} onChange={(sortRules) => updateViewSettings({ sortRules })} />}
+        sortContent={<SortBuilderPopover columns={columns} fieldConfig={fieldConfig} rules={viewSettings.sortRules || []} onChange={updateSortRules} />}
         tools={<div className="mobile-crm-tools">
           <button type="button" onClick={() => setShowImportPeople(true)}>Import people</button>
           <details><summary>Intake fields</summary><IntakeFieldsPopover columns={allDataColumns} fieldConfig={fieldConfig} onToggleField={setFieldIntakeEnabled} onEnableAll={() => setAllFieldsIntakeEnabled(true)} onDisableAll={() => setAllFieldsIntakeEnabled(false)} /></details>
           <details><summary>Visible fields</summary><ColumnsVisibilityPopover columns={allDataColumns} fieldConfig={fieldConfig} onSetHidden={setColumnHidden} onShowAll={() => setAllColumnsHidden(false)} onHideAll={() => setAllColumnsHidden(true)} /></details>
           <details><summary>Field settings</summary>{allDataColumns.map((column) => <button type="button" key={column.id} onClick={() => setSettingsField(column.id)}>{getColumnLabel(column, fieldConfig)}<Settings2 size={16} /></button>)}</details>
           <details><summary>Add custom field</summary>{[...column_options, ...specialColumnOptions].map((option) => <button type="button" key={option.type} onClick={() => handleCreateColumn(option.type)}>{option.label}<Plus size={16} /></button>)}</details>
-          <p>Column order, frozen columns, zones, and row height remain available in the tablet and desktop table.</p>
+          <p>Frozen columns and zones remain available in the tablet and desktop table.</p>
         </div>}
       />}
+      {phoneView && mobileControl && <MobileSheet title={{ sort: 'Sort', visibility: 'Columns', order: 'Column Order', height: 'Row Height', intake: 'Intake' }[mobileControl]} onClose={() => setMobileControl(null)}>
+        {mobileControl === 'sort' ? <SortBuilderPopover columns={columns} fieldConfig={fieldConfig} rules={viewSettings.sortRules || []} onChange={updateSortRules} /> : null}
+        {mobileControl === 'visibility' ? <ColumnsVisibilityPopover columns={allDataColumns} fieldConfig={fieldConfig} onSetHidden={setColumnHidden} onShowAll={() => setAllColumnsHidden(false)} onHideAll={() => setAllColumnsHidden(true)} /> : null}
+        {mobileControl === 'order' ? <ColumnOrderPopover columns={columns.filter((column) => !['select', 'avatar'].includes(column.id))} fieldConfig={fieldConfig} onMove={(fromIndex, toIndex) => moveVisibleColumn(fromIndex + 2, toIndex + 2)} onReset={resetColumnOrder} /> : null}
+        {mobileControl === 'height' ? <RowHeightPopover value={density} onChange={(rowHeight) => { updateViewSettings({ rowHeight }); setMobileControl(null); }} /> : null}
+        {mobileControl === 'intake' ? <IntakeFieldsPopover columns={allDataColumns} fieldConfig={fieldConfig} onToggleField={setFieldIntakeEnabled} onEnableAll={() => setAllFieldsIntakeEnabled(true)} onDisableAll={() => setAllFieldsIntakeEnabled(false)} /> : null}
+      </MobileSheet>}
       {!phoneView && <>
       <div className={`shrink-0 flex items-center gap-3 ${hideTitle ? 'px-6 pb-3 pt-5' : 'px-10 py-8'} ${demoEntrance ? 'crm-demo-entrance-topbar' : ''}`}>
         <div className="flex items-center gap-3">
@@ -2308,7 +2452,7 @@ const LeadsTable = ({
         <div className="flex-1" />
         <div className="flex items-center gap-2">
           {!demoMode && <button type="button" onClick={() => setShowImportPeople(true)}
-            className="px-1 text-[12px] text-zinc-500 transition-colors hover:text-white">Import</button>}
+            className="bg-[#0a0a0a] px-1 text-[12px] text-zinc-500 transition-colors hover:text-white">Import</button>}
           {onRefresh && (
             <button
               type="button"
@@ -2330,20 +2474,20 @@ const LeadsTable = ({
 
       <div className="flex-1 px-6 pb-6 min-h-0">
         <div className="relative group/table h-full flex flex-col">
-          <div className={`flex shrink-0 items-center ${demoEntrance ? 'mb-3 gap-2 px-1 crm-demo-entrance-controls' : 'gap-[14px] px-6 pb-4 text-[12px] text-zinc-500'}`} style={demoEntrance ? undefined : { fontFamily: 'var(--font-family-sans)' }}>
-            <TableControlButton plain={!demoEntrance} ref={sortButtonRef} active={activeControl === 'sort' || (viewSettings.sortRules || []).length > 0} onClick={() => setActiveControl((current) => (current === 'sort' ? null : 'sort'))}>
+          <div className={`flex shrink-0 items-center gap-[14px] px-6 pb-4 text-[12px] text-zinc-500 ${demoEntrance ? 'crm-demo-entrance-controls' : ''}`} style={{ fontFamily: 'var(--font-family-sans)' }}>
+            <TableControlButton plain ref={sortButtonRef} active={activeControl === 'sort' || (viewSettings.sortRules || []).length > 0} onClick={() => setActiveControl((current) => (current === 'sort' ? null : 'sort'))}>
               Sort
             </TableControlButton>
-            <TableControlButton plain={!demoEntrance} ariaLabel={demoEntrance ? undefined : 'Columns'} ref={visibilityButtonRef} active={activeControl === 'visibility'} onClick={() => setActiveControl((current) => (current === 'visibility' ? null : 'visibility'))}>
-              {demoEntrance ? 'Hide/Show Columns' : 'Columns'}
+            <TableControlButton plain ariaLabel="Columns" ref={visibilityButtonRef} active={activeControl === 'visibility'} onClick={() => setActiveControl((current) => (current === 'visibility' ? null : 'visibility'))}>
+              Columns
             </TableControlButton>
-            <TableControlButton plain={!demoEntrance} ariaLabel={demoEntrance ? undefined : 'Column Order'} ref={orderButtonRef} active={activeControl === 'order'} onClick={() => setActiveControl((current) => (current === 'order' ? null : 'order'))}>
-              {demoEntrance ? 'Column Order' : 'Order'}
+            <TableControlButton plain ariaLabel="Column Order" ref={orderButtonRef} active={activeControl === 'order'} onClick={() => setActiveControl((current) => (current === 'order' ? null : 'order'))}>
+              Order
             </TableControlButton>
-            <TableControlButton plain={!demoEntrance} ref={rowHeightButtonRef} active={activeControl === 'height'} onClick={() => setActiveControl((current) => (current === 'height' ? null : 'height'))}>
+            <TableControlButton plain ref={rowHeightButtonRef} active={activeControl === 'height'} onClick={() => setActiveControl((current) => (current === 'height' ? null : 'height'))}>
               Row Height
             </TableControlButton>
-            <TableControlButton plain={!demoEntrance} ref={intakeButtonRef} active={activeControl === 'intake'} onClick={() => setActiveControl((current) => (current === 'intake' ? null : 'intake'))}>
+            <TableControlButton plain ref={intakeButtonRef} active={activeControl === 'intake'} onClick={() => setActiveControl((current) => (current === 'intake' ? null : 'intake'))}>
               Intake
             </TableControlButton>
           </div>
@@ -2361,7 +2505,7 @@ const LeadsTable = ({
           columns={columns}
           fieldConfig={fieldConfig}
           rules={viewSettings.sortRules || []}
-          onChange={(sortRules) => updateViewSettings({ sortRules })}
+          onChange={updateSortRules}
         />
       </FloatingPopover>
       <FloatingPopover anchorRef={visibilityButtonRef} open={activeControl === 'visibility'} onClose={() => setActiveControl(null)} width={320}>

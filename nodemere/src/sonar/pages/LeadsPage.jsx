@@ -9,7 +9,7 @@ const PeoplePage = ({ hideTitle = false, onToolbarMetaChange = null }) => {
     selectedId, setSelectedId,
     searchQuery, setSearchQuery,
     sourceFilter, setSourceFilter,
-    sortBy, sortDir, handleSort,
+    sortBy, sortDir, handleSort, clearSort,
     createLead, updateLead, deleteLead, refresh,
   } = useLeads();
 
@@ -69,7 +69,7 @@ const PeoplePage = ({ hideTitle = false, onToolbarMetaChange = null }) => {
         justAddedLeadIds={justAddedLeadIds}
         searchQuery={searchQuery} onSearchChange={setSearchQuery}
         sourceFilter={sourceFilter} onSourceFilterChange={setSourceFilter}
-        sortBy={sortBy} sortDir={sortDir} onSort={handleSort}
+        sortBy={sortBy} sortDir={sortDir} onSort={handleSort} onClearSort={clearSort}
         totalCount={allLeads.length}
         onCreateInline={handleInlineCreate}
         onDeleteMany={handleDeleteMany}
