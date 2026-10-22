@@ -621,14 +621,15 @@ const DraggableHeader = ({
       )}
       {col.label ? (
         <button onClick={() => col.sortKey && onSort(col.sortKey)}
-          className="ml-1 flex items-center gap-1.5 whitespace-nowrap text-[11px] font-semibold tracking-[-0.02em] text-zinc-500 hover:text-zinc-300 transition-colors">
-          {IconComp && <IconComp size={10} className="text-zinc-700" />}
-          {displayName}
-          {sortBy === col.sortKey && (sortDir === 'asc' ? <ChevronUp size={9} /> : <ChevronDown size={9} />)}
+          title={displayName}
+          className="ml-1 flex min-w-0 flex-1 items-center gap-1.5 whitespace-nowrap text-[11px] font-semibold tracking-[-0.02em] text-zinc-500 hover:text-zinc-300 transition-colors">
+          {IconComp && <IconComp size={10} className="shrink-0 text-zinc-700" />}
+          <span className="min-w-0 truncate">{displayName}</span>
+          {sortBy === col.sortKey && (sortDir === 'asc' ? <ChevronUp size={9} className="shrink-0" /> : <ChevronDown size={9} className="shrink-0" />)}
         </button>
       ) : <div className="w-full" />}
-      {col.id !== 'avatar' && col.label && <button onClick={(e) => { e.stopPropagation(); onFieldSettings(col.id); }} className="p-1 rounded text-zinc-800 hover:text-white hover:bg-white/5 transition-all opacity-0 group-hover/header:opacity-100"><Settings2 size={10} /></button>}
-      {dragOverIndex === index && !isDragging && <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-cyan-400 rounded-full shadow-[0_0_8px_color-mix(in srgb, var(--brandGradientStart) 50%, transparent)]" />}
+      {col.id !== 'avatar' && col.label && <button onClick={(e) => { e.stopPropagation(); onFieldSettings(col.id); }} className="shrink-0 p-1 rounded text-zinc-800 hover:text-white hover:bg-white/5 transition-all opacity-0 group-hover/header:opacity-100"><Settings2 size={10} /></button>}
+      {dragOverIndex === index && !isDragging && <div className="absolute left-0 top-0 bottom-0 w-[2px] rounded-full bg-zinc-300/70 shadow-[0_0_8px_rgba(212,212,216,0.28)]" />}
     </div>
   );
 };
@@ -1871,7 +1872,7 @@ const LeadsTable = ({
       onDragStart={handleDragStart}
       onDragOver={handleDragOver}
       onDrop={handleDrop}
-      onDragEnd={() => setDragIndex(null)}
+      onDragEnd={() => { setDragIndex(null); setDragOverIndex(null); }}
       isDragging={dragIndex === index}
       dragOverIndex={dragOverIndex}
       fieldConfig={fieldConfig}
