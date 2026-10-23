@@ -2438,9 +2438,9 @@
 }
 
 .sb-filter-pin.has-filter:not(.sb-filter-fallback) .sb-filter-label svg {
-  stroke: url(#sb-brand-edge-gradient);
-  fill: color-mix(in srgb, var(--brandGradientStart) 22%, transparent);
-  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--brandGradientStart) 36%, transparent));
+  stroke: #a1a1aa;
+  fill: #a1a1aa;
+  filter: none;
 }
 
 /* ─── Fallback Edge Styles ───────────────────────────────────────────── */
@@ -3710,6 +3710,21 @@
 .sb-crm-select-shell {
   position: relative;
   width: 100%;
+}
+
+.aether-condition-value-select {
+  min-width: 0;
+}
+
+.aether-condition-value-select .sb-crm-select-trigger {
+  min-height: 34px;
+  padding: 7px 10px;
+  font-size: 11px;
+}
+
+.sb-crm-menu.aether-condition-value-menu {
+  z-index: 3000;
+  box-shadow: 0 9px 24px rgba(0, 0, 0, 0.48);
 }
 
 .sb-crm-select-trigger {

@@ -6539,6 +6539,8 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
               }}
               contextType={logicContextType}
               availableVariables={logicAvailableVars}
+              appointmentStatusOptions={appointmentStatusOptions}
+              appointmentStatusColors={appointmentStatusColors}
               fallbackAction={logicFallbackAction}
               onFallbackChange={(val) => setLogicFallbackAction(val)}
               isFallback={logicIsFallback}
