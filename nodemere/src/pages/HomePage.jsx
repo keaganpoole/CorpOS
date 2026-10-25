@@ -7,6 +7,7 @@ import { motion, AnimatePresence, useInView } from 'framer-motion';
 import { CreditCard, FileUp, Globe2, Menu as MenuIcon, MessagesSquare, Mic, Phone, PhoneCall, PhoneOutgoing, ShieldCheck, X as XIcon, Check } from 'lucide-react';
 import SplashScreen from '../components/SplashScreen';
 import { getCookie } from '../utils/cookieUtils';
+import { openVisitorPreferences } from '../lib/visitorConsent.js';
 import '../styles/HomePage.css';
 import logoImage from '@/assets/logo.png';
 
@@ -789,12 +790,6 @@ const HomePage = () => {
 
   return (
     <div id="myHtmlContent" data-jitter-test={jitterTest || undefined}>
-      <div
-        aria-label="Production deployment test marker"
-        style={{ position: 'fixed', top: 12, left: '50%', zIndex: 10001, transform: 'translateX(-50%)', padding: '12px 24px', borderRadius: 8, background: '#dc2626', color: '#fff', fontSize: 24, fontWeight: 900, letterSpacing: '0.12em', boxShadow: '0 0 28px rgba(220, 38, 38, 0.8)', pointerEvents: 'none' }}
-      >
-        DEPLOY TEST
-      </div>
       <AnimatePresence>
         {showSplash && (
           <motion.div
@@ -837,7 +832,7 @@ const HomePage = () => {
             {!session && (
               <Link to="/auth" state={{ isSignUp: true }} data-visitor-event="cta_click" data-visitor-id="mobile-signup" className="text-sm font-semibold gradient-button dashboard-gradient-button btn-shine hover:opacity-90 transition-opacity">Sign Up</Link>
             )}
-            <button onClick={toggleMenu} className="text-white hover:text-gray-300 focus:outline-none">
+            <button type="button" onClick={toggleMenu} className="text-white hover:text-gray-300 focus:outline-none" aria-label={isMenuOpen ? 'Close menu' : 'Open menu'} aria-expanded={isMenuOpen}>
               {isMenuOpen ? <XIcon size={24} /> : <MenuIcon size={24} />}
             </button>
           </div>
@@ -862,6 +857,7 @@ const HomePage = () => {
                 ) : (
                   <Link to="/auth" data-visitor-event="navigation_click" data-visitor-id="mobile-login" className="text-base font-semibold text-white hover:text-gray-300" onClick={toggleMenu}>Login</Link>
                 )}
+                <button type="button" className="text-base font-semibold text-white hover:text-gray-300" onClick={openVisitorPreferences}>Cookie preferences</button>
               </div>
             </motion.div>
           )}

@@ -6,7 +6,7 @@ import './receptionistGallery.css';
 
 const DEFAULT_GALLERY_ZOOM = 1.4;
 
-export default function ReceptionistGallery({ receptionists, onSelect, onInteraction, paused, allowWheelZoom = true, showZoomControls = true, defaultZoom = DEFAULT_GALLERY_ZOOM, randomizeRoster = false, introOnActive = false, children }) {
+export default function ReceptionistGallery({ receptionists, onSelect, onInteraction, paused, allowWheelZoom = true, showZoomControls = true, defaultZoom = DEFAULT_GALLERY_ZOOM, randomizeRoster = false, rosterConfig = null, introOnActive = false, children }) {
   const DRAG_RESISTANCE = 0.78;
   const FOLLOW_STIFFNESS = 5.1;
   const INERTIA_DAMPING = 2.35;
@@ -20,8 +20,8 @@ export default function ReceptionistGallery({ receptionists, onSelect, onInterac
   const [introTiles, setIntroTiles] = useState(null);
   const introPlayedRef = useRef(false);
   const reducedMotion = useReducedMotion();
-  const rosterSeedRef = useRef(randomizeRoster ? Math.random().toString(36).slice(2) : '');
-  const rosterOrder = useMemo(() => galleryRosterOrder(receptionists, rosterSeedRef.current), [receptionists]);
+  const rosterSeedRef = useRef(rosterConfig?.seed ?? (randomizeRoster ? Math.random().toString(36).slice(2) : ''));
+  const rosterOrder = useMemo(() => galleryRosterOrder(receptionists, rosterSeedRef.current, rosterConfig?.featuredNames), [receptionists, rosterConfig?.featuredNames]);
   const pausedRef = useRef(paused);
   pausedRef.current = paused;
   onInteractionRef.current = onInteraction;

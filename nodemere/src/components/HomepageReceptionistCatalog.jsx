@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowDown, Hand, MousePointer2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { api } from '../sonar/lib/api';
 import HireReceptionistModal from '../sonar/pages/HireReceptionistModal';
 import '../sonar/studio/studio.css';
 import '../sonar/studio/receptionistGallery.css';
@@ -65,13 +66,16 @@ export default function HomepageReceptionistCatalog({ active, onContinue }) {
   }, []);
 
   useEffect(() => {
-    if (!active) return undefined;
+    if (!active) {
+      setShowContinueCue(false);
+      return undefined;
+    }
     if (!hasListenedRef.current) {
       setShowGestureHint(true);
       setGestureMode('pan');
     }
     setShowContinueCue(false);
-    const timer = window.setTimeout(() => setShowContinueCue(true), 4500);
+    const timer = window.setTimeout(() => setShowContinueCue(true), 3000);
     return () => window.clearTimeout(timer);
   }, [active]);
 
@@ -110,7 +114,7 @@ export default function HomepageReceptionistCatalog({ active, onContinue }) {
         allowGalleryWheelZoom={false}
         showGalleryZoomControls={false}
         galleryDefaultZoom={typeof window !== 'undefined' && window.innerWidth > 1180 ? 2.05 : undefined}
-        randomizeGalleryRoster
+        galleryRosterConfig={{ seed: 'homepage-receptionist-order-v2', featuredNames: ['brice', 'piper', 'bonnie'] }}
         galleryIntroReveal
         onGalleryInteraction={handleGalleryInteraction}
         interactive={active}
@@ -126,9 +130,12 @@ export default function HomepageReceptionistCatalog({ active, onContinue }) {
         </div>
       )}
       {active && showContinueCue && (
-        <button type="button" className="homepage-catalog-continue" onClick={onContinue} aria-label="Continue past receptionist catalog">
-          <ArrowDown size={22} aria-hidden="true" />
-        </button>
+        <div className="homepage-catalog-continue-surface">
+          <button type="button" className="homepage-catalog-continue" onClick={onContinue} aria-label="Explore what’s next">
+            <ArrowDown size={25} aria-hidden="true" />
+            <span>Explore what’s next</span>
+          </button>
+        </div>
       )}
     </div>
   );

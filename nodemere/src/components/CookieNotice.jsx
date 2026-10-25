@@ -34,6 +34,7 @@ export default function CookieNotice() {
   };
   if ((consent.decided || dismissed) && !opened) {
     if (!PUBLIC_PAGES.has(location.pathname)) return null;
+    if (location.pathname === '/') return null;
     return <button type="button" className="visitor-preferences-reopen" onClick={openVisitorPreferences}>Cookie preferences</button>;
   }
   return (

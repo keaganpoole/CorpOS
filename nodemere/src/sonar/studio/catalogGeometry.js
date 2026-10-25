@@ -21,7 +21,7 @@ const hash = value => {
 
 // Deal each source across both column palettes, then interleave sources within
 // each palette. Sorting by identity makes API ordering irrelevant.
-export function galleryRosterOrder(receptionists, seed = '') {
+export function galleryRosterOrder(receptionists, seed = '', featuredNames = ['kayla', 'maggie', 'chloe']) {
   const unique = new Map();
   receptionists.forEach((person, index) => {
     const key = identity(person);
@@ -45,8 +45,7 @@ export function galleryRosterOrder(receptionists, seed = '') {
     return result;
   });
   const order = Array.from({ length: unique.size }, (_, index) => mixed[index % 2][Math.floor(index / 2)]);
-  const preferred = ['kayla', 'maggie', 'chloe'];
-  const preferredIndexes = preferred.map(name => {
+  const preferredIndexes = (featuredNames || []).map(name => {
     const entry = [...unique.values()].find(item => String(receptionists[item.index]?.full_name || '').toLowerCase().includes(name));
     return entry?.index;
   }).filter(index => index != null);
