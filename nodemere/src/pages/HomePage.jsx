@@ -789,6 +789,12 @@ const HomePage = () => {
 
   return (
     <div id="myHtmlContent" data-jitter-test={jitterTest || undefined}>
+      <div
+        aria-label="Production deployment test marker"
+        style={{ position: 'fixed', top: 12, left: '50%', zIndex: 10001, transform: 'translateX(-50%)', padding: '12px 24px', borderRadius: 8, background: '#dc2626', color: '#fff', fontSize: 24, fontWeight: 900, letterSpacing: '0.12em', boxShadow: '0 0 28px rgba(220, 38, 38, 0.8)', pointerEvents: 'none' }}
+      >
+        DEPLOY TEST
+      </div>
       <AnimatePresence>
         {showSplash && (
           <motion.div
