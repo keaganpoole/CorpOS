@@ -80,42 +80,51 @@ export function MfaPanel({ onVerified, gate = false }) {
   useEffect(() => {
     if (gate && code.length === 6) void verifyCode();
   }, [code, gate]);
-  return <section className={gate
+  const verificationGate = gate && !factorsLoading && factors.length > 0 && !setup;
+  return <section className={verificationGate
+    ? 'mx-auto w-full max-w-[320px] text-center text-white'
+    : gate
     ? 'relative w-full overflow-hidden rounded-[28px] border border-white/[0.09] bg-[#09090b]/95 px-6 py-8 text-center text-white shadow-[0_32px_90px_rgba(0,0,0,0.55)] backdrop-blur-xl sm:px-10 sm:py-10'
     : 'workforce-security-card'}>
-    {gate && <>
+    {gate && !verificationGate && <>
       <div aria-hidden="true" className="pointer-events-none absolute inset-x-16 top-0 h-px bg-gradient-to-r from-transparent via-white/35 to-transparent" />
       <img src={NODEMERE_LOGO_SRC} alt="Nodemere" className="mx-auto mb-7 h-14 w-auto object-contain" />
     </>}
-    <div className={gate ? 'mb-7 space-y-2' : 'workforce-card-heading'}>
+    <div className={verificationGate ? '' : gate ? 'mb-7 space-y-2' : 'workforce-card-heading'}>
       <div>
-        <h2 className={gate ? 'text-2xl font-semibold tracking-[-0.04em] sm:text-[28px]' : ''}>{gate ? (factorsLoading ? 'Checking authenticator…' : factors.length ? 'Confirm it’s you.' : 'Set up your authenticator.') : 'Authenticator'}</h2>
-        <p className={gate ? 'mx-auto max-w-sm text-sm leading-6 text-white/50' : ''}>{gate ? (factorsLoading ? 'One moment.' : factors.length ? 'Enter the six-digit code from your authenticator app.' : 'Your team requires an authenticator before you can use the dashboard.') : 'Add an extra layer of protection to your account.'}</p>
+        <h2 className={verificationGate ? 'text-[30px] font-semibold leading-[1.25] tracking-[-0.045em]' : gate ? 'text-2xl font-semibold tracking-[-0.04em] sm:text-[28px]' : ''}>{verificationGate ? <>Open Your<br />Authenticator App</> : gate ? (factorsLoading ? 'Checking authenticator…' : factors.length ? 'Confirm it’s you.' : 'Set up your authenticator.') : 'Authenticator'}</h2>
+        <p className={verificationGate ? 'mt-7 text-sm leading-5 text-white' : gate ? 'mx-auto max-w-sm text-sm leading-6 text-white/50' : ''}>{verificationGate ? 'Enter the 6-digit code.' : gate ? (factorsLoading ? 'One moment.' : factors.length ? 'Enter the six-digit code from your authenticator app.' : 'Your team requires an authenticator before you can use the dashboard.') : 'Add an extra layer of protection to your account.'}</p>
       </div>
       {!gate && <span className="workforce-status">{factors.length ? 'Active' : 'Optional'}</span>}
     </div>
-    <div className={gate ? 'space-y-4' : 'workforce-card-body'}>
-    {error && <p role="alert" className={gate ? 'text-sm text-red-300' : 'workforce-message is-error'}>{error}</p>}
+    <div className={verificationGate ? 'mt-8' : gate ? 'space-y-4' : 'workforce-card-body'}>
+    {error && <p role="alert" className={verificationGate ? 'mb-5 text-sm text-red-300' : gate ? 'text-sm text-red-300' : 'workforce-message is-error'}>{error}</p>}
     {!setup && unfinished.map(f => <button key={f.id} type="button" disabled={busy} className={gate ? 'mx-auto block text-xs text-white/45 transition hover:text-white/75' : 'workforce-text-button'} onClick={() => run(async () => { const result=await supabase.auth.mfa.unenroll({factorId:f.id}); if(result.error) throw new Error('Could not clear unfinished setup'); await load(); })}>Clear unfinished setup</button>)}
     {setup && <div className="space-y-3">
       <img className="mx-auto h-48 w-48 rounded-2xl bg-white p-3" alt="Scan this private authenticator setup QR code" src={setup.totp.qr_code.startsWith('data:') ? setup.totp.qr_code : `data:image/svg+xml;charset=utf-8,${encodeURIComponent(setup.totp.qr_code)}`} />
       <p className="text-sm">Manual setup key: <code className="break-all select-all">{setup.totp.secret}</code></p>
       <p className="text-xs text-white/45">Keep this key private.</p>
     </div>}
-    {!setup && factors.length > 1 && <label className={gate ? 'block text-xs text-white/45' : 'workforce-field-label'}>Authenticator
+    {!setup && factors.length > 1 && <label className={verificationGate ? 'mb-4 block text-xs text-white/60' : gate ? 'block text-xs text-white/45' : 'workforce-field-label'}>Authenticator
       <select aria-label="Authenticator" className={gate ? 'ml-3 rounded-lg border border-white/10 bg-black/40 p-2 text-white' : ''} value={selected} onChange={e => setSelected(e.target.value)}>{factors.map(f => <option key={f.id} value={f.id}>{f.friendly_name || 'Authenticator'}</option>)}</select>
     </label>}
-    {(setup || selected) && <form onSubmit={e => { e.preventDefault(); void verifyCode(); }} className={gate ? 'mx-auto flex max-w-sm flex-col gap-3' : 'workforce-code-form'}>
-      <input aria-label="Authenticator code" autoComplete="one-time-code" inputMode="numeric" pattern="[0-9]{6}" maxLength={6} placeholder="000000" disabled={busy} className={gate ? 'h-14 rounded-xl border border-white/10 bg-white/[0.045] px-4 text-center font-mono text-xl tracking-[0.42em] text-white outline-none transition placeholder:text-white/15 focus:border-white/25 focus:bg-white/[0.065] disabled:cursor-wait disabled:opacity-70' : ''} value={code} onChange={e => { submittedCodeRef.current = ''; setCode(e.target.value.replace(/\D/g,'')); }} />
+    {(setup || selected) && <form onSubmit={e => { e.preventDefault(); void verifyCode(); }} className={verificationGate ? 'mx-auto flex w-full flex-col' : gate ? 'mx-auto flex max-w-sm flex-col gap-3' : 'workforce-code-form'}>
+      {verificationGate ? <div className="group relative h-12 w-full">
+        <input aria-label="Authenticator code" autoComplete="one-time-code" inputMode="numeric" pattern="[0-9]{6}" maxLength={6} disabled={busy} className="absolute inset-0 z-10 h-full w-full cursor-text opacity-0" value={code} onChange={e => { submittedCodeRef.current = ''; setCode(e.target.value.replace(/\D/g,'')); }} />
+        <div aria-hidden="true" className="grid h-full grid-cols-6 gap-2">
+          {Array.from({ length: 6 }, (_, index) => <span key={index} className={`flex h-12 items-center justify-center rounded-[7px] border border-[#252525] bg-[#0b0b0b] text-xl font-medium text-white ${index === Math.min(code.length, 5) ? 'group-focus-within:border-white/50' : ''}`}>{code[index] || ''}</span>)}
+        </div>
+      </div> : <input aria-label="Authenticator code" autoComplete="one-time-code" inputMode="numeric" pattern="[0-9]{6}" maxLength={6} placeholder="000000" disabled={busy} className={gate ? 'h-14 rounded-xl border border-white/10 bg-white/[0.045] px-4 text-center font-mono text-xl tracking-[0.42em] text-white outline-none transition placeholder:text-white/15 focus:border-white/25 focus:bg-white/[0.065] disabled:cursor-wait disabled:opacity-70' : ''} value={code} onChange={e => { submittedCodeRef.current = ''; setCode(e.target.value.replace(/\D/g,'')); }} />}
       {!gate && <button disabled={busy} className="workforce-button is-primary">{busy ? 'Checking…' : 'Verify code'}</button>}
-      {gate && busy && <p aria-live="polite" className="text-xs font-medium text-white/45">Checking…</p>}
+      {verificationGate && <button type="submit" disabled={busy || code.length !== 6} className="mt-6 h-10 w-full rounded-[8px] bg-[#ededed] text-sm font-semibold text-black transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-90">{busy ? 'Checking…' : 'Verify'}</button>}
+      {gate && !verificationGate && busy && <p aria-live="polite" className="text-xs font-medium text-white/45">Checking…</p>}
     </form>}
-    <div className={gate ? '' : 'workforce-actions'}>
-      <button type="button" disabled={busy || factorsLoading || Boolean(setup)} className={gate ? (factors.length ? 'text-xs font-medium text-white/45 transition hover:text-white/75 disabled:opacity-40' : 'rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-black transition hover:bg-zinc-200 disabled:opacity-40') : 'workforce-button'} onClick={() => run(async () => setSetup(await enrollTotp(supabase.auth)))}>{factors.length ? 'Use a different authenticator' : 'Set up authenticator'}</button>
+    <div className={verificationGate ? 'mt-8' : gate ? '' : 'workforce-actions'}>
+      <button type="button" disabled={busy || factorsLoading || Boolean(setup)} className={verificationGate ? 'text-sm font-medium text-zinc-300 transition hover:text-white disabled:opacity-40' : gate ? (factors.length ? 'text-xs font-medium text-white/45 transition hover:text-white/75 disabled:opacity-40' : 'rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-black transition hover:bg-zinc-200 disabled:opacity-40') : 'workforce-button'} onClick={() => run(async () => setSetup(await enrollTotp(supabase.auth)))}>{factors.length ? 'Use a different authenticator' : 'Set up authenticator'}</button>
       {setup && <button type="button" disabled={busy} className={gate ? 'ml-3 text-sm' : 'workforce-text-button'} onClick={() => run(async () => { const { error: e } = await supabase.auth.mfa.unenroll({ factorId: setup.id }); if (e) throw new Error('Could not cancel setup'); setSetup(null); })}>Cancel setup</button>}
       {!setup && selected && !gate && <button type="button" disabled={busy} className="workforce-text-button" onClick={() => run(async () => { await removeTotp(supabase.auth, selected); await load(); await onVerified?.(); window.dispatchEvent(new CustomEvent('nodemere:authenticator-updated')); })}>Remove authenticator</button>}
     </div>
-    <p className={gate ? 'pt-2 text-xs text-white/35' : 'workforce-help'}>{gate ? 'Need help? Contact Nodemere support.' : 'Lost access? Use another authenticator or contact Nodemere support.'}</p>
+    <p className={verificationGate ? 'mt-9 text-[13px] text-zinc-400' : gate ? 'pt-2 text-xs text-white/35' : 'workforce-help'}>{gate ? 'Need help? Contact Nodemere support.' : 'Lost access? Use another authenticator or contact Nodemere support.'}</p>
     </div>
   </section>;
 }
@@ -200,7 +209,7 @@ export function WorkforceGate({ children }) {
   }
   if (!workforce || workforce.loading) return <SplashScreen />;
   if (workforce.error) return <div className="p-8 text-white"><p role="alert">{workforce.error}</p><button onClick={refreshWorkforce}>Retry</button><button className="ml-4" onClick={logout}>Sign out</button></div>;
-  if (workforce.needsMfa) return <main className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-[#050506] px-5 py-10">
+  if (workforce.needsMfa) return <main className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-black px-5 py-10">
     <div className="relative w-full max-w-md">
       <MfaPanel gate onVerified={refreshWorkforce} />
       <button className="mx-auto mt-5 block text-xs font-medium text-white/35 transition hover:text-white/70" onClick={logout}>Sign out</button>

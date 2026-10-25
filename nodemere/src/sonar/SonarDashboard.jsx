@@ -213,7 +213,7 @@ const POPUP_DEFINITIONS = [
         <div className="mx-auto mt-6 w-full max-w-[650px] overflow-hidden rounded-[22px] border border-white/[0.06] bg-black shadow-[0_8px_22px_rgba(0,0,0,0.16)]">
           <iframe
             className="aspect-video block w-full"
-            src={TASKLIST_VIDEO_PLACEHOLDER}
+            src="https://www.youtube.com/embed/HfcxoUl1hks?start=1276"
             title="Scenarios overview"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
             allowFullScreen
@@ -257,7 +257,10 @@ const getPopupState = (profilePopups, popupId) => {
   };
 };
 
-const TASKLIST_VIDEO_PLACEHOLDER = 'https://www.youtube.com/embed/ysz5S6PUM-U';
+const BUSINESS_BASICS_VIDEO_URL = 'https://www.youtube.com/embed/4TIA8uirPV8';
+const RECEPTIONISTS_AND_STAFF_VIDEO_URL = 'https://www.youtube.com/embed/1KakgS9G6qQ';
+const DESK_ACTIVATION_VIDEO_URL = 'https://www.youtube.com/embed/2TC2bAjLdKE';
+const RECEPTIONIST_WORKFLOW_VIDEO_URL = 'https://www.youtube.com/embed/HfcxoUl1hks';
 
 const TASKLIST_DEFINITIONS = [
   {
@@ -267,7 +270,7 @@ const TASKLIST_DEFINITIONS = [
       {
         id: 'basic_info',
         title: 'Add basic info',
-        videoUrl: TASKLIST_VIDEO_PLACEHOLDER,
+        videoUrl: BUSINESS_BASICS_VIDEO_URL,
         instructionTitle: 'Set Business Details',
         instruction:
           'Basic business details give your receptionist the foundation they need to understand your business and represent it with confidence.',
@@ -275,7 +278,7 @@ const TASKLIST_DEFINITIONS = [
       {
         id: 'business_hours',
         title: 'Set hours of operation',
-        videoUrl: TASKLIST_VIDEO_PLACEHOLDER,
+        videoUrl: BUSINESS_BASICS_VIDEO_URL,
         instructionTitle: 'Set hours of operation',
         instruction:
           'Business hours tell your receptionist when you are available for customers, so calls, appointments, and expectations stay aligned with your real schedule.',
@@ -283,7 +286,7 @@ const TASKLIST_DEFINITIONS = [
       {
         id: 'knowledge_base',
         title: 'Set knowledge base',
-        videoUrl: TASKLIST_VIDEO_PLACEHOLDER,
+        videoUrl: BUSINESS_BASICS_VIDEO_URL,
         instructionTitle: 'Set Up Your Knowledge Base',
         instruction:
           'The knowledge base gives your receptionist the important context behind your business, including what you offer, your policies, and the questions customers ask most.',
@@ -297,7 +300,7 @@ const TASKLIST_DEFINITIONS = [
       {
         id: 'hire_receptionist',
         title: 'Hire a receptionist',
-        videoUrl: TASKLIST_VIDEO_PLACEHOLDER,
+        videoUrl: RECEPTIONISTS_AND_STAFF_VIDEO_URL,
         instructionTitle: 'Onboard Your Team',
         instruction:
           'Your AI receptionists handle the front desk, while your human staff are the people they work alongside. They understand each person’s role, availability, and specialties, giving them the context to connect customers, coordinate appointments, and become a natural part of your day-to-day operations.',
@@ -305,7 +308,7 @@ const TASKLIST_DEFINITIONS = [
       {
         id: 'set_role',
         title: 'Set receptionist role',
-        videoUrl: TASKLIST_VIDEO_PLACEHOLDER,
+        videoUrl: RECEPTIONISTS_AND_STAFF_VIDEO_URL,
         instructionTitle: 'Set The Receptionist Role',
         instruction:
           'The receptionist role explains whether they focus on incoming calls, outgoing calls, or both, so their responsibilities match the way your business works.',
@@ -313,7 +316,7 @@ const TASKLIST_DEFINITIONS = [
       {
         id: 'add_staff_member',
         title: 'Add a staff member',
-        videoUrl: TASKLIST_VIDEO_PLACEHOLDER,
+        videoUrl: RECEPTIONISTS_AND_STAFF_VIDEO_URL,
         instructionTitle: 'Add A Staff Member',
         instruction:
           'Staff members are the people your receptionist can schedule with or contact, helping calls and appointments reach the right person on your team.',
@@ -321,7 +324,7 @@ const TASKLIST_DEFINITIONS = [
       {
         id: 'staff_availability',
         title: 'Set staff availability',
-        videoUrl: TASKLIST_VIDEO_PLACEHOLDER,
+        videoUrl: RECEPTIONISTS_AND_STAFF_VIDEO_URL,
         instructionTitle: 'Set Staff Availability',
         instruction:
           'Staff availability tells your receptionist which appointment times are realistic, so customers are not offered times when nobody is available.',
@@ -335,7 +338,7 @@ const TASKLIST_DEFINITIONS = [
       {
         id: 'activate_front_desk',
         title: 'Activate your front desk',
-        videoUrl: TASKLIST_VIDEO_PLACEHOLDER,
+        videoUrl: DESK_ACTIVATION_VIDEO_URL,
         instructionTitle: 'Activate Your Front Desk',
         instruction:
           'Connect a phone number so your AI receptionist can answer calls and put your front desk to work.',
@@ -349,7 +352,7 @@ const TASKLIST_DEFINITIONS = [
       {
         id: 'set_intake_field',
         title: 'Set an intake field',
-        videoUrl: TASKLIST_VIDEO_PLACEHOLDER,
+        videoUrl: RECEPTIONIST_WORKFLOW_VIDEO_URL,
         instructionTitle: 'Set Intake Fields',
         instruction:
           'Think of intake fields as the important details your receptionist should collect during a call, such as an email address, the reason for the call, or a customer’s location. They help make sure the details that matter most are not missed.',
@@ -363,7 +366,7 @@ const TASKLIST_DEFINITIONS = [
       {
         id: 'setup_authenticator',
         title: 'Set up authenticator',
-        videoUrl: TASKLIST_VIDEO_PLACEHOLDER,
+        videoUrl: null,
         instructionTitle: 'Secure Your Account',
         instruction:
           'An authenticator adds an extra layer of protection by asking for a temporary security code when you sign in.',
@@ -1402,15 +1405,17 @@ const TasklistInstructionModal = ({ subtask, onClose }) => {
               <p className="mb-5 text-sm leading-6 text-zinc-300">
                 {subtask.instruction}
               </p>
-              <div className="aspect-video overflow-hidden rounded-2xl border border-white/[0.08] bg-black">
-                <iframe
-                  className="h-full w-full"
-                  src={subtask.videoUrl}
-                  title={subtask.instructionTitle}
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                  allowFullScreen
-                />
-              </div>
+              {subtask.videoUrl && (
+                <div className="aspect-video overflow-hidden rounded-2xl border border-white/[0.08] bg-black">
+                  <iframe
+                    className="h-full w-full"
+                    src={subtask.videoUrl}
+                    title={subtask.instructionTitle}
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    allowFullScreen
+                  />
+                </div>
+              )}
             </div>
           </motion.section>
         </motion.div>

@@ -51,7 +51,7 @@ import { getContextType, buildVariableMap, getOutputVariables } from '../../lib/
 import { getSmartActions, getSmartActionByKey } from './smartActions';
 
 const API_BASE_URL = window.sonar?.apiUrl || import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
-const SCENARIOS_HELP_VIDEO_URL = 'https://www.youtube.com/watch?v=ysz5S6PUM-U';
+const SCENARIOS_HELP_VIDEO_URL = 'https://www.youtube.com/watch?v=HfcxoUl1hks&t=1276s';
 const SCENARIO_CALL_USAGE_TERMS_KEY = 'scenario_call_usage_acknowledgment_v1';
 const SCENARIO_CALL_USAGE_TERMS_STORAGE_KEY = `nodemere-${SCENARIO_CALL_USAGE_TERMS_KEY}`;
 const readStoredScenarioCallUsageTerms = () => {
