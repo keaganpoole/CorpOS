@@ -325,7 +325,7 @@
     align-items: center;
     justify-content: flex-end;
     gap: 5px;
-    padding: 0 12px max(34px, calc(env(safe-area-inset-bottom) + 26px));
+    padding: 0 12px max(18px, calc(env(safe-area-inset-bottom) + 10px));
     border: 0;
     color: #171717;
     background: transparent;
