@@ -325,7 +325,7 @@
     align-items: center;
     justify-content: flex-end;
     gap: 5px;
-    padding: 0 12px max(44px, calc(env(safe-area-inset-bottom) + 36px));
+    padding: 0 12px max(34px, calc(env(safe-area-inset-bottom) + 26px));
     border: 0;
     color: #171717;
     background: transparent;
@@ -337,8 +337,8 @@
     touch-action: pan-y;
   }
 
-  .homepage-catalog-continue svg {
-    animation: homepage-catalog-scroll-nudge 3.2s ease-in-out infinite;
+  .homepage-catalog-swipe-icon {
+    animation: homepage-catalog-swipe-up 2.4s cubic-bezier(.4,0,.2,1) infinite;
     will-change: transform;
   }
 
@@ -350,12 +350,11 @@
 
   @keyframes homepage-catalog-hint-in { from { opacity: 0; transform: translate(-50%, -44%); } to { opacity: 1; transform: translate(-50%, -50%); } }
   @keyframes homepage-catalog-hand-drift { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(0, 7px); } }
-  @keyframes homepage-catalog-scroll-nudge {
-    0%, 72%, 100% { transform: translateY(0); }
-    79% { transform: translateY(3px); }
-    85% { transform: translateY(0); }
-    91% { transform: translateY(2px); }
-    96% { transform: translateY(0); }
+  @keyframes homepage-catalog-swipe-up {
+    0%, 16%, 100% { opacity: .72; transform: translateY(0); }
+    52% { opacity: 1; transform: translateY(-9px); }
+    68% { opacity: .9; transform: translateY(-9px); }
+    86% { opacity: .72; transform: translateY(0); }
   }
   @keyframes homepage-catalog-panel-reveal {
     from { opacity: 0; transform: translateY(34px); }
@@ -364,6 +363,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .homepage-catalog-continue svg { animation: none !important; }
+  .homepage-catalog-swipe-icon { animation: none !important; }
   .homepage-catalog-continue-surface { animation: none !important; }
 }

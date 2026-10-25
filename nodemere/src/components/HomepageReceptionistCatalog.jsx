@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowDown, Hand, MousePointer2 } from 'lucide-react';
+import { Hand, MousePointer2, Pointer } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../sonar/lib/api';
@@ -131,9 +131,9 @@ export default function HomepageReceptionistCatalog({ active, onContinue }) {
       )}
       {active && showContinueCue && (
         <div className="homepage-catalog-continue-surface">
-          <button type="button" className="homepage-catalog-continue" onClick={onContinue} aria-label="Explore what’s next">
-            <ArrowDown size={25} aria-hidden="true" />
-            <span>Explore what’s next</span>
+          <button type="button" className="homepage-catalog-continue" onClick={onContinue} aria-label="Swipe up to continue">
+            <Pointer className="homepage-catalog-swipe-icon" size={30} aria-hidden="true" />
+            <span>Swipe up to continue</span>
           </button>
         </div>
       )}
