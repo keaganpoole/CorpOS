@@ -754,8 +754,7 @@ export default function ScenariosPage({
   const [edgeDrag, setEdgeDrag] = useState(null);
   const [view, setView] = useState({ x: 0, y: 0, scale: 1 });
   const [viewportReady, setViewportReady] = useState(false);
-  const [isCompactViewport, setIsCompactViewport] = useState(() => window.innerWidth < 1024);
-  const [demoInteractionActive, setDemoInteractionActive] = useState(false);
+  const [isPhone, setIsPhone] = useState(() => window.innerWidth < 768);
   const [selectedNodeId, setSelectedNodeId] = useState('node-1');
   const [hoveredNodeId, setHoveredNodeId] = useState(null);
   const [plusHoveredNodeId, setPlusHoveredNodeId] = useState(null);
@@ -848,18 +847,13 @@ export default function ScenariosPage({
 
   useEffect(() => {
     const updateViewport = () => {
-      const compact = window.innerWidth < 1024;
-      setIsCompactViewport(compact);
-      if (!compact) setDemoInteractionActive(false);
+      setIsPhone(window.innerWidth < 768);
     };
     updateViewport();
     window.addEventListener('resize', updateViewport);
     return () => window.removeEventListener('resize', updateViewport);
   }, []);
 
-  const needsTouchInteractionMode = demoMode && isCompactViewport;
-  const canvasInteractionEnabled = !needsTouchInteractionMode || demoInteractionActive;
-  
   // Fade-in animation state
   const [nodesOpacity, setNodesOpacity] = useState(1);
   const [quantumOrbits, setQuantumOrbits] = useState({}); // { [nodeId]: [ring configs] }
@@ -1604,6 +1598,10 @@ export default function ScenariosPage({
       setPanelIntent(false);
       return;
     }
+    if (isPhone) {
+      setIsPanelVisible(panelIntent);
+      return;
+    }
     const nodeEl = nodeRefs.current[selectedNodeId];
     const pageRect = builderRef.current?.getBoundingClientRect();
     if (!nodeEl || !pageRect) {
@@ -1631,7 +1629,7 @@ export default function ScenariosPage({
     } else {
       setIsPanelVisible(false);
     }
-  }, [selectedNodeId, panelIntent]);
+  }, [selectedNodeId, panelIntent, isPhone]);
 
   useLayoutEffect(() => {
     repositionPanel();
@@ -1704,7 +1702,6 @@ export default function ScenariosPage({
   }, [getNodeAnchor, isValidConnectionTarget, nodes, view.scale]);
 
   const handleEdgeHandlePointerDown = useCallback((edge, event) => {
-    if (!canvasInteractionEnabled && event.pointerType === 'touch') return;
     if (event.button !== 0) return;
     const toAnchor = getNodeAnchor(edge.to);
     if (!toAnchor) return;
@@ -1726,10 +1723,9 @@ export default function ScenariosPage({
     };
     edgeDragRef.current = nextEdgeDrag;
     setEdgeDrag(nextEdgeDrag);
-  }, [canvasInteractionEnabled, getNodeAnchor]);
+  }, [getNodeAnchor]);
 
   const handleNodeOutputPointerDown = useCallback((nodeId, event) => {
-    if (!canvasInteractionEnabled && event.pointerType === 'touch') return;
     if (event.button !== 0) return;
     const fromAnchor = getNodeAnchor(nodeId);
     if (!fromAnchor) return;
@@ -1751,7 +1747,7 @@ export default function ScenariosPage({
     };
     edgeDragRef.current = nextEdgeDrag;
     setEdgeDrag(nextEdgeDrag);
-  }, [canvasInteractionEnabled, getNodeAnchor]);
+  }, [getNodeAnchor]);
 
   useLayoutEffect(() => {
     const canvasRect = canvasRef.current?.getBoundingClientRect();
@@ -1774,7 +1770,7 @@ export default function ScenariosPage({
       // If this is the initial node and it's still unconfigured (in CSS overlay),
       // use the intro circle element's center for positioning — not the full wrapper
       // which includes arrow + CTA text
-      if (nodeId === INITIAL_NODE.id && !nodeMap[nodeId]?.configured) {
+      if (!isPhone && nodeId === INITIAL_NODE.id && !nodeMap[nodeId]?.configured) {
         let circleCenterX, circleCenterY;
         if (introCircleRef.current) {
           const circleRect = introCircleRef.current.getBoundingClientRect();
@@ -1835,7 +1831,7 @@ export default function ScenariosPage({
         setPanelStage('actionConfig');
       }
     },
-    [initialNodeShifted, nodeMap, view.x, view.y]
+    [initialNodeShifted, isPhone, nodeMap, view.x, view.y]
   );
 
   useEffect(() => {
@@ -1999,15 +1995,6 @@ export default function ScenariosPage({
   }, [getCanvasPointFromEvent, getClosestEdgeTarget, getNodeAnchor, isValidConnectionTarget, nodeMap, openSelectionPanel, view.x, view.y, view.scale, triggerQuantumOrbit]);
 
   const handleNodePointerDown = (nodeId, event) => {
-    if (needsTouchInteractionMode && event.pointerType === 'touch') {
-      event.stopPropagation();
-      event.preventDefault();
-      edgeDragRef.current = null;
-      setEdgeDrag(null);
-      openSelectionPanel(nodeId);
-      return;
-    }
-    if (!canvasInteractionEnabled && event.pointerType === 'touch') return;
     if (event.button !== 0) return;
     event.stopPropagation();
     event.preventDefault();
@@ -2025,7 +2012,6 @@ export default function ScenariosPage({
   };
 
   const handleCanvasPointerDown = (event) => {
-    if (!canvasInteractionEnabled && event.pointerType === 'touch') return;
     if (event.button !== 0) return;
     if (event.target.closest('.sb-builder-node')) return;
     if (event.target.closest('.sb-edge-end-handle')) return;
@@ -2500,7 +2486,6 @@ export default function ScenariosPage({
       event.target.closest('.sb-node-add') ||
       event.target.closest('.sb-node-output-handle') ||
       event.target.closest('.sb-edge-end-handle') ||
-      event.target.closest('.sb-demo-touch-toggle') ||
       event.target.closest('.sb-variables-pane') ||
       event.target.closest('.sb-vars-field')
     )
@@ -4828,30 +4813,100 @@ export default function ScenariosPage({
     </div>
   );
 
-  const renderBuilderView = () => (
-    <div className={`scenario-builder-page${demoMode ? ' scenario-builder-page--demo' : ''}`} ref={builderRef} onPointerDown={handlePagePointerDown}>
-      <div className="sb-canvas-wrapper">
-        {needsTouchInteractionMode && (
-          <div className="sb-demo-touch-toggle absolute right-3 top-3 z-40 flex items-center gap-2 rounded-full border border-white/[0.08] bg-[#111113]/90 p-1.5 pl-3 shadow-[0_12px_32px_rgba(0,0,0,0.4)] backdrop-blur-sm lg:hidden">
-            <span className="text-[8px] font-bold uppercase tracking-[0.16em] text-zinc-500">{demoInteractionActive ? 'Canvas active' : 'Scroll enabled'}</span>
-            <button
-              type="button"
-              aria-pressed={demoInteractionActive}
-              onPointerDown={(event) => event.stopPropagation()}
-              onClick={() => setDemoInteractionActive((active) => !active)}
-              className="min-h-[34px] rounded-full border border-white/[0.1] bg-white/[0.06] px-3 text-[9px] font-bold uppercase tracking-[0.14em] text-zinc-200 transition-colors active:bg-white/[0.12]"
-            >
-              {demoInteractionActive ? 'Done' : 'Explore'}
+  // Use the same phone reading order and step cards as the real builder.
+  const mobileOrderedNodes = !isPhone ? [] : (() => {
+    const ordered = [];
+    const visited = new Set();
+    const queue = [INITIAL_NODE.id];
+    while (queue.length) {
+      const id = queue.shift();
+      if (visited.has(id) || !nodeMap[id]) continue;
+      visited.add(id);
+      ordered.push(nodeMap[id]);
+      edges.filter((edge) => edge.from === id).forEach((edge) => queue.push(edge.to));
+    }
+    nodes.forEach((node) => { if (!visited.has(node.id)) ordered.push(node); });
+    return ordered;
+  })();
+  const mobileNextStepParent = !isPhone ? null : (() => {
+    let current = nodeMap[INITIAL_NODE.id];
+    const visited = new Set();
+    while (current && !visited.has(current.id)) {
+      visited.add(current.id);
+      const outgoing = edges.filter((edge) => edge.from === current.id);
+      if (outgoing.length === 0) return current.configured ? current : null;
+      if (outgoing.length !== 1) return null;
+      current = nodeMap[outgoing[0].to];
+    }
+    return null;
+  })();
+
+  const renderMobileWorkflow = () => (
+    <div className="sb-mobile-workflow">
+      <div className="sb-mobile-workflow-intro">
+        <span className="sb-mobile-eyebrow">SCENARIO FLOW</span>
+        <p>Tap a step to edit it. Add conditions to connections between steps.</p>
+      </div>
+      {mobileOrderedNodes.map((node, index) => {
+        const outgoing = edges.filter((edge) => edge.from === node.id);
+        const canRun = node.configured && ['search_records', 'search_appointments', 'create_customer', 'update_customer', 'create_payment', 'send_payment_link', 'create_invoice', 'send_invoice', 'refund_payment', 'cancel_subscription', 'send_email'].includes(node.actionConfig?._key);
+        return (
+          <section className="sb-mobile-step" key={node.id}>
+            <div className="sb-mobile-step-heading">
+              <span className="sb-mobile-step-number">{String(index + 1).padStart(2, '0')}</span>
+              <span className="sb-mobile-step-kind">{node.categoryType === 'TRIGGERS' || node.id === INITIAL_NODE.id ? 'Trigger' : 'Action'}</span>
+              {node.id !== INITIAL_NODE.id && outgoing.length === 0 && (
+                <button type="button" className="sb-mobile-icon-action" aria-label={`Remove ${node.label || 'step'}`} onClick={() => handleDeleteNode(node.id)}><Trash2 size={15} /></button>
+              )}
+            </div>
+            <button type="button" className="sb-mobile-step-main" onClick={() => openSelectionPanel(node.id)}>
+              <span className="sb-mobile-step-copy">
+                <strong>{node.configured ? node.label : node.id === INITIAL_NODE.id ? 'Choose a trigger' : 'Choose an action'}</strong>
+                <small>{node.configured ? (node.detail || 'Tap to edit settings') : 'Tap to configure this step'}</small>
+              </span>
+              <ChevronRight size={17} />
             </button>
-          </div>
-        )}
+            {outgoing.length > 0 && (
+              <div className="sb-mobile-connections">
+                {outgoing.map((edge) => (
+                  <div className="sb-mobile-connection" key={edge.id}>
+                    <div className="sb-mobile-connection-top">
+                      <GitBranch size={13} />
+                      <span>Connects to</span>
+                      <span className="sb-mobile-connection-destination">{nodeMap[edge.to]?.label || 'New step'}</span>
+                    </div>
+                    <div className="sb-mobile-connection-actions">
+                      <button type="button" onClick={(event) => handleEdgeLogicClick(edge, event)}>
+                        <Filter size={13} /> {edge.filter?.type === 'fallback' ? 'Fallback' : edge.filter ? 'Edit condition' : 'Add condition'}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {canRun && (
+              <div className="sb-mobile-step-actions">
+                <button type="button" onClick={() => handleRunNodeRequest(node.id)}><Zap size={14} /> Run step</button>
+              </div>
+            )}
+          </section>
+        );
+      })}
+      {mobileNextStepParent && <button type="button" className="sb-mobile-add-next-action" onClick={() => handleAddNode(mobileNextStepParent.id)}><Plus size={14} /> Add next step</button>}
+    </div>
+  );
+
+  const renderBuilderView = () => (
+    <div className={`scenario-builder-page${demoMode ? ' scenario-builder-page--demo' : ''}`} ref={builderRef} onPointerDown={isPhone ? undefined : handlePagePointerDown}>
+      <div className="sb-canvas-wrapper">
         <div
-          className={`sb-canvas ${needsTouchInteractionMode && demoInteractionActive ? 'sb-canvas--touch-active' : ''}`}
+          className="sb-canvas"
           ref={canvasRef}
-          onPointerDown={handleCanvasPointerDown}
-          onContextMenu={handleCanvasContextMenu}
-          onWheel={handleWheel}
+          onPointerDown={isPhone ? undefined : handleCanvasPointerDown}
+          onContextMenu={isPhone ? undefined : handleCanvasContextMenu}
+          onWheel={isPhone ? undefined : handleWheel}
         >
+          {isPhone ? renderMobileWorkflow() : <>
           <div className="sb-canvas-grid" />
           
           {/* Quantum Reveal label — shown when initial node is unconfigured */}
@@ -5160,6 +5215,7 @@ export default function ScenariosPage({
               </div>
             </div>
           )}
+          </>}
         </div>
 
         {isPanelVisible && selectedNodeId && (

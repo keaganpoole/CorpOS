@@ -532,7 +532,14 @@ const HomepagePeopleCrmDemo = ({ className = '', entranceActive = false, onDemoL
 
   const handleUpdate = useCallback(async (id, updates) => {
     setRows((currentRows) => currentRows.map((row) => (
-      row.id === id ? { ...row, ...updates, updated_at: new Date().toISOString() } : row
+      row.id === id ? {
+        ...row,
+        ...updates,
+        ...(updates.custom_fields && {
+          custom_fields: { ...row.custom_fields, ...updates.custom_fields },
+        }),
+        updated_at: new Date().toISOString(),
+      } : row
     )));
   }, []);
 

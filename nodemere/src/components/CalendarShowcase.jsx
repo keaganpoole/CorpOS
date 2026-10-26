@@ -598,18 +598,7 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
     return () => window.removeEventListener('resize', updateViewportSize);
   }, []);
 
-  const isMobileViewport = viewportSize.width < 768;
-  const isTabletViewport = viewportSize.width >= 768 && viewportSize.width < 1180;
-  const scenarioDemoScale = isScenariosVariant
-    ? Math.min(
-        1,
-        isMobileViewport
-          ? Math.max(0.62, Math.min(viewportSize.width / 440, viewportSize.height / 980))
-          : isTabletViewport
-            ? Math.max(0.78, Math.min(viewportSize.width / 1120, viewportSize.height / 1040))
-            : 1
-      )
-    : 1;
+  const showCrmFilm = isCrmVariant && viewportSize.width < 1180;
 
   useEffect(() => {
     const sticky = stickyRef.current;
@@ -797,28 +786,28 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
     const isCompactFeatureViewport = viewportSize.width < 1024;
     const introEntered = sectionProgress >= 0.16;
     const builderEntered = sectionProgress >= 0.22;
-    const featuresEntered = isMonitoringVariant ? sectionProgress >= 0.44 : sectionProgress >= 0.68;
+    const featuresEntered = isMonitoringVariant ? sectionProgress >= 0.44 : sectionProgress >= (showCrmFilm ? 0.5 : 0.68);
     const isMessageReset = isScenariosVariant && demoResetState === 'message';
     const isIntroReset = isScenariosVariant && demoResetState === 'intro';
     const isCrmMessageReset = isCrmVariant && demoResetState === 'message';
     const isCrmIntroReset = isCrmVariant && demoResetState === 'intro';
     const holdScenarioIntro = isScenariosVariant && scenarioAwaitingReentry && !isMessageReset;
     const holdCrmIntro = isCrmVariant && crmAwaitingReentry && !isCrmMessageReset;
-    const introOpacity = isMonitoringVariant
+    const introOpacity = isMonitoringVariant || showCrmFilm
       ? (featuresEntered ? 0 : 1)
       : isMessageReset || isCrmMessageReset ? 0 : isIntroReset || isCrmIntroReset || holdScenarioIntro || holdCrmIntro || !builderEntered ? 1 : 0;
     const scenariosFeatureProgress = featuresEntered ? 1 : 0;
     const compactFeaturesListProgress = isCompactFeatureViewport
       ? isMonitoringVariant
         ? Math.min(1, Math.max(0, (sectionProgress - 0.44) / 0.38))
-        : Math.min(1, Math.max(0, (sectionProgress - 0.68) / 0.28))
+        : Math.min(1, Math.max(0, (sectionProgress - (showCrmFilm ? 0.5 : 0.68)) / (showCrmFilm ? 0.25 : 0.28)))
       : scenariosFeatureProgress;
     const builderDimFactor = scenariosFeatureProgress > 0.01 ? (1 - scenariosFeatureProgress * 0.68) : 1;
-    const builderOpacity = isMonitoringVariant || demoResetState || holdScenarioIntro || holdCrmIntro || !builderEntered ? 0 : builderDimFactor;
-    const scenariosFeatureOpacity = isMonitoringVariant ? (featuresEntered ? 1 : 0) : isScenariosVariant && demoResetState ? 0 : holdScenarioIntro || holdCrmIntro ? 0 : featuresEntered ? 1 : 0;
+    const builderOpacity = isMonitoringVariant || showCrmFilm || demoResetState || holdScenarioIntro || holdCrmIntro || !builderEntered ? 0 : builderDimFactor;
+    const scenariosFeatureOpacity = isMonitoringVariant || showCrmFilm ? (featuresEntered ? 1 : 0) : isScenariosVariant && demoResetState ? 0 : holdScenarioIntro || holdCrmIntro ? 0 : featuresEntered ? 1 : 0;
     const builderBlur = (isScenariosVariant || isCrmVariant) && demoResetState ? 0 : scenariosFeatureProgress > 0.01 ? 3.5 + scenariosFeatureProgress * 7.5 : 0;
     const builderBrightness = (isScenariosVariant || isCrmVariant) && demoResetState ? 0 : scenariosFeatureProgress > 0.01 ? 0.82 - scenariosFeatureProgress * 0.58 : 1;
-    const featureLockStartProgress = isMonitoringVariant ? 0.44 : 0.68;
+    const featureLockStartProgress = isMonitoringVariant ? 0.44 : showCrmFilm ? 0.5 : 0.68;
     const jitterState = sectionProgress < featureLockStartProgress
       ? 'inactive'
       : compactFeaturesListProgress < 1 ? 'entering' : sectionProgress < 1 ? 'locked' : 'exiting';
@@ -836,7 +825,7 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
     );
 
     return (
-      <div ref={rootRef} className={`calendar-showcase scenario-demo-showcase relative w-full ${isMonitoringVariant ? 'h-[215vh]' : 'h-[340vh]'}`}
+      <div ref={rootRef} className={`calendar-showcase scenario-demo-showcase relative w-full ${isMonitoringVariant ? 'h-[215vh]' : showCrmFilm ? 'h-[300vh]' : 'h-[340vh]'}`}
         data-jitter-debug-root={jitterDebugEnabled ? jitterDebugId : undefined}
         data-jitter-section-progress={jitterDebugEnabled ? sectionProgress : undefined}
         data-jitter-feature-progress={jitterDebugEnabled ? compactFeaturesListProgress : undefined}
@@ -845,6 +834,12 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
         data-jitter-viewport={jitterDebugEnabled ? `${viewportSize.width}x${viewportSize.height}` : undefined}
       >
         <div ref={stickyRef} className="sticky top-0 h-screen overflow-hidden bg-[#020202]" data-jitter-debug-sticky={jitterDebugEnabled ? jitterDebugId : undefined}>
+          {showCrmFilm && copyVisible && (
+            <div className="homepage-crm-film pointer-events-none absolute inset-0 transition-opacity duration-500" style={{ opacity: featuresEntered ? 0 : 1 }} aria-hidden="true">
+              <video className="h-full w-full object-cover" src="/homepage/people-crm-film-loop.mp4" autoPlay muted loop playsInline preload="metadata" />
+              <div className="homepage-crm-film__shade absolute inset-0" />
+            </div>
+          )}
           <div
             className={`absolute inset-0 z-20 flex items-center justify-center px-6 transition-[opacity,transform] duration-500 ease-out ${
               introOpacity <= 0.01 ? 'pointer-events-none' : ''
@@ -852,7 +847,7 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
             style={{
               opacity: introOpacity,
               visibility: introOpacity <= 0.01 ? 'hidden' : 'visible',
-              transform: `translateY(${builderEntered ? -12 : 0}px)`,
+              transform: `translateY(${showCrmFilm ? 0 : builderEntered ? -12 : 0}px)`,
             }}
           >
             <div className="mx-auto max-w-[860px] px-2 text-center sm:px-4">
@@ -906,7 +901,7 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
             </div>
           </div>
 
-          {!isMonitoringVariant && (
+          {!isMonitoringVariant && !showCrmFilm && (
             <div
               className={`absolute inset-0 z-10 transition-[opacity,transform] duration-500 ease-out ${
                 builderOpacity <= 0.01 ? 'pointer-events-none' : ''
@@ -929,13 +924,7 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
                   }}
                 />
               ) : (
-                <div
-                  className="homepage-scenarios-builder-frame"
-                  style={{
-                    transform: `scale(${scenarioDemoScale})`,
-                    transformOrigin: 'center center',
-                  }}
-                >
+                <div className="homepage-scenarios-builder-frame">
                   <HomepageScenariosDemo
                     key={demoInstanceKey}
                     demoMode
@@ -949,7 +938,7 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
             </div>
           )}
 
-          {!isMonitoringVariant && (
+          {!isMonitoringVariant && !showCrmFilm && (
             <div
               className={`absolute inset-0 z-30 flex items-center justify-center bg-[#020202] px-6 transition-opacity duration-300 ${
                 isMessageReset || isCrmMessageReset ? '' : 'pointer-events-none'
