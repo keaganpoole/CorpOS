@@ -3,6 +3,7 @@ import React from 'react';
 import { NavLink, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { NODEMERE_LOGO_URL } from '../../constants/brand';
 import {
   faKey, faCommentDots, faCalendarDays, faCog, faClipboardList
 } from '@fortawesome/free-solid-svg-icons';import '../../styles/NavPanel.css';
@@ -34,8 +35,8 @@ const NavPanel = ({ isExpanded, setIsExpanded }) => {
     >
       <div className="nav-header">
         <img 
-          src="https://d393ec8814550259215504977855f0b8.cdn.bubble.io/cdn-cgi/image/w=128,h=115,f=auto,dpr=0.75,fit=contain/f1751416721976x644012852837373400/lgooo.png" 
-          alt="Logo" 
+          src={NODEMERE_LOGO_URL}
+          alt="Nodemere logo"
           className="nav-logo"
         />
       </div>

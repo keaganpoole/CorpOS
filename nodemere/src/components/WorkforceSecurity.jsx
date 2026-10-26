@@ -6,7 +6,7 @@ import SplashScreen from './SplashScreen';
 import { useLocation, useNavigate } from 'react-router-dom';
 import './WorkforceSecurity.css';
 
-const NODEMERE_LOGO_SRC = 'https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/assets/nodemere_logo2.png';
+const NODEMERE_LOGO_SRC = 'https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/assets/logo_v3_transparent.png';
 
 const base = window.sonar?.apiUrl || import.meta.env.VITE_API_URL || '';
 const WORKFORCE_TIMEOUT_MS = 12000;

@@ -81,7 +81,7 @@ import { CallLogsProvider, useCallLogs } from './contexts/CallLogsContext';
 import { NestProvider } from './nest/NestRuntime';
 import NestDock from './nest/NestDock';
 import { useAuth } from '../contexts/AuthContext';
-import logoImage from '../assets/logo.png';
+import { NODEMERE_LOGO_URL } from '../constants/brand';
 import useDashboardViewport from './hooks/useDashboardViewport';
 import MobileNavigation from './components/MobileNavigation';
 import MobileTeamCarousel from './components/MobileTeamCarousel';
@@ -2920,7 +2920,7 @@ const SonarDashboard = () => {
 
         {/* Logo */}
         <div className="absolute left-[38px] z-10 -translate-x-1/2">
-          <img src={logoImage} alt="Nodemere" className="h-8 w-auto select-none" />
+          <img src={NODEMERE_LOGO_URL} alt="Nodemere" className="h-8 w-auto select-none" />
         </div>
         <CallLogsToolbarTitle active={currentRoute === 'call-logs'} loading={callLogsToolbarMeta.loading} />
         <PeopleToolbarTitle

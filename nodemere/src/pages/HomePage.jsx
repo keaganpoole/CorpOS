@@ -9,7 +9,7 @@ import SplashScreen from '../components/SplashScreen';
 import { getCookie } from '../utils/cookieUtils';
 import { openVisitorPreferences } from '../lib/visitorConsent.js';
 import '../styles/HomePage.css';
-import logoImage from '@/assets/logo.png';
+import { NODEMERE_LOGO_URL } from '@/constants/brand';
 
 import ph1 from '@/assets/ph1.png';
 import ph2 from '@/assets/ph2.png';
@@ -828,7 +828,7 @@ const HomePage = () => {
       </AnimatePresence>
       <div className={`header${headerHasAppeared ? ' is-visible' : ''}`} data-visitor-click-section="header" data-visitor-click-section-index="-1">
         <nav className="nav-content">
-          <img src={logoImage} alt="Nodemere" className="header-logo" />
+          <img src={NODEMERE_LOGO_URL} alt="Nodemere" className="header-logo" />
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-6 ml-auto">
