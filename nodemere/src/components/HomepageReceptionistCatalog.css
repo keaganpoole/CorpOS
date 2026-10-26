@@ -268,7 +268,7 @@
     flex-direction: column;
     align-items: center;
     gap: 5px;
-    margin: 22px auto 0;
+    margin: 56px auto 0;
     padding: 8px 12px;
     border: 0;
     color: rgba(255,255,255,.9);
@@ -430,6 +430,39 @@
   @keyframes homepage-catalog-panel-reveal {
     from { opacity: 0; transform: translateY(34px); }
     to { opacity: 1; transform: translateY(0); }
+  }
+}
+
+/* Keep the mobile collection blob visible above expanding browser controls
+   while extending its opaque backing behind the controls. */
+@media (max-width: 767px), (pointer: coarse) and (max-height: 500px) {
+  .homepage-catalog-continue-surface {
+    --homepage-catalog-browser-ui-inset: 0px;
+    bottom: var(--homepage-catalog-browser-ui-inset);
+  }
+
+  .homepage-catalog-continue-surface::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    right: 0;
+    left: 0;
+    height: var(--homepage-catalog-browser-ui-inset);
+    background: rgba(232,232,232,.96);
+    pointer-events: none;
+  }
+
+  .homepage-catalog-continue {
+    padding-bottom: max(18px, calc(env(safe-area-inset-bottom, 0px) + 10px));
+    padding-bottom: calc(max(18px, calc(env(safe-area-inset-bottom, 0px) + 10px)) + var(--homepage-catalog-browser-ui-inset));
+  }
+}
+
+@supports (height: 100dvh) {
+  @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) {
+    .homepage-catalog-continue-surface {
+      --homepage-catalog-browser-ui-inset: max(0px, calc(100vh - 100dvh));
+    }
   }
 }
 
