@@ -11,7 +11,7 @@ const SNOOZE_DAYS = 7;
 const STORAGE_KEY_PREFIX = 'nodemere-customer-experience-feedback';
 
 const IMPROVEMENT_AREAS = [
-  'Receptionist Catalog',
+  'Receptionist Collection',
   'Call quality',
   'Setup',
   'CRM / People',

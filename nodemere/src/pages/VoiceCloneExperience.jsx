@@ -544,7 +544,7 @@ function ReceptionistProfileSlide({ profile, setProfile, errorMessage, onAddTrai
       <div className="voice-slide-intro">
         <p className="voice-flow-eyebrow">Receptionist profile</p>
         <h1>Shape the receptionist</h1>
-        <p>Give the cloned voice the same presentation data used by the receptionist catalog.</p>
+        <p>Give the cloned voice the same presentation data used by the receptionist collection.</p>
       </div>
 
       <div className="voice-profile-fields">
@@ -601,7 +601,7 @@ function ReceptionistImageSlide({ profile, imagePreview, onUpload, errorMessage,
       <div className="voice-slide-intro">
         <p className="voice-flow-eyebrow">Receptionist image</p>
         <h1>Add the profile image</h1>
-        <p>This image is used in the same card treatment as the receptionist catalog.</p>
+        <p>This image is used in the same card treatment as the receptionist collection.</p>
       </div>
 
       <label className={`voice-image-uploader ${imagePreview ? 'has-image' : ''}`}>
@@ -644,7 +644,7 @@ function ReceptionistSuccessSlide({ profile, cloneState }) {
       <div className="voice-slide-intro voice-slide-intro-centered">
         <p className="voice-flow-eyebrow">Ready to hire</p>
         <h1>{fullName} is ready</h1>
-        <p>The cloned receptionist has been saved and will appear in the Hire a Receptionist catalog with the standard card, traits, image, and hiring flow.</p>
+        <p>The cloned receptionist has been saved and will appear in the receptionist collection with the standard card, traits, image, and hiring flow.</p>
       </div>
       <div className="voice-success-card">
         {savedProfile.avatar || savedProfile.profile_image ? <img src={savedProfile.avatar || savedProfile.profile_image} alt={fullName} /> : null}

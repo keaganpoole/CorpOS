@@ -104,7 +104,7 @@ export default function HomepageReceptionistCatalog({ active, ambientDrift, onCo
 
   return (
     <div className="homepage-receptionist-catalog">
-      <div className="ns-persistent-wordmark homepage-catalog-wordmark" style={{ opacity: active ? 1 : 0, transition: 'opacity 500ms ease-out' }} aria-label="Receptionist catalog">Receptionist <span>catalog</span></div>
+      <div className="ns-persistent-wordmark homepage-catalog-wordmark" style={{ opacity: active ? 1 : 0, transition: 'opacity 500ms ease-out' }} aria-label="Receptionist collection">Receptionist <span>collection</span></div>
       <div className="homepage-catalog-ambient-drift" data-drifting={ambientDrift ? 'true' : 'false'}>
         <div className="homepage-catalog-ambient-drift-y">
           <HireReceptionistModal

@@ -10,16 +10,21 @@ export default function CookieNotice() {
   const [managing, setManaging] = useState(false);
   const [opened, setOpened] = useState(false);
   const [dismissed, setDismissed] = useState(false);
+  const [noticeReady, setNoticeReady] = useState(false);
   const [analytics, setAnalytics] = useState(false);
   const [error, setError] = useState('');
   const heading = useRef(null);
   const trigger = useRef(null);
   useEffect(() => {
+    const timer = window.setTimeout(() => setNoticeReady(true), 5000);
+    return () => window.clearTimeout(timer);
+  }, []);
+  useEffect(() => {
     const unsubscribe = subscribeConsent(next => { setConsent(next); setAnalytics(next.analytics); });
     const open = () => {
       trigger.current = document.activeElement;
       setConsent(readConsent()); setAnalytics(readConsent().analytics);
-      setOpened(true); setManaging(true); setError('');
+      setNoticeReady(true); setOpened(true); setManaging(true); setError('');
     };
     window.addEventListener(OPEN_PREFERENCES, open);
     return () => { unsubscribe(); window.removeEventListener(OPEN_PREFERENCES, open); };
@@ -37,8 +42,9 @@ export default function CookieNotice() {
     if (location.pathname === '/') return null;
     return <button type="button" className="visitor-preferences-reopen" onClick={openVisitorPreferences}>Cookie preferences</button>;
   }
+  if (!noticeReady && !opened) return null;
   return (
-    <section className="visitor-cookie-notice" aria-labelledby="visitor-cookie-heading" onKeyDown={event => { if (event.key === 'Escape' && opened) close(); }}>
+    <section className={`visitor-cookie-notice${!opened && noticeReady ? ' is-delayed-entry' : ''}`} aria-labelledby="visitor-cookie-heading" onKeyDown={event => { if (event.key === 'Escape' && opened) close(); }}>
       <div className="visitor-cookie-heading"><h2 id="visitor-cookie-heading" ref={heading} tabIndex={-1}>{managing ? 'Cookie preferences' : 'Your privacy choices'}</h2>{opened && <button type="button" className="visitor-cookie-close" aria-label="Close cookie preferences" onClick={close}>×</button>}</div>
       <p>Essential storage runs Nodemere. Optional analytics help us understand site visits. <Link to="/cookie-notice">Cookie Notice</Link></p>
       {consent.restricted && <p className="visitor-cookie-signal">Your browser’s privacy signal keeps optional analytics off.</p>}

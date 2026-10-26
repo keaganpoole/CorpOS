@@ -374,16 +374,15 @@ const StackedHeroShowcase = ({ sectionRef }) => {
               <div className="mx-auto mt-6 max-w-[820px] text-base font-semibold leading-[1.55] tracking-[-0.02em] text-[#d4d4d8] md:text-xl">Deploy the world's most advanced AI receptionists and transform your front desk into a 24/7 operation that answers calls, manages everyday front desk work, and doubles as an assistant your team can talk to and put to work.
                 
               </div>
+              {!heroIntroExited && showIntroSwipeCue && (
+                <button type="button" className="homepage-intro-swipe-cue" onClick={continueFromIntro} aria-label="Swipe up or tap to continue">
+                  <Pointer className="homepage-intro-swipe-icon" size={26} aria-hidden="true" />
+                  <span>Swipe up to continue</span>
+                </button>
+              )}
             </div>
           </div>
         </div>
-
-        {!heroIntroExited && showIntroSwipeCue && (
-          <button type="button" className="homepage-intro-swipe-cue" onClick={continueFromIntro} aria-label="Swipe up or tap to continue">
-            <Pointer className="homepage-intro-swipe-icon" size={26} aria-hidden="true" />
-            <span>Swipe up to continue</span>
-          </button>
-        )}
 
         <div
           className={`absolute inset-0 z-10 transition-[opacity,transform] duration-500 ease-out ${catalogActive ? '' : 'pointer-events-none'}`}
