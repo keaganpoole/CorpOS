@@ -71,8 +71,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 from starlette.requests import ClientDisconnect
-from gotrue.errors import AuthApiError
-from supabase_auth.errors import AuthApiError as SupabaseAuthApiError
+from supabase_auth.errors import AuthApiError
 from collections import defaultdict
 from fastapi import BackgroundTasks
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -15692,7 +15691,7 @@ async def create_user(auth_data: AuthSignUpRequest, request: Request):
                     "password": auth_data.password,
                     "email_confirm": True,
                 })
-            except (AuthApiError, SupabaseAuthApiError) as exc:
+            except AuthApiError as exc:
                 if getattr(exc, 'code', None) in {'email_exists', 'user_already_exists'}:
                     existing_profiles = supabase_admin.table('users').select('id').eq('email',str(auth_data.email).strip().lower()).limit(1).execute().data or []
                     existing_user = (supabase_admin.auth.admin.get_user_by_id(existing_profiles[0]['id']).user if existing_profiles else None)
