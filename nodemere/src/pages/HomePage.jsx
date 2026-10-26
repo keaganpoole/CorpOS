@@ -281,8 +281,9 @@ const StackedHeroShowcase = ({ sectionRef }) => {
     };
   }, []);
 
-  const receptionistStartProgress = 0.16;
+  const receptionistStartProgress = isCompactFeatureViewport ? 0.16 * (180 / 252) : 0.16;
   const heroFeaturesStartProgress = 0.52;
+  const heroFeatureProgressDuration = isCompactFeatureViewport ? 0.35 : 0.3;
   const heroIntroExited = sectionProgress >= receptionistStartProgress;
   const receptionistEntered = sectionProgress >= receptionistStartProgress;
   const heroFeaturesEntered = sectionProgress >= heroFeaturesStartProgress;
@@ -316,7 +317,7 @@ const StackedHeroShowcase = ({ sectionRef }) => {
   const receptionistBrightness = heroFeaturesEntered ? 0.46 : receptionistEntered ? 1 : 0.2;
   const receptionistSaturation = receptionistEntered ? 1 : 0.2;
   const catalogActive = catalogReady && receptionistEntered && !heroFeaturesEntered;
-  const heroFeatureProgress = Math.min(1, Math.max(0, (sectionProgress - heroFeaturesStartProgress) / 0.3));
+  const heroFeatureProgress = Math.min(1, Math.max(0, (sectionProgress - heroFeaturesStartProgress) / heroFeatureProgressDuration));
   const heroFeatureOpacity = heroFeaturesEntered ? 1 : 0;
   const jitterState = sectionProgress < heroFeaturesStartProgress ? 'inactive' : heroFeatureProgress < 1 ? 'entering' : sectionProgress < 1 ? 'locked' : 'exiting';
   const continuePastCatalog = () => {
@@ -325,18 +326,22 @@ const StackedHeroShowcase = ({ sectionRef }) => {
     const top = root.getBoundingClientRect().top + window.scrollY;
     const distance = Math.max(root.offsetHeight - window.innerHeight, 1);
     // Land clearly into the feature sequence so the catalog is fully exited.
-    window.scrollTo({ top: top + distance * 0.72, behavior: 'smooth' });
+    const continueProgress = isCompactFeatureViewport
+      ? heroFeaturesStartProgress + (0.72 - 0.52) * (heroFeatureProgressDuration / 0.3)
+      : 0.72;
+    window.scrollTo({ top: top + distance * continueProgress, behavior: 'smooth' });
   };
   const continueFromIntro = () => {
     const root = rootRef.current;
     if (!root || typeof window === 'undefined') return;
     const top = root.getBoundingClientRect().top + window.scrollY;
     const distance = Math.max(root.offsetHeight - window.innerHeight, 1);
-    window.scrollTo({ top: top + distance * (receptionistStartProgress + 0.04), behavior: 'smooth' });
+    const continueProgress = receptionistStartProgress + (isCompactFeatureViewport ? 0.04 * (180 / 252) : 0.04);
+    window.scrollTo({ top: top + distance * continueProgress, behavior: 'smooth' });
   };
 
   return (
-    <div ref={(el) => { rootRef.current = el; if (sectionRef) sectionRef.current = el; }} className="relative h-[280vh] bg-[#020202]"
+    <div ref={(el) => { rootRef.current = el; if (sectionRef) sectionRef.current = el; }} className="relative h-[352vh] bg-[#020202] lg:h-[280vh]"
       data-visitor-section="hero"
       data-visitor-section-index="0"
       data-jitter-debug-root={jitterDebugEnabled ? 'hero' : undefined}
