@@ -285,10 +285,23 @@ const StackedHeroShowcase = ({ sectionRef }) => {
   const heroIntroExited = sectionProgress >= receptionistStartProgress;
   const receptionistEntered = sectionProgress >= receptionistStartProgress;
   const heroFeaturesEntered = sectionProgress >= 0.64;
+  const [catalogReady, setCatalogReady] = useState(false);
+
+  useEffect(() => {
+    if (!receptionistEntered || heroFeaturesEntered) {
+      setCatalogReady(false);
+      return undefined;
+    }
+    const timer = window.setTimeout(() => setCatalogReady(true), 700);
+    return () => window.clearTimeout(timer);
+  }, [receptionistEntered, heroFeaturesEntered]);
+
   const crmOpacity = heroIntroExited ? 0 : 1;
-  const receptionistOpacity = receptionistEntered ? (heroFeaturesEntered ? 0.11 : 1) : 0;
+  const receptionistOpacity = heroFeaturesEntered ? 0.11 : 1;
   const receptionistBlur = heroFeaturesEntered ? 13 : 0;
-  const receptionistBrightness = heroFeaturesEntered ? 0.46 : 1;
+  const receptionistBrightness = heroFeaturesEntered ? 0.46 : receptionistEntered ? 1 : 0.2;
+  const receptionistSaturation = receptionistEntered ? 1 : 0.2;
+  const catalogActive = catalogReady && receptionistEntered && !heroFeaturesEntered;
   const heroFeatureProgress = Math.min(1, Math.max(0, (sectionProgress - 0.64) / 0.3));
   const heroFeatureOpacity = heroFeaturesEntered ? 1 : 0;
   const jitterState = sectionProgress < 0.64 ? 'inactive' : heroFeatureProgress < 1 ? 'entering' : sectionProgress < 1 ? 'locked' : 'exiting';
@@ -318,10 +331,10 @@ const StackedHeroShowcase = ({ sectionRef }) => {
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.055),transparent_42%)]" />
 
         <div
-          className={`absolute inset-0 z-20 flex items-center justify-center px-6 transition-[opacity,transform] duration-500 ease-out ${crmOpacity <= 0.01 ? 'pointer-events-none' : ''}`}
+          className={`absolute inset-0 z-20 flex items-center justify-center px-6 transition-[opacity,transform] duration-700 ease-out ${heroIntroExited ? 'pointer-events-none' : ''}`}
+          aria-hidden={heroIntroExited || undefined}
           style={{
             opacity: crmOpacity,
-            visibility: crmOpacity <= 0.01 ? 'hidden' : 'visible',
             transform: `translateY(${heroIntroExited ? -12 : 0}px)`,
           }}
         >
@@ -340,15 +353,20 @@ const StackedHeroShowcase = ({ sectionRef }) => {
         </div>
 
         <div
-          className={`absolute inset-0 z-10 transition-[opacity,transform] duration-500 ease-out ${receptionistOpacity <= 0.01 ? 'pointer-events-none' : ''}`}
+          className={`absolute inset-0 z-10 transition-[opacity,transform] duration-500 ease-out ${catalogActive ? '' : 'pointer-events-none'}`}
+          inert={catalogActive ? undefined : ''}
+          aria-hidden={!catalogActive || undefined}
           style={{
             opacity: receptionistOpacity,
             visibility: receptionistOpacity <= 0.01 ? 'hidden' : 'visible',
-            transform: `translateY(${receptionistEntered ? 0 : 18}px) scale(${heroFeaturesEntered ? 0.988 : 1})`,
-            filter: `blur(${receptionistBlur}px) brightness(${receptionistBrightness})`,
+            transform: `scale(${heroFeaturesEntered ? 0.988 : 1})`,
+            filter: `blur(${receptionistBlur}px) brightness(${receptionistBrightness}) saturate(${receptionistSaturation})`,
+            transition: heroFeaturesEntered
+              ? 'opacity 500ms ease-out, transform 500ms ease-out'
+              : 'filter 700ms ease-out, opacity 500ms ease-out, transform 500ms ease-out',
           }}
         >
-          <HomepageReceptionistCatalog active={receptionistEntered && !heroFeaturesEntered} onContinue={continuePastCatalog} />
+          <HomepageReceptionistCatalog active={catalogActive} onContinue={continuePastCatalog} />
         </div>
 
         <div

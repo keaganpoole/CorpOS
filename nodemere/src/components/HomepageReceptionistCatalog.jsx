@@ -104,7 +104,7 @@ export default function HomepageReceptionistCatalog({ active, onContinue }) {
 
   return (
     <div className="homepage-receptionist-catalog">
-      <div className="ns-persistent-wordmark homepage-catalog-wordmark" aria-label="Receptionist catalog">Receptionist <span>catalog</span></div>
+      <div className="ns-persistent-wordmark homepage-catalog-wordmark" style={{ opacity: active ? 1 : 0, transition: 'opacity 500ms ease-out' }} aria-label="Receptionist catalog">Receptionist <span>catalog</span></div>
       <HireReceptionistModal
         embedded
         catalogRows={catalogRows}
