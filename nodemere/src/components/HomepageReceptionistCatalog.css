@@ -7,6 +7,36 @@
   background: #020202;
 }
 
+.homepage-catalog-ambient-drift {
+  position: absolute;
+  inset: -20px;
+  animation: homepage-catalog-drift-x 16s ease-in-out infinite;
+  will-change: transform;
+}
+
+.homepage-catalog-ambient-drift-y {
+  position: absolute;
+  inset: 0;
+  animation: homepage-catalog-drift-y 19s ease-in-out infinite;
+  animation-delay: -5s;
+  will-change: transform;
+}
+
+.homepage-catalog-ambient-drift[data-drifting="false"],
+.homepage-catalog-ambient-drift[data-drifting="false"] .homepage-catalog-ambient-drift-y {
+  animation-play-state: paused;
+}
+
+@keyframes homepage-catalog-drift-x {
+  0%, 100% { transform: translate3d(-14px, 0, 0); }
+  50% { transform: translate3d(14px, 0, 0); }
+}
+
+@keyframes homepage-catalog-drift-y {
+  0%, 100% { transform: translate3d(0, -12px, 0); }
+  50% { transform: translate3d(0, 12px, 0); }
+}
+
 @keyframes homepage-catalog-hand-drift {
   0%, 100% { transform: translate(0, 0); }
   50% { transform: translate(0, 7px); }
@@ -363,6 +393,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .homepage-catalog-ambient-drift,
+  .homepage-catalog-ambient-drift-y { animation: none !important; }
   .homepage-catalog-swipe-icon { animation: none !important; }
   .homepage-catalog-continue-surface { animation: none !important; }
 }

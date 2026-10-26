@@ -281,18 +281,24 @@ const StackedHeroShowcase = ({ sectionRef }) => {
     };
   }, []);
 
-  const receptionistStartProgress = 0.26;
+  const receptionistStartProgress = 0.16;
+  const heroFeaturesStartProgress = 0.52;
   const heroIntroExited = sectionProgress >= receptionistStartProgress;
   const receptionistEntered = sectionProgress >= receptionistStartProgress;
-  const heroFeaturesEntered = sectionProgress >= 0.64;
+  const heroFeaturesEntered = sectionProgress >= heroFeaturesStartProgress;
   const [catalogReady, setCatalogReady] = useState(false);
+  const [introDriftRunning, setIntroDriftRunning] = useState(true);
 
   useEffect(() => {
     if (!receptionistEntered || heroFeaturesEntered) {
       setCatalogReady(false);
+      setIntroDriftRunning(!receptionistEntered);
       return undefined;
     }
-    const timer = window.setTimeout(() => setCatalogReady(true), 700);
+    const timer = window.setTimeout(() => {
+      setCatalogReady(true);
+      setIntroDriftRunning(false);
+    }, 700);
     return () => window.clearTimeout(timer);
   }, [receptionistEntered, heroFeaturesEntered]);
 
@@ -302,9 +308,9 @@ const StackedHeroShowcase = ({ sectionRef }) => {
   const receptionistBrightness = heroFeaturesEntered ? 0.46 : receptionistEntered ? 1 : 0.2;
   const receptionistSaturation = receptionistEntered ? 1 : 0.2;
   const catalogActive = catalogReady && receptionistEntered && !heroFeaturesEntered;
-  const heroFeatureProgress = Math.min(1, Math.max(0, (sectionProgress - 0.64) / 0.3));
+  const heroFeatureProgress = Math.min(1, Math.max(0, (sectionProgress - heroFeaturesStartProgress) / 0.3));
   const heroFeatureOpacity = heroFeaturesEntered ? 1 : 0;
-  const jitterState = sectionProgress < 0.64 ? 'inactive' : heroFeatureProgress < 1 ? 'entering' : sectionProgress < 1 ? 'locked' : 'exiting';
+  const jitterState = sectionProgress < heroFeaturesStartProgress ? 'inactive' : heroFeatureProgress < 1 ? 'entering' : sectionProgress < 1 ? 'locked' : 'exiting';
   const continuePastCatalog = () => {
     const root = rootRef.current;
     if (!root || typeof window === 'undefined') return;
@@ -342,7 +348,7 @@ const StackedHeroShowcase = ({ sectionRef }) => {
             <div className="mx-auto max-w-[1100px]">
               <h2 className="pb-2 text-4xl font-semibold leading-[0.95] tracking-[-0.06em] md:text-7xl lg:text-[6.2rem]">
                 <span className="bg-gradient-to-b from-white via-zinc-100 to-zinc-500 bg-clip-text text-transparent">Welcome to the </span>
-                <span className="inline-block bg-gradient-to-r from-[var(--brandGradientStart)] to-[var(--brandGradientEnd)] bg-clip-text pr-[0.04em] text-transparent [-webkit-box-decoration-break:clone] [box-decoration-break:clone]">future</span>
+                <span className="homepage-future-gradient inline-block bg-clip-text pr-[0.04em] text-transparent [-webkit-box-decoration-break:clone] [box-decoration-break:clone]">future</span>
                 <span className="bg-gradient-to-b from-white via-zinc-100 to-zinc-500 bg-clip-text text-transparent"> of the front desk</span>
               </h2>
               <div className="mx-auto mt-6 max-w-[820px] text-base font-semibold leading-[1.55] tracking-[-0.02em] text-[#d4d4d8] md:text-xl">Deploy the world's most advanced AI receptionists and transform your front desk into a 24/7 operation that answers calls, manages everyday front desk work, and doubles as an assistant your team can talk to and put to work.
@@ -366,7 +372,7 @@ const StackedHeroShowcase = ({ sectionRef }) => {
               : 'filter 700ms ease-out, opacity 500ms ease-out, transform 500ms ease-out',
           }}
         >
-          <HomepageReceptionistCatalog active={catalogActive} onContinue={continuePastCatalog} />
+          <HomepageReceptionistCatalog active={catalogActive} ambientDrift={introDriftRunning} onContinue={continuePastCatalog} />
         </div>
 
         <div

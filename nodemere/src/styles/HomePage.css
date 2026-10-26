@@ -5,6 +5,45 @@
     --gradient-end: var(--color2);
 }
 
+@property --future-gradient-start {
+    syntax: '<percentage>';
+    inherits: false;
+    initial-value: 0%;
+}
+
+@property --future-gradient-end {
+    syntax: '<percentage>';
+    inherits: false;
+    initial-value: 100%;
+}
+
+.homepage-future-gradient {
+    background-image: linear-gradient(80deg, var(--brandGradientStart) var(--future-gradient-start), var(--brandGradientEnd) var(--future-gradient-end));
+    filter: saturate(1.16) brightness(1.06);
+    animation: homepage-future-drift 8s ease-in-out infinite;
+}
+
+@keyframes homepage-future-drift {
+    0%, 50%, 100% {
+        --future-gradient-start: 0%;
+        --future-gradient-end: 100%;
+    }
+    25% {
+        --future-gradient-start: -14%;
+        --future-gradient-end: 86%;
+    }
+    75% {
+        --future-gradient-start: 14%;
+        --future-gradient-end: 114%;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .homepage-future-gradient {
+        animation: none;
+    }
+}
+
 .homepage-copy-reveal {
     opacity: 0;
     transform: translateY(24px) scale(0.985);
