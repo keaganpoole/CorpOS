@@ -8646,6 +8646,8 @@ async def route_call_compat(request: Request, _internal: None = Depends(require_
     }
     add_people_intake_dynamic_variables(dynamic_variables, business)
     add_escalation_dynamic_variables(dynamic_variables, business)
+    if business:
+        dynamic_variables["secret__nodemere_context"] = issue_internal_context(internal_tool_secret, business)
     matched_person = lookup_person_record(
         phone_number=call_payload.get("from_number"),
         business_id=str(business.get("id")) if business and business.get("id") is not None else None,
