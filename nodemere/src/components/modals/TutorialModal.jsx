@@ -43,7 +43,7 @@ const TutorialModal = ({ isOpen, onClose, onConfirm }) => {
                 <iframe
                   width="560"
                   height="315"
-                  src="https://www.youtube.com/embed/U8emXhW4YF4"
+                  src="https://www.youtube.com/embed/4TIA8uirPV8?list=PLNXYRvegVNok"
                   title="YouTube video player"
                   frameBorder="0"
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"

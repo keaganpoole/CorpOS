@@ -257,7 +257,7 @@ const getPopupState = (profilePopups, popupId) => {
   };
 };
 
-const BUSINESS_BASICS_VIDEO_URL = 'https://www.youtube.com/embed/4TIA8uirPV8';
+const BUSINESS_BASICS_VIDEO_URL = 'https://www.youtube.com/embed/4TIA8uirPV8?list=PLNXYRvegVNok';
 const RECEPTIONISTS_AND_STAFF_VIDEO_URL = 'https://www.youtube.com/embed/1KakgS9G6qQ';
 const DESK_ACTIVATION_VIDEO_URL = 'https://www.youtube.com/embed/2TC2bAjLdKE';
 const RECEPTIONIST_WORKFLOW_VIDEO_URL = 'https://www.youtube.com/embed/HfcxoUl1hks';

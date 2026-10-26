@@ -129,7 +129,7 @@ const AccountSettings = ({ onChangeMasterPassword, isMasterPasswordModalOpen, on
             <ul className="settings-options">
 
               <li className="settings-option">
-                <button className="settings-btn" onClick={() => window.open('https://www.youtube.com/watch?v=U8emXhW4YF4', '_blank')}>
+                <button className="settings-btn" onClick={() => window.open('https://www.youtube.com/watch?v=4TIA8uirPV8&list=PLNXYRvegVNok', '_blank')}>
                   <FontAwesomeIcon icon={faPlayCircle} />
                   Tutorial
                 </button>

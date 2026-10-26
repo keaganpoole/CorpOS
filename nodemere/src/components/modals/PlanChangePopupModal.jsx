@@ -59,7 +59,7 @@ const PlanChangePopupModal = ({ isOpen, onClose, plan }) => {
                   <div className="aspect-video overflow-hidden rounded-2xl border border-white/[0.08] bg-black">
                     <iframe
                       className="h-full w-full"
-                      src="https://www.youtube.com/embed/U8emXhW4YF4"
+                      src="https://www.youtube.com/embed/4TIA8uirPV8?list=PLNXYRvegVNok"
                       title="Nodemere tutorial"
                       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                       allowFullScreen
