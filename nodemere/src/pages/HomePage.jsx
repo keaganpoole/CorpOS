@@ -282,7 +282,7 @@ const StackedHeroShowcase = ({ sectionRef }) => {
   }, []);
 
   const receptionistStartProgress = isCompactFeatureViewport ? 0.16 * (180 / 252) : 0.16;
-  const heroFeaturesStartProgress = 0.52;
+  const heroFeaturesStartProgress = isCompactFeatureViewport ? 0.6 : 0.52;
   const heroFeatureProgressDuration = isCompactFeatureViewport ? 0.35 : 0.3;
   const heroIntroExited = sectionProgress >= receptionistStartProgress;
   const receptionistEntered = sectionProgress >= receptionistStartProgress;
@@ -327,7 +327,7 @@ const StackedHeroShowcase = ({ sectionRef }) => {
     const distance = Math.max(root.offsetHeight - window.innerHeight, 1);
     // Land clearly into the feature sequence so the catalog is fully exited.
     const continueProgress = isCompactFeatureViewport
-      ? heroFeaturesStartProgress + (0.72 - 0.52) * (heroFeatureProgressDuration / 0.3)
+      ? heroFeaturesStartProgress + heroFeatureProgressDuration * 0.08
       : 0.72;
     window.scrollTo({ top: top + distance * continueProgress, behavior: 'smooth' });
   };

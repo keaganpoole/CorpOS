@@ -998,7 +998,7 @@ const AgentNode = ({ agent, isActive = false, reactions = {}, pendingModel = nul
         </div>
         </div>
 
-        <div className={`${compact ? 'pt-2.5' : 'pt-3.5'} border-t border-white/[0.04]`}>
+        <div className={`${compact ? 'pt-2.5' : 'pt-3.5'} team-receptionist-metrics border-t border-white/[0.04]`}>
           <div className={metricGridClass}>
             <div className="min-w-0">
               <p className="text-[8px] text-zinc-700 font-bold uppercase tracking-widest mb-1.5">Inbound Calls</p>
@@ -1311,7 +1311,7 @@ const PopupModal = ({ popup, profile, onClose }) => {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="responsive-dialog fixed inset-0 z-[1400] flex items-center justify-center bg-black/55 p-6 backdrop-blur-[2px]"
+          className={`responsive-dialog dashboard-guide-popup fixed inset-0 z-[1400] flex items-center justify-center bg-black/55 p-6 backdrop-blur-[2px]${isScenariosIntro ? ' is-scenarios-intro' : ''}`}
           onClick={onClose}
         >
             <motion.section
@@ -2693,7 +2693,7 @@ const SonarDashboard = () => {
                   </div>
                 ) : enrichedAgents.length === 0 ? (
                   <div className="flex min-h-full items-center justify-center pb-20 text-center">
-                    <div className="flex flex-col items-center">
+                    <div className="team-empty-state flex flex-col items-center">
                       <Moon size={30} strokeWidth={1.7} className="mx-auto mb-4 text-zinc-500" />
                       <p className="text-[28px] font-semibold leading-none tracking-tight text-white">No receptionists</p>
                       <p className="text-[13px] leading-none text-zinc-500 -translate-y-1.5">Hire an AI receptionist to put your front desk to work.</p>

@@ -2758,7 +2758,7 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
             <CubePreloader />
           </div>
         ) : staffMembers.length === 0 ? (
-          <div className={`flex flex-col items-center justify-center pb-20 text-center ${hideIntro && hideToolbar ? 'min-h-full' : 'min-h-[420px]'}`}>
+          <div className={`staff-empty-state flex flex-col items-center justify-center pb-20 text-center ${hideIntro && hideToolbar ? 'min-h-full' : 'min-h-[420px]'}`}>
             <Users size={30} strokeWidth={1.7} className="mb-4 text-zinc-500" />
             <p className="text-[28px] font-semibold leading-none tracking-tight text-white">No staff</p>
             <p className="text-[13px] leading-none text-zinc-500 -translate-y-1.5">Add a staff member your receptionist can book with.</p>
@@ -2864,7 +2864,7 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 16, scale: 0.98 }}
               onClick={(e) => e.stopPropagation()}
-              className={`relative max-h-[calc(100vh-24px)] w-full ${staffSlide === 1 ? 'max-w-[1080px]' : 'max-w-[700px]'} overflow-hidden rounded-[34px] border border-white/[0.08] bg-[#070707]/95 shadow-[0_28px_90px_rgba(0,0,0,0.55)] backdrop-blur-xl`}
+              className={`staff-editor-dialog relative max-h-[calc(100vh-24px)] w-full ${staffSlide === 1 ? 'max-w-[1080px]' : 'max-w-[700px]'} overflow-hidden rounded-[34px] border border-white/[0.08] bg-[#070707]/95 shadow-[0_28px_90px_rgba(0,0,0,0.55)] backdrop-blur-xl`}
             >
               <div className="relative p-6 sm:p-8">
                 <div className="mb-6 flex items-start justify-between gap-5">
@@ -2923,7 +2923,7 @@ export const StaffManager = ({ businessId, ensureBusinessRecord, onBusinessLinke
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -18 }}
                     transition={{ duration: 0.18 }}
-                    className={staffSlide === 0 ? 'min-h-[300px]' : 'min-h-[420px]'}
+                    className={`staff-editor-step ${staffSlide === 0 ? 'staff-profile-step min-h-[300px]' : 'min-h-[420px]'}`}
                   >
                     {renderStaffSlide()}
                   </motion.div>

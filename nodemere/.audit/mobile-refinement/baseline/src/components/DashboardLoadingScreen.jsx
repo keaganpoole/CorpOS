@@ -44,7 +44,7 @@ const DashboardLoadingScreen = ({ isLoading }) => {
             transition={{ duration: 0.5 }}
           >
             <img
-              src="https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/assets/nodemere_logo2.png"
+              src="https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/assets/logo_v3_transparent.png"
               alt="Nodemere logo"
               className="dashboard-loading-logo"
             />

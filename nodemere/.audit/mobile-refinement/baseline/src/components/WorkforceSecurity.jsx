@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { enrollTotp, verifyTotp, removeTotp } from '../lib/workforceSecurity';
 import SplashScreen from './SplashScreen';
 
-const NODEMERE_LOGO_SRC = 'https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/assets/nodemere_logo2.png';
+const NODEMERE_LOGO_SRC = 'https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/assets/logo_v3_transparent.png';
 
 const base = window.sonar?.apiUrl || import.meta.env.VITE_API_URL || '';
 const WORKFORCE_TIMEOUT_MS = 12000;

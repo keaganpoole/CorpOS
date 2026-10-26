@@ -824,7 +824,7 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
       ? ['Live Call Monitoring']
       : isCrmVariant
       ? ['One.', 'CRM.']
-      : ['Build Outbound Workflows'];
+      : ['Build Powerful Workflows'];
     const description = isMonitoringVariant ? (
       <>Monitor calls as they happen and review every conversation later with the context, <GradientWord>playback</GradientWord>, and history your team actually needs.</>
     ) : isCrmVariant ? (

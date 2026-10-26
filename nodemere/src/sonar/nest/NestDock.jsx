@@ -121,7 +121,7 @@ export default function NestDock({ onStageChange, businessAvatar = '', mobile = 
         <NestIntercom mobile={mobile} open={intercomOpen} onClose={closeIntercom} />
       </div>
       {!intercomOpen && toolsContainer && createPortal(
-        <div className="nest-toolbar-tools no-drag">
+        <div className={`nest-toolbar-tools no-drag${mobile && displayEvent ? ' has-mobile-notification' : ''}`}>
           {queueLength > 0 && <span className="nest-queue-count" title={`${queueLength} queued Nest events`}>{queueLength}</span>}
           <button type="button" onClick={() => setConversationsOpen(true)} aria-label="Open voice conversations" title="Voice conversations">
             <MessageCircle size={13} />

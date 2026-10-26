@@ -10,7 +10,7 @@ import { LEGAL_ACCEPTANCE_VERSION } from '../legal/legalDocuments';
 
 const API_BASE_URL = (import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:8000' : '')).replace(/\/$/, '');
 const FRONTEND_PUBLIC_URL = import.meta.env.VITE_FRONTEND_PUBLIC_URL || window.location.origin;
-const NODEMERE_LOGO_SRC = 'https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/assets/nodemere_logo2.png';
+const NODEMERE_LOGO_SRC = 'https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/assets/logo_v3_transparent.png';
 const OAUTH_LEGAL_ACCEPTANCE_STORAGE_KEY = 'nodemere:oauth-legal-acceptance';
 
 console.debug("AuthPage.jsx:event_15");
