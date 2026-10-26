@@ -598,6 +598,18 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
     return () => window.removeEventListener('resize', updateViewportSize);
   }, []);
 
+  const isMobileViewport = viewportSize.width < 768;
+  const isTabletViewport = viewportSize.width >= 768 && viewportSize.width < 1180;
+  const scenarioDemoScale = isScenariosVariant
+    ? Math.min(
+        1,
+        isMobileViewport
+          ? Math.max(0.62, Math.min(viewportSize.width / 440, viewportSize.height / 980))
+          : isTabletViewport
+            ? Math.max(0.78, Math.min(viewportSize.width / 1120, viewportSize.height / 1040))
+            : 1
+      )
+    : 1;
   const showCrmFilm = isCrmVariant && viewportSize.width < 1180;
 
   useEffect(() => {
@@ -924,7 +936,13 @@ const CalendarShowcase = ({ variant = 'calendar' }) => {
                   }}
                 />
               ) : (
-                <div className="homepage-scenarios-builder-frame">
+                <div
+                  className="homepage-scenarios-builder-frame"
+                  style={{
+                    transform: `scale(${scenarioDemoScale})`,
+                    transformOrigin: 'center center',
+                  }}
+                >
                   <HomepageScenariosDemo
                     key={demoInstanceKey}
                     demoMode
@@ -1750,7 +1768,7 @@ function RightCalendarGrid({ hasAnimatedDots, calendarVisible = true }) {
                   {eventsList.map((event, dotIndex) => (
                     <div
                       key={`${dayNum}-${event.title}`}
-                      className={`dot-item rounded-full ${isMobile ? 'h-[3px] w-[3px]' : isCompact ? 'h-1 w-1' : 'h-1.5 w-1.5'}`}
+                      className={`dot-item rounded-full ${isMobile ? 'h-[3px] w-[3px]' : isCompact ? 'h-1 w-1' : 'h-[5px] w-[5px]'}`}
                       style={{
                         backgroundColor: isSelected ? '#52525b' : event.statusColor,
                         animationDelay: shouldRevealCalendarDetails ? `${dayNum * 24 + dotIndex * 80}ms` : '0ms',

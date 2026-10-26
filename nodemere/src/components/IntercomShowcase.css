@@ -30,8 +30,6 @@
 .intercom-showcase__headline-block { display: flex; max-width: 100%; flex-direction: column; align-items: flex-start; }
 .intercom-showcase__word { display: inline-flex; align-items: center; justify-content: center; white-space: nowrap; font-weight: 500; }
 .intercom-showcase__lead { display: inline-block; padding-right: .06em; margin-right: -.06em; font-weight: 700; }
-.intercom-showcase__letter-o { position: relative; top: .16em; left: .025em; display: inline-flex; width: .57em; height: .57em; flex: none; margin: 0; }
-.intercom-showcase__letter-o .circle-preloader { width: 100% !important; height: 100% !important; }
 
 .intercom-showcase.has-entered .intercom-showcase__copy,
 .intercom-showcase.has-entered .intercom-showcase__visual { opacity: 1; transform: none; }
@@ -49,8 +47,6 @@
 .intercom-showcase__line { position: relative; display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 20px; align-items: start; }
 .intercom-showcase__line > * { position: relative; z-index: 2; }
 .intercom-showcase__line--reply { isolation: isolate; overflow: hidden; margin: -20px -24px; padding: 20px 24px; border: 1px solid #ffffff0a; border-radius: 22px; background: #050505; box-shadow: inset 0 1px #ffffff08, 0 18px 50px #00000026; }
-.intercom-showcase__reply-banner { position: absolute; inset: 0 0 0 auto; z-index: 0; width: 59%; background-position: 40% 38%; background-repeat: no-repeat; background-size: cover; opacity: .3; filter: saturate(.62) contrast(1.02) brightness(.78); transform: translateX(-50%) scale(1.03); transform-origin: right center; }
-.intercom-showcase__reply-scrim { position: absolute; inset: 0; z-index: 1; background: linear-gradient(90deg, rgba(0,0,0,.94), rgba(0,0,0,.76) 32%, rgba(0,0,0,.48) 62%, rgba(0,0,0,.3)); box-shadow: inset 0 1px #ffffff08, inset 0 -1px #ffffff06; }
 .intercom-showcase__avatar { display: grid; place-items: center; width: 56px; height: 56px; margin-top: 4px; overflow: hidden; border-radius: 50%; background: #151922; color: #c4d4ec; border: 1px solid #ffffff14; }
 .intercom-showcase__avatar--user { background: #ffffff06; color: #a4a7af; }
 .intercom-showcase__avatar img { width: 100%; height: 100%; object-fit: cover; object-position: center 20%; }
@@ -88,7 +84,6 @@
   .intercom-showcase__industry { height: 18px; font-size: 7px; }
   .intercom-showcase__industry-icon { width: 18px; height: 18px; }
   .intercom-showcase__line--reply { margin: -12px -14px; padding: 12px 14px; border-radius: 16px; }
-  .intercom-showcase__reply-banner { width: 70%; opacity: .25; }
   .intercom-showcase__dialogue { min-height: 220px; }
   .intercom-showcase__exchange { gap: 24px; }
 }

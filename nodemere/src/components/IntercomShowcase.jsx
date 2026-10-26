@@ -6,7 +6,6 @@ import {
   Stethoscope, Syringe, Thermometer, Wrench, Zap,
 } from 'lucide-react';
 import IntercomVoiceLine from '../sonar/nest/IntercomVoiceLine';
-import CubePreloader from '../sonar/components/CubePreloader';
 import './IntercomShowcase.css';
 
 const EXAMPLES = [
@@ -413,7 +412,7 @@ export default function IntercomShowcase() {
         <div className="intercom-showcase__copy">
           <div className="intercom-showcase__copy-content">
             <div className="intercom-showcase__headline-block">
-              <h2 id="homepage-intercom-title" aria-label="Live intercom" className={`homepage-copy-reveal ${entered ? 'is-visible' : ''}`}><span className="intercom-showcase__lead">Live</span>{' '}<span className="intercom-showcase__word">interc<span aria-hidden="true" className="intercom-showcase__letter-o"><CubePreloader size={10} strokeWidth={8.5} wiggleIntensity={1.2} primaryGradient={['var(--brandGradientEnd)', 'var(--brandGradientStart)']} /></span>m</span></h2>
+              <h2 id="homepage-intercom-title" aria-label="Live intercom" className={`homepage-copy-reveal ${entered ? 'is-visible' : ''}`}><span className="intercom-showcase__lead">Live</span>{' '}<span className="intercom-showcase__word">intercom</span></h2>
             </div>
             <p>Check in with your receptionist via voice whenever you want. Ask how things are going, why something happened, or who needs attention. Then put them to work, moving appointments, following up on leads, or making just about any call you ask of them</p>
           </div>
@@ -452,8 +451,6 @@ export default function IntercomShowcase() {
                   transition={{ duration: reducedMotion ? 0 : 0.85, ease: EASE }}
                   aria-hidden={!showReply}
                 >
-                  <span className="intercom-showcase__reply-banner" style={{ backgroundImage: `url(${receptionist.banner})` }} aria-hidden="true" />
-                  <span className="intercom-showcase__reply-scrim" aria-hidden="true" />
                   <span className="intercom-showcase__avatar intercom-showcase__avatar--receptionist">
                     <img src={receptionist.avatar} alt="" loading="lazy" />
                   </span>

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useAuth } from '../../../contexts/AuthContext';
 import {
   Phone,
@@ -754,7 +755,7 @@ export default function ScenariosPage({
   const [edgeDrag, setEdgeDrag] = useState(null);
   const [view, setView] = useState({ x: 0, y: 0, scale: 1 });
   const [viewportReady, setViewportReady] = useState(false);
-  const [isPhone, setIsPhone] = useState(() => window.innerWidth < 768);
+  const [isCompactViewport, setIsCompactViewport] = useState(() => window.innerWidth < 1180);
   const [selectedNodeId, setSelectedNodeId] = useState('node-1');
   const [hoveredNodeId, setHoveredNodeId] = useState(null);
   const [plusHoveredNodeId, setPlusHoveredNodeId] = useState(null);
@@ -783,6 +784,8 @@ export default function ScenariosPage({
   const [triggerConfig, setTriggerConfig] = useState(null);
   const triggerFilterSourceNodeRef = useRef(null);
   const [varsPane, setVarsPane] = useState({ visible: false, active: false, fieldKey: '', fieldLabel: '', fieldType: 'text' });
+  const inlineVariablesHostRef = useRef(null);
+  const [inlineVariablesHost, setInlineVariablesHost] = useState(null);
   const [hoveredTableColor, setHoveredTableColor] = useState('');
   const [actionConfig, setActionConfig] = useState(null);
   const [recordFieldMenu, setRecordFieldMenu] = useState(null);
@@ -814,7 +817,7 @@ export default function ScenariosPage({
       });
     }, 1500);
   }, []);
-  
+
   // Save scenario modal state
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [scenarioName, setScenarioName] = useState('');
@@ -847,12 +850,14 @@ export default function ScenariosPage({
 
   useEffect(() => {
     const updateViewport = () => {
-      setIsPhone(window.innerWidth < 768);
+      setIsCompactViewport(window.innerWidth < 1180);
     };
     updateViewport();
     window.addEventListener('resize', updateViewport);
     return () => window.removeEventListener('resize', updateViewport);
   }, []);
+
+  const guidedDemoCanvas = demoMode && isCompactViewport;
 
   // Fade-in animation state
   const [nodesOpacity, setNodesOpacity] = useState(1);
@@ -973,6 +978,39 @@ export default function ScenariosPage({
   const circleRefs = useRef({}); // per-node circle element refs
   const edgeDragRef = useRef(null);
   const scenarioRunStateRef = useRef(null);
+
+  useLayoutEffect(() => {
+    const panel = builderRef.current?.querySelector('.sb-selection-panel');
+    panel?.querySelectorAll('.sb-variables-following-field').forEach((row) => row.classList.remove('sb-variables-following-field'));
+    if (!guidedDemoCanvas || !varsPane.visible) {
+      inlineVariablesHostRef.current?.remove();
+      inlineVariablesHostRef.current = null;
+      setInlineVariablesHost(null);
+      return;
+    }
+
+    const field = document.activeElement;
+    if (!field || !panel?.contains(field)) return;
+    const fieldRow = field.closest('.sb-action-config-field, .sb-record-field') || field.parentElement?.parentElement;
+    if (!fieldRow || !panel.contains(fieldRow)) return;
+    panel.querySelectorAll('.sb-action-config-field, .sb-record-field').forEach((row) => {
+      if (fieldRow.compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING) {
+        row.classList.add('sb-variables-following-field');
+      }
+    });
+    const host = inlineVariablesHostRef.current || document.createElement('div');
+    host.className = 'sb-inline-variables-host';
+    fieldRow.appendChild(host);
+    const actions = panel.querySelector('.sb-panel-actions');
+    if (actions) {
+      const available = actions.getBoundingClientRect().bottom - fieldRow.getBoundingClientRect().bottom - 10;
+      host.style.setProperty('--sb-inline-vars-height', `${Math.max(220, Math.round(available))}px`);
+    }
+    inlineVariablesHostRef.current = host;
+    setInlineVariablesHost(host);
+  }, [guidedDemoCanvas, varsPane.visible, varsPane.fieldKey, panelStage]);
+
+  useEffect(() => () => inlineVariablesHostRef.current?.remove(), []);
 
   const dragRef = useRef({ id: null, moved: false, startX: 0, startY: 0, nodeX: 0, nodeY: 0, scale: 1 });
   const panRef = useRef(null);
@@ -1403,20 +1441,24 @@ export default function ScenariosPage({
 
     if (panelStage === 'appointmentConfig') {
       applyInsert(setAppointmentConfig);
+      if (guidedDemoCanvas) setVarsPane(prev => ({ ...prev, visible: false }));
       return;
     }
 
     if (panelStage === 'scheduleConfig') {
       applyInsert(setScheduleConfig);
+      if (guidedDemoCanvas) setVarsPane(prev => ({ ...prev, visible: false }));
       return;
     }
 
     if (panelStage === 'triggerConfig') {
       setTriggerConfig(prev => ({ ...(prev || {}), fields: { ...(prev?.fields || {}), [varsPane.fieldKey]: prev?.fields?.[varsPane.fieldKey] ? `${prev.fields[varsPane.fieldKey]} ${varRef}` : varRef } }));
+      if (guidedDemoCanvas) setVarsPane(prev => ({ ...prev, visible: false }));
       return;
     }
 
     applyInsert(setActionConfig);
+    if (guidedDemoCanvas) setVarsPane(prev => ({ ...prev, visible: false }));
   };
 
   // Find the trigger key from parent node for smart actions
@@ -1598,10 +1640,6 @@ export default function ScenariosPage({
       setPanelIntent(false);
       return;
     }
-    if (isPhone) {
-      setIsPanelVisible(panelIntent);
-      return;
-    }
     const nodeEl = nodeRefs.current[selectedNodeId];
     const pageRect = builderRef.current?.getBoundingClientRect();
     if (!nodeEl || !pageRect) {
@@ -1611,7 +1649,9 @@ export default function ScenariosPage({
     }
     const rect = nodeEl.getBoundingClientRect();
     const panelWidth = Math.min(440, Math.max(280, pageRect.width - 24));
-    const panelHeight = Math.min(800, Math.max(360, pageRect.height - 24));
+    const panelHeight = guidedDemoCanvas
+      ? Math.min(660, pageRect.height * 0.72)
+      : Math.min(800, Math.max(360, pageRect.height - 24));
     
     let left = rect.right - pageRect.left - rect.width * 0.13;
     if (left + panelWidth > pageRect.width) {
@@ -1629,7 +1669,7 @@ export default function ScenariosPage({
     } else {
       setIsPanelVisible(false);
     }
-  }, [selectedNodeId, panelIntent, isPhone]);
+  }, [selectedNodeId, panelIntent, guidedDemoCanvas]);
 
   useLayoutEffect(() => {
     repositionPanel();
@@ -1702,6 +1742,7 @@ export default function ScenariosPage({
   }, [getNodeAnchor, isValidConnectionTarget, nodes, view.scale]);
 
   const handleEdgeHandlePointerDown = useCallback((edge, event) => {
+    if (guidedDemoCanvas) return;
     if (event.button !== 0) return;
     const toAnchor = getNodeAnchor(edge.to);
     if (!toAnchor) return;
@@ -1723,9 +1764,10 @@ export default function ScenariosPage({
     };
     edgeDragRef.current = nextEdgeDrag;
     setEdgeDrag(nextEdgeDrag);
-  }, [getNodeAnchor]);
+  }, [guidedDemoCanvas, getNodeAnchor]);
 
   const handleNodeOutputPointerDown = useCallback((nodeId, event) => {
+    if (guidedDemoCanvas) return;
     if (event.button !== 0) return;
     const fromAnchor = getNodeAnchor(nodeId);
     if (!fromAnchor) return;
@@ -1747,7 +1789,7 @@ export default function ScenariosPage({
     };
     edgeDragRef.current = nextEdgeDrag;
     setEdgeDrag(nextEdgeDrag);
-  }, [getNodeAnchor]);
+  }, [guidedDemoCanvas, getNodeAnchor]);
 
   useLayoutEffect(() => {
     const canvasRect = canvasRef.current?.getBoundingClientRect();
@@ -1755,6 +1797,25 @@ export default function ScenariosPage({
     nodes.forEach(node => {
       const circleEl = circleRefs.current[node.id];
       if (!circleEl) return;
+      const nodeEl = nodeRefs.current[node.id];
+      if (guidedDemoCanvas && nodeEl?.contains(circleEl)) {
+        let left = 0;
+        let top = 0;
+        let element = circleEl;
+        while (element && element !== nodeEl) {
+          left += element.offsetLeft;
+          top += element.offsetTop;
+          element = element.offsetParent;
+        }
+        if (element === nodeEl) {
+          circleCenterRef.current[node.id] = {
+            cx: node.x - nodeEl.offsetWidth / 2 + left + circleEl.offsetWidth / 2,
+            cy: node.y - nodeEl.offsetHeight / 2 + top + circleEl.offsetHeight / 2,
+            r: circleEl.offsetHeight / 2,
+          };
+          return;
+        }
+      }
       const rect = circleEl.getBoundingClientRect();
       circleCenterRef.current[node.id] = {
         cx: (rect.left + rect.width / 2 - canvasRect.left - view.x) / view.scale,
@@ -1762,7 +1823,7 @@ export default function ScenariosPage({
         r: (rect.height / 2) / view.scale,
       };
     });
-  }, [nodes, nodesOpacity, view.x, view.y, view.scale]);
+  }, [nodes, nodesOpacity, view.x, view.y, view.scale, guidedDemoCanvas]);
 
   const openSelectionPanel = useCallback(
     (nodeId) => {
@@ -1770,7 +1831,7 @@ export default function ScenariosPage({
       // If this is the initial node and it's still unconfigured (in CSS overlay),
       // use the intro circle element's center for positioning — not the full wrapper
       // which includes arrow + CTA text
-      if (!isPhone && nodeId === INITIAL_NODE.id && !nodeMap[nodeId]?.configured) {
+      if (nodeId === INITIAL_NODE.id && !nodeMap[nodeId]?.configured) {
         let circleCenterX, circleCenterY;
         if (introCircleRef.current) {
           const circleRect = introCircleRef.current.getBoundingClientRect();
@@ -1782,8 +1843,16 @@ export default function ScenariosPage({
           circleCenterY = builderRect ? builderRect.top + builderRect.height / 2 : window.innerHeight / 2;
         }
         // Convert circle center to canvas coordinates (undo viewport transform)
-        const canvasX = (circleCenterX - view.x) / view.scale;
-        const canvasY = (circleCenterY - view.y) / view.scale;
+        const canvasRect = canvasRef.current?.getBoundingClientRect();
+        const frameScale = guidedDemoCanvas && canvasRect && canvasRef.current
+          ? canvasRect.width / canvasRef.current.clientWidth
+          : 1;
+        const canvasX = guidedDemoCanvas && canvasRect
+          ? ((circleCenterX - canvasRect.left) / frameScale - view.x) / view.scale
+          : (circleCenterX - view.x) / view.scale;
+        const canvasY = guidedDemoCanvas && canvasRect
+          ? ((circleCenterY - canvasRect.top) / frameScale - view.y) / view.scale
+          : (circleCenterY - view.y) / view.scale;
         setNodes((prev) =>
           prev.map((node) =>
             node.id === INITIAL_NODE.id ? { ...node, x: canvasX, y: canvasY } : node
@@ -1796,7 +1865,19 @@ export default function ScenariosPage({
       
       // If this node has a schedule config, show the schedule config form
       const node = nodeMap[nodeId];
-      if (node?.scheduleConfig) {
+      if (guidedDemoCanvas && node && !node.configured) {
+        restoringFromNodeRef.current = false;
+        setActionConfig(null);
+        setAppointmentConfig({});
+        setScheduleConfig({});
+        setTriggerFilter({});
+        setTriggerConfig(null);
+        triggerFilterSourceNodeRef.current = null;
+        setPanelStage('options');
+        setPanelCategory(nodeId === INITIAL_NODE.id ? 'TRIGGERS' : 'ACTIONS');
+        setPanelSearch('');
+        setActiveOption(null);
+      } else if (node?.scheduleConfig) {
         restoringFromNodeRef.current = true;
         setScheduleConfig({ ...node.scheduleConfig });
         setPanelStage('scheduleConfig');
@@ -1831,7 +1912,7 @@ export default function ScenariosPage({
         setPanelStage('actionConfig');
       }
     },
-    [initialNodeShifted, isPhone, nodeMap, view.x, view.y]
+    [initialNodeShifted, nodeMap, view.x, view.y, guidedDemoCanvas]
   );
 
   useEffect(() => {
@@ -1995,6 +2076,14 @@ export default function ScenariosPage({
   }, [getCanvasPointFromEvent, getClosestEdgeTarget, getNodeAnchor, isValidConnectionTarget, nodeMap, openSelectionPanel, view.x, view.y, view.scale, triggerQuantumOrbit]);
 
   const handleNodePointerDown = (nodeId, event) => {
+    if (guidedDemoCanvas) {
+      if (event.target.closest('.sb-node-add, .sb-node-output-handle')) return;
+      event.stopPropagation();
+      edgeDragRef.current = null;
+      setEdgeDrag(null);
+      openSelectionPanel(nodeId);
+      return;
+    }
     if (event.button !== 0) return;
     event.stopPropagation();
     event.preventDefault();
@@ -2012,6 +2101,7 @@ export default function ScenariosPage({
   };
 
   const handleCanvasPointerDown = (event) => {
+    if (guidedDemoCanvas) return;
     if (event.button !== 0) return;
     if (event.target.closest('.sb-builder-node')) return;
     if (event.target.closest('.sb-edge-end-handle')) return;
@@ -2085,6 +2175,14 @@ export default function ScenariosPage({
     edgeIdCounter.current += 1;
     setNodes((prev) => [...prev, newNode]);
     setEdges((prev) => [...prev, { id: nextEdgeId, from: nodeId, to: nextId, filter: null }]);
+    if (guidedDemoCanvas && canvasRef.current) {
+      const { clientWidth, clientHeight } = canvasRef.current;
+      setView((current) => ({
+        ...current,
+        x: clientWidth / 2 - newNode.x * current.scale,
+        y: clientHeight / 2 - newNode.y * current.scale,
+      }));
+    }
     setSelectedNodeId(nextId);
     setLogicPanel(null);
   };
@@ -4813,100 +4911,16 @@ export default function ScenariosPage({
     </div>
   );
 
-  // Use the same phone reading order and step cards as the real builder.
-  const mobileOrderedNodes = !isPhone ? [] : (() => {
-    const ordered = [];
-    const visited = new Set();
-    const queue = [INITIAL_NODE.id];
-    while (queue.length) {
-      const id = queue.shift();
-      if (visited.has(id) || !nodeMap[id]) continue;
-      visited.add(id);
-      ordered.push(nodeMap[id]);
-      edges.filter((edge) => edge.from === id).forEach((edge) => queue.push(edge.to));
-    }
-    nodes.forEach((node) => { if (!visited.has(node.id)) ordered.push(node); });
-    return ordered;
-  })();
-  const mobileNextStepParent = !isPhone ? null : (() => {
-    let current = nodeMap[INITIAL_NODE.id];
-    const visited = new Set();
-    while (current && !visited.has(current.id)) {
-      visited.add(current.id);
-      const outgoing = edges.filter((edge) => edge.from === current.id);
-      if (outgoing.length === 0) return current.configured ? current : null;
-      if (outgoing.length !== 1) return null;
-      current = nodeMap[outgoing[0].to];
-    }
-    return null;
-  })();
-
-  const renderMobileWorkflow = () => (
-    <div className="sb-mobile-workflow">
-      <div className="sb-mobile-workflow-intro">
-        <span className="sb-mobile-eyebrow">SCENARIO FLOW</span>
-        <p>Tap a step to edit it. Add conditions to connections between steps.</p>
-      </div>
-      {mobileOrderedNodes.map((node, index) => {
-        const outgoing = edges.filter((edge) => edge.from === node.id);
-        const canRun = node.configured && ['search_records', 'search_appointments', 'create_customer', 'update_customer', 'create_payment', 'send_payment_link', 'create_invoice', 'send_invoice', 'refund_payment', 'cancel_subscription', 'send_email'].includes(node.actionConfig?._key);
-        return (
-          <section className="sb-mobile-step" key={node.id}>
-            <div className="sb-mobile-step-heading">
-              <span className="sb-mobile-step-number">{String(index + 1).padStart(2, '0')}</span>
-              <span className="sb-mobile-step-kind">{node.categoryType === 'TRIGGERS' || node.id === INITIAL_NODE.id ? 'Trigger' : 'Action'}</span>
-              {node.id !== INITIAL_NODE.id && outgoing.length === 0 && (
-                <button type="button" className="sb-mobile-icon-action" aria-label={`Remove ${node.label || 'step'}`} onClick={() => handleDeleteNode(node.id)}><Trash2 size={15} /></button>
-              )}
-            </div>
-            <button type="button" className="sb-mobile-step-main" onClick={() => openSelectionPanel(node.id)}>
-              <span className="sb-mobile-step-copy">
-                <strong>{node.configured ? node.label : node.id === INITIAL_NODE.id ? 'Choose a trigger' : 'Choose an action'}</strong>
-                <small>{node.configured ? (node.detail || 'Tap to edit settings') : 'Tap to configure this step'}</small>
-              </span>
-              <ChevronRight size={17} />
-            </button>
-            {outgoing.length > 0 && (
-              <div className="sb-mobile-connections">
-                {outgoing.map((edge) => (
-                  <div className="sb-mobile-connection" key={edge.id}>
-                    <div className="sb-mobile-connection-top">
-                      <GitBranch size={13} />
-                      <span>Connects to</span>
-                      <span className="sb-mobile-connection-destination">{nodeMap[edge.to]?.label || 'New step'}</span>
-                    </div>
-                    <div className="sb-mobile-connection-actions">
-                      <button type="button" onClick={(event) => handleEdgeLogicClick(edge, event)}>
-                        <Filter size={13} /> {edge.filter?.type === 'fallback' ? 'Fallback' : edge.filter ? 'Edit condition' : 'Add condition'}
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-            {canRun && (
-              <div className="sb-mobile-step-actions">
-                <button type="button" onClick={() => handleRunNodeRequest(node.id)}><Zap size={14} /> Run step</button>
-              </div>
-            )}
-          </section>
-        );
-      })}
-      {mobileNextStepParent && <button type="button" className="sb-mobile-add-next-action" onClick={() => handleAddNode(mobileNextStepParent.id)}><Plus size={14} /> Add next step</button>}
-    </div>
-  );
-
   const renderBuilderView = () => (
-    <div className={`scenario-builder-page${demoMode ? ' scenario-builder-page--demo' : ''}`} ref={builderRef} onPointerDown={isPhone ? undefined : handlePagePointerDown}>
+    <div className={`scenario-builder-page${demoMode ? ' scenario-builder-page--demo' : ''}${guidedDemoCanvas ? ' scenario-builder-page--guided-demo' : ''}`} ref={builderRef} onPointerDown={handlePagePointerDown}>
       <div className="sb-canvas-wrapper">
         <div
-          className="sb-canvas"
+          className={`sb-canvas ${guidedDemoCanvas ? 'sb-canvas--guided-demo' : ''}`}
           ref={canvasRef}
-          onPointerDown={isPhone ? undefined : handleCanvasPointerDown}
-          onContextMenu={isPhone ? undefined : handleCanvasContextMenu}
-          onWheel={isPhone ? undefined : handleWheel}
+          onPointerDown={handleCanvasPointerDown}
+          onContextMenu={handleCanvasContextMenu}
+          onWheel={handleWheel}
         >
-          {isPhone ? renderMobileWorkflow() : <>
           <div className="sb-canvas-grid" />
           
           {/* Quantum Reveal label — shown when initial node is unconfigured */}
@@ -4919,7 +4933,9 @@ export default function ScenariosPage({
             style={{
               transform: `translate(${view.x}px, ${view.y}px) scale(${view.scale})`,
               opacity: viewportReady ? 1 : 0,
-              transition: 'opacity 0.15s ease',
+              transition: guidedDemoCanvas
+                ? 'opacity 0.15s ease, transform 0.7s cubic-bezier(0.22, 1, 0.36, 1)'
+                : 'opacity 0.15s ease',
             }}
           >
             <svg className="sb-canvas-connections">
@@ -5215,11 +5231,16 @@ export default function ScenariosPage({
               </div>
             </div>
           )}
-          </>}
         </div>
 
         {isPanelVisible && selectedNodeId && (
-          <div className="sb-selection-panel" style={panelStyle}>
+          <div className="sb-selection-panel" style={panelStyle} onPointerDownCapture={(event) => {
+            if (guidedDemoCanvas && varsPane.visible &&
+                !event.target.closest('.sb-inline-variables-host') &&
+                event.target !== document.activeElement) {
+              setVarsPane(prev => ({ ...prev, visible: false }));
+            }
+          }}>
             <div className="sb-panel-inner">
               <div className="sb-panel-header" onPointerDown={(e) => {
                 if (e.target.closest('button')) return;
@@ -6301,8 +6322,20 @@ export default function ScenariosPage({
         )}
 
         {/* Variables pane — rendered outside selection panel (overflow: hidden clips it otherwise) */}
-        {['actionConfig', 'appointmentConfig', 'scheduleConfig'].includes(panelStage) && (
-          <VariablesPane
+        {(['actionConfig', 'appointmentConfig', 'scheduleConfig'].includes(panelStage) ||
+          (guidedDemoCanvas && panelStage === 'triggerConfig')) && (
+          guidedDemoCanvas && !inlineVariablesHost ? null : (guidedDemoCanvas ? createPortal(<VariablesPane
+            visible={varsPane.visible}
+            fieldLabel={varsPane.fieldLabel}
+            onInsertVariable={handleInsertVariable}
+            onTableHover={(color) => setHoveredTableColor(color)}
+            onClose={() => { setVarsPane({ visible: false, active: false, fieldKey: '', fieldLabel: '', fieldType: 'text' }); setHoveredTableColor(''); }}
+            nodes={nodes}
+            edges={edges}
+            currentNodeId={selectedNodeId}
+            demoMode={demoMode}
+            demoPeopleCustomFields={demoPeopleCustomFields}
+          />, inlineVariablesHost) : <VariablesPane
             visible={varsPane.visible}
             targetFieldKey={varsPane.fieldKey}
             fieldLabel={varsPane.fieldLabel}
@@ -6322,7 +6355,7 @@ export default function ScenariosPage({
               left: Math.max(10, (panelStyle.left || 0) - 272 - 8),
               height: 800,
             }}
-          />
+          />)
         )}
 
         {logicPanel && (

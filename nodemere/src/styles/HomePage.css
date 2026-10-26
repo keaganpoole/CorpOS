@@ -578,6 +578,16 @@ main > section.content-section--showcase {
 .scenario-demo-showcase .homepage-scenarios-builder .sb-canvas {
     min-height: 100vh;
 }
+.scenario-demo-showcase .homepage-scenarios-builder .sb-canvas--guided-demo {
+    overflow: hidden;
+    overscroll-behavior: auto;
+    touch-action: pan-y;
+}
+@media (prefers-reduced-motion: reduce) {
+    .scenario-demo-showcase .homepage-scenarios-builder .sb-canvas--guided-demo .sb-canvas-viewport {
+        transition-duration: 0.15s, 0.01ms !important;
+    }
+}
 .scenario-demo-showcase .homepage-scenarios-builder .delete-confirm-overlay,
 .scenario-demo-showcase .homepage-scenarios-builder .save-scenario-modal-overlay,
 .scenario-demo-showcase .homepage-scenarios-builder .sb-json-modal-overlay {
@@ -807,6 +817,54 @@ main > section.content-section--showcase {
 .scenario-demo-showcase .homepage-scenarios-builder .sb-selection-panel {
     max-width: calc(100vw - 32px);
     max-height: calc(100vh - 32px);
+}
+@media (max-width: 1179px) {
+    .scenario-demo-showcase .homepage-scenarios-builder .scenario-builder-page--guided-demo .sb-selection-panel {
+        height: min(72dvh, 660px) !important;
+        max-height: calc(100dvh - 88px) !important;
+    }
+    .scenario-demo-showcase .homepage-scenarios-builder .scenario-builder-page--guided-demo .sb-inline-variables-host {
+        display: block;
+        width: 100%;
+        min-width: 0;
+        margin-top: 8px;
+    }
+    .scenario-demo-showcase .homepage-scenarios-builder .scenario-builder-page--guided-demo .sb-inline-variables-host .sb-variables-pane {
+        position: relative !important;
+        inset: auto !important;
+        width: 100%;
+        height: var(--sb-inline-vars-height, 300px) !important;
+        max-width: none;
+        border-radius: 10px;
+        border-left-width: 1px;
+        box-shadow: none;
+        z-index: 1;
+        transform: none !important;
+        animation: sb-inline-vars-reveal .22s ease-out;
+    }
+    .scenario-demo-showcase .homepage-scenarios-builder .scenario-builder-page--guided-demo .sb-inline-variables-host .sb-vars-field {
+        min-height: 0;
+        padding: 4px 8px;
+    }
+    .scenario-demo-showcase .homepage-scenarios-builder .scenario-builder-page--guided-demo .sb-inline-variables-host .sb-vars-fields {
+        gap: 1px;
+        padding: 2px 4px 4px;
+    }
+    .scenario-demo-showcase .homepage-scenarios-builder .scenario-builder-page--guided-demo .sb-variables-following-field,
+    .scenario-demo-showcase .homepage-scenarios-builder .scenario-builder-page--guided-demo .sb-action-config-header,
+    .scenario-demo-showcase .homepage-scenarios-builder .scenario-builder-page--guided-demo .sb-trigger-filter-copy {
+        display: none;
+    }
+    @keyframes sb-inline-vars-reveal {
+        from { opacity: 0; transform: translateY(-6px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+}
+@media (max-width: 767px) {
+    .scenario-demo-showcase .homepage-scenarios-builder .scenario-builder-page--guided-demo .sb-selection-panel {
+        inset: auto 12px max(12px, env(safe-area-inset-bottom)) !important;
+        width: auto;
+    }
 }
 .scenario-demo-showcase .homepage-scenarios-builder .sb-panel-inner,
 .scenario-demo-showcase .homepage-scenarios-builder .sb-panel-actions {
