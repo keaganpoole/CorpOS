@@ -40,7 +40,7 @@ export default function CookieNotice() {
   return (
     <section className="visitor-cookie-notice" aria-labelledby="visitor-cookie-heading" onKeyDown={event => { if (event.key === 'Escape' && opened) close(); }}>
       <div className="visitor-cookie-heading"><h2 id="visitor-cookie-heading" ref={heading} tabIndex={-1}>{managing ? 'Cookie preferences' : 'Your privacy choices'}</h2>{opened && <button type="button" className="visitor-cookie-close" aria-label="Close cookie preferences" onClick={close}>×</button>}</div>
-      <p>We use necessary storage to run Nodemere. With your choice, optional first-party analytics uses a persistent visitor ID and limited fingerprint-derived identification to understand public-site visits and conversions. <Link to="/cookie-notice">Cookie Notice</Link></p>
+      <p>Essential storage runs Nodemere. Optional analytics help us understand site visits. <Link to="/cookie-notice">Cookie Notice</Link></p>
       {consent.restricted && <p className="visitor-cookie-signal">Your browser’s privacy signal keeps optional analytics off.</p>}
       {managing && <div id="visitor-cookie-categories" className="visitor-cookie-categories">
         <label><span><strong>Necessary</strong><small>Sign-in, security, and essential preferences.</small></span><input type="checkbox" checked disabled aria-label="Necessary storage, always on" /></label>
@@ -50,7 +50,7 @@ export default function CookieNotice() {
       <div className="visitor-cookie-actions">
         <button type="button" onClick={() => decide(false)}>Reject Non-Essential</button>
         <button type="button" onClick={() => decide(true)} disabled={consent.restricted}>Accept All</button>
-        {managing ? <button type="button" className="visitor-cookie-manage" onClick={() => decide(analytics)}>Save Preferences</button> : <button type="button" className="visitor-cookie-manage" aria-expanded={managing} aria-controls="visitor-cookie-categories" onClick={() => { setManaging(true); setAnalytics(consent.analytics); }}>Manage Preferences</button>}
+        {managing && <button type="button" className="visitor-cookie-manage" onClick={() => decide(analytics)}>Save Preferences</button>}
       </div>
     </section>
   );
