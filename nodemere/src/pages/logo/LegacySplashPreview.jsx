@@ -49,7 +49,7 @@ const LegacySplashPreview = ({ onAnimationEnd }) => {
         <div className="fixed inset-0 bg-[#020202] flex items-center justify-center z-[100] transition-opacity duration-1000">
             <div className={`transform transition-all duration-1000 ease-in-out ${getAnimationClasses()}`}>
                 <img
-                    src="https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/assets/nodemere_logo2.png"
+                    src="https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/assets/logo_v3_transparent.png"
                     alt="Nodemere logo"
                     className="w-28 h-auto"
                 />

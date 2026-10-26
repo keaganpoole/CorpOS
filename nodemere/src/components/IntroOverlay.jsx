@@ -48,7 +48,7 @@ export default function IntroOverlay() {
     >
       <img
         ref={logoRef}
-        src="https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/assets/nodemere_logo2.png"
+        src="https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/assets/logo_v3_transparent.png"
         alt="Nodemere logo"
         id="intro-logo"
       />
