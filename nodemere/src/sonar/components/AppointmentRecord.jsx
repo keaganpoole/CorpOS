@@ -5,18 +5,19 @@ import { AnimatePresence, motion } from 'framer-motion';
 export default function AppointmentRecord({
   actionsOpen, actions, actionable = true, onToggleActions, onDetails, detailsLabel,
   avatar, avatarProps = {}, details, category, time, color, prompting = false,
-  className = '', style, overlay, actionMotionVariants,
+  missingPerson = false, className = '', style, overlay, actionMotionVariants,
 }) {
   const toggle = event => { event.preventDefault(); event.stopPropagation(); onToggleActions?.(); };
-  return <motion.div initial={false} animate={{ opacity: 1, y: 0 }}
+  return <motion.div initial={false} animate={{ opacity: missingPerson ? 0.52 : 1, y: 0 }}
     className={`agenda-item real-calendar-appointment-record flex w-full items-center justify-between gap-3 rounded-lg border bg-[#070707]/92 p-3 text-left ${prompting ? 'demo-call-agenda-item' : 'border-white/[0.08]'} ${className}`} style={style}>
     <button type="button" aria-label={`${actionsOpen ? 'Hide' : 'Show'} appointment actions`} onClick={toggle}
+      disabled={missingPerson}
       className={`relative z-10 flex shrink-0 items-center justify-center rounded-full p-1 transition-transform duration-200 focus:outline-none ${actionable ? 'hover:scale-110' : 'cursor-default'}`}>
-      <span className={`h-1.5 w-1.5 rounded-full ${prompting ? 'demo-call-status-dot' : 'shadow-[0_0_4px_currentColor]'}`} style={prompting ? undefined : { color, backgroundColor: color }} />
+      <span className={`h-1.5 w-1.5 rounded-full ${missingPerson ? 'animate-pulse bg-zinc-500' : prompting ? 'demo-call-status-dot' : 'shadow-[0_0_4px_currentColor]'}`} style={missingPerson || prompting ? undefined : { color, backgroundColor: color }} />
     </button>
     <div role={onDetails ? 'button' : undefined} tabIndex={onDetails ? 0 : undefined} aria-label={detailsLabel}
       onKeyDown={event => { if (event.target === event.currentTarget && ['Enter', ' '].includes(event.key)) { event.preventDefault(); onDetails?.(); } }}
-      onClick={onDetails} className="relative flex min-w-0 flex-1 items-center justify-between gap-2 overflow-visible text-left">
+      onClick={onDetails} className={`relative flex min-w-0 flex-1 items-center justify-between gap-2 overflow-visible text-left ${onDetails ? 'cursor-pointer' : 'cursor-default'}`}>
       <AnimatePresence initial={false}>
         {actionsOpen && <motion.div
           {...(actionMotionVariants ? { variants: actionMotionVariants, initial: 'hidden', animate: 'visible', exit: 'exit' } : {

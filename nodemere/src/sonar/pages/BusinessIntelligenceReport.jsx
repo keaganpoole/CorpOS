@@ -178,7 +178,7 @@ export default function BusinessIntelligenceReport() {
   }
 
   if (!report) {
-    return <div className="flex h-full items-center justify-center bg-[#020202] p-8"><Panel className="max-w-lg p-8 text-center"><AlertTriangle className="brand-icon mx-auto" size={24} /><h1 className="mt-4 text-xl font-semibold text-white">Business intelligence unavailable</h1><p className="mt-2 text-sm leading-6 text-zinc-500">{error || 'Not enough data.'}</p><button type="button" onClick={() => loadReport({ force: true })} className="mt-6 rounded-xl border border-white/10 px-4 py-2 text-[11px] font-bold uppercase tracking-[0.14em] text-zinc-300 hover:bg-white/[0.05]">Retry</button></Panel></div>;
+    return <div className="flex h-full items-center justify-center bg-[#020202] p-8"><Panel className="max-w-lg p-8 text-center"><AlertTriangle className="brand-icon mx-auto" size={24} /><h1 className="mt-4 text-xl font-semibold text-white">Nodemere Reports unavailable</h1><p className="mt-2 text-sm leading-6 text-zinc-500">{error || 'Not enough data.'}</p><button type="button" onClick={() => loadReport({ force: true })} className="mt-6 rounded-xl border border-white/10 px-4 py-2 text-[11px] font-bold uppercase tracking-[0.14em] text-zinc-300 hover:bg-white/[0.05]">Retry</button></Panel></div>;
   }
 
   return (
@@ -186,8 +186,7 @@ export default function BusinessIntelligenceReport() {
       <div className="mx-auto max-w-[1500px] px-5 pb-24 pt-8 sm:px-8 lg:px-12">
         <div className="report-page-heading mb-5 flex flex-col justify-between gap-5 xl:flex-row xl:items-end">
           <div>
-            <div className="mb-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500"><span>Nodemere <span className="brand-gradient-text">intelligence</span></span></div>
-            <h1 className="text-[34px] font-semibold tracking-[-0.055em] text-white sm:text-[48px]">Live Reports</h1>
+            <h1 className="text-[34px] font-semibold tracking-[-0.055em] text-white sm:text-[48px]">Nodemere Reports</h1>
             <p className="mt-3 max-w-3xl text-[13px] leading-6 text-zinc-500">Real insights into how your business is running, drawn directly from your front desk activity.</p>
           </div>
           <div className="report-print-hide flex flex-wrap items-center gap-2">

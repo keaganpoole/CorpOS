@@ -53,6 +53,9 @@ const getCustomerFirstName = (appointment) => {
 };
 
 const getCustomerName = (appointment) => appointment._personName || appointment.client_name || 'Customer';
+const hasAppointmentPerson = (appointment) => Boolean(
+  String(appointment._personName || appointment.client_name || '').trim() || appointment.person_id
+);
 
 const appointmentFieldClass =
   'w-full rounded-2xl border border-neutral-800 bg-neutral-900 px-5 py-4 text-base text-neutral-100 placeholder:text-neutral-600 outline-none focus:outline-none focus-visible:outline-none focus:ring-0 focus:border-neutral-700 transition-all [color-scheme:dark]';
@@ -632,9 +635,9 @@ function CalendarMonthViewBody({ data, className = '', selectedDate: selectedDat
                   {dayAppointments.slice(0, 3).map((appointment, dotIndex) => (
                     <div
                       key={appointment.id}
-                      className="dot-item h-1 w-1 rounded-full"
+                      className={`dot-item h-1 w-1 rounded-full ${hasAppointmentPerson(appointment) ? '' : 'animate-pulse'}`}
                       style={{
-                        backgroundColor: isSelected ? '#52525b' : getAppointmentColor(appointment, servicesById),
+                        backgroundColor: hasAppointmentPerson(appointment) ? (isSelected ? '#52525b' : getAppointmentColor(appointment, servicesById)) : '#71717a',
                         animationDelay: hasAnimatedDots ? `${day * 24 + dotIndex * 80 + appointmentIndexSeed(appointment.id)}ms` : '0ms',
                         animationDuration: '720ms',
                       }}
@@ -672,6 +675,7 @@ function CalendarMonthViewBody({ data, className = '', selectedDate: selectedDat
                 const receptionistRow = receptionistsById.get(String(appointment.receptionist_id || '')) || null;
                 const assignedReceptionistName = appointment._receptionistName || receptionistRow?.full_name || '';
                 const receptionistCatalogRow = receptionistRow?.catalog_id ? receptionistCatalogById.get(String(receptionistRow.catalog_id)) : null;
+                const hasPerson = hasAppointmentPerson(appointment);
                 const avatarLabel = getAvatarLabel(appointment);
                 const avatarSrc = appointment._receptionistAvatar
                   || receptionistRow?.avatar
@@ -708,11 +712,11 @@ function CalendarMonthViewBody({ data, className = '', selectedDate: selectedDat
                 return (
                   <div key={appointment.id} className="space-y-1">
                     <AppointmentRecord
-                      actionsOpen={showActionLane} actionable={hasAppointmentActions}
+                      actionsOpen={showActionLane} actionable={hasAppointmentActions && hasPerson} missingPerson={!hasPerson}
                       actionMotionVariants={DEMO_ACTION_LANE_VARIANTS}
                       onToggleActions={toggleAppointmentActions} prompting={!!activePromptAction}
-                      onDetails={() => setExpandedAppointmentId(current => current === appointment.id ? null : appointment.id)}
-                      detailsLabel={`Appointment details for ${getCustomerName(appointment)}`}
+                      onDetails={hasPerson ? () => setExpandedAppointmentId(current => current === appointment.id ? null : appointment.id) : undefined}
+                      detailsLabel={hasPerson ? `Appointment details for ${getCustomerName(appointment)}` : undefined}
                       color={tagColor} category={category} time={formatTime(appointment.time)}
                       style={{ animationDelay: `${index * 90}ms`, '--demo-receptionist-banner': `url(${receptionistBannerUrl || avatarSrc})` }}
                       avatar={avatarSrc ? <img src={avatarSrc} alt="" className="h-full w-full object-cover" /> : avatarLabel}

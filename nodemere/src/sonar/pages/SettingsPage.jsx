@@ -3268,9 +3268,8 @@ const KnowledgeBaseEditor = ({ value, onChange, industry }) => {
       ...value,
       about: refreshed,
       policies: allIndustryExampleValues('policies').includes(value.policies) ? '' : value.policies,
-      faq: allIndustryExampleValues('faq').includes(value.faq) ? '' : value.faq,
     };
-    if (nextValue.about !== value.about || nextValue.policies !== value.policies || nextValue.faq !== value.faq) onChange(nextValue);
+    if (nextValue.about !== value.about || nextValue.policies !== value.policies) onChange(nextValue);
   }, [industry, value.about]);
 
   const updateDoc = (nextValue) => onChange({ ...value, [activeTab]: limitKnowledgeText(nextValue) });

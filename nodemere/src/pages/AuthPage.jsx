@@ -204,7 +204,7 @@ const AuthPage = () => {
                 setError(detail);
                 return;
             }
-            setError(`${isSignUp ? 'Signup' : 'Login'} failed: ${detail}`);
+            setError(isSignUp ? detail : `Login failed: ${detail}`);
         } finally {
             setIsLoading(false);
         }

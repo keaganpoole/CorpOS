@@ -15753,7 +15753,22 @@ async def create_user(auth_data: AuthSignUpRequest, request: Request):
     except HTTPException:
         raise
     except AuthApiError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='The request could not be completed')
+        error_code = str(getattr(e, 'code', '') or '').strip().lower()
+        error_message = str(getattr(e, 'message', '') or e).strip().lower()
+        if error_code == 'password_too_short' or (
+            'password' in error_message
+            and any(term in error_message for term in ('too short', 'at least', 'minimum', 'characters long'))
+        ):
+            detail = 'Your password is too short. Choose a longer password and try again.'
+        elif error_code in {'email_exists', 'user_already_exists'}:
+            detail = 'An account already exists for this email. Sign in or use a different email address.'
+        elif error_code in {'invalid_email', 'email_address_invalid'}:
+            detail = 'Enter a valid email address and try again.'
+        elif error_code in {'weak_password', 'password_strength'} or 'password' in error_message:
+            detail = 'That password does not meet the security requirements. Choose a stronger password and try again.'
+        else:
+            detail = 'We could not create your account. Please check your details and try again.'
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=detail)
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail='The request could not be completed')
 
