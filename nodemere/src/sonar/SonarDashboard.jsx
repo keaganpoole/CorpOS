@@ -2960,7 +2960,7 @@ const SonarDashboard = () => {
           description="Source-aware project report"
         />
 
-        <NestDock mobile={isPhone && responsiveEnabled} businessAvatar={businessUsage?.avatar || ''} onStageChange={setNestStageExpanded} toolsContainer={nestToolsContainer} />
+        <NestDock mobile={isPhone && responsiveEnabled} compactNotifications={isCompact} businessAvatar={businessUsage?.avatar || ''} onStageChange={setNestStageExpanded} toolsContainer={nestToolsContainer} />
         <div className="dashboard-header-actions no-drag relative z-20 ml-auto flex shrink-0 items-center">
           <div ref={setNestToolsContainer} />
           <div className="dashboard-account-controls flex items-center">

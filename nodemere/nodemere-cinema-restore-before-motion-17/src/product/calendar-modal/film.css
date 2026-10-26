@@ -1,0 +1,33 @@
+/* Fixed desktop dimensions keep native Calendar-modal layout identical in Studio and render. */
+.calendar-dropins-film {
+  font-family: Inter, sans-serif;
+  color: #e4e4e7;
+  --brandGradientStart: #ff32ac;
+  --brandGradientEnd: #8b5cf6;
+}
+.calendar-dropins-film *,
+.calendar-dropins-film *::before,
+.calendar-dropins-film *::after {
+  box-sizing: border-box;
+  animation: none !important;
+  transition: none !important;
+  scroll-behavior: auto !important;
+}
+.calendar-dropins-film .drop-ins-modal {
+  width: 920px;
+  height: 880px;
+  max-height: none;
+}
+.calendar-dropins-film .drop-ins-modal .drop-in-preview {
+  flex-basis: 310px;
+}
+.calendar-dropins-film .drop-ins-workspace {
+  overflow: hidden;
+  scrollbar-width: none;
+}
+.calendar-dropins-film .drop-ins-statuses {
+  overflow: hidden;
+}
+.calendar-dropins-film .drop-ins-editor textarea {
+  resize: none;
+}

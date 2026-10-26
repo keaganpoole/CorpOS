@@ -1,0 +1,18 @@
+.phase4-product .scenario-builder-page{overflow:visible;background:transparent;}
+.phase4-product .sb-selection-panel{transform:none;}
+.phase4-product .sb-panel-options{scrollbar-width:none;}
+.phase4-product .sb-panel-options::-webkit-scrollbar{display:none;}
+.phase4-product .sb-input-field{min-height:35px;width:100%;}
+.phase4-product .sb-action-config-fields{padding:18px 24px;display:grid;gap:18px;}
+.phase4-product .sb-action-config-field{display:grid;gap:8px;}
+.phase4-product .film-nest-shell{position:relative;background:#070708;border:1px solid #ffffff14;border-radius:22px;overflow:hidden;box-shadow:inset 0 1px #ffffff05;}
+.phase4-product .film-nest-top{position:absolute;top:18px;left:24px;right:24px;display:flex;justify-content:space-between;align-items:center;color:#77777f;font-size:9px;letter-spacing:.08em;}
+.phase4-product .film-intercom-avatar{width:76px;height:76px;border:1px solid #ffffff26;border-radius:50%;overflow:hidden;box-shadow:0 8px 25px #0006;}
+.phase4-product .film-intercom-avatar img{width:100%;height:100%;object-fit:cover;object-position:center 30%;}
+.phase4-product .film-nest-shell .intercom-transcript{height:54px;}
+.phase4-product .film-nest-shell .intercom-transcript p{white-space:normal;line-height:1.55;top:0;}
+.phase4-product .film-nest-shell .intercom-controls{position:relative;inset:auto;display:flex;gap:8px;}
+.phase4-product .film-nest-shell .intercom-controls button{display:grid;place-items:center;width:30px;height:30px;}
+
+@keyframes p4-colorbarSweep{0%{background-position:0% 0%}100%{background-position:0% 300%}}
+@keyframes p4-colorbarPulse{0%,100%{opacity:.45}50%{opacity:1}}

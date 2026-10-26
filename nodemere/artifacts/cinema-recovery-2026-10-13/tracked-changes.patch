@@ -1,0 +1,14 @@
+diff --git a/nodemere/src/sonar/components/DropInsModal.jsx b/nodemere/src/sonar/components/DropInsModal.jsx
+index 377e4ef..d2b3c3f 100644
+--- a/nodemere/src/sonar/components/DropInsModal.jsx
++++ b/nodemere/src/sonar/components/DropInsModal.jsx
+@@ -73,8 +73,7 @@ export default function DropInsModal({ model, onClose }) {
+   const normalizedListSearch = listSearch.trim().toLocaleLowerCase();
+   const matchesListSearch = item => !normalizedListSearch ||
+     `${item.name} ${item.purpose || ''} ${item.prompt || ''}`.toLocaleLowerCase().includes(normalizedListSearch);
+-  const sortedItems = statusItems.filter(matchesListSearch)
+-    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }) || a.id.localeCompare(b.id));
++  const sortedItems = statusItems.filter(matchesListSearch).sort(manual);
+   const sortedGroups = allGroups.filter(group => group.rows.some(matchesListSearch))
+     .sort((a, b) => a.primary.name.localeCompare(b.primary.name, undefined, { sensitivity: 'base' }) || a.position - b.position);
+   const applicableTemplates = availableDropInTemplates(templates, model.items, status);

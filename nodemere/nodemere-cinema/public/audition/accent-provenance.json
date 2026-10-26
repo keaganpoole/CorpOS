@@ -1,0 +1,31 @@
+{
+  "assets": [
+    {
+      "file": "american_landscape2.png",
+      "source": "https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/audition_faces/countries/american_landscape2.png",
+      "sha256": "45f3baad42d586d5ba094608f260cbe715f6f4dd9be02dd59b593d659e5aa8b3"
+    },
+    {
+      "file": "british_landscape2.png",
+      "source": "https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/audition_faces/countries/british_landscape2.png",
+      "sha256": "70d24a35ae27b94347e68a5bf33abf662ee210f454a14da288bfa4c566295ade"
+    },
+    {
+      "file": "british.png",
+      "source": "https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/audition_faces/woman/ethnicity/british.png",
+      "sha256": "8d45a63974297fa7805a80a305d9ce5fcd65eadcb850051c29df16c97db21e0e"
+    }
+  ],
+  "imageGlows": {
+    "American": {
+      "left": "#9f3815",
+      "center": "#8c451f",
+      "right": "#287ab1"
+    },
+    "British": {
+      "left": "#826458",
+      "center": "#614131",
+      "right": "#eda067"
+    }
+  }
+}

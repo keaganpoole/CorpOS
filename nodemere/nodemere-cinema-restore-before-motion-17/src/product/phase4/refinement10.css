@@ -1,0 +1,46 @@
+.phase4-product .film-workflow .sb-builder-node {
+  width: 220px;
+  height: 230px;
+}
+.phase4-product .film-workflow .sb-node-inner-wrap {
+  width: 134px;
+  height: 134px;
+  flex: 0 0 134px;
+}
+.phase4-product .film-workflow .sb-node-label-below {
+  height: 42px;
+  flex: none;
+}
+.phase4-product .film-workflow .sb-node-below-title,
+.phase4-product .film-workflow .sb-node-below-desc {
+  white-space: nowrap;
+}
+.phase4-product .film-config-scroll {
+  flex: 1;
+  min-height: 0;
+}
+.phase4-product .film-config-scroll .sb-action-config-fields {
+  padding: 0;
+  display: flex;
+  gap: 12px;
+}
+.phase4-product .film-config-scroll .sb-action-config-field {
+  display: flex;
+  gap: 4px;
+  flex: none;
+}
+.phase4-product .film-config-scroll .sb-action-config-form {
+  padding: 16px;
+}
+.phase4-product .film-payment-notice {
+  height: 100px;
+  flex: none;
+  box-sizing: border-box;
+  border: 1px solid #fcd34d40;
+  background: #fbbf241a;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 10px;
+  line-height: 16px;
+  color: #fef3c7;
+}

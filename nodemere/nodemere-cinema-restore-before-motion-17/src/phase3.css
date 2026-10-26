@@ -1,0 +1,85 @@
+/* Only deterministic viewport/animation adapters. Original Drop-ins styles are vendored. */
+.film-dropins *,
+.film-dropins *::before,
+.film-dropins *::after {
+  box-sizing: border-box;
+  animation: none !important;
+  transition: none !important;
+  scroll-behavior: auto !important;
+}
+.film-dropins {
+  --brandGradientStart: #ff32ac;
+  --brandGradientEnd: #8b5cf6;
+  font-family: Inter, sans-serif;
+}
+.film-dropins .di-studio {
+  border: 1px solid #ffffff1c;
+  border-radius: 18px;
+  box-shadow: 0 28px 100px #0007;
+}
+.film-dropins .di-studio.has-panel .di-panel {
+  position: relative;
+  flex-basis: 324px;
+  width: 324px;
+  max-width: none;
+  box-shadow: none;
+}
+.film-dropins .di-panel-heading {
+  height: 70px;
+  min-width: 324px;
+  padding: 20px 22px 14px;
+}
+.film-dropins .di-panel-content {
+  min-width: 324px;
+  padding: 0 22px 26px;
+  scrollbar-width: none;
+}
+.film-dropins .di-page-header {
+  min-height: 56px;
+  padding: 0 32px;
+}
+.film-dropins .di-save-group > span {
+  display: block;
+}
+.film-dropins .di-save > svg {
+  display: block;
+}
+.film-dropins .di-status-top {
+  justify-content: center;
+  padding: 0;
+}
+.film-dropins .di-status-top .di-statuses > button {
+  min-width: 82px;
+}
+.film-dropins .di-statuses small {
+  display: block;
+}
+.film-dropins .di-preview-showcase {
+  flex-basis: 228px;
+}
+.film-dropins .di-template {
+  min-height: 142px;
+  padding: 11px 9px 10px;
+}
+.film-dropins .di-template strong {
+  font-size: 10px;
+}
+.film-dropins .di-template p {
+  font-size: 9px;
+}
+.film-dropins .di-node-name {
+  font-size: 11px;
+}
+.film-dropins .di-field textarea {
+  height: 196px;
+  resize: none;
+}
+.film-dropins .di-preview-caption {
+  bottom: 17px;
+}
+.film-dropins .drop-in-preview-stage {
+  min-height: 0;
+}
+.film-dropins .drop-in-preview-record {
+  font-family: Inter, sans-serif;
+}

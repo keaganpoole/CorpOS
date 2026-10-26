@@ -31,8 +31,12 @@
   .sonar-dashboard-shell[data-responsive="true"] main,
   .sonar-dashboard-shell[data-responsive="true"] main > div { min-height: 0; }
   .sonar-dashboard-shell[data-responsive="true"] .nest-toolbar-meta { display: none; }
+  .sonar-dashboard-shell .nest-toolbar-tools.has-compact-notification { display: none; }
+  .sonar-dashboard-shell .nest-dock:not(.is-intercom) .nest-content-eyebrow,
+  .sonar-dashboard-shell .nest-dock:not(.is-intercom) .nest-content-secondary { display: none; }
   .sonar-dashboard-shell[data-responsive="true"] .team-toolbar { padding: 16px 24px 0; gap: 16px; }
   .sonar-dashboard-shell[data-responsive="true"] .receptionists-page-scope .custom-scrollbar.absolute { padding: 16px 24px 24px; }
+  .sonar-dashboard-shell[data-responsive="true"] .receptionists-page-scope { overflow: clip; }
   .sonar-dashboard-shell[data-responsive="true"] .receptionists-page-scope .grid.items-start { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
   .sonar-dashboard-shell[data-responsive="true"] .team-receptionist-card,
   .sonar-dashboard-shell[data-responsive="true"] .receptionists-page-scope .grid.items-start > div { width: 100%; min-width: 0; }
@@ -58,6 +62,7 @@
   .sonar-dashboard-shell[data-responsive="true"] .settings-page-scope > .flex-1 > .grid { grid-template-columns: 190px minmax(0, 1fr); gap: 16px; }
   .sonar-dashboard-shell[data-responsive="true"] .settings-page-scope > .flex-1 > .grid > aside { overflow-y: auto; }
   .sonar-dashboard-shell[data-responsive="true"] .call-logs-page > .grid { grid-template-columns: 280px minmax(0, 1fr); }
+  .sonar-dashboard-shell[data-responsive="true"] .call-logs-empty > p { margin-bottom: 0; }
   .sonar-dashboard-shell[data-responsive="true"] .call-detail-header { padding: 24px 16px 16px; }
   .sonar-dashboard-shell[data-responsive="true"] .call-detail-transcript { padding-inline: 16px; }
   .sonar-dashboard-shell[data-responsive="true"] .call-record-card { padding-left: 44px; padding-right: 44px; }

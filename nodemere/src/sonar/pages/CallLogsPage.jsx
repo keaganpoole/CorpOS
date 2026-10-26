@@ -934,7 +934,7 @@ export default function CallLogsPage({ onToolbarMetaChange = null }) {
               </div>
             )}
             {!error && filteredCalls.length === 0 && (
-              <div className="p-6 text-center">
+              <div className="call-logs-empty p-6 text-center">
                 <p className="text-[13px] font-semibold text-zinc-300">No calls found</p>
                 <p className="mt-2 text-[12px] text-zinc-600">{calls.length ? 'Adjust the filters or search another caller.' : 'Call details will appear here.'}</p>
               </div>

@@ -1,0 +1,676 @@
+[
+  {
+    "key": "people",
+    "label": "People",
+    "color": "#32f0d9",
+    "icon": "User",
+    "fields": [
+      {
+        "key": "id",
+        "label": "Record ID",
+        "type": "text"
+      },
+      {
+        "key": "first_name",
+        "label": "First Name",
+        "type": "text"
+      },
+      {
+        "key": "last_name",
+        "label": "Last Name",
+        "type": "text"
+      },
+      {
+        "key": "phone",
+        "label": "Phone",
+        "type": "phone"
+      },
+      {
+        "key": "email",
+        "label": "Email",
+        "type": "email"
+      },
+      {
+        "key": "street_address",
+        "label": "Street Address",
+        "type": "text"
+      },
+      {
+        "key": "city",
+        "label": "City",
+        "type": "text"
+      },
+      {
+        "key": "state",
+        "label": "State",
+        "type": "text"
+      },
+      {
+        "key": "zip_code",
+        "label": "Zip Code",
+        "type": "text"
+      },
+      {
+        "key": "preferred_contact_method",
+        "label": "Preferred Contact Method",
+        "type": "text"
+      },
+      {
+        "key": "preferred_language",
+        "label": "Preferred Language",
+        "type": "text"
+      },
+      {
+        "key": "best_time_to_contact",
+        "label": "Best Time to Contact",
+        "type": "text"
+      },
+      {
+        "key": "consent_sms",
+        "label": "Consent SMS",
+        "type": "boolean"
+      },
+      {
+        "key": "consent_call",
+        "label": "Consent Call",
+        "type": "boolean"
+      },
+      {
+        "key": "do_not_call",
+        "label": "Do Not Call",
+        "type": "boolean"
+      },
+      {
+        "key": "do_not_text",
+        "label": "Do Not Text",
+        "type": "boolean"
+      },
+      {
+        "key": "source",
+        "label": "Source",
+        "type": "text"
+      },
+      {
+        "key": "lead_source_detail",
+        "label": "Source Detail",
+        "type": "text"
+      },
+      {
+        "key": "special_instructions",
+        "label": "Special Instructions",
+        "type": "text"
+      },
+      {
+        "key": "last_call_status",
+        "label": "Last Call Status",
+        "type": "text"
+      },
+      {
+        "key": "last_intent",
+        "label": "Last Intent",
+        "type": "text"
+      },
+      {
+        "key": "last_outcome",
+        "label": "Last Outcome",
+        "type": "text"
+      },
+      {
+        "key": "missed_call_count",
+        "label": "Missed Call Count",
+        "type": "number"
+      },
+      {
+        "key": "stripe_customer_id",
+        "label": "Stripe Customer ID",
+        "type": "text"
+      },
+      {
+        "key": "stripe_payment_method_id",
+        "label": "Stripe Payment Method ID",
+        "type": "text"
+      },
+      {
+        "key": "created_at",
+        "label": "Created At",
+        "type": "timestamp"
+      },
+      {
+        "key": "updated_at",
+        "label": "Updated At",
+        "type": "timestamp"
+      }
+    ]
+  },
+  {
+    "key": "payments",
+    "label": "Payments",
+    "color": "#f472b6",
+    "icon": "CreditCard",
+    "fields": [
+      {
+        "key": "id",
+        "label": "Record ID",
+        "type": "text"
+      },
+      {
+        "key": "amount",
+        "label": "Amount",
+        "type": "number"
+      },
+      {
+        "key": "currency",
+        "label": "Currency",
+        "type": "text"
+      },
+      {
+        "key": "status",
+        "label": "Status",
+        "type": "text"
+      },
+      {
+        "key": "payment_method",
+        "label": "Payment Method",
+        "type": "text"
+      },
+      {
+        "key": "description",
+        "label": "Description",
+        "type": "text"
+      },
+      {
+        "key": "receipt_url",
+        "label": "Receipt URL",
+        "type": "url"
+      },
+      {
+        "key": "stripe_payment_intent_id",
+        "label": "Stripe Intent ID",
+        "type": "text"
+      },
+      {
+        "key": "stripe_session_id",
+        "label": "Stripe Session ID",
+        "type": "text"
+      },
+      {
+        "key": "refunded_amount",
+        "label": "Refunded Amount",
+        "type": "number"
+      },
+      {
+        "key": "error_message",
+        "label": "Error Message",
+        "type": "text"
+      },
+      {
+        "key": "created_at",
+        "label": "Created At",
+        "type": "timestamp"
+      },
+      {
+        "key": "updated_at",
+        "label": "Updated At",
+        "type": "timestamp"
+      }
+    ]
+  },
+  {
+    "key": "invoices",
+    "label": "Invoices",
+    "color": "#f59e0b",
+    "icon": "CreditCard",
+    "fields": [
+      {
+        "key": "id",
+        "label": "Record ID",
+        "type": "text"
+      },
+      {
+        "key": "invoice_id",
+        "label": "Record ID",
+        "type": "text"
+      },
+      {
+        "key": "amount_due",
+        "label": "Amount Due",
+        "type": "number"
+      },
+      {
+        "key": "amount_paid",
+        "label": "Amount Paid",
+        "type": "number"
+      },
+      {
+        "key": "currency",
+        "label": "Currency",
+        "type": "text"
+      },
+      {
+        "key": "status",
+        "label": "Status",
+        "type": "text"
+      },
+      {
+        "key": "customer_id",
+        "label": "Customer ID",
+        "type": "text"
+      },
+      {
+        "key": "hosted_invoice_url",
+        "label": "Hosted Invoice URL",
+        "type": "url"
+      },
+      {
+        "key": "invoice_pdf",
+        "label": "Invoice PDF",
+        "type": "url"
+      },
+      {
+        "key": "due_date",
+        "label": "Due Date",
+        "type": "timestamp"
+      },
+      {
+        "key": "metadata",
+        "label": "Metadata",
+        "type": "text"
+      }
+    ]
+  },
+  {
+    "key": "appointments",
+    "label": "Appointments",
+    "color": "#38bdf8",
+    "icon": "Calendar",
+    "fields": [
+      {
+        "key": "id",
+        "label": "Record ID",
+        "type": "text"
+      },
+      {
+        "key": "date",
+        "label": "Date",
+        "type": "date"
+      },
+      {
+        "key": "time",
+        "label": "Time",
+        "type": "text"
+      },
+      {
+        "key": "duration",
+        "label": "Duration",
+        "type": "number"
+      },
+      {
+        "key": "status",
+        "label": "Status",
+        "type": "text"
+      },
+      {
+        "key": "notes",
+        "label": "Notes",
+        "type": "text"
+      },
+      {
+        "key": "created_at",
+        "label": "Created At",
+        "type": "timestamp"
+      }
+    ]
+  },
+  {
+    "key": "services",
+    "label": "Services",
+    "color": "#fb923c",
+    "icon": "Zap",
+    "fields": [
+      {
+        "key": "id",
+        "label": "Record ID",
+        "type": "text"
+      },
+      {
+        "key": "name",
+        "label": "Name",
+        "type": "text"
+      },
+      {
+        "key": "description",
+        "label": "Description",
+        "type": "text"
+      },
+      {
+        "key": "price_type",
+        "label": "Price Type",
+        "type": "text"
+      },
+      {
+        "key": "price_min",
+        "label": "Price Min",
+        "type": "number"
+      },
+      {
+        "key": "price_max",
+        "label": "Price Max",
+        "type": "number"
+      },
+      {
+        "key": "unit",
+        "label": "Unit",
+        "type": "text"
+      },
+      {
+        "key": "category",
+        "label": "Category",
+        "type": "text"
+      },
+      {
+        "key": "is_active",
+        "label": "Is Active",
+        "type": "text"
+      },
+      {
+        "key": "sort_order",
+        "label": "Sort Order",
+        "type": "number"
+      },
+      {
+        "key": "created_at",
+        "label": "Created At",
+        "type": "timestamp"
+      },
+      {
+        "key": "updated_at",
+        "label": "Updated At",
+        "type": "timestamp"
+      }
+    ]
+  },
+  {
+    "key": "hired_receptionists",
+    "label": "Receptionists",
+    "color": "#f472b6",
+    "icon": "Phone",
+    "fields": [
+      {
+        "key": "id",
+        "label": "Record ID",
+        "type": "text"
+      },
+      {
+        "key": "full_name",
+        "label": "Full Name",
+        "type": "text"
+      },
+      {
+        "key": "first_name",
+        "label": "First Name",
+        "type": "text"
+      },
+      {
+        "key": "description",
+        "label": "Description",
+        "type": "text"
+      },
+      {
+        "key": "stereotype",
+        "label": "Role",
+        "type": "text"
+      },
+      {
+        "key": "avatar",
+        "label": "Avatar",
+        "type": "text"
+      },
+      {
+        "key": "voice",
+        "label": "Voice",
+        "type": "text"
+      },
+      {
+        "key": "elevenlabs_voice_id",
+        "label": "ElevenLabs Voice ID",
+        "type": "text"
+      },
+      {
+        "key": "age",
+        "label": "Age",
+        "type": "number"
+      },
+      {
+        "key": "call_types",
+        "label": "Call Types",
+        "type": "text"
+      },
+      {
+        "key": "is_active",
+        "label": "Is Active",
+        "type": "boolean"
+      },
+      {
+        "key": "language_model",
+        "label": "Language Model",
+        "type": "text"
+      },
+      {
+        "key": "status",
+        "label": "Status",
+        "type": "text"
+      },
+      {
+        "key": "current_activity",
+        "label": "Current Activity",
+        "type": "text"
+      },
+      {
+        "key": "total_calls",
+        "label": "Total Calls",
+        "type": "number"
+      },
+      {
+        "key": "inbound_calls_count",
+        "label": "Inbound Calls",
+        "type": "number"
+      },
+      {
+        "key": "outbound_calls_count",
+        "label": "Outbound Calls",
+        "type": "number"
+      },
+      {
+        "key": "completed_calls_count",
+        "label": "Completed Calls",
+        "type": "number"
+      },
+      {
+        "key": "failed_calls_count",
+        "label": "Failed Calls",
+        "type": "number"
+      },
+      {
+        "key": "missed_calls_count",
+        "label": "Missed Calls",
+        "type": "number"
+      },
+      {
+        "key": "average_call_duration_seconds",
+        "label": "Avg Call Duration Seconds",
+        "type": "number"
+      },
+      {
+        "key": "last_call_at",
+        "label": "Last Call At",
+        "type": "timestamp"
+      },
+      {
+        "key": "hired_at",
+        "label": "Hired At",
+        "type": "timestamp"
+      }
+    ]
+  },
+  {
+    "key": "businesses",
+    "label": "Business",
+    "color": "#a1a1aa",
+    "icon": "User",
+    "fields": [
+      {
+        "key": "id",
+        "label": "Record ID",
+        "type": "text"
+      },
+      {
+        "key": "name",
+        "label": "Name",
+        "type": "text"
+      },
+      {
+        "key": "phone",
+        "label": "Phone",
+        "type": "phone"
+      },
+      {
+        "key": "email",
+        "label": "Email",
+        "type": "email"
+      },
+      {
+        "key": "address",
+        "label": "Address",
+        "type": "text"
+      },
+      {
+        "key": "city",
+        "label": "City",
+        "type": "text"
+      },
+      {
+        "key": "state",
+        "label": "State",
+        "type": "text"
+      },
+      {
+        "key": "zip",
+        "label": "Zip",
+        "type": "text"
+      },
+      {
+        "key": "website",
+        "label": "Website",
+        "type": "url"
+      },
+      {
+        "key": "about_us",
+        "label": "About Us",
+        "type": "text"
+      },
+      {
+        "key": "policies",
+        "label": "Policies",
+        "type": "text"
+      },
+      {
+        "key": "faq",
+        "label": "FAQ",
+        "type": "text"
+      },
+      {
+        "key": "business_hours",
+        "label": "Business Hours",
+        "type": "text"
+      },
+      {
+        "key": "created_at",
+        "label": "Created At",
+        "type": "timestamp"
+      },
+      {
+        "key": "updated_at",
+        "label": "Updated At",
+        "type": "timestamp"
+      }
+    ]
+  },
+  {
+    "key": "staff",
+    "label": "Staff",
+    "color": "#60a5fa",
+    "icon": "User",
+    "fields": [
+      {
+        "key": "id",
+        "label": "Record ID",
+        "type": "text"
+      },
+      {
+        "key": "business_id",
+        "label": "Business ID",
+        "type": "number"
+      },
+      {
+        "key": "full_name",
+        "label": "Full Name",
+        "type": "text"
+      },
+      {
+        "key": "first_name",
+        "label": "First Name",
+        "type": "text"
+      },
+      {
+        "key": "last_name",
+        "label": "Last Name",
+        "type": "text"
+      },
+      {
+        "key": "role",
+        "label": "Role",
+        "type": "text"
+      },
+      {
+        "key": "email",
+        "label": "Email",
+        "type": "email"
+      },
+      {
+        "key": "phone",
+        "label": "Phone",
+        "type": "phone"
+      },
+      {
+        "key": "avatar",
+        "label": "Avatar",
+        "type": "text"
+      },
+      {
+        "key": "is_active",
+        "label": "Is Active",
+        "type": "boolean"
+      },
+      {
+        "key": "working_hours",
+        "label": "Working Hours",
+        "type": "text"
+      },
+      {
+        "key": "notes",
+        "label": "Notes",
+        "type": "text"
+      },
+      {
+        "key": "created_at",
+        "label": "Created At",
+        "type": "timestamp"
+      },
+      {
+        "key": "updated_at",
+        "label": "Updated At",
+        "type": "timestamp"
+      }
+    ]
+  }
+]

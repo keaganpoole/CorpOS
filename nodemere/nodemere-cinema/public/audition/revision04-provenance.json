@@ -1,0 +1,42 @@
+[
+  {
+    "file": "public\\audition\\italian.png",
+    "source": "https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/audition_faces/woman/ethnicity/italian.png",
+    "sha256": "a01fc9dc8916b43602bfd5d17eca89e0aa5d5a4615f270d82636a8e31ec191d0"
+  },
+  {
+    "file": "public\\audition\\italian_landscape2.png",
+    "source": "https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/audition_faces/countries/italian_landscape2.png",
+    "sha256": "885d0bd6eea0c02ae7cd926adfbc1c53a48f6901661d03044cb3c602ed0e1960"
+  },
+  {
+    "file": "public\\audition\\calm_man.png",
+    "source": "https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/audition_faces/man/temperament/calm_man.png",
+    "sha256": "e61c2da18eba9a580c674a17596606735e4eb9433b125adb43eccd5434e9e9e1"
+  },
+  {
+    "file": "public\\audition\\mature.png",
+    "source": "https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/audition_faces/woman/age/mature.png",
+    "sha256": "f090ebe1f3be78c9d92b9ab03e4c57fe5c2d567b63b792300ee5dcbea2fcd4fb"
+  },
+  {
+    "file": "public\\audition\\african.png",
+    "source": "https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/audition_faces/woman/ethnicity/african.png",
+    "sha256": "8f04347b38990f3f6fb5d0de58a08a094c3eca92eb8c59146cec32327da3d84e"
+  },
+  {
+    "file": "public\\audition\\indian.png",
+    "source": "https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/audition_faces/woman/ethnicity/indian.png",
+    "sha256": "903ca66fd5b783f82a6b33d2411b44600920feebde2f59667fdb658f1b5d1181"
+  },
+  {
+    "file": "public\\audition\\irish.png",
+    "source": "https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/audition_faces/woman/ethnicity/irish.png",
+    "sha256": "d2a6448cadee1e6a7ea35e9b10a48530a520654463807ccb33e97d51a89c0cdd"
+  },
+  {
+    "file": "public\\videos\\6-source.mp4",
+    "source": "https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/avatars/videos/nikki_video.mp4",
+    "sha256": "03f2c9dd7f3eb085722ecd1ab2bcf251e85378439a6db377565c2f04ad0f5984"
+  }
+]

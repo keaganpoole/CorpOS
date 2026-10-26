@@ -1,0 +1,12 @@
+[
+  {
+    "file": "public\\phase4\\maggie-banner.png",
+    "source": "https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/banners/maggie_001.png",
+    "sha256": "73f770484b973723382d88386768c9aee65d5d3869caf40c70d733243c4f3ce1"
+  },
+  {
+    "file": "public\\phase4\\piper-banner.png",
+    "source": "https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/banners/piper_banner1.png",
+    "sha256": "1524deeff907d32c91c5e1bceb37e92a438d34350db0cbb1584f329bc2d1c876"
+  }
+]

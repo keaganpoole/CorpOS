@@ -1,0 +1,77 @@
+[
+  {
+    "source": "src\\sonar\\studio\\studio.css",
+    "sha256": "f11f2fcb027183df19e551b53b16416908770111561f280daa1c6bf4e1621d2e",
+    "adaptation": "Framer Motion clock import redirected to frame adapter; presentation retained."
+  },
+  {
+    "source": "src\\sonar\\studio\\voiceDefinition.js",
+    "sha256": "aa0fb58393c44c956a0aa3badb2c2fcd8f24ccba43c0ab5edac567a185d3229a",
+    "adaptation": "Framer Motion clock import redirected to frame adapter; presentation retained."
+  },
+  {
+    "source": "src\\sonar\\studio\\ReceptionistReviewDetails.jsx",
+    "sha256": "42b963b285c1a570c033c1cc6ff1e1150479ed74781fcef60127652c8d9d73f9",
+    "adaptation": "Framer Motion clock import redirected to frame adapter; presentation retained."
+  },
+  {
+    "source": "src\\sonar\\components\\dropIns.css",
+    "sha256": "1a69033be087f96f713e25345ac61900c3626c81a9f12aabcd8703a24030dab7",
+    "adaptation": "Framer Motion clock import redirected to frame adapter; presentation retained."
+  },
+  {
+    "source": "src\\sonar\\components\\AppointmentRecord.jsx",
+    "sha256": "ac6afaf3a8737b04d6f237f5e5dc58e1e339c92daed28e37cee5c1f26f81c369",
+    "adaptation": "Framer Motion clock import redirected to frame adapter; presentation retained."
+  },
+  {
+    "source": "src\\sonar\\components\\DropInStrip.jsx",
+    "sha256": "858713e738c810149ba11363423d40d09003d01a87b204f93a776118503ac52d",
+    "adaptation": "Framer Motion clock import redirected to frame adapter; presentation retained."
+  },
+  {
+    "source": "src/sonar/studio/PortraitPreview.jsx",
+    "sha256": "d6febe120d40c80e75fffcfe7d143c2b73b626de8c0ec6987b823a15c0b1aa18",
+    "adaptation": "Only async image selection and timeout state replaced with supplied deterministic state. Original image styles, layers, masks and 520ms crossfade retained."
+  },
+  {
+    "file": "audition\\friendly_woman.png",
+    "url": "https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/audition_faces/woman/temperament/friendly_woman.png",
+    "sha256": "3c0ef3cbe90cd4cee5225d32c89dd76fbd9a40a5f4a7dcbf28b4cb0fd344dd6a"
+  },
+  {
+    "file": "audition\\young_adult_2.png",
+    "url": "https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/audition_faces/woman/age/young_adult_2.png",
+    "sha256": "0fe29a7493520bf98a5c9c362f20b379aa9bd516e930b10d7fbadfc51a8f52ed"
+  },
+  {
+    "file": "audition\\middle_aged_3.png",
+    "url": "https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/audition_faces/woman/age/middle_aged_3.png",
+    "sha256": "0ac5ab017dc0f46858d473470f0e7e12874177fce0795cc55c23c0d49b35b6a1"
+  },
+  {
+    "file": "audition\\american.png",
+    "url": "https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/audition_faces/woman/ethnicity/american.png",
+    "sha256": "82498105ac7d873d781457de8e7cdc24bcb6251defca00b5b4a3425028c3ccdf"
+  },
+  {
+    "file": "audition\\calm_woman.png",
+    "url": "https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/audition_faces/woman/temperament/calm_woman.png",
+    "sha256": "6a4879fdc7851949bf22b52b46a06c95ad98e05e1b3f1a06e4b91f84615ef616"
+  },
+  {
+    "file": "audition\\caring_woman.png",
+    "url": "https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/audition_faces/woman/temperament/caring_woman.png",
+    "sha256": "f3ca722a43135f8bc7c4bb0426371e67fb6352e168d234cbc78089297bd07689"
+  },
+  {
+    "file": "audition\\maggie-avatar.png",
+    "url": "https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/avatars/maggie.png",
+    "sha256": "08c76bdb0454417bdaa9a70dae4db27ee0048257777c368a635191d35d9de345"
+  },
+  {
+    "file": "audition\\maggie-banner.png",
+    "url": "https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/banners/maggie_001.png",
+    "sha256": "73f770484b973723382d88386768c9aee65d5d3869caf40c70d733243c4f3ce1"
+  }
+]

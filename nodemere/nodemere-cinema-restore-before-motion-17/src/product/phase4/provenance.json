@@ -1,0 +1,54 @@
+[
+  {
+    "source": "src/sonar/pages/LeadsTable.jsx",
+    "sha256": "a04f4590fb66333d7ea169eb625ffae2772d7e9a60efcf48479dd19dd5055189"
+  },
+  {
+    "source": "src/sonar/lib/leadSchema.js",
+    "sha256": "1000f787c90239330d0fb53f83341c0104d3ff8f993f41296ebeebb9244a7f3d"
+  },
+  {
+    "source": "src/sonar/lib/fieldConfig.js",
+    "sha256": "d81dc205b5b7c0e38b440a880c8516e1ac0031a3c020c7fd7d3ed212f7d2197b"
+  },
+  {
+    "source": "src/sonar/pages/HomepagePeopleCrmDemo.jsx",
+    "sha256": "e11b69184a30ff36b76e612d94b85f90d75313ea793c6017ecce5ba2d6fedaee"
+  },
+  {
+    "source": "src/sonar/lib/customFields.js",
+    "sha256": "2b6db2c2f0ded0c20b29642876f58062da6af99810a0a0a5385bb9b06d720d7b"
+  },
+  {
+    "source": "src/styles/HomePage.css",
+    "sha256": "a472265f47b6fcf1ae7a189837e5cc325ec87f7b19ce533d5ec83ac7487f4ddb"
+  },
+  {
+    "source": "src/sonar/pages/FieldSettingsModal.jsx",
+    "sha256": "fbd1a96e7368f24d14d5a6a98d060d19f1a65a916d5cb514e46c3247947c313e"
+  },
+  {
+    "source": "src/sonar/pages/Scenarios/Scenarios.jsx",
+    "sha256": "a75f69382916e8992bc71647a8fe63edb16efb8632d065805bc389052c46ff55"
+  },
+  {
+    "source": "src/sonar/pages/Scenarios/Scenarios.css",
+    "sha256": "fc85e004f6e60db6b5290e937d3d131c13580803528710f1b401f4a05a2671b6"
+  },
+  {
+    "source": "src/sonar/nest/NestStage.jsx",
+    "sha256": "5622bd3e5b00bbcd248b417743bd93094be7a01b6de2eb3a38cf2f341ce7c640"
+  },
+  {
+    "source": "src/sonar/nest/nest.css",
+    "sha256": "7511f11fcae556f97b25c88b5afea68c69efd5e5985acf13a227d88b6e1277c8"
+  },
+  {
+    "source": "src/sonar/nest/IntercomVoiceLine.jsx",
+    "sha256": "982516ff2ebf823dd2039dfe15fde1d5fbc348fa6327c8caa72ba285126bdd47"
+  },
+  {
+    "source": "src/sonar/pages/Scenarios/VariablesPane.jsx",
+    "sha256": "294d00c683c3e229ae30cca62523b84173337deee2a9f9e13bed811f607a18aa"
+  }
+]

@@ -1,0 +1,4 @@
+ M src/sonar/components/DropInsModal.jsx
+?? artifacts/cinema-recovery-2026-10-13/
+?? nodemere-film/
+?? ../transcripts

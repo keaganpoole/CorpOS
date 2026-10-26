@@ -1,0 +1,32 @@
+{
+  "revision": "14-splash-full-perimeter",
+  "delivery": "Remotion Studio; no video export",
+  "composition": "Nodemere-Film",
+  "url": "http://localhost:3100/Nodemere-Film",
+  "width": 3840,
+  "height": 2160,
+  "fps": 60,
+  "frames": 16792,
+  "seconds": 279.8666666666667,
+  "scene11": {
+    "startFrame": 15246,
+    "frames": 960
+  },
+  "scene12": {
+    "startFrame": 16206,
+    "frames": 586,
+    "holdStart": 144,
+    "holdEndExclusive": 294,
+    "holdFrames": 150
+  },
+  "logoAnimation": {
+    "id": "fullperimeter",
+    "name": "Full perimeter",
+    "source": "Native logoPresets.js and original demo draw; SplashLogo strokeWidth=16"
+  },
+  "claim": "Built with AES-256-GCM encryption and per-business key protection.",
+  "previousStudioRevision": "13-encryption-brand-finale",
+  "lastVideoExport": "10-scenarios-logic-nest-hover",
+  "videoExported": false,
+  "productionAppChanged": false
+}

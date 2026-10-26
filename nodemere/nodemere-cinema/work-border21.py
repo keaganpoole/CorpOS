@@ -1,0 +1,2 @@
+from pathlib import Path
+p=Path('src/phase2.css');s=p.read_text().replace('animation: demoCallStatusGradient 4.8s ease-in-out infinite; animation-play-state: paused; animation-delay: var(--call-gradient-clock, 0s);','animation: demoCallStatusGradient 4.8s ease-in-out infinite !important; animation-play-state: paused !important; animation-delay: var(--call-gradient-clock, 0s) !important;');p.write_text(s)

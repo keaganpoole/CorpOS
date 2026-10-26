@@ -1,0 +1,30 @@
+[
+  {
+    "source": "src/sonar/SonarDashboard.jsx",
+    "sha256": "2c4205f4c24bebc4a03b21ebcdced7907c2bc5eb6efbe087e34441051fbddba3"
+  },
+  {
+    "source": "src/sonar/nest/NestDock.jsx",
+    "sha256": "7e56c99d9a1ea44aacd959c63b03321b4b7b9f8d1b2eaa23918f52d35ccd7952"
+  },
+  {
+    "source": "src/sonar/pages/Scenarios/HomepageScenariosDemo.jsx",
+    "sha256": "cd5d30bcfbf6897675dce324b9ba3683ae7c37c58ed4c92806c7dacb0b914116"
+  },
+  {
+    "source": "src/sonar/pages/Scenarios/VariablesPane.jsx",
+    "sha256": "294d00c683c3e229ae30cca62523b84173337deee2a9f9e13bed811f607a18aa"
+  },
+  {
+    "source": "src/sonar/pages/Scenarios/Scenarios.jsx",
+    "sha256": "a75f69382916e8992bc71647a8fe63edb16efb8632d065805bc389052c46ff55"
+  },
+  {
+    "source": "src/sonar/pages/Scenarios/Scenarios.css",
+    "sha256": "fc85e004f6e60db6b5290e937d3d131c13580803528710f1b401f4a05a2671b6"
+  },
+  {
+    "source": "src/assets/logo.png",
+    "sha256": "3e305f4e94a845a7cf76b4f2af1a03a8792c76b27f2baf52788c3a2bc7ca3dee"
+  }
+]

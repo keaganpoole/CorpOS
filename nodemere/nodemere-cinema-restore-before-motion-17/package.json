@@ -1,0 +1,42 @@
+{
+  "name": "nodemere-cinema",
+  "version": "1.0.0",
+  "description": "Nodemere cinematic film - scenes 1 through 12",
+  "repository": {},
+  "license": "UNLICENSED",
+  "private": true,
+  "dependencies": {
+    "@remotion/cli": "4.0.535",
+    "@remotion/fonts": "4.0.535",
+    "@remotion/media": "4.0.535",
+    "@remotion/transitions": "4.0.535",
+    "lucide-react": "0.526.0",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "remotion": "4.0.535",
+    "three": "0.180.0"
+  },
+  "devDependencies": {
+    "@remotion/eslint-config-flat": "4.0.535",
+    "@types/react": "19.2.7",
+    "@types/three": "0.180.0",
+    "@types/web": "0.0.166",
+    "eslint": "9.39.5",
+    "prettier": "3.8.1",
+    "typescript": "5.9.3"
+  },
+  "scripts": {
+    "dev": "remotion studio --no-open --port=3100",
+    "render:film-preview": "node scripts/render-phase4-final.cjs --full",
+    "render:dropins-preview": "remotion render 05-Drop-ins out/dropins-preview.mp4 --scale=0.5 --codec=h264 --crf=16 --pixel-format=yuv420p --color-space=bt709 --muted --concurrency=3",
+    "render:network-preview": "remotion render 06-Network out/network-preview.mp4 --scale=0.5 --codec=h264 --crf=16 --pixel-format=yuv420p --color-space=bt709 --muted --concurrency=3",
+    "render:handoff-preview": "remotion render 07-Handoff out/handoff-preview.mp4 --scale=0.5 --codec=h264 --crf=16 --pixel-format=yuv420p --color-space=bt709 --muted --concurrency=3",
+    "render:audition-preview": "remotion render 03-Audition out/audition-preview.mp4 --scale=0.5 --codec=h264 --crf=16 --pixel-format=yuv420p --color-space=bt709 --muted --concurrency=3",
+    "render:calendar-preview": "remotion render 04-Calendar out/calendar-preview.mp4 --scale=0.5 --codec=h264 --crf=16 --pixel-format=yuv420p --color-space=bt709 --muted --concurrency=3",
+    "render:preview": "remotion render Nodemere-Opening out/nodemere-v4-directed-preview.mp4 --scale=0.5 --codec=h264 --crf=16 --pixel-format=yuv420p --muted --concurrency=3",
+    "render:4k": "remotion render Nodemere-Opening out/nodemere-v4-directed-4k.mp4 --codec=h264 --crf=16 --pixel-format=yuv420p --muted --concurrency=3",
+    "build": "remotion bundle",
+    "upgrade": "remotion upgrade",
+    "lint": "eslint src && tsc"
+  }
+}

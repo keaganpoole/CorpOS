@@ -1,0 +1,132 @@
+/* Fixed desktop dimensions keep native Calendar-modal layout identical in Studio and render. */
+.calendar-dropins-film {
+  font-family: Inter, sans-serif;
+  color: #e4e4e7;
+  --brandGradientStart: #ff32ac;
+  --brandGradientEnd: #8b5cf6;
+}
+.calendar-dropins-film *,
+.calendar-dropins-film *::before,
+.calendar-dropins-film *::after {
+  box-sizing: border-box;
+  animation: none !important;
+  transition: none !important;
+  scroll-behavior: auto !important;
+}
+.calendar-dropins-film .drop-ins-modal {
+  width: 920px;
+  height: 880px;
+  max-height: none;
+}
+.calendar-dropins-film .drop-ins-modal .drop-in-preview {
+  flex-basis: 310px;
+}
+.calendar-dropins-film .drop-ins-workspace {
+  overflow: hidden;
+  scrollbar-width: none;
+}
+.calendar-dropins-film .drop-ins-statuses {
+  overflow: hidden;
+}
+.calendar-dropins-film--inline .drop-ins-modal {
+  width: 700px;
+  height: 508px;
+  max-width: none;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.calendar-dropins-film--inline .drop-ins-modal::before,
+.calendar-dropins-film--inline .drop-ins-modal .drop-ins-header,
+.calendar-dropins-film--inline .drop-ins-modal .drop-ins-controls,
+.calendar-dropins-film--inline .drop-ins-modal .drop-in-preview {
+  background: transparent;
+}
+.calendar-dropins-film--inline .drop-ins-modal .drop-ins-header {
+  display: none;
+}
+.calendar-dropins-film--inline .drop-ins-modal .drop-ins-status-indicator {
+  display: none !important;
+}
+.calendar-dropins-film--inline .drop-ins-header {
+  padding: 14px 18px 12px;
+}
+.calendar-dropins-film--inline .drop-ins-eyebrow {
+  font-size: 7px !important;
+  margin-bottom: 5px !important;
+}
+.calendar-dropins-film--inline .drop-ins-heading h2 {
+  font-size: 23px;
+}
+.calendar-dropins-film--inline .drop-ins-header-actions {
+  gap: 8px;
+}
+.calendar-dropins-film--inline .drop-ins-header-feedback {
+  display: none !important;
+}
+.calendar-dropins-film--inline .drop-ins-statuses {
+  padding: 0 18px;
+  gap: 16px;
+}
+.calendar-dropins-film--inline .drop-ins-statuses > button {
+  gap: 5px;
+  padding: 12px 0;
+  font-size: 9px;
+}
+.calendar-dropins-film--inline .drop-ins-tab-count {
+  font-size: 8px;
+  padding: 1px 4px;
+}
+.calendar-dropins-film--inline .drop-ins-body {
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+}
+.calendar-dropins-film--inline .drop-in-preview {
+  min-width: 0;
+  flex-basis: 0 !important;
+}
+.calendar-dropins-film--inline .drop-in-preview-scale {
+  transform: scale(0.72) !important;
+}
+.calendar-dropins-film--inline .drop-in-preview-label {
+  padding: 16px 18px;
+  font-size: 8px;
+}
+.calendar-dropins-film--inline .drop-in-preview-stage {
+  min-height: 0;
+}
+.calendar-dropins-film--inline .drop-ins-workspace {
+  padding: 16px 18px;
+}
+.calendar-dropins-film--inline .drop-ins-section-heading {
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.calendar-dropins-film--inline .drop-ins-section-heading h3 {
+  font-size: 18px;
+  margin: 4px 0 6px;
+}
+.calendar-dropins-film--inline .drop-ins-section-heading p:not(.drop-ins-eyebrow) {
+  font-size: 10px;
+}
+.calendar-dropins-film--inline .drop-ins-list-row {
+  gap: 8px;
+  padding: 10px 9px;
+}
+.calendar-dropins-film--inline .drop-ins-list-text h4 {
+  font-size: 12px;
+}
+.calendar-dropins-film--inline .drop-ins-list-text p {
+  font-size: 9px;
+  line-height: 1.45;
+}
+.calendar-dropins-film--inline .drop-ins-list-text > span {
+  font-size: 8px;
+}
+.calendar-dropins-film--inline .drop-ins-icon-button {
+  width: 25px;
+  height: 25px;
+}
+.calendar-dropins-film .drop-ins-editor textarea {
+  resize: none;
+}

@@ -1,0 +1,26 @@
+{
+  "australian": {
+    "url": "https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/audition_faces/woman/ethnicity/australian.png",
+    "sha256": "f5c3cdc9f6481f9447cc7b2e2ff91039b7dfa3156e270ea748c12efb219df083"
+  },
+  "canadian": {
+    "url": "https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/audition_faces/woman/ethnicity/canadian.png",
+    "sha256": "2d6a9ad33d34916f4d30e85edda89e537e1170d77e67693abc8ce4c4fc7c2e68"
+  },
+  "charming_woman": {
+    "url": "https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/audition_faces/woman/temperament/charming_woman.png",
+    "sha256": "473ed1686dcbd90285362c6fc15e6449e0763c7509639c74c5e8bb1f7aaf8452"
+  },
+  "motivational_woman": {
+    "url": "https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/audition_faces/woman/temperament/motivational_woman.png",
+    "sha256": "7f2bed6e2ed3b2b50a53c068af6ece6c35f0547bf0ebef3c7a07d563e6d1d7bd"
+  },
+  "playful_woman": {
+    "url": "https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/audition_faces/woman/temperament/playful_woman.png",
+    "sha256": "133e589223a83722f4c79ec8169a4b2dcab4acb024f24416c4ba3f4533444064"
+  },
+  "serious_woman": {
+    "url": "https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/audition_faces/woman/temperament/serious_woman.png",
+    "sha256": "57b08f25c0db861a013d8ef546a4b8d4e00164e0dea502cad642552ba25f75e9"
+  }
+}

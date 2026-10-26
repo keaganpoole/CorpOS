@@ -1,0 +1,42 @@
+[
+  {
+    "source": "src/index.css",
+    "sha256": "71cb17940775feea82c81aab7e767f1ede20910ae2a0f0dce93ee7e307530ead"
+  },
+  {
+    "source": "public/logo/nodemere.svg",
+    "sha256": "a3d0d4a2555d1155948728231fa0e501d0c10a5379e68e9affc4138d3452b2de"
+  },
+  {
+    "source": "src/pages/logo/logoPresets.js",
+    "sha256": "651f3caf912dfb780c84b3a9af9ae4707aa6cd85600da54fb2e1af4905a88ffd"
+  },
+  {
+    "source": "src/pages/logo/logoAnimation.js",
+    "sha256": "a4d314af0892a624d8019c4fe823f16421d56ba785c8e7e56f7ac5f4645be789"
+  },
+  {
+    "source": "src/pages/logo/LogoPage.jsx",
+    "sha256": "550e62e34876d54de2f4614f52227b00a0d2de0e2b51f14ab845a740485e736f"
+  },
+  {
+    "source": "backend/envelope.py",
+    "sha256": "4eb98b2c64166f9a22aca8f244f67de6df1084057b986cf9bc5d3b7af36bf7e3"
+  },
+  {
+    "source": "backend/security_maintenance.py",
+    "sha256": "d46f2c8cd9f15c33da49e5ca908e4d6890cd5d649b2bc5934fc12ee6ae716d02"
+  },
+  {
+    "source": "backend/protected_data.py",
+    "sha256": "1744f009780b411dd36731a65e1891b24483431206599910f025b5a2cf0c18e1"
+  },
+  {
+    "source": "docs/security-phases5-7.md",
+    "sha256": "7ec07d6a9e9f56379a3c973258632f60c7071fb54d9c08b6437edb674b4fbab7"
+  },
+  {
+    "source": "docs/security-phases5-7-development-acceptance.md",
+    "sha256": "70b07b6ae393f18ba18d73fdb4b26b4313f8d4063d9a6003d3bdfb16604dd00f"
+  }
+]
