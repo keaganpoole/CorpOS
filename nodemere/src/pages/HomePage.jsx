@@ -4,7 +4,7 @@ import useLegacyAnimation from '../hooks/useLegacyAnimation';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { motion, AnimatePresence, useInView } from 'framer-motion';
-import { CreditCard, FileUp, Globe2, Menu as MenuIcon, MessagesSquare, Mic, Phone, PhoneCall, PhoneOutgoing, ShieldCheck, X as XIcon, Check } from 'lucide-react';
+import { CreditCard, FileUp, Globe2, Menu as MenuIcon, MessagesSquare, Mic, Phone, PhoneCall, PhoneOutgoing, Pointer, ShieldCheck, X as XIcon, Check } from 'lucide-react';
 import SplashScreen from '../components/SplashScreen';
 import { getCookie } from '../utils/cookieUtils';
 import { openVisitorPreferences } from '../lib/visitorConsent.js';
@@ -288,6 +288,14 @@ const StackedHeroShowcase = ({ sectionRef }) => {
   const heroFeaturesEntered = sectionProgress >= heroFeaturesStartProgress;
   const [catalogReady, setCatalogReady] = useState(false);
   const [introDriftRunning, setIntroDriftRunning] = useState(true);
+  const [showIntroSwipeCue, setShowIntroSwipeCue] = useState(false);
+
+  useEffect(() => {
+    setShowIntroSwipeCue(false);
+    if (heroIntroExited) return undefined;
+    const timer = window.setTimeout(() => setShowIntroSwipeCue(true), 2000);
+    return () => window.clearTimeout(timer);
+  }, [heroIntroExited]);
 
   useEffect(() => {
     if (!receptionistEntered || heroFeaturesEntered) {
@@ -318,6 +326,13 @@ const StackedHeroShowcase = ({ sectionRef }) => {
     const distance = Math.max(root.offsetHeight - window.innerHeight, 1);
     // Land clearly into the feature sequence so the catalog is fully exited.
     window.scrollTo({ top: top + distance * 0.72, behavior: 'smooth' });
+  };
+  const continueFromIntro = () => {
+    const root = rootRef.current;
+    if (!root || typeof window === 'undefined') return;
+    const top = root.getBoundingClientRect().top + window.scrollY;
+    const distance = Math.max(root.offsetHeight - window.innerHeight, 1);
+    window.scrollTo({ top: top + distance * (receptionistStartProgress + 0.04), behavior: 'smooth' });
   };
 
   return (
@@ -357,6 +372,13 @@ const StackedHeroShowcase = ({ sectionRef }) => {
             </div>
           </div>
         </div>
+
+        {!heroIntroExited && showIntroSwipeCue && (
+          <button type="button" className="homepage-intro-swipe-cue" onClick={continueFromIntro} aria-label="Swipe up or tap to continue">
+            <Pointer className="homepage-intro-swipe-icon" size={26} aria-hidden="true" />
+            <span>Swipe up to continue</span>
+          </button>
+        )}
 
         <div
           className={`absolute inset-0 z-10 transition-[opacity,transform] duration-500 ease-out ${catalogActive ? '' : 'pointer-events-none'}`}

@@ -46,6 +46,10 @@
   display: none;
 }
 
+.homepage-intro-swipe-cue {
+  display: none;
+}
+
 .ns-gallery-detail-portal {
   z-index: 1100;
 }
@@ -257,6 +261,35 @@
 }
 
 @media (max-width: 1180px) {
+  .homepage-intro-swipe-cue {
+    position: absolute;
+    bottom: max(70px, calc(env(safe-area-inset-bottom) + 62px));
+    left: 50%;
+    z-index: 40;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    padding: 8px 12px;
+    border: 0;
+    color: rgba(255,255,255,.9);
+    background: transparent;
+    font: 700 10px/1 Inter, sans-serif;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    cursor: pointer;
+    touch-action: pan-y;
+    transform: translateX(-50%);
+    animation: homepage-intro-swipe-in .4s ease-out both;
+  }
+
+  .homepage-intro-swipe-icon {
+    transform: rotate(-12deg);
+    animation: homepage-intro-swipe-up 2.4s cubic-bezier(.4,0,.2,1) infinite;
+    will-change: transform;
+  }
+
   .homepage-catalog-gesture-hint {
     position: absolute;
     top: 50%;
@@ -386,6 +419,16 @@
     68% { opacity: .9; transform: translateY(-9px); }
     86% { opacity: .72; transform: translateY(0); }
   }
+  @keyframes homepage-intro-swipe-in {
+    from { opacity: 0; transform: translate(-50%, 6px); }
+    to { opacity: .9; transform: translate(-50%, 0); }
+  }
+  @keyframes homepage-intro-swipe-up {
+    0%, 16%, 100% { opacity: .72; transform: translateY(0) rotate(-12deg); }
+    52% { opacity: 1; transform: translateY(-9px) rotate(-12deg); }
+    68% { opacity: .9; transform: translateY(-9px) rotate(-12deg); }
+    86% { opacity: .72; transform: translateY(0) rotate(-12deg); }
+  }
   @keyframes homepage-catalog-panel-reveal {
     from { opacity: 0; transform: translateY(34px); }
     to { opacity: 1; transform: translateY(0); }
@@ -396,5 +439,7 @@
   .homepage-catalog-ambient-drift,
   .homepage-catalog-ambient-drift-y { animation: none !important; }
   .homepage-catalog-swipe-icon { animation: none !important; }
+  .homepage-intro-swipe-icon { animation: none !important; }
+  .homepage-intro-swipe-cue { animation: none !important; }
   .homepage-catalog-continue-surface { animation: none !important; }
 }
