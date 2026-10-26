@@ -454,7 +454,6 @@
 
   .homepage-catalog-continue {
     padding-bottom: max(18px, calc(env(safe-area-inset-bottom, 0px) + 10px));
-    padding-bottom: calc(max(18px, calc(env(safe-area-inset-bottom, 0px) + 10px)) + var(--homepage-catalog-browser-ui-inset));
   }
 }
 
