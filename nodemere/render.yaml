@@ -1,17 +1,18 @@
 # render.yaml
 
 services:
-  # Backend Service (FastAPI)
+  # Backend Service (FastAPI). The frontend is deployed separately on Vercel.
   - type: web
     name: nodemere-backend
     env: python
+    plan: free
     buildCommand: "pip install -r backend/requirements.txt"
     startCommand: "uvicorn backend.main:app --host 0.0.0.0 --port $PORT"
-    rootDir: .
+    rootDir: nodemere
     envVars:
       # Supabase
       - key: SUPABASE_URL
-      - key: SUPABASE_KEY
+      - key: SUPABASE_ANON_KEY
       - key: SUPABASE_SERVICE_ROLE_KEY
       - key: SUPABASE_JWT_SECRET
       # OpenAI
@@ -29,7 +30,9 @@ services:
       - key: TWILIO_API_SECRET
       - key: TWILIO_PHONE_NUMBER
       - key: TWILIO_VOICE_WEBHOOK_URL
+        value: https://nodemere-backend.onrender.com/twilio/inbound
       - key: BACKEND_PUBLIC_URL
+        value: https://nodemere-backend.onrender.com
       # Enables the reversible Twilio-controlled warm escalation path.
       - key: TWILIO_WARM_ESCALATIONS_ENABLED
       # Resend sender for verification, document-upload, and workforce invitation links.
@@ -42,26 +45,23 @@ services:
       - key: STRIPE_WEBHOOK_SECRET
       - key: STRIPE_CONNECT_CLIENT_ID
       - key: STRIPE_CONNECT_REDIRECT_URI
+        value: https://nodemere-backend.onrender.com/users/me/integrations/stripe/callback
+      - key: GOOGLE_OAUTH_REDIRECT_URI
+        value: https://nodemere-backend.onrender.com/users/me/integrations/gmail/callback
+      - key: OUTLOOK_REDIRECT_URI
+        value: https://nodemere-backend.onrender.com/users/me/integrations/outlook/callback
       - key: NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
       # JWT auth
       - key: SECRET_KEY
       - key: ALGORITHM
       - key: CORS_ORIGINS
       - key: FRONTEND_BASE_URL
+        value: https://nodemere.ai
+      - key: VERIFICATION_BASE_URL
+        value: https://nodemere.ai
+      - key: PAYMENT_TEST_FRONTEND_URL
+        value: https://nodemere.ai
+      - key: PAYMENT_LIVE_FRONTEND_URL
+        value: https://nodemere.ai
       - key: TEST_MODE
-        value: "false"
-
-  # Frontend Service (React Static Site)
-  - type: static
-    name: nodemere-frontend
-    buildCommand: "npm install && npm run build"
-    publishPath: "dist"
-    rootDir: .
-    envVars:
-      - key: VITE_SUPABASE_URL
-      - key: VITE_SUPABASE_ANON_KEY
-      - key: VITE_API_URL
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html
+        value: "true"

@@ -6,7 +6,7 @@ import '../styles/marketplace.css'; // Import the stylesheet
 import BreakroomLoginModal from '../components/modals/BreakroomLoginModal'; // Import the BreakroomLoginModal
 import SplashScreen from '../components/SplashScreen'; // Import the SplashScreen component
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://nodemere.onrender.com';
+const API_BASE_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:8000' : 'https://nodemere-backend.onrender.com');
 
 
 // --- Helper Components & Icons ---

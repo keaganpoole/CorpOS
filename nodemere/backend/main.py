@@ -3852,8 +3852,8 @@ def get_payment_mode_label() -> str:
 
 def get_payment_frontend_base_url() -> str:
     if is_payment_test_mode() or is_real_stripe_test_mode():
-        return os.environ.get("PAYMENT_TEST_FRONTEND_URL", "http://localhost:5173")
-    return os.environ.get("PAYMENT_LIVE_FRONTEND_URL", "https://nodemere.com")
+        return os.environ.get("PAYMENT_TEST_FRONTEND_URL") or frontend_base_url or "http://localhost:5173"
+    return os.environ.get("PAYMENT_LIVE_FRONTEND_URL") or frontend_base_url or "https://nodemere.ai"
 
 
 def _simulated_id(kind: str) -> str:
