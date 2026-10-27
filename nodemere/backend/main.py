@@ -5556,9 +5556,9 @@ def sync_business_plan_entitlement(user_id, plan_name, period_start=None, period
 # but it is never trusted to enforce them.
 DEFAULT_PLAN_ENTITLEMENTS = {
     "free": {"included_call_minutes": 20, "max_receptionists": 1, "max_scenarios": 3, "max_contacts": 100, "inbound_calling": True, "outbound_calling": False, "overage_enabled": False, "payment_processing": False, "intercom_daily_turns": 10},
-    "essentials": {"included_call_minutes": 300, "max_receptionists": 3, "max_scenarios": None, "max_contacts": 1000, "inbound_calling": True, "outbound_calling": False, "overage_enabled": True, "overage_cap_cents": 2500, "payment_processing": True, "intercom_daily_turns": 40},
-    "pro": {"included_call_minutes": 1500, "max_receptionists": None, "max_scenarios": None, "max_contacts": None, "inbound_calling": True, "outbound_calling": True, "overage_enabled": True, "overage_cap_cents": 10000, "payment_processing": True, "intercom_daily_turns": 200},
-    "ultra": {"included_call_minutes": 3000, "max_receptionists": None, "max_scenarios": None, "max_contacts": None, "inbound_calling": True, "outbound_calling": True, "overage_enabled": True, "overage_cap_cents": 25000, "payment_processing": True, "intercom_daily_turns": 500},
+    "essentials": {"included_call_minutes": 200, "max_receptionists": 3, "max_scenarios": None, "max_contacts": 1000, "inbound_calling": True, "outbound_calling": False, "overage_enabled": True, "overage_cap_cents": 2500, "payment_processing": True, "intercom_daily_turns": 40},
+    "pro": {"included_call_minutes": 1000, "max_receptionists": None, "max_scenarios": None, "max_contacts": None, "inbound_calling": True, "outbound_calling": True, "overage_enabled": True, "overage_cap_cents": 10000, "payment_processing": True, "intercom_daily_turns": 200},
+    "ultra": {"included_call_minutes": 2500, "max_receptionists": None, "max_scenarios": None, "max_contacts": None, "inbound_calling": True, "outbound_calling": True, "overage_enabled": True, "overage_cap_cents": 25000, "payment_processing": True, "intercom_daily_turns": 500},
 }
 SUBSCRIPTION_ACCESS_STATUSES = {"active"}
 
