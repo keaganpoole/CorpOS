@@ -135,9 +135,9 @@ export default function HomepageReceptionistCatalog({ active, ambientDrift, onCo
       )}
       {active && showContinueCue && (
         <div className="homepage-catalog-continue-surface">
-          <button type="button" className="homepage-catalog-continue" onClick={onContinue} aria-label="Swipe up to continue">
+          <button type="button" className="homepage-catalog-continue" onClick={onContinue} aria-label="Tap to continue">
             <Pointer className="homepage-catalog-swipe-icon" size={30} aria-hidden="true" />
-            <span>Swipe up to continue</span>
+            <span>Tap to continue</span>
           </button>
         </div>
       )}

@@ -325,10 +325,7 @@ const StackedHeroShowcase = ({ sectionRef }) => {
     if (!root || typeof window === 'undefined') return;
     const top = root.getBoundingClientRect().top + window.scrollY;
     const distance = Math.max(root.offsetHeight - window.innerHeight, 1);
-    // Land clearly into the feature sequence so the catalog is fully exited.
-    const continueProgress = isCompactFeatureViewport
-      ? heroFeaturesStartProgress + heroFeatureProgressDuration * 0.08
-      : 0.72;
+    const continueProgress = Math.min(heroFeaturesStartProgress + 0.01, 1);
     window.scrollTo({ top: top + distance * continueProgress, behavior: 'smooth' });
   };
   const continueFromIntro = () => {
