@@ -319,7 +319,7 @@ const PlanCard = ({ plan, cycle, isInitialLoad, index, currentUserPlan, subscrip
     }, [cycle, isInitialLoad]);
 
     return (
-        <div ref={cardRef} className={`plan-card flex flex-col bg-[#111111] border border-gray-800 rounded-2xl p-6 ${isCurrent ? '' : ''} w-full max-w-[300px] md:flex-shrink-0 card-entry`} style={{ '--animation-delay': `${index * 100}ms` }}>
+        <div ref={cardRef} className={`plan-card flex flex-col bg-[#111111] border border-[#303034] rounded-2xl p-6 ${isCurrent ? '' : ''} w-full max-w-[300px] md:flex-shrink-0 card-entry`} style={{ '--animation-delay': `${index * 100}ms` }}>
             <div className="flex-grow">
                 <div className="flex justify-between items-start">
                     <h3 className="text-xl font-bold text-white">{plan.name}</h3>
@@ -647,7 +647,7 @@ const PricingPage = () => {
                     <p className="text-lg max-sm:text-sm text-gray-400">Choose a plan that's right for your business.</p>
                 </div>
                 <div className="flex justify-center items-center mb-12 max-sm:mb-5">
-                    <div className="relative flex items-center bg-[#1a1a1a] p-1 rounded-full border border-gray-800">
+                    <div className="relative flex items-center bg-[#1a1a1a] p-1 rounded-full border border-[#303034]">
                         <div ref={pillBgRef} className="absolute h-[85%] rounded-full gradient-bg transition-all duration-300 ease-in-out"></div>
                         <button ref={annualBtnRef} onClick={() => setCycle('annually')} className={`toggle-button relative z-10 text-sm font-semibold px-6 py-2 transition-colors duration-300 ${cycle === 'annually' ? 'text-[var(--buttonText)]' : 'text-gray-400'}`}>Annually</button>
                         <button ref={monthlyBtnRef} onClick={() => setCycle('monthly')} className={`toggle-button relative z-10 text-sm font-semibold px-6 py-2 transition-colors duration-300 ${cycle === 'monthly' ? 'text-[var(--buttonText)]' : 'text-gray-400'}`}>Monthly</button>
