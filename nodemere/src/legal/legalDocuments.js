@@ -1,8 +1,8 @@
-export const LEGAL_EFFECTIVE_DATE = 'September 5, 2026';
+export const LEGAL_EFFECTIVE_DATE = 'October 28, 2026';
 
-export const LEGAL_ACCEPTANCE_KEY = 'nodemere_legal_acceptance_v2026_09_05';
+export const LEGAL_ACCEPTANCE_KEY = 'nodemere_legal_acceptance_v2026_10_28';
 
-export const LEGAL_ACCEPTANCE_VERSION = '2026-09-05';
+export const LEGAL_ACCEPTANCE_VERSION = '2026-10-28';
 
 export const hasCurrentLegalAcceptance = (profile) => (
   profile?.terms_of_service?.[LEGAL_ACCEPTANCE_KEY]?.accepted === true
@@ -57,7 +57,7 @@ Where you connect a supported payment provider account, payments are processed t
 
 Your relationship with the connected payment provider is governed by that provider's agreements and policies. The provider may assess processing fees, currency-conversion fees, reserves, negative balances, payout fees, dispute fees, or other amounts under its terms. If you connect Stripe, Stripe's agreements and policies also apply. Nodemere is not a payment processor and does not control a third-party provider's approval, settlement, reserves, holds, fees, or account decisions.
 
-For eligible sales successfully generated through an AI receptionist and processed through a supported connected payment provider, Nodemere may charge a **3% platform fee**. An eligible sale is a transaction for the Customer's goods or services that is attributable to an AI receptionist interaction and successfully processed through the connected payment provider. The platform fee is calculated only on the eligible transaction amount, excluding separately stated taxes and tips. Refunded amounts and amounts subject to a payment dispute are excluded from the platform-fee calculation; if a fee was collected before a refund or dispute was recorded, Nodemere may reverse or credit the corresponding fee against a future amount due where reasonably practicable.
+For payments that you collect from your own customers for goods or services through a supported connected payment provider in Nodemere, Nodemere may charge a **3% platform fee**. This fee does not apply to your Nodemere subscription or setup charges. The platform fee is calculated on the sale amount, excluding tax and tip amounts identified separately in the payment request. Refunded amounts and amounts subject to a payment dispute are excluded from the platform-fee calculation; if a fee was collected before a refund or dispute was recorded, Nodemere may reverse or credit the corresponding fee against a future amount due where reasonably practicable.
 
 The platform fee is separate from all connected payment-provider fees and other third-party charges. Unless an order form or applicable pricing page states otherwise, the Customer authorizes Nodemere to collect the platform fee using the method disclosed for the applicable payment flow, which may include deduction from applicable transaction proceeds where supported, invoicing the Customer, or charging an authorized payment method associated with the Customer's account. The Customer remains responsible for maintaining valid payment information and paying all amounts when due.
 

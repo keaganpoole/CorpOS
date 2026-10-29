@@ -2129,6 +2129,8 @@ class ScenarioActionExecutor:
         payload = {
             "user_id": context.get("user_id") or context.get("business", {}).get("user_id"),
             "amount": self._parse_money_to_cents(self._resolve_variables(config.get("amount") or "", context)),
+            "tax_amount": self._parse_money_to_cents(self._resolve_variables(config.get("tax_amount") or "0", context)),
+            "tip_amount": self._parse_money_to_cents(self._resolve_variables(config.get("tip_amount") or "0", context)),
             "currency": self._resolve_variables(config.get("currency") or "usd", context),
             "payment_method_type": self._resolve_variables(config.get("payment_method") or "card", context),
             "description": self._resolve_variables(config.get("description") or "", context),
@@ -2183,6 +2185,8 @@ class ScenarioActionExecutor:
         payload = {
             "user_id": context.get("user_id") or context.get("business", {}).get("user_id"),
             "amount": self._parse_money_to_cents(self._resolve_variables(config.get("amount") or "", context)) if config.get("amount") else None,
+            "tax_amount": self._parse_money_to_cents(self._resolve_variables(config.get("tax_amount") or "0", context)),
+            "tip_amount": self._parse_money_to_cents(self._resolve_variables(config.get("tip_amount") or "0", context)),
             "currency": self._resolve_variables(config.get("currency") or "usd", context),
             "description": self._resolve_variables(config.get("description") or "", context),
             "person_id": self._string_or_none(self._resolve_variables(config.get("person_id") or "", context) or person.get("id") or context.get("person_id")),
@@ -2203,6 +2207,8 @@ class ScenarioActionExecutor:
         payload = {
             "user_id": context.get("user_id") or context.get("business", {}).get("user_id"),
             "amount": self._parse_money_to_cents(self._resolve_variables(config.get("amount") or "", context)),
+            "tax_amount": self._parse_money_to_cents(self._resolve_variables(config.get("tax_amount") or "0", context)),
+            "tip_amount": self._parse_money_to_cents(self._resolve_variables(config.get("tip_amount") or "0", context)),
             "currency": self._resolve_variables(config.get("currency") or "usd", context),
             "description": self._resolve_variables(config.get("description") or "", context),
             "person_id": self._string_or_none(self._resolve_variables(config.get("person_id") or "", context) or person.get("id") or context.get("person_id")),

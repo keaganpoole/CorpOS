@@ -200,8 +200,8 @@ from .record_reads import router as record_read_router
 app.include_router(record_read_router)
 app.include_router(build_visitor_router(supabase_admin, get_current_user))
 app.include_router(build_visitor_intelligence_router(supabase_admin, get_current_user))
-NODEMERE_LEGAL_ACCEPTANCE_KEY = "nodemere_legal_acceptance_v2026_09_05"
-NODEMERE_LEGAL_ACCEPTANCE_VERSION = "2026-09-05"
+NODEMERE_LEGAL_ACCEPTANCE_KEY = "nodemere_legal_acceptance_v2026_10_28"
+NODEMERE_LEGAL_ACCEPTANCE_VERSION = "2026-10-28"
 # scheduler = AsyncIOScheduler()
 PAYMENT_TEST_MODE = TEST_MODE
 
@@ -3192,6 +3192,8 @@ class ConfigStatusResponse(BaseModel):
 
 class PaymentCreateRequest(BaseModel):
     amount: int
+    tax_amount: int = Field(default=0, ge=0)
+    tip_amount: int = Field(default=0, ge=0)
     currency: str = "usd"
     payment_method_type: str = "card"
     description: Optional[str] = None
@@ -3297,6 +3299,8 @@ class CustomerUpdateRequest(BaseModel):
 
 class PaymentLinkCreateRequest(BaseModel):
     amount: int
+    tax_amount: int = Field(default=0, ge=0)
+    tip_amount: int = Field(default=0, ge=0)
     currency: str = "usd"
     description: Optional[str] = None
     person_id: Optional[str] = None
@@ -3307,6 +3311,8 @@ class PaymentLinkCreateRequest(BaseModel):
 
 class InvoiceCreateRequest(BaseModel):
     amount: int
+    tax_amount: int = Field(default=0, ge=0)
+    tip_amount: int = Field(default=0, ge=0)
     currency: str = "usd"
     description: Optional[str] = None
     person_id: Optional[str] = None
@@ -4100,6 +4106,25 @@ def calculate_platform_application_fee(amount_cents: int) -> int:
         return 0
     fee = (Decimal(amount) * percent / Decimal("100")).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
     return min(amount, max(int(fee), 0))
+
+
+def customer_payment_fee_base(amount_cents: int, tax_amount_cents: int = 0, tip_amount_cents: int = 0) -> int:
+    """The 3% fee excludes tax and tip portions identified in a customer payment."""
+    amount = int(amount_cents or 0)
+    tax = int(tax_amount_cents or 0)
+    tip = int(tip_amount_cents or 0)
+    if tax < 0 or tip < 0 or tax + tip > amount:
+        raise HTTPException(status_code=422, detail="Tax and tip must be nonnegative and cannot exceed the payment amount.")
+    return amount - tax - tip
+
+
+def customer_payment_fee_metadata(amount_cents: int, tax_amount_cents: int, tip_amount_cents: int) -> dict:
+    return {
+        "nodemere_payment_total_cents": str(amount_cents),
+        "nodemere_sale_amount_cents": str(customer_payment_fee_base(amount_cents, tax_amount_cents, tip_amount_cents)),
+        "nodemere_tax_amount_cents": str(tax_amount_cents),
+        "nodemere_tip_amount_cents": str(tip_amount_cents),
+    }
 
 def create_or_update_stripe_customer_for_user(
     *,
@@ -14335,6 +14360,7 @@ async def _update_customer_for_user(request: CustomerUpdateRequest, user_id: str
 
 async def _create_payment_for_user(request: PaymentCreateRequest, user_id: str):
     require_payment_access(user_id)
+    fee_base_cents = customer_payment_fee_base(request.amount, request.tax_amount, request.tip_amount)
     description = "Business payment"
     payment_method_type = (request.payment_method_type or "card").lower()
     payment_method = "us_bank_account" if payment_method_type == "ach" else payment_method_type
@@ -14420,13 +14446,16 @@ async def _create_payment_for_user(request: PaymentCreateRequest, user_id: str):
             "payment_method_types": [payment_method],
             "automatic_payment_methods": {"enabled": False},
             "customer": customer.get("id"),
-            "metadata": build_scenario_customer_metadata(
-                user_id=user_id,
-                person_id=request.person_id,
-                appointment_id=request.appointment_id,
-            ),
+            "metadata": {
+                **build_scenario_customer_metadata(
+                    user_id=user_id,
+                    person_id=request.person_id,
+                    appointment_id=request.appointment_id,
+                ),
+                **customer_payment_fee_metadata(request.amount, request.tax_amount, request.tip_amount),
+            },
         }
-        application_fee_amount = calculate_platform_application_fee(request.amount)
+        application_fee_amount = calculate_platform_application_fee(fee_base_cents)
         if application_fee_amount:
             payment_intent_payload["application_fee_amount"] = application_fee_amount
         stripe_payment_intent = stripe.PaymentIntent.create(**stripe_request_options, **payment_intent_payload)
@@ -14498,6 +14527,7 @@ async def create_payment_profile(
 
 async def _send_payment_link_for_user(request: PaymentLinkCreateRequest, user_id: str):
     require_payment_access(user_id)
+    fee_base_cents = customer_payment_fee_base(request.amount, request.tax_amount, request.tip_amount)
     description = "Business payment"
     payment_mode_base_url = get_payment_frontend_base_url()
     ensure_no_unresolved_templates(
@@ -14573,12 +14603,13 @@ async def _send_payment_link_for_user(request: PaymentLinkCreateRequest, user_id
     )
     stripe_request_options = _get_connected_stripe_request_options(user_id)
     payment_metadata = build_scenario_customer_metadata(user_id=user_id, person_id=request.person_id)
+    payment_metadata.update(customer_payment_fee_metadata(request.amount, request.tax_amount, request.tip_amount))
     try:
 
         payment_intent_data = {
             "metadata": payment_metadata,
         }
-        application_fee_amount = calculate_platform_application_fee(request.amount)
+        application_fee_amount = calculate_platform_application_fee(fee_base_cents)
         if application_fee_amount:
             payment_intent_data["application_fee_amount"] = application_fee_amount
 
@@ -14653,6 +14684,7 @@ async def create_invoice(
 
 async def _create_invoice_for_user(request: InvoiceCreateRequest, user_id: str):
     require_payment_access(user_id)
+    fee_base_cents = customer_payment_fee_base(request.amount, request.tax_amount, request.tip_amount)
     description = "Business invoice"
     ensure_no_unresolved_templates(
         request.person_id,
@@ -14703,6 +14735,7 @@ async def _create_invoice_for_user(request: InvoiceCreateRequest, user_id: str):
             appointment_id=request.appointment_id,
             service_id=request.service_id,
         )
+        invoice_metadata.update(customer_payment_fee_metadata(request.amount, request.tax_amount, request.tip_amount))
 
         stripe.InvoiceItem.create(
             **stripe_request_options,
@@ -14713,6 +14746,7 @@ async def _create_invoice_for_user(request: InvoiceCreateRequest, user_id: str):
             metadata=invoice_metadata,
         )
 
+        application_fee_amount = calculate_platform_application_fee(fee_base_cents)
         invoice = stripe.Invoice.create(
             **stripe_request_options,
             customer=customer.get("id"),
@@ -14722,7 +14756,7 @@ async def _create_invoice_for_user(request: InvoiceCreateRequest, user_id: str):
             pending_invoice_items_behavior="include",
             description=description or None,
             metadata=invoice_metadata,
-            **({"application_fee_amount": calculate_platform_application_fee(request.amount)} if calculate_platform_application_fee(request.amount) else {}),
+            **({"application_fee_amount": application_fee_amount} if application_fee_amount else {}),
         )
         payload = serialize_stripe_invoice(invoice)
         payload["customer_id"] = customer.get("id")

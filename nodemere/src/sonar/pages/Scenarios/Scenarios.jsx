@@ -447,7 +447,9 @@ const AUTOMATION_HIERARCHY = {
         { key: 'create_payment', name: 'Create Payment', description: 'Process a new payment', configFields: [
           { key: 'person_id', label: 'Person ID', type: 'person_id' },
           { key: 'customer_id', label: 'Stripe Customer ID', type: 'text' },
-          { key: 'amount', label: 'Amount ($)', type: 'text' },
+          { key: 'amount', label: 'Total amount ($)', type: 'text' },
+          { key: 'tax_amount', label: 'Tax included ($)', type: 'text' },
+          { key: 'tip_amount', label: 'Tip included ($)', type: 'text' },
           { key: 'currency', label: 'Currency', type: 'select', options: ['usd', 'eur', 'gbp', 'cad', 'aud'] },
           { key: 'payment_method', label: 'Payment Method', type: 'select', options: ['card', 'ach', 'link'] },
           { key: 'description', label: 'Description', type: 'prompt_textarea', smartActions: true },
@@ -458,7 +460,9 @@ const AUTOMATION_HIERARCHY = {
         { key: 'send_payment_link', name: 'Create Payment Link', description: 'Generate a hosted payment link for the customer', configFields: [
           { key: 'person_id', label: 'Person ID', type: 'person_id' },
           { key: 'customer_id', label: 'Stripe Customer ID', type: 'text' },
-          { key: 'amount', label: 'Amount ($)', type: 'text' },
+          { key: 'amount', label: 'Total amount ($)', type: 'text' },
+          { key: 'tax_amount', label: 'Tax included ($)', type: 'text' },
+          { key: 'tip_amount', label: 'Tip included ($)', type: 'text' },
           { key: 'currency', label: 'Currency', type: 'select', options: ['usd', 'eur', 'gbp', 'cad', 'aud'] },
           { key: 'description', label: 'Description', type: 'prompt_textarea', smartActions: true },
           { key: 'customer_name', label: 'Customer Name', type: 'text' },
@@ -468,7 +472,9 @@ const AUTOMATION_HIERARCHY = {
         { key: 'create_invoice', name: 'Create Invoice', description: 'Create a real Stripe invoice with line items', configFields: [
           { key: 'person_id', label: 'Person ID', type: 'person_id' },
           { key: 'customer_id', label: 'Stripe Customer ID', type: 'text' },
-          { key: 'amount', label: 'Amount ($)', type: 'text' },
+          { key: 'amount', label: 'Total amount ($)', type: 'text' },
+          { key: 'tax_amount', label: 'Tax included ($)', type: 'text' },
+          { key: 'tip_amount', label: 'Tip included ($)', type: 'text' },
           { key: 'currency', label: 'Currency', type: 'select', options: ['usd', 'eur', 'gbp', 'cad', 'aud'] },
           { key: 'description', label: 'Description', type: 'prompt_textarea', smartActions: true },
           { key: 'customer_name', label: 'Customer Name', type: 'text' },
@@ -3818,12 +3824,16 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
 
       if (actionKey === 'create_payment') {
         const amountCents = Math.round(Number(getValue('amount') || 0) * 100);
+        const taxCents = Math.round(Number(getValue('tax_amount') || 0) * 100);
+        const tipCents = Math.round(Number(getValue('tip_amount') || 0) * 100);
         console.debug("Scenarios.jsx:event_4105");
         const resp = await authorizedApiFetch('/api/sonar/create-payment', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             amount: amountCents,
+            tax_amount: taxCents,
+            tip_amount: tipCents,
             currency: getValue('currency') || 'usd',
             payment_method_type: getValue('payment_method') || 'card',
             description: getValue('description') || '',
@@ -3843,12 +3853,16 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
 
       if (actionKey === 'send_payment_link') {
         const amountCents = Math.round(Number(getValue('amount') || 0) * 100);
+        const taxCents = Math.round(Number(getValue('tax_amount') || 0) * 100);
+        const tipCents = Math.round(Number(getValue('tip_amount') || 0) * 100);
         console.debug("Scenarios.jsx:event_4130");
         const resp = await authorizedApiFetch('/api/sonar/send-payment-link', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             amount: amountCents,
+            tax_amount: taxCents,
+            tip_amount: tipCents,
             currency: getValue('currency') || 'usd',
             description: getValue('description') || '',
             person_id: getValue('person_id') || null,
@@ -3866,12 +3880,16 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
 
       if (actionKey === 'create_invoice') {
         const amountCents = Math.round(Number(getValue('amount') || 0) * 100);
+        const taxCents = Math.round(Number(getValue('tax_amount') || 0) * 100);
+        const tipCents = Math.round(Number(getValue('tip_amount') || 0) * 100);
         console.debug("Scenarios.jsx:event_4153");
         const resp = await authorizedApiFetch('/api/sonar/create-invoice', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             amount: amountCents,
+            tax_amount: taxCents,
+            tip_amount: tipCents,
             currency: getValue('currency') || 'usd',
             description: getValue('description') || '',
             person_id: getValue('person_id') || null,
@@ -4162,8 +4180,12 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
         } else if (actionKey === 'create_payment') {
           const config = node.actionConfig || node.appointmentConfig;
           const amountCents = Math.round(Number(resolveVariableRefs(resolveTableVariableRefs(config.amount, resultsMap), resultsMap) || config.amount || 0) * 100);
+          const taxCents = Math.round(Number(resolveVariableRefs(resolveTableVariableRefs(config.tax_amount, resultsMap), resultsMap) || config.tax_amount || 0) * 100);
+          const tipCents = Math.round(Number(resolveVariableRefs(resolveTableVariableRefs(config.tip_amount, resultsMap), resultsMap) || config.tip_amount || 0) * 100);
           const body = {
             amount: amountCents,
+            tax_amount: taxCents,
+            tip_amount: tipCents,
             currency: config.currency || 'usd',
             payment_method_type: config.payment_method || 'card',
             description: resolveVariableRefs(resolveTableVariableRefs(config.description, resultsMap), resultsMap) || config.description || '',
@@ -4190,8 +4212,12 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
         } else if (actionKey === 'send_payment_link') {
           const config = node.actionConfig || node.appointmentConfig;
           const amountCents = Math.round(Number(resolveVariableRefs(resolveTableVariableRefs(config.amount, resultsMap), resultsMap) || config.amount || 0) * 100);
+          const taxCents = Math.round(Number(resolveVariableRefs(resolveTableVariableRefs(config.tax_amount, resultsMap), resultsMap) || config.tax_amount || 0) * 100);
+          const tipCents = Math.round(Number(resolveVariableRefs(resolveTableVariableRefs(config.tip_amount, resultsMap), resultsMap) || config.tip_amount || 0) * 100);
           const body = {
             amount: amountCents,
+            tax_amount: taxCents,
+            tip_amount: tipCents,
             currency: config.currency || 'usd',
             description: resolveVariableRefs(resolveTableVariableRefs(config.description, resultsMap), resultsMap) || config.description || '',
             person_id: resolveVariableRefs(resolveTableVariableRefs(config.person_id, resultsMap), resultsMap) || config.person_id || null,
@@ -4219,8 +4245,12 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
         } else if (actionKey === 'create_invoice') {
           const config = node.actionConfig || node.appointmentConfig;
           const amountCents = Math.round(Number(resolveVariableRefs(resolveTableVariableRefs(config.amount, resultsMap), resultsMap) || config.amount || 0) * 100);
+          const taxCents = Math.round(Number(resolveVariableRefs(resolveTableVariableRefs(config.tax_amount, resultsMap), resultsMap) || config.tax_amount || 0) * 100);
+          const tipCents = Math.round(Number(resolveVariableRefs(resolveTableVariableRefs(config.tip_amount, resultsMap), resultsMap) || config.tip_amount || 0) * 100);
           const body = {
             amount: amountCents,
+            tax_amount: taxCents,
+            tip_amount: tipCents,
             currency: config.currency || 'usd',
             description: resolveVariableRefs(resolveTableVariableRefs(config.description, resultsMap), resultsMap) || config.description || '',
             person_id: resolveVariableRefs(resolveTableVariableRefs(config.person_id, resultsMap), resultsMap) || config.person_id || null,
