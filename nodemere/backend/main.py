@@ -5826,8 +5826,6 @@ def attach_overage_to_upcoming_invoice(invoice: dict) -> None:
         return
 
     usage = get_usage_snapshot(str(user["id"]))
-    if usage["billable_overage_minutes"] <= 0:
-        return
 
     existing_response = (
         supabase_admin.table("billing_overage_events")
@@ -5838,7 +5836,7 @@ def attach_overage_to_upcoming_invoice(invoice: dict) -> None:
         .execute()
     )
     existing = (existing_response.data or [None])[0]
-    if existing and existing.get("stripe_invoice_item_id"):
+    if existing and existing.get("cycle_rolled_at"):
         return
 
     event_payload = {
@@ -5848,6 +5846,7 @@ def attach_overage_to_upcoming_invoice(invoice: dict) -> None:
         "stripe_invoice_id": invoice_id,
         "billing_period_start": datetime.fromtimestamp(invoice["period_start"], timezone.utc).isoformat() if invoice.get("period_start") else usage.get("cycle_started_at"),
         "billing_period_end": datetime.fromtimestamp(invoice["period_end"], timezone.utc).isoformat() if invoice.get("period_end") else usage.get("cycle_ends_at"),
+        "billed_usage_seconds": usage["used_seconds"],
         "overage_seconds": usage["overage_seconds"],
         "billable_minutes": usage["billable_overage_minutes"],
         "amount_cents": usage["estimated_overage_amount_cents"],
@@ -5858,26 +5857,31 @@ def attach_overage_to_upcoming_invoice(invoice: dict) -> None:
         if not existing:
             insert_response = supabase_admin.table("billing_overage_events").insert(event_payload).execute()
             existing = (insert_response.data or [None])[0]
-        if existing and existing.get("stripe_invoice_item_id"):
-            return
-
-        item = stripe.InvoiceItem.create(
-            customer=customer_id,
-            invoice=invoice_id,
-            amount=event_payload["amount_cents"],
-            currency=event_payload["currency"],
-            description=f"Nodemere call overage: {event_payload['billable_minutes']} minute(s)",
-            metadata={
-                "nodemere_user_id": str(user["id"]),
-                "nodemere_overage_event_id": str((existing or {}).get("id") or ""),
-            },
-            idempotency_key=f"nodemere-overage-{invoice_id}-{user['id']}",
-        )
+        if not existing:
+            raise RuntimeError("Overage invoice event was not recorded")
+        item_id = existing.get("stripe_invoice_item_id")
+        if existing["amount_cents"] > 0 and not item_id:
+            item = stripe.InvoiceItem.create(
+                customer=customer_id,
+                invoice=invoice_id,
+                amount=existing["amount_cents"],
+                currency=existing["currency"],
+                description=f"Nodemere call overage: {existing['billable_minutes']} minute(s)",
+                metadata={
+                    "nodemere_user_id": str(user["id"]),
+                    "nodemere_overage_event_id": str(existing["id"]),
+                },
+                idempotency_key=f"nodemere-overage-{invoice_id}-{user['id']}",
+            )
+            item_id = item.get("id")
         supabase_admin.table("billing_overage_events").update({
-            "stripe_invoice_item_id": item.get("id"),
+            "stripe_invoice_item_id": item_id,
             "status": "invoiced",
             "error_message": None,
         }).eq("user_id", str(user["id"])).eq("stripe_invoice_id", invoice_id).execute()
+        supabase_admin.rpc("roll_business_usage_for_invoice", {
+            "p_user_id": str(user["id"]), "p_invoice_id": invoice_id,
+        }).execute()
         logging.info('main.attach_overage_to_upcoming_invoice.event_4815')
     except Exception as exc:
         logging.error('main.attach_overage_to_upcoming_invoice.event_4784')
@@ -5885,6 +5889,7 @@ def attach_overage_to_upcoming_invoice(invoice: dict) -> None:
             "status": "failed",
             "error_message": str(exc)[:1000],
         }).eq("user_id", str(user["id"])).eq("stripe_invoice_id", invoice_id).execute()
+        raise
 
 
 def reconcile_overage_invoice(invoice_id: Optional[str], status_value: str) -> None:
@@ -14847,10 +14852,20 @@ async def _refund_payment_for_user(request: RefundPaymentRequest, user_id: str):
         raise HTTPException(status_code=404, detail="Payment not found")
 
     try:
+        payment_intent = stripe.PaymentIntent.retrieve(
+            payment_intent_id,
+            expand=["latest_charge"],
+            **stripe_request_options,
+        )
+        latest_charge = payment_intent.get("latest_charge") or {}
+        if isinstance(latest_charge, str):
+            latest_charge = stripe.Charge.retrieve(latest_charge, **stripe_request_options)
+        has_application_fee = bool(latest_charge.get("application_fee"))
         refund = _stripe_object_to_dict(
             stripe.Refund.create(
                 **stripe_request_options,
                 payment_intent=payment_intent_id,
+                **({"refund_application_fee": True} if has_application_fee else {}),
                 **({"amount": request.amount} if request.amount else {}),
                 **({"reason": "requested_by_customer"} if request.refund_reason else {}),
                 metadata={"user_id": user_id, "source": "nodemere_scenarios"},
@@ -15285,12 +15300,12 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
         )
         logging.info('main.stripe_webhook.event_11655')
 
-    elif event_type == 'invoice.upcoming':
+    elif event_type == 'invoice.created':
         invoice = event['data']['object']
-        if not is_connected_account_event:
+        if not is_connected_account_event and invoice.get('billing_reason') == 'subscription_cycle':
             attach_overage_to_upcoming_invoice(invoice)
         return {"status": "success"}
-    elif event_type in {'invoice.created', 'invoice.sent'}:
+    elif event_type in {'invoice.upcoming', 'invoice.sent'}:
         # These invoice lifecycle events are intentionally not exposed as
         # Scenarios triggers.
         return {"status": "success"}
@@ -15338,13 +15353,6 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
                 if not user_status_update_response.data:
                     logging.error('main.stripe_webhook.event_11627')
                     raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update user's subscription status.")
-                sync_business_plan_entitlement(
-                    user_id,
-                    user_data_response.data.get('plan'),
-                    datetime.fromtimestamp(invoice.get('period_start'), timezone.utc).isoformat() if invoice.get('period_start') else None,
-                    datetime.fromtimestamp(invoice.get('period_end'), timezone.utc).isoformat() if invoice.get('period_end') else None,
-                    reset_usage=True,
-                )
                 logging.info('main.stripe_webhook.event_11636')
                 # 2. Commission Calculation for Rep
                 if associate_rep_id:
