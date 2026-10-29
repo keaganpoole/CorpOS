@@ -140,28 +140,28 @@ export default function MbtiPersonalityModal({ person, onClose }) {
   if (typeof document === 'undefined') return null;
 
   return createPortal(
-    <motion.div className="fixed inset-0 z-[1200] flex items-center justify-center bg-black/75 px-5 backdrop-blur-md" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onMouseDown={onClose} onClick={(event) => event.stopPropagation()}>
-      <motion.section role="dialog" aria-modal="true" aria-labelledby="mbti-personality-title" className="relative w-full max-w-[620px] overflow-hidden rounded-[30px] border border-white/[0.08] bg-[#070707]/[0.97] shadow-[0_28px_90px_rgba(0,0,0,.62)]" initial={{ opacity: 0, y: 16, scale: .98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 16, scale: .98 }} transition={{ duration: .2 }} onMouseDown={(event) => event.stopPropagation()}>
+    <motion.div className="fixed inset-0 z-[1200] flex items-center justify-center bg-black/75 px-8 backdrop-blur-md lg:px-5" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onMouseDown={onClose} onClick={(event) => event.stopPropagation()}>
+      <motion.section role="dialog" aria-modal="true" aria-labelledby="mbti-personality-title" className="relative max-h-[calc(100dvh-32px)] w-full max-w-[340px] overflow-x-hidden overflow-y-auto rounded-[24px] border border-white/[0.08] bg-[#070707]/[0.97] shadow-[0_28px_90px_rgba(0,0,0,.62)] sm:max-w-[460px] lg:max-h-none lg:max-w-[620px] lg:overflow-hidden lg:rounded-[30px]" initial={{ opacity: 0, y: 16, scale: .98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 16, scale: .98 }} transition={{ duration: .2 }} onMouseDown={(event) => event.stopPropagation()}>
         <MbtiSpectrumLine type={type} />
         <div className="pointer-events-none absolute right-[-110px] top-[-130px] h-72 w-72 rounded-full blur-[90px]" style={{ background: `${SPECTRUM[type]?.[0] || '#c4b5fd'}18` }} />
-        <div className="relative p-7 sm:px-9 sm:py-8">
+        <div className="relative p-4 sm:p-5 lg:px-9 lg:py-8">
           <div className="flex items-start justify-between gap-5">
             <div className="min-w-0">
-              <div className="mb-3 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[.18em] text-zinc-600"><Sparkles size={14} /><span>Personality profile</span></div>
+              <div className="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[.18em] text-zinc-600 lg:mb-3 lg:text-[11px]"><Sparkles size={14} /><span>Personality profile</span></div>
               <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <h2 id="mbti-personality-title" className="text-[36px] font-semibold tracking-[-.05em] text-white">{type || 'MBTI'}</h2>
+                <h2 id="mbti-personality-title" className="text-[28px] font-semibold tracking-[-.05em] text-white lg:text-[36px]">{type || 'MBTI'}</h2>
               </div>
             </div>
             <button type="button" onClick={onClose} className="flex h-8 w-8 shrink-0 items-center justify-center text-zinc-600 transition hover:text-white" aria-label="Close personality profile"><X size={17} /></button>
           </div>
 
           {type.length === 4 && (
-            <div className="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {type.split('').map((letter) => <div key={letter} className="flex items-start gap-3 rounded-lg border border-white/[.045] bg-transparent px-3.5 py-3"><div className="flex w-[82px] shrink-0 items-baseline gap-1.5"><strong className="text-xl text-white">{letter}</strong><span className="text-[11px] font-semibold text-zinc-400">{LETTERS[letter]?.[0]}</span></div><p className="min-w-0 pt-0.5 text-[11px] leading-[1.6] text-zinc-500">{LETTERS[letter]?.[1]}</p></div>)}
+            <div className="mt-3 grid grid-cols-1 gap-1.5 sm:grid-cols-2 lg:mt-5 lg:gap-2">
+              {type.split('').map((letter) => <div key={letter} className="flex items-start gap-2 rounded-lg border border-white/[.045] bg-transparent px-2.5 py-2 lg:gap-3 lg:px-3.5 lg:py-3"><div className="flex w-[72px] shrink-0 items-baseline gap-1 lg:w-[82px] lg:gap-1.5"><strong className="text-base text-white lg:text-xl">{letter}</strong><span className="text-[10px] font-semibold text-zinc-400 lg:text-[11px]">{LETTERS[letter]?.[0]}</span></div><p className="min-w-0 text-[10px] leading-[1.4] text-zinc-500 lg:pt-0.5 lg:text-[11px] lg:leading-[1.6]">{LETTERS[letter]?.[1]}</p></div>)}
             </div>
           )}
 
-          <div className="mt-10 border-t border-white/[.045] pt-5">
+          <div className="mt-5 border-t border-white/[.045] pt-3 lg:mt-10 lg:pt-5">
             <p className="text-center text-[10px] leading-4 text-zinc-700">Personality type is a helpful communication lens, not a limit on how someone can think, grow, or behave.</p>
           </div>
         </div>
