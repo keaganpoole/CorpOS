@@ -83,6 +83,7 @@ from .config import (
     supabase_admin,
     supabase_auth,
     stripe_webhook_secret,
+    stripe_connect_webhook_secret,
     SECRET_KEY,
     ALGORITHM,
     TEST_MODE,
@@ -15180,17 +15181,31 @@ async def update_payment(request: PaymentUpdateRequest, current_user: dict = Dep
 
 @app.post("/stripe-webhook", tags=["Billing"])
 async def stripe_webhook(request: Request, stripe_signature: str = Header(None)):
-    if not stripe_webhook_secret:
+    if not stripe_webhook_secret and not stripe_connect_webhook_secret:
         logging.error('main.stripe_webhook.event_11531')
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Stripe webhook authentication is not configured.")
     raw_body = await request.body()
     logging.info('main.stripe_webhook.event_11626')
-    try:
-        event = stripe.Webhook.construct_event(payload=raw_body, sig_header=stripe_signature, secret=stripe_webhook_secret)
-    except ValueError:
-        logging.warning('main.stripe_webhook.event_11473')
-        raise HTTPException(status_code=400, detail="Invalid payload")
-    except stripe.error.SignatureVerificationError:
+    event = None
+    for secret, expects_connected_account in (
+        (stripe_webhook_secret, False),
+        (stripe_connect_webhook_secret, True),
+    ):
+        if not secret:
+            continue
+        try:
+            candidate = stripe.Webhook.construct_event(payload=raw_body, sig_header=stripe_signature, secret=secret)
+        except ValueError:
+            logging.warning('main.stripe_webhook.event_11473')
+            raise HTTPException(status_code=400, detail="Invalid payload")
+        except stripe.error.SignatureVerificationError:
+            continue
+        if bool(candidate.get("account")) != expects_connected_account:
+            logging.warning('main.stripe_webhook.event_11476')
+            raise HTTPException(status_code=400, detail="Invalid webhook account scope")
+        event = candidate
+        break
+    if event is None:
         logging.warning('main.stripe_webhook.event_11476')
         raise HTTPException(status_code=400, detail="Invalid signature")
 

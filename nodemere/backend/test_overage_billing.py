@@ -127,6 +127,7 @@ class InvoiceWebhookTests(unittest.IsolatedAsyncioTestCase):
                 return b"{}"
 
         with patch.object(main, "stripe_webhook_secret", "secret"), \
+             patch.object(main, "stripe_connect_webhook_secret", "connect_secret"), \
              patch.object(main.stripe.Webhook, "construct_event") as construct, \
              patch.object(main, "record_verified_billing_event"), \
              patch.object(main, "attach_overage_to_upcoming_invoice") as attach:
@@ -136,10 +137,15 @@ class InvoiceWebhookTests(unittest.IsolatedAsyncioTestCase):
                 ("invoice.created", "subscription_cycle", "acct_connected"),
                 ("invoice.created", "subscription_cycle", None),
             ):
-                construct.return_value = {
+                event = {
                     "type": event_type, "account": account,
                     "data": {"object": {"id": "in_renewal", "billing_reason": billing_reason}},
                 }
+                def verified_event(*, payload, sig_header, secret):
+                    if secret != ("connect_secret" if account else "secret"):
+                        raise main.stripe.error.SignatureVerificationError("Invalid signature", sig_header)
+                    return event
+                construct.side_effect = verified_event
                 self.assertEqual(
                     await main.stripe_webhook(Request(), stripe_signature="sig"),
                     {"status": "success"},
