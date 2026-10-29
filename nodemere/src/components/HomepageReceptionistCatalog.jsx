@@ -8,7 +8,7 @@ import '../sonar/studio/studio.css';
 import '../sonar/studio/receptionistGallery.css';
 import './HomepageReceptionistCatalog.css';
 
-const catalogFields = 'id,full_name,description,stereotype,avatar,avatar_video,traits,voice,age,first_name,is_active,showcase_in_hero,hero_avatar,banner_id,gender,personality_type,personality_id,personality:personalities(mbti,personality)';
+const catalogFields = 'id,full_name,description,stereotype,avatar,avatar_video,traits,voice,age,first_name,is_active,showcase_in_hero,hero_avatar,banner_id,gender,personality_id,personality:personalities!receptionist_catalog_personality_id_fkey(mbti,personality)';
 
 export default function HomepageReceptionistCatalog({ active, ambientDrift, onContinue }) {
   const [catalogRows, setCatalogRows] = useState(null);
@@ -36,23 +36,12 @@ export default function HomepageReceptionistCatalog({ active, ambientDrift, onCo
         catalogRowsForHomepage = catalogRowsForHomepage.filter((person) => (
           person.source !== 'created_receptionist' && person.created_receptionist_id == null && person.is_custom !== true
         ));
-        const personalityIds = [...new Set(catalogRowsForHomepage.map((person) => person.personality_id).filter(Boolean))];
-        const personalityMap = new Map();
-        await Promise.all(personalityIds.map(async (personalityId) => {
-          const personalityResponse = await fetch(`${supabaseUrl}/rest/v1/personalities?id=eq.${encodeURIComponent(personalityId)}&select=mbti,personality`, {
-            headers: { apikey: publicKey, Authorization: `Bearer ${publicKey}` },
-          });
-          if (personalityResponse.ok) {
-            const personalityRows = await personalityResponse.json();
-            if (personalityRows[0]) personalityMap.set(String(personalityId), personalityRows[0]);
-          }
-        }));
         if (cancelled) return;
         setCatalogRows(catalogRowsForHomepage
           .filter((person) => person.id != null)
           .map((person) => ({
             ...person,
-            personality: person.personality || personalityMap.get(String(person.personality_id)),
+            personality: Array.isArray(person.personality) ? person.personality[0] : person.personality,
             catalog_id: person.catalog_id ?? person.id,
           })));
       } catch (error) {
