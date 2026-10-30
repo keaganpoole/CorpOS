@@ -14049,7 +14049,19 @@ async def get_plans():
         is_payment_test_mode()
         products = stripe.Product.list(active=True, limit=100)
         prices = stripe.Price.list(active=True, limit=100)
-        return {"products": products.data, "prices": prices.data}
+        return {
+            "products": [{"id": product.id, "name": product.name} for product in products.data],
+            "prices": [
+                {
+                    "id": price.id,
+                    "product": price.product,
+                    "unit_amount": price.unit_amount,
+                    "recurring": {"interval": price.recurring.interval} if price.recurring else None,
+                    "metadata": dict(price.metadata or {}),
+                }
+                for price in prices.data
+            ],
+        }
     except Exception as e:
         logging.error('main.get_plans.event_10326')
         raise HTTPException(status_code=500, detail="Failed to fetch plans")
