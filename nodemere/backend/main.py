@@ -14049,8 +14049,10 @@ async def get_plans():
         is_payment_test_mode()
         products = stripe.Product.list(active=True, limit=100)
         prices = stripe.Price.list(active=True, limit=100)
+        product_rows = [product.to_dict() for product in products.data]
+        price_rows = [price.to_dict() for price in prices.data]
         return {
-            "products": [{"id": product.get("id"), "name": product.get("name")} for product in products.data],
+            "products": [{"id": product.get("id"), "name": product.get("name")} for product in product_rows],
             "prices": [
                 {
                     "id": price.get("id"),
@@ -14059,7 +14061,7 @@ async def get_plans():
                     "recurring": {"interval": (price.get("recurring") or {}).get("interval")} if price.get("recurring") else None,
                     "metadata": dict(price.get("metadata") or {}),
                 }
-                for price in prices.data
+                for price in price_rows
             ],
         }
     except Exception as e:
