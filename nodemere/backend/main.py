@@ -14063,7 +14063,7 @@ async def get_plans():
             ],
         }
     except Exception as e:
-        logging.error('main.get_plans.event_10326')
+        logging.exception('main.get_plans.event_10326')
         raise HTTPException(status_code=500, detail="Failed to fetch plans")
 
 
