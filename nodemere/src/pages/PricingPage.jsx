@@ -25,9 +25,9 @@ const plansConfig = [
         name: "Ultra",
         description: "Built for high-scale operations, deeper customization, and maximum control.",
         prices: {
-            Standard: { monthly: 900, annually: 810 },
-            Sales: { monthly: 900, annually: 810 },
-            Social: { monthly: 900, annually: 810 },
+            Standard: { monthly: 1100, annually: 990 },
+            Sales: { monthly: 1100, annually: 990 },
+            Social: { monthly: 1100, annually: 990 },
         },
         features: [
             { label: "Everything in Pro", description: "Includes every Pro feature with more room to grow." },
@@ -44,9 +44,9 @@ const plansConfig = [
         name: "Pro",
         description: "Advanced AI receptionist infrastructure designed to operate beyond the limitations of traditional staffing.",
         prices: {
-            Standard: { monthly: 400, annually: 360 },
-            Sales: { monthly: 400, annually: 360 },
-            Social: { monthly: 400, annually: 360 },
+            Standard: { monthly: 600, annually: 540 },
+            Sales: { monthly: 600, annually: 540 },
+            Social: { monthly: 600, annually: 540 },
         },
         features: [
             { label: "Everything in Essentials", description: "Starts with all Essentials features already included." },
@@ -66,9 +66,9 @@ const plansConfig = [
         name: "Essentials",
         description: "A focused AI receptionist for ordinary front-desk work, general questions, and routine scheduling.",
         prices: {
-            Standard: { monthly: 100, annually: 90 },
-            Sales: { monthly: 100, annually: 90 },
-            Social: { monthly: 100, annually: 90 },
+            Standard: { monthly: 200, annually: 180 },
+            Sales: { monthly: 200, annually: 180 },
+            Social: { monthly: 200, annually: 180 },
         },
         features: [
             { label: "3 AI Receptionists", description: "Use up to three receptionists for different call styles or duties." },

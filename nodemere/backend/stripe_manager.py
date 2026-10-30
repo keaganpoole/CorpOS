@@ -2,7 +2,6 @@ import stripe
 import os
 import json
 from time import sleep
-2
 
 try:
     from .env_loader import load_project_env
@@ -30,38 +29,38 @@ pricing_matrix = {
     },
     "essentials": {
         "monthly": {
-            "standard": 10000,
-            "sales": 10000,
-            "social": 10000
+            "standard": 20000,
+            "sales": 20000,
+            "social": 20000
         },
         "annual": {
-            "standard": 108000,  # 90 * 12
-            "sales": 108000,
-            "social": 108000
+            "standard": 216000,  # 180 * 12
+            "sales": 216000,
+            "social": 216000
         }
     },
     "pro": {
         "monthly": {
-            "standard": 40000,
-            "sales": 40000,
-            "social": 40000
+            "standard": 60000,
+            "sales": 60000,
+            "social": 60000
         },
         "annual": {
-            "standard": 432000,  # 360 * 12
-            "sales": 432000,
-            "social": 432000
+            "standard": 648000,  # 540 * 12
+            "sales": 648000,
+            "social": 648000
         }
     },
     "ultra": {
         "monthly": {
-            "standard": 90000,
-            "sales": 90000,
-            "social": 90000
+            "standard": 110000,
+            "sales": 110000,
+            "social": 110000
         },
         "annual": {
-            "standard": 972000,  # 810 * 12
-            "sales": 972000,
-            "social": 972000
+            "standard": 1188000,  # 990 * 12
+            "sales": 1188000,
+            "social": 1188000
         }
     }
 }

@@ -356,7 +356,7 @@ def _build_report() -> dict[str, Any]:
 
     pricing_metrics = [
         metric("Recommended Entry Price", "$99 / month", "Matches the category anchor while leaving room to prove value on lower-volume businesses.", "Market Estimate"),
-        metric("Recommended Main Plan Price", "$299 / month", "Better reflects workflow, CRM, booking, and automation value than the current $100 Essentials anchor.", "Market Estimate"),
+        metric("Recommended Main Plan Price", "$299 / month", "Better reflects workflow, CRM, booking, and automation value than the current $200 Essentials anchor.", "Market Estimate"),
         metric("Recommended Premium Price", "$799 / month", "A reasonable high-touch tier for multi-receptionist, payments, voice, and advanced workflow usage.", "Market Estimate"),
         metric("Best Pricing Model", "Tiered platform fee + included usage + transparent overage", "Balances predictable bills with provider and call-volume economics.", "Market Estimate"),
         metric("Maximum Reasonable Price", "$1,500 / month", "Requires high volume, multi-location control, onboarding, support, or measurable revenue lift.", "Market Estimate"),
