@@ -14050,14 +14050,14 @@ async def get_plans():
         products = stripe.Product.list(active=True, limit=100)
         prices = stripe.Price.list(active=True, limit=100)
         return {
-            "products": [{"id": product.id, "name": product.name} for product in products.data],
+            "products": [{"id": product.get("id"), "name": product.get("name")} for product in products.data],
             "prices": [
                 {
-                    "id": price.id,
-                    "product": price.product,
-                    "unit_amount": price.unit_amount,
-                    "recurring": {"interval": price.recurring.interval} if price.recurring else None,
-                    "metadata": dict(price.metadata or {}),
+                    "id": price.get("id"),
+                    "product": price.get("product"),
+                    "unit_amount": price.get("unit_amount"),
+                    "recurring": {"interval": (price.get("recurring") or {}).get("interval")} if price.get("recurring") else None,
+                    "metadata": dict(price.get("metadata") or {}),
                 }
                 for price in prices.data
             ],
