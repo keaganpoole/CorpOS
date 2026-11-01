@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ChevronLeft, ChevronRight, Lightbulb, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, LayoutGrid, Lightbulb, Table2, X } from 'lucide-react';
 import { createPortal } from 'react-dom';
 
 import { Link, useNavigate, useLocation } from 'react-router-dom';
@@ -17,7 +17,6 @@ import CubePreloader from '../sonar/components/CubePreloader';
 // --- Data ---
 const API_BASE_URL = (import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:8000' : '')).replace(/\/$/, '');
 const apiUrl = (path) => `${API_BASE_URL}${path}`;
-const planHierarchy = { "Free": 0, "Essentials": 1, "Pro": 2, "Ultra": 3 };
 const paidPlanNames = new Set(['essentials', 'pro', 'ultra']);
 
 const plansConfig = [
@@ -31,7 +30,7 @@ const plansConfig = [
         },
         features: [
             { label: "Everything in Pro", description: "Includes every Pro feature with more room to grow." },
-            { label: "Accept Payments", description: "Includes a 3% platform fee on customer payments processed through Nodemere, excluding tax and tip." },
+            { label: "Accept Payments", description: "Includes a 3% platform fee on customer payments processed through Nodemere," },
             { label: "Advanced AI Reasoning", description: "Gives receptionists stronger decision-making for more complex conversations." },
             { label: "Voice Studio", description: "Customize voice experience more deeply for your team and brand." },
             { label: "Professional Business Setup", description: "A dedicated onboarding specialist handles the setup, configuration, and optimization of your AI receptionist so it’s ready to start taking calls for your business." },
@@ -52,7 +51,7 @@ const plansConfig = [
             { label: "Everything in Essentials", description: "Starts with all Essentials features already included." },
             { label: "25 Receptionists", description: "Run a larger receptionist team for different roles or workflows." },
             { label: "AI Outbound Calling", description: "Place consented operational calls for follow-ups, reminders, and service updates." },
-            { label: "Accept Payments", description: "Receptionists can take payments and send invoices. A 3% platform fee applies to customer payments through Nodemere, excluding tax and tip." },
+            { label: "Accept Payments", description: "Receptionists can take payments and send invoices. A 3% platform fee applies to customer payments through Nodemere," },
             { label: "Unlock All Receptionists", description: "Full Access to the entire receptionist marketplace." },
             { label: "AI Texting Automation", description: "Not enabled at launch. Any future operational texting will require lawful consent and carrier approval." },
             { label: "Unlimited Contacts", description: "Keep your full contact list without contact-based restrictions." },
@@ -75,7 +74,7 @@ const plansConfig = [
             { label: "24/7 AI Inbound Call Handling", description: "Answer incoming calls around the clock without missing opportunities." },
             { label: "10 Scenarios", description: "Build up to ten workflows for calls, appointments, records, and more." },
             { label: "Appointment Booking", description: "Book, update, and manage appointments during live conversations." },
-            { label: "Accept Payments", description: "Receptionists can take payments and send invoices. A 3% platform fee applies to customer payments through Nodemere, excluding tax and tip." },
+            { label: "Accept Payments", description: "Receptionists can take payments and send invoices. A 3% platform fee applies to customer payments through Nodemere," },
             { label: "Store 1,000 Contacts", description: "Keep up to one thousand contacts in your CRM." },
             { label: "Live Call Monitoring", description: "Watch live call activity and follow what your system is doing." },
             { label: "Call Analytics", description: "See summaries and performance data from your calls." }
@@ -170,19 +169,19 @@ const PaymentTipsModal = ({ onClose }) => {
                 <div className="flex items-start justify-between gap-4">
                     <div className="relative">
                         <div className="mb-3 flex items-center gap-1.5">
-                            <Lightbulb className="h-4 w-4 shrink-0 -translate-y-[5px] text-zinc-600" aria-hidden="true" />
-                            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-zinc-600">Info</p>
+                            <Lightbulb className="h-4 w-4 shrink-0 -translate-y-[5px] text-neutral-600" aria-hidden="true" />
+                            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-neutral-600">Info</p>
                         </div>
                         <h2 className="text-xl font-semibold tracking-[-0.04em] text-white sm:text-2xl">Accept payments</h2>
-                        <p className="mt-3 max-w-[520px] text-sm leading-6 text-zinc-500">
+                        <p className="mt-3 max-w-[520px] text-sm leading-6 text-neutral-500">
                             Let your AI receptionist take payments, collect deposits, and upsell services, all right over the phone.
                         </p>
                     </div>
-                    <button type="button" onClick={onClose} className="flex h-8 w-8 shrink-0 items-center justify-center text-zinc-600 transition hover:text-white" aria-label="Close payment tips">
+                    <button type="button" onClick={onClose} className="flex h-8 w-8 shrink-0 items-center justify-center text-neutral-600 transition hover:text-white" aria-label="Close payment tips">
                         <X className="h-4 w-4" />
                     </button>
                 </div>
-                <div className="relative mt-7 space-y-4 text-sm leading-6 text-zinc-400">
+                <div className="relative mt-7 space-y-4 text-sm leading-6 text-neutral-400">
                     {[
                         ['How it works.', 'Your AI receptionist learns what services you offer and uses that information to help customers pay over the phone.'],
                         ['Platform fee.', 'Nodemere charges a 3% platform fee on customer payments processed through Nodemere using a supported connected provider. It does not apply to Nodemere plan or setup charges.'],
@@ -190,7 +189,7 @@ const PaymentTipsModal = ({ onClose }) => {
                     ].map(([title, body], index) => (
                         <div key={title} className="flex gap-3">
                             <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: `rgba(255,255,255,${Math.max(0.35, 1 - (index * 0.14))})` }} />
-                            <div><p className="text-sm font-semibold text-zinc-200">{title}</p><p className="mt-1 text-sm leading-6 text-zinc-500">{body}</p></div>
+                            <div><p className="text-sm font-semibold text-neutral-200">{title}</p><p className="mt-1 text-sm leading-6 text-neutral-500">{body}</p></div>
                         </div>
                     ))}
                 </div>
@@ -201,27 +200,19 @@ const PaymentTipsModal = ({ onClose }) => {
     return createPortal(modal, document.body);
 };
 
+const PlanCheckmark = ({ className, featureIndex }) => (
+    <svg className={className} fill="none" viewBox="0 0 24 24" aria-hidden="true">
+        <path stroke="#a3a3a3" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
+        <path className="plan-checkmark-gradient" style={featureIndex == null ? undefined : { '--checkmark-stagger': `${featureIndex * 60}ms` }} stroke="url(#checkGradient)" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
+    </svg>
+);
+
 // --- Plan Card ---
-const PlanCard = ({ plan, cycle, isInitialLoad, index, currentUserPlan, subscriptionStatus, isTestMode }) => {
+const usePlanAction = (plan, cycle, subscriptionStatus, isTestMode) => {
     const { session, refreshProfile } = useAuth();
     const navigate = useNavigate();
     const [isCheckoutLoading, setCheckoutLoading] = useState(false);
-    const [openFeature, setOpenFeature] = useState(null);
-    const [paymentTipsOpen, setPaymentTipsOpen] = useState(false);
-
-    const price = plan.price?.[cycle];
-    const isCurrent = plan.name.toLowerCase() === currentUserPlan.toLowerCase();
-    const isUpgrade = planHierarchy[plan.name] > planHierarchy[currentUserPlan];
-    const annualSavings = ((plan.price?.monthly || 0) * 12) - ((plan.price?.annually || 0) * 12);
-    const hasOverages = Boolean(plan.entitlements?.overage_enabled);
     const billingManagedInStripe = !isTestMode && ['active', 'trialing', 'past_due', 'unpaid'].includes(String(subscriptionStatus || '').toLowerCase());
-    const overageCents = Number(plan.entitlements?.overage_price_per_minute_cents ?? 30);
-    const overageRate = overageCents / 100;
-
-    const priceRef = useRef(null);
-    const scrambleFx = useTextScramble(priceRef);
-    const cardRef = useRef(null);
-    const savingsRef = useRef(null);
 
     const handleUpgradeClick = async () => {
         const planSlug = plan.name.toLowerCase();
@@ -295,12 +286,32 @@ const PlanCard = ({ plan, cycle, isInitialLoad, index, currentUserPlan, subscrip
         }
     };
 
+    return { isCheckoutLoading, billingManagedInStripe, handleUpgradeClick, handleManageBilling };
+};
+
+const PlanCard = ({ plan, cycle, isInitialLoad, index, currentUserPlan, subscriptionStatus, isTestMode }) => {
+    const { isCheckoutLoading, billingManagedInStripe, handleUpgradeClick, handleManageBilling } = usePlanAction(plan, cycle, subscriptionStatus, isTestMode);
+    const [openFeature, setOpenFeature] = useState(null);
+    const [paymentTipsOpen, setPaymentTipsOpen] = useState(false);
+
+    const price = plan.price?.[cycle];
+    const isCurrent = plan.name.toLowerCase() === currentUserPlan.toLowerCase();
+    const annualSavings = ((plan.price?.monthly || 0) * 12) - ((plan.price?.annually || 0) * 12);
+    const hasOverages = Boolean(plan.entitlements?.overage_enabled);
+    const overageCents = Number(plan.entitlements?.overage_price_per_minute_cents ?? 30);
+    const overageRate = overageCents / 100;
+
+    const priceRef = useRef(null);
+    const scrambleFx = useTextScramble(priceRef);
+    const cardRef = useRef(null);
+    const savingsRef = useRef(null);
+
     useEffect(() => {
         if (isInitialLoad || !scrambleFx.current) return;
 
         const savingsEl = savingsRef.current;
         savingsEl.innerHTML = '\u00A0';
-        savingsEl.classList.remove('animate', 'savings-gradient-text', 'text-zinc-400');
+        savingsEl.classList.remove('animate', 'savings-gradient-text', 'text-neutral-400');
         
         if (price > 0) {
             scrambleFx.current.setText(String(price)).then(() => {
@@ -319,23 +330,23 @@ const PlanCard = ({ plan, cycle, isInitialLoad, index, currentUserPlan, subscrip
     }, [cycle, isInitialLoad]);
 
     return (
-        <div ref={cardRef} className={`plan-card flex flex-col bg-[#111111] border border-[#303034] rounded-2xl p-6 ${isCurrent ? '' : ''} w-full max-w-[300px] md:flex-shrink-0 card-entry`} style={{ '--animation-delay': `${index * 100}ms` }}>
+        <div ref={cardRef} className={`plan-card plan-card-entry ${plan.name === 'Pro' ? 'plan-card--pro-touch' : ''} flex flex-col bg-[#111111] border border-[#303034] rounded-2xl p-6 ${isCurrent ? '' : ''} w-full max-w-[300px] md:flex-shrink-0`} style={{ '--animation-delay': `${index * 100}ms`, fontFamily: "'Inter', sans-serif" }}>
             <div className="flex-grow">
                 <div className="flex justify-between items-start">
                     <h3 className="text-xl font-bold text-white">{plan.name}</h3>
                     {plan.isRecommended && <span className="text-[13px] font-bold tracking-[0.01em] pricing-recommended-text" style={{ '--animation-delay': `${Math.random() * 2}s` }}>Recommended</span>}
                 </div>
-                <p className="text-gray-400 mt-2">{plan.description}</p>
-                {plan.scopeNote && <p className="mt-3 text-xs leading-5 text-gray-500">{plan.scopeNote}</p>}
+                <p className="mt-2 text-[15px] text-neutral-400">{plan.description}</p>
+                {plan.scopeNote && <p className="mt-3 text-xs leading-5 text-neutral-500">{plan.scopeNote}</p>}
                 <div className="my-6">
                     <div className="flex items-baseline justify-center text-center">
-                        <div className="flex items-start text-6xl font-extrabold text-white">
-                            <span className={`text-2xl mt-1 mr-1 ${price > 0 ? '' : 'hidden'}`}>$</span>
+                        <div className="flex items-start text-5xl font-extrabold text-white">
+                            <span className={`text-xl mt-1 mr-1 ${price > 0 ? '' : 'hidden'}`}>$</span>
                             <span ref={priceRef}>{price > 0 ? price : 'Free'}</span>
                         </div>
-                        <span className="text-gray-400 ml-2">/ month</span>
+                        <span className="text-sm text-neutral-400 ml-2">/ month</span>
                     </div>
-                    <p className="relative top-2 text-center text-xs text-gray-500 h-5 mt-2">
+                    <p className="relative top-2 text-center text-xs text-neutral-500 h-5 mt-2">
                         {cycle === 'annually' && price > 0 ? 'Billed annually' : ''}
                     </p>
                     <p ref={savingsRef} className="savings-text text-center text-xs font-semibold h-5">{'\u00A0'}</p>
@@ -349,15 +360,13 @@ const PlanCard = ({ plan, cycle, isInitialLoad, index, currentUserPlan, subscrip
 
                         return (
                         <li key={featureLabel} className="relative flex items-center">
-                            <svg className="w-5 h-5 mr-1.5 flex-shrink-0" fill="none" viewBox="0 0 24 24">
-                                <path stroke="url(#checkGradient)" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7"></path>
-                            </svg>
-                            <span className="text-gray-300 text-sm min-w-0 overflow-hidden text-ellipsis">{featureLabel}</span>
+                            <PlanCheckmark className="w-5 h-5 mr-1.5 flex-shrink-0" featureIndex={featureIndex} />
+                            <span className="text-neutral-300 text-sm min-w-0 overflow-hidden text-ellipsis">{featureLabel}</span>
                             {isPaymentFeature && (
                                 <button
                                     type="button"
                                     onClick={() => setPaymentTipsOpen(true)}
-                                    className="ml-1 flex h-4 w-4 shrink-0 items-center justify-center text-gray-300 transition-colors hover:text-white"
+                                    className="ml-1 flex h-4 w-4 shrink-0 items-center justify-center text-neutral-300 transition-colors hover:text-white"
                                     aria-label={`More info about ${featureLabel}`}
                                 >
                                     <Lightbulb className="h-3.5 w-3.5" aria-hidden="true" />
@@ -370,7 +379,7 @@ const PlanCard = ({ plan, cycle, isInitialLoad, index, currentUserPlan, subscrip
                                         onMouseEnter={() => setOpenFeature(featureIndex)}
                                         onMouseLeave={() => setOpenFeature(null)}
                                         onClick={() => setOpenFeature(openFeature === featureIndex ? null : featureIndex)}
-                                        className="flex h-3 w-3 items-center justify-center rounded-full border border-white/[0.07] bg-white/[0.015] text-[7px] font-semibold text-zinc-600 transition-colors hover:border-white/[0.14] hover:bg-white/[0.03] hover:text-zinc-400"
+                                        className="flex h-3 w-3 items-center justify-center rounded-full border border-white/[0.07] bg-white/[0.015] text-[7px] font-semibold text-neutral-600 transition-colors hover:border-white/[0.14] hover:bg-white/[0.03] hover:text-neutral-400"
                                         aria-label={`More info about ${featureLabel}`}
                                     >
                                         <span className="leading-none">i</span>
@@ -379,7 +388,7 @@ const PlanCard = ({ plan, cycle, isInitialLoad, index, currentUserPlan, subscrip
                                         <div
                                             onMouseEnter={() => setOpenFeature(featureIndex)}
                                             onMouseLeave={() => setOpenFeature(null)}
-                                            className="absolute bottom-5 left-1/2 z-20 w-44 -translate-x-1/2 rounded-xl border border-white/[0.08] bg-[#101010]/80 px-3 py-2.5 text-left text-[11px] leading-relaxed text-zinc-300 shadow-[0_18px_40px_rgba(0,0,0,0.45)] backdrop-blur-md"
+                                            className="absolute bottom-5 left-1/2 z-20 w-44 -translate-x-1/2 rounded-xl border border-white/[0.08] bg-[#101010]/80 px-3 py-2.5 text-left text-[11px] leading-relaxed text-neutral-300 shadow-[0_18px_40px_rgba(0,0,0,0.45)] backdrop-blur-md"
                                         >
                                             <div className="absolute bottom-[-4px] left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 border-r border-b border-white/[0.08] bg-[#101010]/80" />
                                             {featureDescription}
@@ -393,18 +402,18 @@ const PlanCard = ({ plan, cycle, isInitialLoad, index, currentUserPlan, subscrip
             </div>
             <div className="mt-8">
                 {['Essentials', 'Pro', 'Ultra'].includes(plan.name) && (
-                    <p className="relative top-2 mb-[6px] text-center text-[11px] text-gray-500">
-                        3% fee on customer payments through Nodemere, excluding tax and tip.
+                    <p className="relative top-2 mb-[6px] text-center text-[11px] text-neutral-500">
+                        3% fee on payments collected by receptionists,
                     </p>
                 )}
                 {hasOverages && (
-                    <p className="mb-3 text-center text-[11px] text-gray-500">
+                    <p className="mb-3 text-center text-[11px] text-neutral-500">
                         Additional minutes billed at ${overageRate.toFixed(2)}/min.
                     </p>
                 )}
                 {isCurrent ? (
                     plan.name === 'Free' ? (
-                        <div className="w-full mt-auto font-semibold py-3 text-gray-500 cursor-default text-center">Your current plan</div>
+                        <div className="w-full mt-auto font-semibold py-3 text-neutral-500 cursor-default text-center">Your current plan</div>
                     ) : (
                         <button onClick={handleManageBilling} className="pricing-neutral-button w-full mt-auto font-semibold py-3 rounded-lg hover:opacity-90 transition-opacity btn-shine">
                             Manage billing in Stripe
@@ -418,7 +427,7 @@ const PlanCard = ({ plan, cycle, isInitialLoad, index, currentUserPlan, subscrip
                         disabled={isCheckoutLoading}
                         className="pricing-neutral-button w-full mt-auto font-semibold py-3 rounded-lg hover:opacity-90 transition-opacity btn-shine disabled:opacity-50 disabled:cursor-wait">
                         {isCheckoutLoading ? 'Redirecting...' : (
-                            billingManagedInStripe ? 'Manage plan in Stripe' : (isTestMode ? 'Test this subscription' : (
+                            billingManagedInStripe ? 'Manage plan in Stripe' : (isTestMode ? 'Test this plan' : (
                                 plan.name === 'Free' ? 'Choose plan' : (
                                     plan.cta || 'Start plan'
                                 )
@@ -432,6 +441,150 @@ const PlanCard = ({ plan, cycle, isInitialLoad, index, currentUserPlan, subscrip
     );
 };
 
+const PricingToggle = ({ label, options, value, onChange, controlRef, matchHeightRef }) => {
+    const pillRef = useRef(null);
+    const buttonRefs = useRef({});
+    const groupRef = useRef(null);
+    const resolvedGroupRef = controlRef || groupRef;
+
+    useEffect(() => {
+        const activeButton = buttonRefs.current[value];
+        if (pillRef.current && activeButton) {
+            pillRef.current.style.width = `${activeButton.offsetWidth}px`;
+            pillRef.current.style.left = `${activeButton.offsetLeft}px`;
+        }
+    }, [value, options]);
+
+    useLayoutEffect(() => {
+        if (!matchHeightRef) return undefined;
+        const syncHeight = () => {
+            const targetHeight = matchHeightRef.current?.getBoundingClientRect().height;
+            if (targetHeight && groupRef.current) groupRef.current.style.height = `${targetHeight}px`;
+        };
+        syncHeight();
+        window.addEventListener('resize', syncHeight);
+        return () => window.removeEventListener('resize', syncHeight);
+    }, [matchHeightRef]);
+
+    return (
+        <div ref={resolvedGroupRef} role="group" aria-label={label} className="relative flex items-center bg-[#1a1a1a] p-1 rounded-full border border-[#303034]">
+            <div ref={pillRef} className="absolute h-[85%] rounded-full gradient-bg transition-all duration-300 ease-in-out" />
+            {options.map((option) => (
+                <button
+                    key={option.value}
+                    ref={(element) => { buttonRefs.current[option.value] = element; }}
+                    type="button"
+                    onClick={() => onChange(option.value)}
+                    aria-pressed={value === option.value}
+                    aria-label={option.label}
+                    title={option.label}
+                    className={`toggle-button relative z-10 text-xs sm:text-sm font-semibold px-2 py-1 sm:px-4 sm:py-1.5 transition-colors duration-300 ${value === option.value ? 'text-[var(--buttonText)]' : 'text-neutral-400'}`}
+                >
+                    {option.icon || option.label}
+                </button>
+            ))}
+        </div>
+    );
+};
+
+const PlanComparisonAction = ({ plan, cycle, currentUserPlan, subscriptionStatus, isTestMode }) => {
+    const { isCheckoutLoading, billingManagedInStripe, handleUpgradeClick, handleManageBilling } = usePlanAction(plan, cycle, subscriptionStatus, isTestMode);
+    const isCurrent = plan.name.toLowerCase() === currentUserPlan.toLowerCase();
+
+    if (isCurrent && plan.name === 'Free') {
+        return <span className="text-xs font-semibold text-neutral-500">Your current plan</span>;
+    }
+
+    const label = isCurrent
+        ? 'Manage billing in Stripe'
+        : billingManagedInStripe
+            ? 'Manage plan in Stripe'
+            : isTestMode
+                ? 'Test this plan'
+                : plan.name === 'Free'
+                    ? 'Choose plan'
+                    : (plan.cta || 'Start plan');
+
+    return (
+        <button
+            type="button"
+            onClick={isCurrent ? handleManageBilling : handleUpgradeClick}
+            disabled={!isCurrent && isCheckoutLoading}
+            className="pricing-neutral-button inline-flex w-[85%] max-w-full justify-center rounded-lg px-2 py-2 text-[11px] font-semibold leading-4 transition-opacity hover:opacity-90 disabled:cursor-wait disabled:opacity-50 sm:text-xs"
+        >
+            {!isCurrent && isCheckoutLoading ? 'Redirecting...' : label}
+        </button>
+    );
+};
+
+const PlanComparisonTable = ({ plans, cycle, currentUserPlan, subscriptionStatus, isTestMode }) => {
+    const formatLimit = (value) => {
+        if (value === null) return 'Unlimited';
+        if (typeof value === 'number') return value.toLocaleString();
+        return '—';
+    };
+    const hasFeature = (plan, pattern) => (plan.features || []).some((feature) => {
+        const label = typeof feature === 'string' ? feature : feature?.label;
+        return pattern.test(String(label || ''));
+    });
+    const rows = [
+        { label: 'Price', isPrice: true, getValue: (plan) => plan.name === 'Free' ? 'Free' : `$${Number(plan.price?.[cycle] || 0).toLocaleString()} / month` },
+        { label: 'Inbound calling', getValue: (plan) => Boolean(plan.entitlements?.inbound_calling) },
+        { label: 'Receptionists', getValue: (plan) => formatLimit(plan.entitlements?.max_receptionists) },
+        { label: 'Contacts', getValue: (plan) => formatLimit(plan.entitlements?.max_contacts) },
+        { label: 'Scenarios', getValue: (plan) => formatLimit(plan.entitlements?.max_scenarios) },
+        { label: 'Outbound calling', getValue: (plan) => Boolean(plan.entitlements?.outbound_calling) },
+        { label: 'Accept payments', getValue: (plan) => Boolean(plan.entitlements?.payment_processing) },
+        { label: 'Voice cloning', getValue: (plan) => hasFeature(plan, /voice\s*clon/i) },
+        { label: 'Dedicated onboarding specialist', getValue: (plan) => hasFeature(plan, /dedicated onboarding specialist/i) },
+    ];
+
+    return (
+        <div role="region" aria-label="Plan comparison" className="pricing-comparison-scroll mx-auto max-w-[1272px] overflow-x-auto pt-4 pb-4" style={{ fontFamily: "'Inter', sans-serif" }}>
+            <div className="min-w-[680px] rounded-2xl bg-[#111111]">
+                <table className="w-full table-fixed border-separate border-spacing-0 text-left text-sm">
+                    <thead>
+                        <tr className="text-white">
+                            <th scope="col" className="w-[32%] border-b border-white/[0.08] px-4 py-3 font-semibold">Feature</th>
+                            {plans.map((plan) => <th key={plan.name} scope="col" className="border-b border-white/[0.08] px-4 py-3 text-center font-semibold">{plan.name}</th>)}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {rows.map((row, rowIndex) => (
+                        <tr key={row.label} className="card-entry" style={{ '--animation-delay': `${rowIndex * 40}ms` }}>
+                            <th scope="row" className={`px-4 py-3 font-medium text-neutral-300 border-b border-white/[0.06] ${rowIndex === rows.length - 1 ? 'border-b-0' : ''}`}>{row.label}</th>
+                                {plans.map((plan) => {
+                                    const value = row.getValue(plan);
+                                    return (
+                                    <td key={plan.name} className={`px-4 py-3 text-center text-neutral-300 border-b border-white/[0.06] ${rowIndex === rows.length - 1 ? 'border-b-0' : ''}`}>
+                                            {row.isPrice ? (
+                                                <div className="flex min-h-10 flex-col items-center justify-center leading-5">
+                                                    <span className="font-semibold text-white">{value}</span>
+                                                    <span className="text-xs text-neutral-500">{plan.name === 'Free' ? 'No charge' : cycle === 'annually' ? 'Billed annually' : 'Billed monthly'}</span>
+                                                </div>
+                                            ) : typeof value === 'boolean' ? (value ? <span aria-label="Included" className="text-white">✓</span> : '—') : value}
+                                        </td>
+                                    );
+                                })}
+                            </tr>
+                        ))}
+                    </tbody>
+                    <tfoot>
+                        <tr className="card-entry" style={{ '--animation-delay': `${rows.length * 40}ms` }}>
+                            <th scope="row" className="border-t border-white/[0.08] px-4 py-3 font-semibold text-neutral-300">Choose a plan</th>
+                            {plans.map((plan) => (
+                                <td key={plan.name} className="border-t border-white/[0.08] px-2 py-3 text-center">
+                                    <PlanComparisonAction plan={plan} cycle={cycle} currentUserPlan={currentUserPlan} subscriptionStatus={subscriptionStatus} isTestMode={isTestMode} />
+                                </td>
+                            ))}
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    );
+};
+
 // --- Main Pricing Page Component ---
 const PricingPage = () => {
     const location = useLocation();
@@ -439,6 +592,7 @@ const PricingPage = () => {
     const subscriptionStatus = profile?.subscription_status;
     const subscriptionLog = profile?.log;
     const [cycle, setCycle] = useState('monthly');
+    const [pricingView, setPricingView] = useState('cards');
     const [isInitialLoad, setIsInitialLoad] = useState(true);
     const [source, setSource] = useState('standard');
     const [stripeData, setStripeData] = useState(null);
@@ -448,9 +602,7 @@ const PricingPage = () => {
     const [isTestMode, setIsTestMode] = useState(false);
     const [carouselEdges, setCarouselEdges] = useState({ previous: false, next: false });
     const mobilePlanTrackRef = useRef(null);
-    const pillBgRef = useRef(null);
-    const annualBtnRef = useRef(null);
-    const monthlyBtnRef = useRef(null);
+    const pricingViewToggleRef = useRef(null);
 
     const currentUserPlan = profile?.plan || 'Free';
 
@@ -517,14 +669,6 @@ const PricingPage = () => {
         };
         fetchPlans();
     }, []);
-
-    useEffect(() => {
-        const activeButton = cycle === 'annually' ? annualBtnRef.current : monthlyBtnRef.current;
-        if (pillBgRef.current && activeButton) {
-            pillBgRef.current.style.width = `${activeButton.offsetWidth}px`;
-            pillBgRef.current.style.left = `${activeButton.offsetLeft}px`;
-        }
-    }, [cycle]);
 
     const configuredPlans = (planEntitlements || []).map((databasePlan) => {
         const fallbackPlan = plansConfig.find((plan) => plan.name.toLowerCase() === databasePlan.name.toLowerCase()) || {};
@@ -627,13 +771,13 @@ const PricingPage = () => {
     }, [plansToDisplay.length]);
 
     return (
-        <div className="pricing-page-bg text-gray-300 antialiased min-h-screen flex flex-col">
+        <div className="pricing-page-bg text-neutral-300 antialiased min-h-screen flex flex-col">
             <svg width="0" height="0" style={{ position: 'absolute' }}><defs>
                 <linearGradient id="checkGradient" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stopColor="var(--brandGradientStart)" /><stop offset="100%" stopColor="var(--brandGradientEnd)" /></linearGradient>
             </defs></svg>
             <div className="absolute top-0 left-0 right-0 pt-4">
                 <div className="text-center">
-                    <Link to="/" className="text-sm text-gray-500 hover:text-gray-300 transition-colors">
+                    <Link to="/" className="text-sm text-neutral-500 hover:text-neutral-300 transition-colors">
                         &larr; back to home
                     </Link>
                 </div>
@@ -644,25 +788,36 @@ const PricingPage = () => {
                     {subscriptionStatus === 'failed' && subscriptionLog && (
                         <p className="text-red-500 text-lg mb-4">{subscriptionLog}</p>
                     )}
-                    <p className="text-lg max-sm:text-sm text-gray-400">Choose a plan that's right for your business.</p>
+                    <p className="text-lg max-sm:text-sm text-neutral-400">Choose a plan that's right for your business.</p>
                 </div>
-                <div className="flex justify-center items-center mb-12 max-sm:mb-5">
-                    <div className="relative flex items-center bg-[#1a1a1a] p-1 rounded-full border border-[#303034]">
-                        <div ref={pillBgRef} className="absolute h-[85%] rounded-full gradient-bg transition-all duration-300 ease-in-out"></div>
-                        <button ref={annualBtnRef} onClick={() => setCycle('annually')} className={`toggle-button relative z-10 text-sm font-semibold px-6 py-2 transition-colors duration-300 ${cycle === 'annually' ? 'text-[var(--buttonText)]' : 'text-gray-400'}`}>Annually</button>
-                        <button ref={monthlyBtnRef} onClick={() => setCycle('monthly')} className={`toggle-button relative z-10 text-sm font-semibold px-6 py-2 transition-colors duration-300 ${cycle === 'monthly' ? 'text-[var(--buttonText)]' : 'text-gray-400'}`}>Monthly</button>
+                <div className="relative mt-12 max-sm:mt-10">
+                    <div className="relative z-10 -mt-5 mb-1 flex flex-wrap items-center justify-center gap-2 sm:-mt-5">
+                        <PricingToggle
+                            label="Pricing display"
+                            options={[{ value: 'cards', label: 'Cards', icon: <LayoutGrid size={16} strokeWidth={2} aria-hidden="true" /> }, { value: 'table', label: 'Table', icon: <Table2 size={16} strokeWidth={2} aria-hidden="true" /> }]}
+                            value={pricingView}
+                            onChange={setPricingView}
+                            controlRef={pricingViewToggleRef}
+                        />
+                        <PricingToggle
+                            label="Billing interval"
+                            options={[{ value: 'monthly', label: 'Monthly' }, { value: 'annually', label: 'Yearly' }]}
+                            value={cycle}
+                            onChange={setCycle}
+                            matchHeightRef={pricingViewToggleRef}
+                        />
                     </div>
-                </div>
-                <div className="relative text-center">
                     {plansLoading ? (
                         <div className="flex min-h-[55vh] items-center justify-center" aria-label="Loading pricing plans">
                             <CubePreloader size={28} />
                         </div>
                     ) : plansError ? (
-                        <div className="py-10 text-sm text-gray-500">{plansError}</div>
+                        <div className="py-10 text-sm text-neutral-500">{plansError}</div>
                     ) : (
-                        <>
-                            <div className="pricing-carousel-shell">
+                        pricingView === 'table' ? (
+                            <PlanComparisonTable plans={plansToDisplay} cycle={cycle} currentUserPlan={currentUserPlan} subscriptionStatus={subscriptionStatus} isTestMode={isTestMode} />
+                        ) : (
+                            <div className="pricing-carousel-shell flex justify-center">
                                 {carouselEdges.previous && <div className="pricing-carousel-edge pricing-carousel-edge--left lg:hidden" aria-hidden="true" />}
                                 {carouselEdges.next && <div className="pricing-carousel-edge pricing-carousel-edge--right lg:hidden" aria-hidden="true" />}
                                 <div ref={mobilePlanTrackRef} onClick={focusCarouselCard} onScroll={updateCarouselEdges} className="pricing-plan-track inline-grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 py-4" aria-label="Pricing plans">
@@ -671,15 +826,12 @@ const PricingPage = () => {
                                 {carouselEdges.previous && <button type="button" onClick={() => moveCarousel(-1)} aria-label="Previous pricing plans" className="pricing-carousel-arrow pricing-carousel-arrow--left lg:hidden"><ChevronLeft size={22} strokeWidth={2.5} aria-hidden="true" /></button>}
                                 {carouselEdges.next && <button type="button" onClick={() => moveCarousel(1)} aria-label="Next pricing plans" className="pricing-carousel-arrow pricing-carousel-arrow--right lg:hidden"><ChevronRight size={22} strokeWidth={2.5} aria-hidden="true" /></button>}
                             </div>
-                        </>
+                        )
                     )}
                 </div>
                 {!plansLoading && (
                     <>
-                        <p className="mx-auto mt-7 max-w-3xl text-center text-xs leading-5 text-zinc-500">
-                            Payment feature pricing: a 3% platform fee applies to customer payments processed through Nodemere using a supported connected payment provider. Tax and tip amounts identified separately, refunded payments, and disputed payments are excluded. The fee does not apply to Nodemere plan or setup charges. Provider processing fees are separate.
-                        </p>
-                        <p className="mx-auto mt-3 max-w-3xl text-center text-xs leading-5 text-zinc-500">
+                        <p className="mx-auto mt-20 max-w-3xl text-center text-xs leading-5 text-neutral-500">
                             By starting a subscription, you agree to the <Link to="/terms" className="underline underline-offset-2">Terms of Service</Link> and <Link to="/privacy-policy" className="underline underline-offset-2">Privacy Policy</Link>. Paid subscriptions renew automatically at the selected billing interval unless canceled before the next renewal date. You can request cancellation at <a href="mailto:support@nodemere.ai" className="underline underline-offset-2">support@nodemere.ai</a>.
                         </p>
                     </>

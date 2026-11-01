@@ -307,7 +307,7 @@ p:not(.comparison-human-statement):not(.comparison-ai-statement) {
 /* --- PRICING PAGE STYLES --- */
 .pricing-page-bg { background-color: var(--pageBackground); }
 .pricing-page-bg .gradient-text { background: linear-gradient(90deg, var(--color1), var(--color2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-fill-color: transparent; }
-.pricing-recommended-text { background: linear-gradient(90deg, #ffffff 0%, #e4e4e7 55%, #a1a1aa 100%); background-size: 200% 100%; background-position: 100% 50%; animation: pricing-recommended-gradient 4s ease-in-out infinite; -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-fill-color: transparent; text-shadow: none; filter: drop-shadow(0 0 2px rgb(228 228 231 / 16%)); }
+.pricing-recommended-text { background: linear-gradient(90deg, #ffffff 0%, #e5e5e5 55%, #a3a3a3 100%); background-size: 200% 100%; background-position: 100% 50%; animation: pricing-recommended-gradient 4s ease-in-out infinite; -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-fill-color: transparent; text-shadow: none; filter: drop-shadow(0 0 2px rgb(228 228 228 / 16%)); }
 @keyframes pricing-recommended-gradient { 0%, 100% { background-position: 100% 50%; } 50% { background-position: 0% 50%; } }
 @media (prefers-reduced-motion: reduce) { .pricing-recommended-text { animation: none; } }
 .savings-gradient-text { background: linear-gradient(90deg, var(--brandGradientStart), var(--brandGradientEnd)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-fill-color: transparent; }
@@ -321,10 +321,16 @@ p:not(.comparison-human-statement):not(.comparison-ai-statement) {
 .plan-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; border-radius: 1rem; border: 2px solid transparent; background: linear-gradient(90deg, var(--brandGradientStart), var(--brandGradientEnd)) border-box; -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0); -webkit-mask-composite: destination-out; mask-composite: exclude; opacity: 0; transition: opacity 0.3s ease-in-out; pointer-events: none; }
 @property --pricing-border-angle { syntax: '<angle>'; initial-value: 65deg; inherits: false; }
 @keyframes pricing-border-orbit { to { --pricing-border-angle: 425deg; } }
+.pricing-comparison-scroll { scrollbar-width: none; -ms-overflow-style: none; }
+.pricing-comparison-scroll::-webkit-scrollbar { display: none; }
 .plan-card:not(.current-plan-glow)::before { background: conic-gradient(from var(--pricing-border-angle), var(--brandGradientStart), var(--brandGradientEnd), var(--brandGradientStart)) border-box; animation: pricing-border-orbit 14s linear infinite; animation-play-state: paused; }
+.plan-card--pro-touch:not(.current-plan-glow)::before { background: conic-gradient(from var(--pricing-border-angle), var(--brandGradientStart) 0%, #c547d1 25%, var(--brandGradientEnd) 50%, #c547d1 75%, var(--brandGradientStart) 100%) border-box; }
 .plan-card:not(.current-plan-glow):hover::before { animation-play-state: running; }
 @media (prefers-reduced-motion: reduce) { .plan-card:not(.current-plan-glow)::before { animation: none; } }
 .plan-card:hover::before { opacity: 1; }
+@media (hover: none) and (pointer: coarse) {
+  .plan-card--pro-touch::before { opacity: 1; animation-play-state: running; }
+}
 .current-plan-glow { box-shadow: 0 0 30px var(--color1); transform: translateY(-5px); }
 .current-plan-glow::before { opacity: 1; animation: pulse-glow 3s infinite ease-in-out; }
 @media (max-width: 1023px) {
@@ -401,6 +407,12 @@ p:not(.comparison-human-statement):not(.comparison-ai-statement) {
 .savings-text.animate { animation: animate-savings 0.5s ease-out forwards; }
 @keyframes card-enter { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 .card-entry { animation: card-enter 0.5s ease-out forwards; animation-delay: var(--animation-delay); opacity: 0; }
+@keyframes card-fade-in { from { opacity: 0; } to { opacity: 1; } }
+.plan-card-entry { animation: card-fade-in 0.5s ease-out forwards; animation-delay: var(--animation-delay); opacity: 0; }
+@keyframes plan-checkmark-color-in { to { opacity: 1; } }
+.plan-checkmark-gradient { filter: drop-shadow(0 0 1px rgb(255 50 172 / 30%)) drop-shadow(0 0 2px rgb(139 92 246 / 18%)); }
+.plan-card-entry .plan-checkmark-gradient { opacity: 0; animation: plan-checkmark-color-in 0.18s ease-out forwards; animation-delay: calc(var(--animation-delay, 0ms) + 200ms + var(--checkmark-stagger, 0ms)); }
+@media (prefers-reduced-motion: reduce) { .plan-card-entry .plan-checkmark-gradient { animation: none; opacity: 1; } }
 .dollar-bill-pricing { position: absolute; top: -20%; width: 30px; height: auto; opacity: 0; animation: rain 5s linear forwards; pointer-events: none; }
 @keyframes rain { 0% { transform: translateY(0) rotate(0deg); opacity: 0; } 20% { opacity: 1; } 80% { opacity: 1; } 100% { transform: translateY(120vh) rotate(360deg); opacity: 0; } }
 @keyframes smooth-pill-border { 0% { opacity: 0; background-position: 0% center; } 10% { opacity: 0.8; } 99% { opacity: 0.8; background-position: 200% center; } 100% { opacity: 0; background-position: 200% center; } }
