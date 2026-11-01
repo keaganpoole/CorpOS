@@ -62,7 +62,7 @@ begin
       'people_field_definitions','verification_sessions','people_docs','requests','contracts','drop_ins','flow_executions','jobs',
       'scenario_events','call_logs','appointments','nest','intercom','intercom_usage_daily',
       'reviews','bugs','custom_voices','people_schema','appointments_schema','account_settings',
-      'created_receptionists','hired_receptionists','scenarios','staff','services','people','purchased_numbers'
+      'audition_creation_usage','created_receptionists','hired_receptionists','scenarios','staff','services','people','purchased_numbers'
     ] loop
       if to_regclass('public.' || v_table_name) is not null
          and exists (

@@ -47,7 +47,7 @@ async function buildAuthHeaders(extraHeaders = {}) {
 
 function reportApiError(detail, statusCode) {
   const value = detail?.detail || detail;
-  if (statusCode === 402 && value && typeof value === 'object') {
+  if (statusCode === 402 && value && typeof value === 'object' && value.code !== 'audition_creation_limit_reached') {
     window.dispatchEvent(new CustomEvent('nodemere:plan-limit', { detail: value }));
   }
   const message = typeof value === 'string' ? value : value?.message || `Request failed (HTTP ${statusCode})`;
@@ -115,6 +115,7 @@ async function strictGetJSON(endpoint, timeoutMs = API_TIMEOUT_MS) {
 }
 
 export const api = {
+  getStudioCreationQuota: () => strictGetJSON('/api/sonar/studio/quota'),
   designVoice: (definition) => postJSON('/api/sonar/studio/design', definition, 150000),
   generateReceptionistPortraits: (profile) => postJSON('/api/sonar/studio/portraits', profile, 180000),
   saveDesignedVoice: (voice) => postJSON('/api/sonar/studio/save', voice, 150000),

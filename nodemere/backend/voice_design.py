@@ -12,6 +12,7 @@ from fastapi import HTTPException
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from .portrait_generation import upload_portrait
+from .audition_quota import reserve_creation, finish_creation
 
 
 class VoiceDesignRequest(BaseModel):
@@ -147,7 +148,7 @@ def _upload_preview(db, audio, *, owner_id, candidate_id):
         raise HTTPException(503, "The selected voice preview could not be saved.") from None
 
 
-def save_voice(payload, *, db, api_key, owner_id, business_id):
+def save_voice(payload, *, db, api_key, owner_id, business_id, plan="free"):
     if not api_key:
         raise HTTPException(503, "Voice Design is not configured on this server.")
     candidate = verify_ticket(payload.ticket, owner_id, api_key)
@@ -160,6 +161,7 @@ def save_voice(payload, *, db, api_key, owner_id, business_id):
         return _saved_catalog_result(row)
     if row and row.get("status") != "draft":
         raise HTTPException(409, "This voice save is still being confirmed. Contact support before saving it again.")
+    reserve_creation(db, owner_id, business_id, candidate["id"], plan)
     try:
         if row:
             reserved = (db.table("created_receptionists").update({"status": "generating"})
@@ -198,6 +200,7 @@ def save_voice(payload, *, db, api_key, owner_id, business_id):
         preview_url = _upload_preview(db, payload.preview_audio, owner_id=str(owner_id), candidate_id=asset_id)
     except Exception:
         update({"status": "draft"})  # No provider write was attempted; retry is safe.
+        finish_creation(db, owner_id, business_id, candidate["id"], False)
         raise
     try:
         voice = provider_post("", {"voice_name": payload.voice_name, "voice_description": voice_description,
@@ -206,6 +209,7 @@ def save_voice(payload, *, db, api_key, owner_id, business_id):
     except HTTPException as error:
         if getattr(error, "provider_rejected", False):
             update({"status": "draft"})
+            finish_creation(db, owner_id, business_id, candidate["id"], False)
         # Ambiguous timeouts keep the reservation; never create the provider voice twice.
         raise
     voice_id = voice.get("voice_id")
@@ -226,4 +230,5 @@ def save_voice(payload, *, db, api_key, owner_id, business_id):
         raise HTTPException(503, "Your voice was saved, but the catalog could not confirm it. Contact support before retrying.") from None
     if not created:
         raise HTTPException(503, "Your voice was saved, but the catalog could not confirm it. Contact support before retrying.")
+    finish_creation(db, owner_id, business_id, candidate["id"], True)
     return _saved_catalog_result(created[0])

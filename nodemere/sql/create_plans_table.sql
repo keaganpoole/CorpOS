@@ -50,8 +50,8 @@ values
   true,
   false,
   '{"description":"For testing the product with light usage.","cta":"Get started"}'::jsonb,
-  '{"included_call_minutes":20,"max_receptionists":1,"max_scenarios":3,"max_contacts":100,"inbound_calling":true,"outbound_calling":false,"sms":false,"overage_enabled":false}'::jsonb,
-  '["20 call minutes","1 receptionist","100 contacts","3 scenarios","Inbound calling"]'::jsonb
+  '{"included_call_minutes":20,"max_receptionists":1,"max_audition_creations_per_month":2,"max_scenarios":3,"max_contacts":100,"inbound_calling":true,"outbound_calling":false,"sms":false,"overage_enabled":false}'::jsonb,
+  '["20 call minutes","1 receptionist","100 contacts","3 scenarios","Inbound calling","Create a receptionist"]'::jsonb
 ),
 (
   'essentials',
@@ -61,8 +61,8 @@ values
   true,
   false,
   '{"description":"For businesses that need a solid front desk without the complexity.","cta":"Start plan"}'::jsonb,
-  '{"included_call_minutes":200,"max_receptionists":3,"max_scenarios":null,"max_contacts":1000,"inbound_calling":true,"outbound_calling":false,"sms":false,"overage_enabled":true,"overage_price_per_minute_cents":30,"overage_cap_cents":2500,"payment_processing":true}'::jsonb,
-  '["200 call minutes","3 receptionists","1,000 contacts","Unlimited scenarios","Inbound calling","Accept payments"]'::jsonb
+  '{"included_call_minutes":200,"max_receptionists":3,"max_audition_creations_per_month":5,"max_scenarios":null,"max_contacts":1000,"inbound_calling":true,"outbound_calling":false,"sms":false,"overage_enabled":true,"overage_price_per_minute_cents":30,"overage_cap_cents":2500,"payment_processing":true}'::jsonb,
+  '["200 call minutes","3 receptionists","1,000 contacts","Unlimited scenarios","Inbound calling","Accept payments","Create a receptionist"]'::jsonb
 ),
 (
   'pro',
@@ -71,9 +71,9 @@ values
   3,
   true,
   true,
-  '{"description":"For growing businesses that need serious call capacity.","cta":"Start plan"}'::jsonb,
-  '{"included_call_minutes":1000,"max_receptionists":null,"max_scenarios":null,"max_contacts":null,"inbound_calling":true,"outbound_calling":true,"sms":true,"overage_enabled":true,"overage_price_per_minute_cents":30,"overage_cap_cents":10000,"payment_processing":true}'::jsonb,
-  '["1,000 call minutes","Unlimited receptionists","Unlimited contacts","Unlimited scenarios","Outbound calling","Inbound calling","Accept payments","Voice cloning","SMS support"]'::jsonb
+  '{"description":"Launch a fully operational AI receptionist that answers calls, books appointments, and handles customers 24/7.","cta":"Start plan"}'::jsonb,
+  '{"included_call_minutes":1000,"max_receptionists":null,"max_audition_creations_per_month":15,"max_scenarios":null,"max_contacts":null,"inbound_calling":true,"outbound_calling":true,"sms":true,"overage_enabled":true,"overage_price_per_minute_cents":30,"overage_cap_cents":10000,"payment_processing":true}'::jsonb,
+  '["1,000 call minutes","Unlimited receptionists","Unlimited contacts","Unlimited scenarios","Outbound calling","Inbound calling","Accept payments","Voice cloning","SMS support","Create a receptionist"]'::jsonb
 ),
 (
   'ultra',
@@ -82,9 +82,9 @@ values
   4,
   true,
   false,
-  '{"description":"For high-volume teams running advanced voice operations.","cta":"Start plan"}'::jsonb,
-  '{"included_call_minutes":2500,"max_receptionists":null,"max_scenarios":null,"max_contacts":null,"inbound_calling":true,"outbound_calling":true,"sms":true,"overage_enabled":true,"overage_price_per_minute_cents":30,"overage_cap_cents":25000,"payment_processing":true}'::jsonb,
-  '["2,500 call minutes","Unlimited receptionists","Unlimited contacts","Unlimited scenarios","Inbound calling","Outbound calling","Accept payments","Voice cloning","SMS support","Dedicated onboarding specialist"]'::jsonb
+  '{"description":"For growing businesses that need more call capacity.","cta":"Start plan"}'::jsonb,
+  '{"included_call_minutes":2500,"max_receptionists":null,"max_audition_creations_per_month":15,"max_scenarios":null,"max_contacts":null,"inbound_calling":true,"outbound_calling":true,"sms":true,"overage_enabled":true,"overage_price_per_minute_cents":30,"overage_cap_cents":25000,"payment_processing":true}'::jsonb,
+  '["2,500 call minutes","Unlimited receptionists","Unlimited contacts","Unlimited scenarios","Inbound calling","Outbound calling","Accept payments","Voice cloning","SMS support","Dedicated onboarding specialist","Create a receptionist"]'::jsonb
 )
 on conflict (slug) do update set
   name = excluded.name,

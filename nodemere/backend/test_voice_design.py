@@ -1,19 +1,46 @@
 import unittest
+from datetime import datetime, timezone
+from threading import Lock
+from concurrent.futures import ThreadPoolExecutor
 from types import SimpleNamespace
 from unittest.mock import patch, Mock
 from fastapi import HTTPException
 from pydantic import ValidationError
 from backend.voice_design import VoiceDesignRequest, VoiceSaveRequest, candidate_ticket, verify_ticket, design_voice, save_voice, _upload_preview
+from backend.audition_quota import LIMITS, quota_snapshot, reserve_creation
 
 SECRET = 'test-only-signing-key'
 DESCRIPTION = 'A warm adult receptionist with a clear American accent and thoughtful delivery.'
 
 
 class MemoryDB:
-    def __init__(self): self.tables = {"businesses": [{"id": 7, "name": "Acme"}]}; self.writes = []
+    def __init__(self): self.tables = {"businesses": [{"id": 7, "name": "Acme"}]}; self.writes = []; self.lock = Lock(); self.plan = 'free'
     @property
     def rows(self): return {r["id"]: r for r in self.tables.get("created_receptionists", [])}
     def table(self, name): return Query(self, name)
+    def rpc(self, name, values): return RpcQuery(self, name, values)
+
+
+class RpcQuery:
+    def __init__(self, db, name, values): self.db=db; self.name=name; self.values=values
+    def execute(self):
+        owner=self.values['target_owner']; business=self.values['target_business']; candidate=self.values['candidate_id']
+        with self.db.lock:
+            usage=self.db.tables.setdefault('audition_creation_usage', [])
+            matching=[row for row in usage if row['user_id']==owner and row['business_id']==business and row['design_candidate_id']==candidate]
+            if self.name=='nodemere_finish_audition_creation':
+                if matching:
+                    if self.values['completed']: matching[0]['state']='completed'
+                    elif matching[0]['state']=='reserved': usage.remove(matching[0])
+            elif not matching:
+                month=datetime.now(timezone.utc).date().replace(day=1).isoformat()
+                if sum(row['user_id']==owner and row['month_start']==month for row in usage)>=LIMITS[self.db.plan]:
+                    raise RuntimeError('audition_creation_limit_reached')
+                usage.append({'id':len(usage)+1,'user_id':owner,'business_id':business,
+                              'design_candidate_id':candidate,'month_start':month,'state':'reserved'})
+            else:
+                return SimpleNamespace(data=-1)
+        return SimpleNamespace(data=None)
 
 
 class Query:
@@ -92,6 +119,40 @@ class VoiceDesignTests(unittest.TestCase):
         self.assertEqual(row['voice_preview_url'], 'https://example.com/preview.mp3')
         self.assertEqual(first['created_receptionist_id'], row['id'])
         self.assertTrue(all(table == 'created_receptionists' for table, operation in db.writes))
+        self.assertEqual(db.tables['audition_creation_usage'][0]['state'], 'completed')
+
+    def test_monthly_creation_limits_reset_and_survive_deletion(self):
+        for plan, limit in LIMITS.items():
+            db=MemoryDB(); db.plan=plan
+            db.tables['created_receptionists']=[{'id':1,'user_id':'owner','business_id':7,'status':'ready'}]
+            db.tables['audition_creation_usage']=[{'id':0,'user_id':'owner','business_id':7,
+                'design_candidate_id':'old','month_start':'2000-01-01','state':'completed'}]
+            self.assertEqual(quota_snapshot(db,'owner',plan)['used'],0)
+            for number in range(limit): reserve_creation(db,'owner',7,f'{plan}-{number}',plan)
+            db.tables['created_receptionists'].clear()
+            self.assertTrue(quota_snapshot(db,'owner',plan)['capped'])
+            with self.assertRaises(HTTPException) as error:
+                reserve_creation(db,'owner',7,'one-more',plan)
+            self.assertEqual(error.exception.detail['code'],'audition_creation_limit_reached')
+
+    def test_concurrent_reservations_cannot_exceed_last_slot(self):
+        db=MemoryDB()
+        reserve_creation(db,'owner',7,'first','free')
+        def attempt(candidate):
+            try: reserve_creation(db,'owner',7,candidate,'free'); return True
+            except HTTPException: return False
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            results=list(pool.map(attempt,[f'candidate-{i}' for i in range(8)]))
+        self.assertEqual(sum(results),1)
+        self.assertEqual(quota_snapshot(db,'owner','free')['used'],2)
+
+    def test_same_candidate_cannot_start_twice(self):
+        db=MemoryDB()
+        reserve_creation(db,'owner',7,'clone:contract-1','free')
+        with self.assertRaises(HTTPException) as error:
+            reserve_creation(db,'owner',7,'clone:contract-1','free')
+        self.assertEqual(error.exception.status_code,409)
+        self.assertEqual(quota_snapshot(db,'owner','free')['used'],1)
 
     @patch('backend.voice_design.provider_post')
     def test_uncertain_save_never_reissues_provider_creation(self,post):

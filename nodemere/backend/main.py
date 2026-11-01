@@ -159,6 +159,7 @@ from .contract_service import (
     clone_voice,
     create_contract,
     get_contract_public_state,
+    load_contract_by_token,
     record_checkbox_consent,
     save_cloned_receptionist_profile,
     sign_contract,
@@ -5581,10 +5582,10 @@ def sync_business_plan_entitlement(user_id, plan_name, period_start=None, period
 # the server-owned entitlement table. The browser may display these values,
 # but it is never trusted to enforce them.
 DEFAULT_PLAN_ENTITLEMENTS = {
-    "free": {"included_call_minutes": 20, "max_receptionists": 1, "max_scenarios": 3, "max_contacts": 100, "inbound_calling": True, "outbound_calling": False, "overage_enabled": False, "payment_processing": False, "intercom_daily_turns": 10},
-    "essentials": {"included_call_minutes": 200, "max_receptionists": 3, "max_scenarios": None, "max_contacts": 1000, "inbound_calling": True, "outbound_calling": False, "overage_enabled": True, "overage_cap_cents": 2500, "payment_processing": True, "intercom_daily_turns": 40},
-    "pro": {"included_call_minutes": 1000, "max_receptionists": None, "max_scenarios": None, "max_contacts": None, "inbound_calling": True, "outbound_calling": True, "overage_enabled": True, "overage_cap_cents": 10000, "payment_processing": True, "intercom_daily_turns": 200},
-    "ultra": {"included_call_minutes": 2500, "max_receptionists": None, "max_scenarios": None, "max_contacts": None, "inbound_calling": True, "outbound_calling": True, "overage_enabled": True, "overage_cap_cents": 25000, "payment_processing": True, "intercom_daily_turns": 500},
+    "free": {"included_call_minutes": 20, "max_receptionists": 1, "max_audition_creations_per_month": 2, "max_scenarios": 3, "max_contacts": 100, "inbound_calling": True, "outbound_calling": False, "overage_enabled": False, "payment_processing": False, "intercom_daily_turns": 10},
+    "essentials": {"included_call_minutes": 200, "max_receptionists": 3, "max_audition_creations_per_month": 5, "max_scenarios": None, "max_contacts": 1000, "inbound_calling": True, "outbound_calling": False, "overage_enabled": True, "overage_cap_cents": 2500, "payment_processing": True, "intercom_daily_turns": 40},
+    "pro": {"included_call_minutes": 1000, "max_receptionists": None, "max_audition_creations_per_month": 15, "max_scenarios": None, "max_contacts": None, "inbound_calling": True, "outbound_calling": True, "overage_enabled": True, "overage_cap_cents": 10000, "payment_processing": True, "intercom_daily_turns": 200},
+    "ultra": {"included_call_minutes": 2500, "max_receptionists": None, "max_audition_creations_per_month": 15, "max_scenarios": None, "max_contacts": None, "inbound_calling": True, "outbound_calling": True, "overage_enabled": True, "overage_cap_cents": 25000, "payment_processing": True, "intercom_daily_turns": 500},
 }
 SUBSCRIPTION_ACCESS_STATUSES = {"active"}
 
@@ -7421,33 +7422,43 @@ async def check_document_upload_status_tool(request: Request):
 
 
 from .voice_design import VoiceDesignRequest, VoiceSaveRequest, design_voice, save_voice
+from .audition_quota import quota_snapshot, require_creation_slot, reserve_creation, finish_creation
 from .portrait_generation import PortraitGenerationRequest, generate_portraits
 from .receptionist_catalog import private_created_catalog, hire_created_receptionist, created_receptionist_lifecycle, normalize_created_receptionist
+
+
+@app.get('/api/sonar/studio/quota', tags=['Nodemere Studio'])
+def studio_creation_quota(current_user: dict = Depends(get_current_user)):
+    owner_id = business_owner_id(current_user)
+    context = get_user_plan_context(owner_id)
+    return quota_snapshot(supabase_admin.raw, owner_id, context['plan'])
 
 
 @app.post('/api/sonar/studio/design', tags=['Nodemere Studio'])
 def studio_design_voice(payload: VoiceDesignRequest, current_user: dict = Depends(get_current_user)):
     owner_id = business_owner_id(current_user)
-    require_plan_access(owner_id, 'receptionists')
+    context = require_plan_access(owner_id, 'receptionists')
+    require_creation_slot(supabase_admin.raw, owner_id, context['plan'])
     return design_voice(payload, api_key=elevenlabs_api_key, owner_id=owner_id)
 
 
 @app.post('/api/sonar/studio/portraits', tags=['Nodemere Studio'])
 def studio_generate_portraits(payload: PortraitGenerationRequest, current_user: dict = Depends(get_current_user)):
     owner_id = business_owner_id(current_user)
-    require_plan_access(owner_id, 'receptionists')
+    context = require_plan_access(owner_id, 'receptionists')
+    require_creation_slot(supabase_admin.raw, owner_id, context['plan'])
     return generate_portraits(payload, db=supabase, api_key=openai_api_key, owner_id=owner_id)
 
 
 @app.post('/api/sonar/studio/save', tags=['Nodemere Studio'])
 def studio_save_voice(payload: VoiceSaveRequest, current_user: dict = Depends(get_current_user)):
     owner_id = business_owner_id(current_user)
-    require_plan_access(owner_id, 'receptionists')
+    context = require_plan_access(owner_id, 'receptionists')
     business = load_business_by_user_id(owner_id)
     if not business:
         raise HTTPException(404, 'Business not found')
-    return save_voice(payload, db=supabase, api_key=elevenlabs_api_key,
-                      owner_id=owner_id, business_id=business['id'])
+    return save_voice(payload, db=supabase_admin.raw, api_key=elevenlabs_api_key,
+                      owner_id=owner_id, business_id=business['id'], plan=context['plan'])
 
 
 class ContractCreateRequest(BaseModel):
@@ -7581,6 +7592,10 @@ async def create_instant_voice_clone(token: str, request: Request):
         contract=get_contract_public_state(supabase_admin,token)
         if not contract.get('success') or contract.get('status') not in {'signed','cloned'}:
             raise HTTPException(403,'This voice upload link is unavailable')
+        private_contract = load_contract_by_token(supabase_admin, token)
+        studio_clone = (private_contract.get('metadata') or {}).get('source') == 'nodemere_studio'
+        if studio_clone and contract.get('custom_voice_id'):
+            raise HTTPException(409, 'This studio voice has already been created.')
         form = await request.form(max_files=6,max_fields=3)
         voice_name = str(form.get("voice_name") or "").strip()
         remove_background_noise = str(form.get("remove_background_noise") or "true").lower() in {"1", "true", "yes", "on"}
@@ -7598,6 +7613,11 @@ async def create_instant_voice_clone(token: str, request: Request):
                 content_type=getattr(uploaded, "content_type", None),
                 content=content,
             ))
+        if studio_clone:
+            owner_id = str(private_contract['user_id'])
+            context = require_plan_access(owner_id, 'receptionists')
+            candidate_id = f"clone:{private_contract['id']}"
+            reserve_creation(supabase_admin.raw, owner_id, private_contract['business_id'], candidate_id, context['plan'])
         result = clone_voice(
             supabase_admin,
             token=token,
@@ -7607,7 +7627,11 @@ async def create_instant_voice_clone(token: str, request: Request):
             remove_background_noise=remove_background_noise,
         )
         if not result.get("success"):
+            if studio_clone:
+                finish_creation(supabase_admin.raw, owner_id, private_contract['business_id'], candidate_id, False)
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='The request could not be completed')
+        if studio_clone:
+            finish_creation(supabase_admin.raw, owner_id, private_contract['business_id'], candidate_id, True)
         return result
     except HTTPException:
         raise

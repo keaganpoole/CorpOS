@@ -30,6 +30,7 @@ const plansConfig = [
         },
         features: [
             { label: "Everything in Pro", description: "Includes every Pro feature with more room to grow." },
+            { label: "Create a receptionist" },
             { label: "Accept Payments", description: "Includes a 3% platform fee on customer payments processed through Nodemere," },
             { label: "Advanced AI Reasoning", description: "Gives receptionists stronger decision-making for more complex conversations." },
             { label: "Voice Studio", description: "Customize voice experience more deeply for your team and brand." },
@@ -49,6 +50,7 @@ const plansConfig = [
         },
         features: [
             { label: "Everything in Essentials", description: "Starts with all Essentials features already included." },
+            { label: "Create a receptionist" },
             { label: "25 Receptionists", description: "Run a larger receptionist team for different roles or workflows." },
             { label: "AI Outbound Calling", description: "Place consented operational calls for follow-ups, reminders, and service updates." },
             { label: "Accept Payments", description: "Receptionists can take payments and send invoices. A 3% platform fee applies to customer payments through Nodemere," },
@@ -70,6 +72,7 @@ const plansConfig = [
             Social: { monthly: 200, annually: 180 },
         },
         features: [
+            { label: "Create a receptionist" },
             { label: "3 AI Receptionists", description: "Use up to three receptionists for different call styles or duties." },
             { label: "24/7 AI Inbound Call Handling", description: "Answer incoming calls around the clock without missing opportunities." },
             { label: "10 Scenarios", description: "Build up to ten workflows for calls, appointments, records, and more." },
@@ -90,6 +93,7 @@ const plansConfig = [
             Social: { monthly: 0, annually: 0 },
         },
         features: [
+            { label: "Create a receptionist" },
             "Business setup",
             "Limited use of features"
         ],
@@ -168,9 +172,9 @@ const PaymentTipsModal = ({ onClose }) => {
             <div className="p-7 sm:p-8">
                 <div className="flex items-start justify-between gap-4">
                     <div className="relative">
-                        <div className="mb-3 flex items-center gap-1.5">
-                            <Lightbulb className="h-4 w-4 shrink-0 -translate-y-[5px] text-neutral-600" aria-hidden="true" />
-                            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-neutral-600">Info</p>
+                        <div className="mb-3 inline-flex items-center gap-1.5">
+                            <Lightbulb className="block h-4 w-4 shrink-0 text-[#96969c]" aria-hidden="true" />
+                            <p className="text-[9px] font-semibold uppercase leading-none tracking-[0.18em] text-[#96969c]" style={{ fontFamily: 'Inter, sans-serif', margin: 0 }}>Payments</p>
                         </div>
                         <h2 className="text-xl font-semibold tracking-[-0.04em] text-white sm:text-2xl">Accept payments</h2>
                         <p className="mt-3 max-w-[520px] text-sm leading-6 text-neutral-500">
@@ -181,7 +185,7 @@ const PaymentTipsModal = ({ onClose }) => {
                         <X className="h-4 w-4" />
                     </button>
                 </div>
-                <div className="relative mt-7 space-y-4 text-sm leading-6 text-neutral-400">
+                <div className="relative mt-5 space-y-2.5 text-sm leading-5 text-neutral-400">
                     {[
                         ['How it works.', 'Your AI receptionist learns what services you offer and uses that information to help customers pay over the phone.'],
                         ['Platform fee.', 'Nodemere charges a 3% platform fee on customer payments processed through Nodemere using a supported connected provider. It does not apply to Nodemere plan or setup charges.'],
@@ -189,9 +193,44 @@ const PaymentTipsModal = ({ onClose }) => {
                     ].map(([title, body], index) => (
                         <div key={title} className="flex gap-3">
                             <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: `rgba(255,255,255,${Math.max(0.35, 1 - (index * 0.14))})` }} />
-                            <div><p className="text-sm font-semibold text-neutral-200">{title}</p><p className="mt-1 text-sm leading-6 text-neutral-500">{body}</p></div>
+                            <div><p className="text-sm font-semibold text-neutral-200">{title}</p><p className="mt-1 text-sm leading-5 text-neutral-500">{body}</p></div>
                         </div>
                     ))}
+                </div>
+            </div>
+        </motion.div>
+    </motion.div>
+    );
+    return createPortal(modal, document.body);
+};
+
+const ReceptionistCreationTipsModal = ({ onClose }) => {
+    const modal = (
+    <motion.div className="fixed inset-0 z-[220] flex items-center justify-center bg-black/70 px-5 backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onMouseDown={onClose}>
+        <motion.div initial={{ opacity: 0, y: 16, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 16, scale: 0.98 }} transition={{ duration: 0.18 }} className="relative w-full max-w-[620px] overflow-hidden rounded-[30px] border border-white/[0.08] bg-[#070707] shadow-[0_28px_90px_rgba(0,0,0,0.62)]" onMouseDown={(event) => event.stopPropagation()}>
+            <ModalSpectrumLine variant="tips" />
+            <div className="pointer-events-none absolute right-[-140px] top-[-180px] h-72 w-72 rounded-full bg-white/[0.035] blur-[72px]" />
+            <div className="p-7 sm:p-8">
+                <div className="mb-3 inline-flex items-center justify-start gap-1.5">
+                    <Lightbulb className="block h-4 w-4 shrink-0 text-[#96969c]" aria-hidden="true" />
+                    <p className="text-[9px] font-semibold uppercase leading-none tracking-[0.18em] text-[#96969c]" style={{ fontFamily: 'Inter, sans-serif', margin: 0 }}>Nodemere Audition</p>
+                </div>
+                <div className="flex items-start justify-between gap-4">
+                    <div className="relative">
+                        <h2 className="text-xl font-semibold tracking-[-0.04em] text-white sm:text-2xl">Create a receptionist</h2>
+                        <p className="mt-3 max-w-[520px] text-sm leading-6 text-neutral-500">Design a receptionist that fits your business. Customize their voice, explore different options, and add your favorite to your collection.</p>
+                    </div>
+                    <button type="button" onClick={onClose} className="flex h-8 w-8 shrink-0 items-center justify-center text-neutral-600 transition hover:text-white" aria-label="Close receptionist creation info"><X className="h-4 w-4" /></button>
+                </div>
+                <div className="relative mt-5 space-y-2.5 text-sm leading-5 text-neutral-400">
+                    {[
+                        ['Make it your own.', 'Choose the accent, tone, and personality that bring your receptionist to life.'],
+                        ['Find the perfect voice.', 'Audition different voices until you find one that feels right for your business.'],
+                        ['Save now. Hire later.', 'Add your new receptionist to your collection, ready to join your team whenever you are.'],
+                    ].map(([title, body], index) => <div key={title} className="flex items-start gap-2.5">
+                        <span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: `rgba(255,255,255,${Math.max(0.35, 1 - (index * 0.14))})` }} />
+                        <p className="text-[13px] leading-5 text-neutral-500"><span className="font-semibold text-neutral-200">{title}</span> {body}</p>
+                    </div>)}
                 </div>
             </div>
         </motion.div>
@@ -293,6 +332,7 @@ const PlanCard = ({ plan, cycle, isInitialLoad, index, currentUserPlan, subscrip
     const { isCheckoutLoading, billingManagedInStripe, handleUpgradeClick, handleManageBilling } = usePlanAction(plan, cycle, subscriptionStatus, isTestMode);
     const [openFeature, setOpenFeature] = useState(null);
     const [paymentTipsOpen, setPaymentTipsOpen] = useState(false);
+    const [receptionistTipsOpen, setReceptionistTipsOpen] = useState(false);
 
     const price = plan.price?.[cycle];
     const isCurrent = plan.name.toLowerCase() === currentUserPlan.toLowerCase();
@@ -336,7 +376,7 @@ const PlanCard = ({ plan, cycle, isInitialLoad, index, currentUserPlan, subscrip
                     <h3 className="text-xl font-bold text-white">{plan.name}</h3>
                     {plan.isRecommended && <span className="text-[13px] font-bold tracking-[0.01em] pricing-recommended-text" style={{ '--animation-delay': `${Math.random() * 2}s` }}>Recommended</span>}
                 </div>
-                <p className="mt-2 text-[15px] max-sm:text-sm text-neutral-400">{plan.description}</p>
+                <p className="mt-2 text-[15px] text-neutral-400">{plan.description}</p>
                 {plan.scopeNote && <p className="mt-3 text-xs leading-5 text-neutral-500">{plan.scopeNote}</p>}
                 <div className="my-6">
                     <div className="flex items-baseline justify-center text-center">
@@ -356,6 +396,7 @@ const PlanCard = ({ plan, cycle, isInitialLoad, index, currentUserPlan, subscrip
                         const featureLabel = typeof feature === 'string' ? feature : feature.label;
                         const featureDescription = typeof feature === 'string' ? null : feature.description;
                         const isPaymentFeature = featureLabel.toLowerCase().includes('payment');
+                        const isReceptionistCreationFeature = featureLabel.toLowerCase() === 'create a receptionist';
                         const showFeatureDescription = featureDescription && !featureLabel.toLowerCase().startsWith('everything in ') && !isPaymentFeature;
 
                         return (
@@ -366,6 +407,16 @@ const PlanCard = ({ plan, cycle, isInitialLoad, index, currentUserPlan, subscrip
                                 <button
                                     type="button"
                                     onClick={() => setPaymentTipsOpen(true)}
+                                    className="ml-1 flex h-4 w-4 shrink-0 items-center justify-center text-neutral-300 transition-colors hover:text-white"
+                                    aria-label={`More info about ${featureLabel}`}
+                                >
+                                    <Lightbulb className="h-3.5 w-3.5" aria-hidden="true" />
+                                </button>
+                            )}
+                            {isReceptionistCreationFeature && (
+                                <button
+                                    type="button"
+                                    onClick={() => setReceptionistTipsOpen(true)}
                                     className="ml-1 flex h-4 w-4 shrink-0 items-center justify-center text-neutral-300 transition-colors hover:text-white"
                                     aria-label={`More info about ${featureLabel}`}
                                 >
@@ -437,6 +488,7 @@ const PlanCard = ({ plan, cycle, isInitialLoad, index, currentUserPlan, subscrip
                 )}
             </div>
             <AnimatePresence>{paymentTipsOpen ? <PaymentTipsModal onClose={() => setPaymentTipsOpen(false)} /> : null}</AnimatePresence>
+            <AnimatePresence>{receptionistTipsOpen ? <ReceptionistCreationTipsModal onClose={() => setReceptionistTipsOpen(false)} /> : null}</AnimatePresence>
         </div>
     );
 };
@@ -530,13 +582,12 @@ const PlanComparisonTable = ({ plans, cycle, currentUserPlan, subscriptionStatus
     const rows = [
         { label: 'Price', isPrice: true, getValue: (plan) => plan.name === 'Free' ? 'Free' : `$${Number(plan.price?.[cycle] || 0).toLocaleString()} / month` },
         { label: 'Inbound calling', getValue: (plan) => Boolean(plan.entitlements?.inbound_calling) },
+        { label: 'Outbound calling', getValue: (plan) => Boolean(plan.entitlements?.outbound_calling) },
         { label: 'Receptionists', getValue: (plan) => formatLimit(plan.entitlements?.max_receptionists) },
         { label: 'Contacts', getValue: (plan) => formatLimit(plan.entitlements?.max_contacts) },
+        { label: 'Take payments', getValue: (plan) => Boolean(plan.entitlements?.payment_processing) },
         { label: 'Scenarios', getValue: (plan) => formatLimit(plan.entitlements?.max_scenarios) },
-        { label: 'Outbound calling', getValue: (plan) => Boolean(plan.entitlements?.outbound_calling) },
-        { label: 'Accept payments', getValue: (plan) => Boolean(plan.entitlements?.payment_processing) },
-        { label: 'Voice cloning', getValue: (plan) => hasFeature(plan, /voice\s*clon/i) },
-        { label: 'Dedicated onboarding specialist', getValue: (plan) => hasFeature(plan, /dedicated onboarding specialist/i) },
+        { label: 'Intelligence', getValue: (plan) => ['Pro', 'Ultra'].includes(plan.name) ? 'Advanced' : 'Smart' },
     ];
 
     return (
