@@ -19,12 +19,16 @@ colors.forEach(color => {
 // Function to set the viewport height custom property
 const setAppHeight = () => {
   const doc = document.documentElement;
-  doc.style.setProperty('--app-height', `${window.innerHeight}px`);
+  const visualHeight = window.visualViewport && Math.abs(window.visualViewport.scale - 1) < 0.01
+    ? window.visualViewport.height
+    : window.innerHeight;
+  doc.style.setProperty('--app-height', `${Math.round(visualHeight)}px`);
 };
 
 // Initial set and event listener
 setAppHeight();
 window.addEventListener('resize', setAppHeight);
+window.visualViewport?.addEventListener('resize', setAppHeight);
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>

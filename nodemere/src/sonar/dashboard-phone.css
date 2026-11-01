@@ -38,6 +38,7 @@
     --phone-nav-offset: max(12px, env(safe-area-inset-bottom));
     --phone-nav-clearance: calc(var(--phone-nav-height) + var(--phone-nav-offset) + 20px);
   }
+  .sonar-dashboard-shell[data-responsive="true"][data-studio="true"] { height: var(--app-height, 100dvh); }
   .sonar-dashboard-shell[data-responsive="true"] > header { height: 60px; padding: 0 16px; }
   .sonar-dashboard-shell[data-responsive="true"] > header > .absolute.left-\[38px\],
   .sonar-dashboard-shell[data-responsive="true"] .nest-toolbar-title,
