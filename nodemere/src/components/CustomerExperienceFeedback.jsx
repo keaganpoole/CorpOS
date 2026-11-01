@@ -96,7 +96,7 @@ const getUsageContext = async (businessId) => {
   const results = await Promise.all([
     countQuery('people'),
     countQuery('appointments'),
-    countQuery('call_logs'),
+    countQuery('call_logs').eq('status', 'completed'),
     countQuery('hired_receptionists'),
     countQuery('scenarios'),
   ]);
@@ -347,9 +347,8 @@ const CustomerExperienceFeedback = () => {
           .sort((left, right) => new Date(right).getTime() - new Date(left).getTime())[0] || null;
         const snoozedUntil = reviewSnoozedUntil || localState?.snoozed_until || null;
         const isSnoozed = snoozedUntil && new Date(snoozedUntil).getTime() > Date.now();
-        const eligibleByUsage = Number(usageContext.people_count) >= 3;
-        const eligibleByAccountAge = Number(nextContext.account_age_days) >= 15;
-        const isEligible = eligibleByUsage || eligibleByAccountAge;
+        const eligibleByCalls = Number(usageContext.call_count) >= 30;
+        const isEligible = eligibleByCalls;
         const shouldShow = !dismissalRef.current && !isCompleted && !isDeclined && isEligible && !isSnoozed;
 
         if (shouldShow) {
