@@ -133,7 +133,7 @@ const HireReceptionistModal = ({
     if (!embedded || selectedIndex === null) return;
     const previousFocus = document.activeElement;
     const panel = detailRef.current;
-    panel?.querySelector('button')?.focus();
+    panel?.focus({ preventScroll: true });
     return () => { previousFocus?.focus({ preventScroll: true }); };
   }, [embedded, selectedIndex]);
 
@@ -146,7 +146,7 @@ const HireReceptionistModal = ({
       if (event.key !== 'Tab') return;
       const buttons = [...panel.querySelectorAll('button:not(:disabled),[href],[tabindex="0"]')];
       const first = buttons[0], last = buttons[buttons.length - 1];
-      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+      if (event.shiftKey && (document.activeElement === first || document.activeElement === panel)) { event.preventDefault(); last?.focus(); }
       if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
     };
     document.addEventListener('keydown', key);
@@ -308,6 +308,7 @@ const HireReceptionistModal = ({
         transition={embedded ? { duration: reducedMotion ? 0 : .68, ease: [.77, 0, .175, 1] } : undefined}
         className={embedded ? 'ns-gallery-detail-inner relative z-10 flex flex-col items-center' : 'relative z-10 w-full max-w-[440px] flex flex-col items-center'}
         ref={detailRef}
+        tabIndex={embedded ? -1 : undefined}
         role={embedded ? 'dialog' : undefined}
         aria-modal={embedded && !archiveTarget ? true : undefined}
         inert={archiveTarget ? '' : undefined}
