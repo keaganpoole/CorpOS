@@ -340,6 +340,7 @@ const HireReceptionistModal = ({
               const mbtiColors = getMbtiSpectrumColors(catalogMbti(person));
               return (
               <section className={`ns-receptionist-preview-card ns-catalog-review ${person.avatar_video ? 'ns-catalog-video-review' : ''}`} key={person.id || person.full_name}>
+                <button type="button" className="ns-gallery-modal-close" aria-label="Close receptionist details" disabled={Boolean(hiringId) || archiving} onClick={event => { event.stopPropagation(); closeDetail(); }}><X size={15}/></button>
                 <div className="ns-receptionist-preview-image">
                   {person.avatar_video ? <video src={avatarVideoUrl(person.avatar_video)} poster={person.avatar || undefined} autoPlay muted loop playsInline preload="metadata" aria-label={`${person.full_name || 'Receptionist'} video portrait`} /> : person.avatar ? <img src={person.avatar} alt={person.full_name || 'Receptionist'} style={person.source === 'created_receptionist' || person.created_receptionist_id != null ? { objectPosition: 'center top' } : undefined} /> : <div className="ns-gallery-placeholder"><User size={64}/></div>}
                   <div className="ns-receptionist-preview-image-wash" />
@@ -604,7 +605,8 @@ const HireReceptionistModal = ({
   {portalDetail && typeof document !== 'undefined' && createPortal(
     <AnimatePresence>{selectedIndex !== null && detail}</AnimatePresence>,
     document.body,
-  )}</>;
+  )}
+  </>;
 };
 
 export default HireReceptionistModal;

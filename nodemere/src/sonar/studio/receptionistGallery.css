@@ -23,9 +23,13 @@
 .ns-gallery-toolbar button[aria-pressed=true]{background:#f1f1f1;color:#111}
 .ns-gallery-toolbar button:disabled{opacity:.35;cursor:default}
 .ns-gallery-tile:focus-visible,.ns-gallery-toolbar button:focus-visible{outline:2px solid #dab6fa;outline-offset:-4px}
-.ns-gallery-detail{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;overflow:auto;padding:76px 24px 28px;background:#0009;backdrop-filter:blur(8px);cursor:default;touch-action:pan-y;overscroll-behavior:contain}
-.ns-gallery-detail-inner{margin:auto;width:100%;max-width:920px}
-.ns-catalog-review{grid-template-columns:minmax(0,.92fr) minmax(0,1.08fr)}
+.ns-gallery-detail{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;overflow:hidden;padding:76px 24px 28px;background:#0009;backdrop-filter:blur(8px);cursor:default;touch-action:pan-y;overscroll-behavior:contain}
+.ns-gallery-modal-close{position:absolute;top:12px;right:12px;z-index:12;display:grid;place-items:center;width:26px;height:26px;border:1px solid #ffffff24;border-radius:50%;background:#080808a0;color:#b5b5ba;backdrop-filter:blur(8px);cursor:pointer;transition:color .2s,background .2s}
+.ns-gallery-modal-close svg{width:12px;height:12px}
+.ns-gallery-modal-close:hover{color:#fff;background:#181818c9}
+.ns-gallery-modal-close:disabled{opacity:.45;cursor:default}
+.ns-gallery-detail-inner{margin:auto;width:100%;max-width:920px;max-height:100%;overflow-y:auto;overscroll-behavior:contain}
+.ns-catalog-review{position:relative;grid-template-columns:minmax(0,.92fr) minmax(0,1.08fr)}
 .ns-receptionist-preview-card.ns-catalog-review{background:#09090a}
 .ns-catalog-video-review{grid-template-columns:minmax(0,1fr);width:min(760px,100%);margin:0 auto}
 .ns-catalog-video-review .ns-receptionist-preview-image{height:auto;aspect-ratio:16/9;min-height:0}
