@@ -331,6 +331,7 @@ p:not(.comparison-human-statement):not(.comparison-ai-statement) {
 @media (hover: none) and (pointer: coarse) {
   .plan-card--pro-touch::before { opacity: 1; animation-play-state: running; }
   .plan-card:not(.plan-card--pro-touch):not(.current-plan-glow):hover::before { opacity: 0; animation-play-state: paused; }
+  .plan-card:not(.current-plan-glow):hover { transform: none; }
 }
 .current-plan-glow { box-shadow: 0 0 30px var(--color1); transform: translateY(-5px); }
 .current-plan-glow::before { opacity: 1; animation: pulse-glow 3s infinite ease-in-out; }

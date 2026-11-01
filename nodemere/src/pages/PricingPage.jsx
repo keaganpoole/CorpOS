@@ -336,7 +336,7 @@ const PlanCard = ({ plan, cycle, isInitialLoad, index, currentUserPlan, subscrip
                     <h3 className="text-xl font-bold text-white">{plan.name}</h3>
                     {plan.isRecommended && <span className="text-[13px] font-bold tracking-[0.01em] pricing-recommended-text" style={{ '--animation-delay': `${Math.random() * 2}s` }}>Recommended</span>}
                 </div>
-                <p className="mt-2 text-[15px] text-neutral-400">{plan.description}</p>
+                <p className="mt-2 text-[15px] max-sm:text-sm text-neutral-400">{plan.description}</p>
                 {plan.scopeNote && <p className="mt-3 text-xs leading-5 text-neutral-500">{plan.scopeNote}</p>}
                 <div className="my-6">
                     <div className="flex items-baseline justify-center text-center">
