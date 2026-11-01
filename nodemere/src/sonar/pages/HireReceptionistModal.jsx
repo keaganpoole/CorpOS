@@ -2,13 +2,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import {
-  X, Play, Pause, Sparkles,
+  X, Play, Pause,
   User, ChevronLeft, ChevronRight, Loader2,
   CalendarDays, Volume2,
 } from 'lucide-react';
 import { api } from '../lib/api';
 import CubePreloader from '../components/CubePreloader';
-import MbtiPersonalityModal, { getMbtiProfileSummary } from '../components/MbtiPersonalityModal';
+import MbtiPersonalityModal, { getMbtiProfileSummary, getMbtiSpectrumColors } from '../components/MbtiPersonalityModal';
 import ReceptionistGallery from '../studio/ReceptionistGallery';
 import ReceptionistActionConfirmation from '../components/ReceptionistActionConfirmation';
 import IntercomVoiceLine from '../nest/IntercomVoiceLine';
@@ -18,7 +18,6 @@ import { CHARACTERISTICS, SUB_ACCENTS } from '../studio/voiceDefinition';
 const accentLabels = new Set([...CHARACTERISTICS.find(item => item.key === 'accent').options, ...Object.values(SUB_ACCENTS).flat()]);
 const isCreatedReceptionist = person => person.source === 'created_receptionist' || person.created_receptionist_id != null;
 const catalogAccentTraits = person => isCreatedReceptionist(person) && Array.isArray(person.traits) ? person.traits.filter(trait => accentLabels.has(trait)) : [];
-const catalogCoreTraits = person => Array.isArray(person.traits) ? person.traits.filter(trait => !isCreatedReceptionist(person) || !accentLabels.has(trait)) : [];
 const catalogMbti = person => {
   let personality = Array.isArray(person.personality) ? person.personality[0] : person.personality;
   if (typeof personality === 'string') {
@@ -338,6 +337,7 @@ const HireReceptionistModal = ({
             {embedded ? receptionists.filter((_, index) => index === selectedIndex).map(person => {
               const description = person.description || getMbtiProfileSummary(person.personality?.mbti || person.personality_type, person.first_name || person.full_name);
               const expandableDescription = isCreatedReceptionist(person) && typeof description === 'string' && description.length > 130;
+              const mbtiColors = getMbtiSpectrumColors(catalogMbti(person));
               return (
               <section className={`ns-receptionist-preview-card ns-catalog-review ${person.avatar_video ? 'ns-catalog-video-review' : ''}`} key={person.id || person.full_name}>
                 <div className="ns-receptionist-preview-image">
@@ -367,10 +367,9 @@ const HireReceptionistModal = ({
                   {description && (expandableDescription ? <div className="ns-catalog-description"><p className={`ns-receptionist-preview-copy${descriptionExpanded ? '' : ' is-collapsed'}`}>{description}</p><button type="button" aria-expanded={descriptionExpanded} onClick={() => setDescriptionExpanded(expanded => !expanded)}>{descriptionExpanded ? 'Show less' : 'Show more'}</button></div> : <p className="ns-receptionist-preview-copy">{description}</p>)}
                   <dl className={`ns-catalog-review-meta${isCreatedReceptionist(person) ? ' ns-catalog-review-meta-created' : ''}`}>
                     {person.age && <div><dt>Age</dt><dd>{String(person.age).match(/^\d+$/) ? `${person.age} years old` : person.age}</dd></div>}
-                    {!showPersonalityTypePill && catalogMbti(person) && <div><dt>Personality</dt><dd><button type="button" onClick={() => setPersonalityPerson(person)}>{catalogMbti(person)}</button></dd></div>}
+                    {!showPersonalityTypePill && catalogMbti(person) && <div className="ns-catalog-review-mbti"><dt>Personality</dt><dd><button type="button" className="ns-catalog-mbti-button" style={{ '--ns-mbti-a': mbtiColors[0], '--ns-mbti-b': mbtiColors[1], '--ns-mbti-c': mbtiColors[2] }} onClick={() => setPersonalityPerson(person)}><span className="ns-catalog-mbti-glow" aria-hidden="true"/><span className="ns-catalog-mbti-rim" aria-hidden="true"/><span className="ns-catalog-mbti-bubble">{catalogMbti(person)}</span></button></dd></div>}
                     {catalogAccentTraits(person).length > 0 && <div><dt>Accent</dt><dd>{catalogAccentTraits(person).join(' · ')}</dd></div>}
                   </dl>
-                  {catalogCoreTraits(person).length > 0 && <div className="ns-catalog-review-traits"><span>Core traits</span><div>{catalogCoreTraits(person).map((trait, i) => <span key={i}>{trait}</span>)}</div></div>}
                   <div className="ns-receptionist-preview-actions">
                     {person.voice && !hideVoiceButton ? <div className="ns-catalog-voice-preview"><button type="button" className="ns-take-play" aria-label={playingVoice === person.id ? 'Pause voice preview' : 'Play voice preview'} onClick={() => playVoice(person.voice, person.id)}>{playingVoice === person.id ? <Pause size={18}/> : <Play size={18}/>}</button><IntercomVoiceLine enabled={playingVoice === person.id} level={voiceLevel}/><span>{playingVoice === person.id ? 'Playing preview' : 'Preview voice'}</span></div> : !person.voice ? <span className="ns-footnote">No voice preview</span> : null}
                     <div className={`ns-catalog-hire-actions${isCreatedReceptionist(person) ? ' is-created' : ''}`}>
@@ -486,21 +485,6 @@ const HireReceptionistModal = ({
                             ) : (
                               <p className="text-[11px] text-white/30">No voice set</p>
                             )}
-                          </div>
-                        </div>
-
-                        {/* Core Traits */}
-                        <div className="space-y-3">
-                          <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-white/30">
-                            <Sparkles size={12} />
-                            <span>Core Traits</span>
-                          </div>
-                          <div className="flex flex-wrap gap-2">
-                            {person.traits && Array.isArray(person.traits) && person.traits.map((trait, i) => (
-                              <span key={`${String(trait)}-${i}`} className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[11px] text-white/60 font-medium">
-                                {trait}
-                              </span>
-                            ))}
                           </div>
                         </div>
 

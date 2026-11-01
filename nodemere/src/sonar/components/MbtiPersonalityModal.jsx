@@ -62,6 +62,8 @@ const SPECTRUM = {
   ESTP: ['#431407', '#f97316', '#ef4444', 4.9], ESFP: ['#422006', '#facc15', '#f43f5e', 5.4],
 };
 
+export const getMbtiSpectrumColors = type => (SPECTRUM[String(type || '').toUpperCase()] || SPECTRUM.INFP).slice(0, 3);
+
 const EASINGS = {
   INTJ: 'cubic-bezier(.55,0,.25,1)', INTP: 'cubic-bezier(.45,0,.25,1)', ENTJ: 'cubic-bezier(.25,.75,.2,1)', ENTP: 'cubic-bezier(.35,0,.25,1)',
   INFJ: 'cubic-bezier(.4,0,.15,1)', INFP: 'cubic-bezier(.22,.75,.18,1)', ENFJ: 'cubic-bezier(.25,.75,.25,1)', ENFP: 'cubic-bezier(.3,.8,.25,1)',
