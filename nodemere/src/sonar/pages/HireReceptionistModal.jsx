@@ -131,14 +131,6 @@ const HireReceptionistModal = ({
 
   useEffect(() => {
     if (!embedded || selectedIndex === null) return;
-    const previousFocus = document.activeElement;
-    const panel = detailRef.current;
-    panel?.focus({ preventScroll: true });
-    return () => { previousFocus?.focus({ preventScroll: true }); };
-  }, [embedded, selectedIndex]);
-
-  useEffect(() => {
-    if (!embedded || selectedIndex === null) return;
     const panel = detailRef.current;
     const key = event => {
       if (personalityPerson || archiveTarget) return;
@@ -308,7 +300,6 @@ const HireReceptionistModal = ({
         transition={embedded ? { duration: reducedMotion ? 0 : .68, ease: [.77, 0, .175, 1] } : undefined}
         className={embedded ? 'ns-gallery-detail-inner relative z-10 flex flex-col items-center' : 'relative z-10 w-full max-w-[440px] flex flex-col items-center'}
         ref={detailRef}
-        tabIndex={embedded ? -1 : undefined}
         role={embedded ? 'dialog' : undefined}
         aria-modal={embedded && !archiveTarget ? true : undefined}
         inert={archiveTarget ? '' : undefined}
