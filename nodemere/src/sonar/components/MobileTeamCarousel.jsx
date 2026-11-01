@@ -6,7 +6,7 @@ export default function MobileTeamCarousel({ children }) {
   const count = Children.count(children);
   useEffect(() => { setIndex(0); track.current?.scrollTo({ left: 0 }); }, [count]);
   return <div className="mobile-team-carousel" role="region" aria-label="Receptionists">
-    <div className="mobile-team-track" ref={track} onScroll={() => {
+    <div className={`mobile-team-track${count > 1 ? ' has-multiple' : ' has-single'}`} ref={track} onScroll={() => {
       const el = track.current;
       if (el?.children.length) setIndex([...el.children].reduce((best, child, i) => Math.abs(child.offsetLeft - el.scrollLeft) < Math.abs(el.children[best].offsetLeft - el.scrollLeft) ? i : best, 0));
     }}>{Children.map(children, (child, i) => <div className="mobile-team-slide" role="group" aria-label={`Receptionist ${i + 1} of ${count}`}>{child}</div>)}</div>
