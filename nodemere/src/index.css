@@ -335,7 +335,7 @@ p:not(.comparison-human-statement):not(.comparison-ai-statement) {
 }
 .current-plan-glow { box-shadow: 0 0 30px var(--color1); transform: translateY(-5px); }
 .current-plan-glow::before { opacity: 1; animation: pulse-glow 3s infinite ease-in-out; }
-@media (max-width: 1023px) {
+@media (max-width: 1319px) {
   .pricing-carousel-shell { position: relative; }
   .pricing-carousel-edge {
     position: absolute;
@@ -386,9 +386,6 @@ p:not(.comparison-human-statement):not(.comparison-ai-statement) {
     scroll-snap-align: center;
     scroll-snap-stop: always;
   }
-}
-@media (min-width: 640px) and (max-width: 1023px) {
-  .pricing-plan-track { padding-left: 24px; padding-right: max(24px, calc((100% - 300px) / 2)); }
 }
 @media (max-width: 639px) {
   .pricing-carousel-arrow { width: 48px; height: 48px; border: 0; background: transparent; box-shadow: none; }

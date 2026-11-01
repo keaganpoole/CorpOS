@@ -370,28 +370,28 @@ const PlanCard = ({ plan, cycle, isInitialLoad, index, currentUserPlan, subscrip
     }, [cycle, isInitialLoad]);
 
     return (
-        <div ref={cardRef} className={`plan-card plan-card-entry ${plan.name === 'Pro' ? 'plan-card--pro-touch' : ''} flex flex-col bg-[#111111] border border-[#303034] rounded-2xl p-6 ${isCurrent ? '' : ''} w-full max-w-[300px] md:flex-shrink-0`} style={{ '--animation-delay': `${index * 100}ms`, fontFamily: "'Inter', sans-serif" }}>
+        <div ref={cardRef} className={`plan-card plan-card-entry ${plan.name === 'Pro' ? 'plan-card--pro-touch' : ''} flex flex-col bg-[#111111] border border-[#303034] rounded-2xl p-6 max-sm:p-5 ${isCurrent ? '' : ''} w-full max-w-[300px] md:flex-shrink-0`} style={{ '--animation-delay': `${index * 100}ms`, fontFamily: "'Inter', sans-serif" }}>
             <div className="flex-grow">
                 <div className="flex justify-between items-start">
-                    <h3 className="text-xl font-bold text-white">{plan.name}</h3>
+                    <h3 className="text-xl max-sm:text-lg font-bold text-white">{plan.name}</h3>
                     {plan.isRecommended && <span className="text-[13px] font-bold tracking-[0.01em] pricing-recommended-text" style={{ '--animation-delay': `${Math.random() * 2}s` }}>Recommended</span>}
                 </div>
-                <p className="mt-2 text-[15px] text-neutral-400">{plan.description}</p>
+                <p className="mt-2 text-[15px] max-sm:text-[13px] text-neutral-400">{plan.description}</p>
                 {plan.scopeNote && <p className="mt-3 text-xs leading-5 text-neutral-500">{plan.scopeNote}</p>}
-                <div className="my-6">
+                <div className="my-6 max-sm:my-5">
                     <div className="flex items-baseline justify-center text-center">
-                        <div className="flex items-start text-5xl font-extrabold text-white">
-                            <span className={`text-xl mt-1 mr-1 ${price > 0 ? '' : 'hidden'}`}>$</span>
+                        <div className="flex items-start text-5xl max-sm:text-4xl font-extrabold text-white">
+                            <span className={`text-xl max-sm:text-lg mt-1 mr-1 ${price > 0 ? '' : 'hidden'}`}>$</span>
                             <span ref={priceRef}>{price > 0 ? price : 'Free'}</span>
                         </div>
-                        <span className="text-sm text-neutral-400 ml-2">/ month</span>
+                        <span className="text-sm max-sm:text-xs text-neutral-400 ml-2">/ month</span>
                     </div>
                     <p className="relative top-2 text-center text-xs text-neutral-500 h-5 mt-2">
                         {cycle === 'annually' && price > 0 ? 'Billed annually' : ''}
                     </p>
                     <p ref={savingsRef} className="savings-text text-center text-xs font-semibold h-5">{'\u00A0'}</p>
                 </div>
-                <ul className="space-y-2.5">
+                <ul className="space-y-2.5 max-sm:space-y-2">
                     {plan.features.map((feature, featureIndex) => {
                         const featureLabel = typeof feature === 'string' ? feature : feature.label;
                         const featureDescription = typeof feature === 'string' ? null : feature.description;
@@ -401,8 +401,8 @@ const PlanCard = ({ plan, cycle, isInitialLoad, index, currentUserPlan, subscrip
 
                         return (
                         <li key={featureLabel} className="relative flex items-center">
-                            <PlanCheckmark className="w-5 h-5 mr-1.5 flex-shrink-0" featureIndex={featureIndex} />
-                            <span className="text-neutral-300 text-sm min-w-0 overflow-hidden text-ellipsis">{featureLabel}</span>
+                            <PlanCheckmark className="w-5 h-5 max-sm:w-4 max-sm:h-4 mr-1.5 flex-shrink-0" featureIndex={featureIndex} />
+                            <span className="text-neutral-300 text-sm max-sm:text-[13px] min-w-0 overflow-hidden text-ellipsis">{featureLabel}</span>
                             {isPaymentFeature && (
                                 <button
                                     type="button"
@@ -451,14 +451,14 @@ const PlanCard = ({ plan, cycle, isInitialLoad, index, currentUserPlan, subscrip
                     )})}
                 </ul>
             </div>
-            <div className="mt-8">
+            <div className="mt-8 max-sm:mt-6">
                 {['Essentials', 'Pro', 'Ultra'].includes(plan.name) && (
-                    <p className="relative top-2 mb-[6px] text-center text-[11px] text-neutral-500">
+                    <p className="relative top-2 mb-[6px] text-center text-[11px] max-sm:text-[10px] text-neutral-500">
                         3% fee on payments collected by receptionists,
                     </p>
                 )}
                 {hasOverages && (
-                    <p className="mb-3 text-center text-[11px] text-neutral-500">
+                    <p className="mb-3 text-center text-[11px] max-sm:text-[10px] text-neutral-500">
                         Additional minutes billed at ${overageRate.toFixed(2)}/min.
                     </p>
                 )}
@@ -476,7 +476,7 @@ const PlanCard = ({ plan, cycle, isInitialLoad, index, currentUserPlan, subscrip
                         data-visitor-event="cta_click"
                         data-visitor-id={`pricing-${plan.name.toLowerCase()}`}
                         disabled={isCheckoutLoading}
-                        className="pricing-neutral-button w-full mt-auto font-semibold py-3 rounded-lg hover:opacity-90 transition-opacity btn-shine disabled:opacity-50 disabled:cursor-wait">
+                        className="pricing-neutral-button w-full mt-auto font-semibold py-3 max-sm:py-2.5 rounded-lg hover:opacity-90 transition-opacity btn-shine disabled:opacity-50 disabled:cursor-wait">
                         {isCheckoutLoading ? 'Redirecting...' : (
                             billingManagedInStripe ? 'Manage plan in Stripe' : (isTestMode ? 'Test this plan' : (
                                 plan.name === 'Free' ? 'Choose plan' : (
@@ -593,21 +593,21 @@ const PlanComparisonTable = ({ plans, cycle, currentUserPlan, subscriptionStatus
     return (
         <div role="region" aria-label="Plan comparison" className="pricing-comparison-scroll mx-auto max-w-[1272px] overflow-x-auto pt-4 pb-4" style={{ fontFamily: "'Inter', sans-serif" }}>
             <div className="min-w-[680px] rounded-2xl bg-[#111111]">
-                <table className="w-full table-fixed border-separate border-spacing-0 text-left text-sm">
+                <table className="w-full table-fixed border-separate border-spacing-0 text-left text-sm max-sm:text-xs">
                     <thead>
                         <tr className="text-white">
-                            <th scope="col" className="w-[32%] border-b border-white/[0.08] px-4 py-3 font-semibold">Feature</th>
-                            {plans.map((plan) => <th key={plan.name} scope="col" className="border-b border-white/[0.08] px-4 py-3 text-center font-semibold">{plan.name}</th>)}
+                            <th scope="col" className="w-[32%] border-b border-white/[0.08] px-4 py-3 max-sm:px-2.5 max-sm:py-2.5 font-semibold">Feature</th>
+                            {plans.map((plan) => <th key={plan.name} scope="col" className="border-b border-white/[0.08] px-4 py-3 max-sm:px-2.5 max-sm:py-2.5 text-center font-semibold">{plan.name}</th>)}
                         </tr>
                     </thead>
                     <tbody>
                         {rows.map((row, rowIndex) => (
                         <tr key={row.label} className="card-entry" style={{ '--animation-delay': `${rowIndex * 40}ms` }}>
-                            <th scope="row" className={`px-4 py-3 font-medium text-neutral-300 border-b border-white/[0.06] ${rowIndex === rows.length - 1 ? 'border-b-0' : ''}`}>{row.label}</th>
+                            <th scope="row" className={`px-4 py-3 max-sm:px-2.5 max-sm:py-2.5 font-medium text-neutral-300 border-b border-white/[0.06] ${rowIndex === rows.length - 1 ? 'border-b-0' : ''}`}>{row.label}</th>
                                 {plans.map((plan) => {
                                     const value = row.getValue(plan);
                                     return (
-                                    <td key={plan.name} className={`px-4 py-3 text-center text-neutral-300 border-b border-white/[0.06] ${rowIndex === rows.length - 1 ? 'border-b-0' : ''}`}>
+                                    <td key={plan.name} className={`px-4 py-3 max-sm:px-2.5 max-sm:py-2.5 text-center text-neutral-300 border-b border-white/[0.06] ${rowIndex === rows.length - 1 ? 'border-b-0' : ''}`}>
                                             {row.isPrice ? (
                                                 <div className="flex min-h-10 flex-col items-center justify-center leading-5">
                                                     <span className="font-semibold text-white">{value}</span>
@@ -622,9 +622,9 @@ const PlanComparisonTable = ({ plans, cycle, currentUserPlan, subscriptionStatus
                     </tbody>
                     <tfoot>
                         <tr className="card-entry" style={{ '--animation-delay': `${rows.length * 40}ms` }}>
-                            <th scope="row" className="border-t border-white/[0.08] px-4 py-3 font-semibold text-neutral-300">Choose a plan</th>
+                            <th scope="row" className="border-t border-white/[0.08] px-4 py-3 max-sm:px-2.5 max-sm:py-2.5 font-semibold text-neutral-300">Choose a plan</th>
                             {plans.map((plan) => (
-                                <td key={plan.name} className="border-t border-white/[0.08] px-2 py-3 text-center">
+                                <td key={plan.name} className="border-t border-white/[0.08] px-2 py-3 max-sm:py-2.5 text-center">
                                     <PlanComparisonAction plan={plan} cycle={cycle} currentUserPlan={currentUserPlan} subscriptionStatus={subscriptionStatus} isTestMode={isTestMode} />
                                 </td>
                             ))}
@@ -835,11 +835,11 @@ const PricingPage = () => {
             </div>
             <div className="container mx-auto px-3 py-12 sm:py-20 flex-1">
                 <div className="text-center max-w-3xl mx-auto mb-12 max-sm:mb-7">
-                    <h1 className="text-4xl max-sm:text-3xl md:text-5xl font-extrabold text-white mb-4 max-sm:mb-2">Choose your plan</h1>
+                    <h1 className="text-3xl md:text-5xl font-extrabold text-white mb-4 max-sm:mb-2">Choose your plan</h1>
                     {subscriptionStatus === 'failed' && subscriptionLog && (
                         <p className="text-red-500 text-lg mb-4">{subscriptionLog}</p>
                     )}
-                    <p className="text-lg max-sm:text-sm text-neutral-400">Choose a plan that's right for your business.</p>
+                    <p className="text-sm md:text-lg text-neutral-400">Choose a plan that's right for your business.</p>
                 </div>
                 <div className="relative mt-12 max-sm:mt-10">
                     <div className="relative z-10 -mt-5 mb-1 flex flex-wrap items-center justify-center gap-2 sm:-mt-5">
@@ -871,7 +871,7 @@ const PricingPage = () => {
                             <div className="pricing-carousel-shell flex justify-center">
                                 {carouselEdges.previous && <div className="pricing-carousel-edge pricing-carousel-edge--left lg:hidden" aria-hidden="true" />}
                                 {carouselEdges.next && <div className="pricing-carousel-edge pricing-carousel-edge--right lg:hidden" aria-hidden="true" />}
-                                <div ref={mobilePlanTrackRef} onClick={focusCarouselCard} onScroll={updateCarouselEdges} className="pricing-plan-track inline-grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 py-4" aria-label="Pricing plans">
+                                <div ref={mobilePlanTrackRef} onClick={focusCarouselCard} onScroll={updateCarouselEdges} className="pricing-plan-track inline-grid grid-cols-4 gap-6 py-4" aria-label="Pricing plans">
                                     {plansToDisplay.map((plan, index) => <PlanCard key={plan.name} plan={plan} cycle={cycle} isInitialLoad={isInitialLoad} index={index} currentUserPlan={currentUserPlan} subscriptionStatus={subscriptionStatus} isTestMode={isTestMode} />)}
                                 </div>
                                 {carouselEdges.previous && <button type="button" onClick={() => moveCarousel(-1)} aria-label="Previous pricing plans" className="pricing-carousel-arrow pricing-carousel-arrow--left lg:hidden"><ChevronLeft size={22} strokeWidth={2.5} aria-hidden="true" /></button>}
@@ -882,7 +882,7 @@ const PricingPage = () => {
                 </div>
                 {!plansLoading && (
                     <>
-                        <p className="mx-auto mt-20 max-w-3xl text-center text-xs leading-5 text-neutral-500">
+                        <p className="mx-auto mt-20 max-w-3xl text-center text-xs leading-5 max-sm:text-[11px] max-sm:leading-[18px] text-neutral-500">
                             By starting a subscription, you agree to the <Link to="/terms" className="underline underline-offset-2">Terms of Service</Link> and <Link to="/privacy-policy" className="underline underline-offset-2">Privacy Policy</Link>. Paid subscriptions renew automatically at the selected billing interval unless canceled before the next renewal date. You can request cancellation at <a href="mailto:support@nodemere.ai" className="underline underline-offset-2">support@nodemere.ai</a>.
                         </p>
                     </>
