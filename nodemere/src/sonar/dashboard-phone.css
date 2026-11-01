@@ -71,7 +71,7 @@
     backdrop-filter: blur(20px) saturate(.72);
   }
   /* Every dashboard view gets space to scroll clear of the floating nav. */
-  .sonar-dashboard-shell[data-responsive="true"] > div.flex.flex-1 > main { padding-bottom: var(--phone-nav-clearance); }
+  .sonar-dashboard-shell[data-responsive="true"]:not([data-studio="true"]) > div.flex.flex-1 > main { padding-bottom: var(--phone-nav-clearance); }
   .sonar-dashboard-shell[data-responsive="true"] .dashboard-mobile-nav button {
     min-height: 0;
     height: 48px;

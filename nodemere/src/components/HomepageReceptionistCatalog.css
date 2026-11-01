@@ -438,7 +438,8 @@
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) {
   .homepage-catalog-continue-surface {
     --homepage-catalog-browser-ui-inset: 0px;
-    bottom: var(--homepage-catalog-browser-ui-inset);
+    --homepage-catalog-continue-lift: 12px;
+    bottom: calc(var(--homepage-catalog-browser-ui-inset) + var(--homepage-catalog-continue-lift));
   }
 
   .homepage-catalog-continue-surface::after {
@@ -447,7 +448,7 @@
     top: 100%;
     right: 0;
     left: 0;
-    height: var(--homepage-catalog-browser-ui-inset);
+    height: calc(var(--homepage-catalog-browser-ui-inset) + var(--homepage-catalog-continue-lift));
     background: rgba(232,232,232,.96);
     pointer-events: none;
   }
