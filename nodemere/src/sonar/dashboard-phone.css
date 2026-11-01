@@ -126,7 +126,7 @@
   .mobile-team-carousel { display: flex; flex-direction: column; height: 100%; min-height: 0; }
   .mobile-team-track { position: relative; display: flex; gap: 16px; min-height: 0; flex: 1; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; scrollbar-width: none; }
   .mobile-team-track::-webkit-scrollbar { display: none; }
-  .mobile-team-slide { flex: 0 0 100%; min-width: 0; height: 100%; scroll-snap-align: start; scroll-snap-stop: always; }
+  .mobile-team-slide { flex: 0 0 calc(100% - 28px); min-width: 0; height: 100%; scroll-snap-align: start; scroll-snap-stop: always; }
   .mobile-team-slide > div { height: 100%; }
   .sonar-dashboard-shell[data-responsive="true"] .mobile-team-slide .team-receptionist-card { height: 100%; border-radius: 22px; }
   .sonar-dashboard-shell[data-responsive="true"] .mobile-team-slide .team-receptionist-card > div:first-child { min-height: 120px; height: auto; flex: 1; border-radius: 22px 22px 0 0; }
@@ -406,3 +406,4 @@
   .mobile-team-slide, .mobile-team-slide > div { height: auto; min-height: 100%; }
   .sonar-dashboard-shell[data-responsive="true"] .mobile-team-slide .team-receptionist-card { min-height: 330px; }
 }
+

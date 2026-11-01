@@ -346,3 +346,13 @@
 .ns-receptionist-preview-actions .ns-text-button{align-self:flex-start}
 .ns-receptionist-preview-actions .ns-primary{width:100%;min-width:0}
 @container nodemere-office (max-width:600px){.ns-receptionist-preview-body{padding:28px 24px 32px}.ns-review-name{font-size:32px}.ns-receptionist-preview-selections{gap:20px;padding:22px 0;margin-top:22px}.ns-review-detail dd{font-size:13px}}
+
+/* Keep the new receptionist choice screen lighter and more compact on phones. */
+@media(max-width:767px){
+  .ns-office.ns-choice-modal .ns-choice-card-decoration{opacity:.1!important;filter:contrast(1.04) brightness(1.08)}
+  .ns-office.ns-choice-modal .ns-choice-cards{gap:12px}
+  .ns-office.ns-choice-modal .ns-choice-card{min-height:260px;padding:19px 18px 17px!important;border-radius:18px}
+  .ns-office.ns-choice-modal .ns-choice-card-title{margin-top:26px;font-size:32px}
+  .ns-office.ns-choice-modal .ns-choice-card-copy{margin-top:11px;font-size:10px;line-height:1.5}
+  .ns-office.ns-choice-modal .ns-choice-card-action{padding-top:12px;font-size:10px}
+}
