@@ -1246,10 +1246,18 @@ const LeadsTable = ({
   const [personDocuments, setPersonDocuments] = useState([]);
   const [documentViewer, setDocumentViewer] = useState(null);
   const [columnOptionsPosition, setColumnOptionsPosition] = useState({ top: 0, left: 0 });
+  const [headerPortalTarget, setHeaderPortalTarget] = useState(null);
   const columnOptionsButtonRef = useRef(null);
   const tableScrollRef = useRef(null);
   const horizontalScrollRef = useRef(null);
+  const stickyHorizontalScrollRef = useRef(null);
+  const stickyHorizontalContentRef = useRef(null);
   const headerStickyRef = useRef(null);
+  const headerScrollRef = useRef(null);
+  const setHeaderScrollNode = useCallback((node) => {
+    headerScrollRef.current = node;
+    setHeaderPortalTarget(node);
+  }, []);
   const headerRowRef = useRef(null);
   const zoneOverlayRef = useRef(null);
   const headerRefs = useRef({});
@@ -1749,6 +1757,46 @@ const LeadsTable = ({
   }, [leads, viewSettings.sortRules]);
 
   const frozenCount = Math.min(Math.max(viewSettings.frozenCount || 0, 0), columns.length);
+
+  useLayoutEffect(() => {
+    const source = horizontalScrollRef.current;
+    const sticky = stickyHorizontalScrollRef.current;
+    const content = stickyHorizontalContentRef.current;
+    if (!source || !sticky || !content) return undefined;
+    let proxyDrivenScrollLeft = null;
+    const updateWidth = () => {
+      content.style.width = `${source.scrollWidth}px`;
+      sticky.scrollLeft = source.scrollLeft;
+    };
+    const onSourceScroll = () => {
+      const wasProxyDriven = proxyDrivenScrollLeft !== null
+        && Math.abs(source.scrollLeft - proxyDrivenScrollLeft) < 1;
+      proxyDrivenScrollLeft = null;
+      if (!wasProxyDriven) sticky.scrollLeft = source.scrollLeft;
+    };
+    const onStickyScroll = () => {
+      proxyDrivenScrollLeft = sticky.scrollLeft;
+      source.scrollLeft = sticky.scrollLeft;
+    };
+    const onHorizontalScroll = () => {
+      if (headerScrollRef.current) headerScrollRef.current.scrollLeft = source.scrollLeft;
+    };
+    updateWidth();
+    source.addEventListener('scroll', onSourceScroll, { passive: true });
+    source.addEventListener('scroll', onHorizontalScroll, { passive: true });
+    sticky.addEventListener('scroll', onStickyScroll, { passive: true });
+    if (headerScrollRef.current) headerScrollRef.current.scrollLeft = source.scrollLeft;
+    const observer = new ResizeObserver(updateWidth);
+    observer.observe(source);
+    if (source.firstElementChild) observer.observe(source.firstElementChild);
+    return () => {
+      source.removeEventListener('scroll', onSourceScroll);
+      source.removeEventListener('scroll', onHorizontalScroll);
+      sticky.removeEventListener('scroll', onStickyScroll);
+      observer.disconnect();
+    };
+  }, [columns.length, leads.length, frozenCount, headerPortalTarget]);
+
   const frozenSnapTargets = useMemo(() => {
     const dataColumns = columns
       .map((column, index) => ({ column, index }))
@@ -2115,18 +2163,24 @@ const LeadsTable = ({
 
   const renderSplitTable = () => (
     <div ref={tableScrollRef} className="relative flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar">
+      <div className="sticky top-0 z-20 flex min-w-0 border-b border-white/[0.04] bg-[#0a0a0a]/95 backdrop-blur-sm">
+        <div
+          className="shrink-0 overflow-hidden border-r border-white/[0.04]"
+          style={{ width: frozenPaneWidth, minWidth: frozenPaneWidth }}
+        >
+          {frozenCount > 0 && (
+            <div className="flex items-center gap-3 py-2 pl-5 pr-0 group" style={{ paddingTop: '15px' }}>
+              {frozenColumns.map((col) => renderHeaderColumn(col, columns.findIndex((column) => column.id === col.id)))}
+            </div>
+          )}
+        </div>
+        <div ref={setHeaderScrollNode} className="min-w-0 flex-1 overflow-hidden" />
+      </div>
       <div ref={headerRowRef} className="relative flex min-w-0">
         <div
           className="shrink-0 overflow-hidden border-r border-white/[0.04] bg-[#0a0a0a]"
           style={{ width: frozenPaneWidth, minWidth: frozenPaneWidth }}
         >
-          {frozenCount > 0 && (
-            <div className="sticky top-0 z-20 border-b border-white/[0.04] bg-[#0a0a0a]/95 backdrop-blur-sm">
-              <div className="flex items-center gap-3 py-2 pl-5 pr-0 group" style={{ paddingTop: '15px' }}>
-                {frozenColumns.map((col) => renderHeaderColumn(col, columns.findIndex((column) => column.id === col.id)))}
-              </div>
-            </div>
-          )}
           <div className="divide-y divide-white/[0.02]">
             {!showInitialLoader && leads.length > 0 && sortedLeads.map((lead, idx) => {
               const isJustAdded = justAddedLeadIds.includes(lead.id);
@@ -2193,7 +2247,8 @@ const LeadsTable = ({
         )}
         <div ref={horizontalScrollRef} className="crm-horizontal-scroll min-w-0 flex-1 overflow-x-auto overflow-y-visible custom-scrollbar">
           <div className="min-w-max">
-            <div ref={headerStickyRef} className="sticky top-0 z-10 border-b border-white/[0.04] bg-[#0a0a0a]/95 backdrop-blur-sm overflow-visible">
+            {headerPortalTarget && createPortal(
+            <div ref={headerStickyRef} className="min-w-max border-b border-white/[0.04] bg-[#0a0a0a]/95 backdrop-blur-sm overflow-visible">
               <div ref={zoneOverlayRef} className="relative">
                 <div className="hidden" style={{ left: frozenCount > 0 ? 0 : frozenHandleLeft }}>
                   {isDraggingFrozenDivider && <div className="absolute top-0 h-[calc(100vh-220px)] border-l border-dotted border-zinc-300/35" />}
@@ -2319,7 +2374,7 @@ const LeadsTable = ({
                   {showColumnOptions && <div className="w-[190px] shrink-0" />}
                 </div>
               </div>
-            </div>
+            </div>, headerPortalTarget)}
 
             <div className="divide-y divide-white/[0.02]">
               {showInitialLoader ? null : leads.length === 0 ? null : (
@@ -2374,6 +2429,16 @@ const LeadsTable = ({
             </div>
           </div>
         </div>
+      </div>
+      <div
+        ref={stickyHorizontalScrollRef}
+        className="crm-sticky-horizontal-scroll sticky bottom-0 z-30 h-[14px] overflow-x-auto overflow-y-hidden border-t border-white/[0.04] bg-[#090909]/95"
+        onScroll={(event) => {
+          if (horizontalScrollRef.current) horizontalScrollRef.current.scrollLeft = event.currentTarget.scrollLeft;
+        }}
+        aria-label="People table horizontal scrollbar"
+      >
+        <div ref={stickyHorizontalContentRef} className="h-px" />
       </div>
       {!showInitialLoader && leads.length === 0 ? renderNewRecordEmptyState() : null}
       {showInitialLoader ? renderPeopleLoader() : null}

@@ -489,6 +489,13 @@ p:not(.comparison-human-statement):not(.comparison-ai-statement) {
   scrollbar-gutter: stable;
 }
 
+.crm-horizontal-scroll { scrollbar-width: none; }
+.crm-horizontal-scroll::-webkit-scrollbar { display: none; }
+.crm-sticky-horizontal-scroll { scrollbar-width: thin; scrollbar-color: rgba(90, 90, 98, 0.72) rgba(255, 255, 255, 0.03); }
+.crm-sticky-horizontal-scroll::-webkit-scrollbar { height: 10px; }
+.crm-sticky-horizontal-scroll::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.03); border-radius: 9999px; }
+.crm-sticky-horizontal-scroll::-webkit-scrollbar-thumb { background: linear-gradient(180deg, rgba(92, 92, 100, 0.92), rgba(72, 72, 80, 0.92)); border-radius: 9999px; border: 2px solid rgba(7, 7, 9, 0.95); }
+
 .crm-horizontal-scroll::-webkit-scrollbar {
   height: 10px;
 }
