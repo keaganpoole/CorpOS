@@ -7,6 +7,7 @@ import { Toaster } from 'react-hot-toast';
 import HomePage from './pages/HomePage';
 import PricingPage from './pages/PricingPage';
 import AuthPage from './pages/AuthPage';
+import OAuthConsentPage from './pages/OAuthConsentPage';
 import AccountRecoveryPage from './pages/AccountRecoveryPage';
 import Onboarding2Page from './pages/Onboarding2Page';
 import ResetPasswordPage from './pages/ResetPasswordPage';
@@ -167,6 +168,7 @@ function AppContent() {
         <Route path="/" element={<><VisitorTracking /><HomePage /></>} />
         <Route path="/pricing" element={<PricingPage />} />
         <Route path="/auth" element={<AuthPage />} />
+        <Route path="/oauth/consent" element={<OAuthConsentPage />} />
         <Route path="/invite/:invitationId" element={<AuthPage />} />
         <Route path="/onboarding" element={<OnboardingGate />} />
         <Route path="/onboarding2" element={<Navigate to="/onboarding" replace />} />

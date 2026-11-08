@@ -1,0 +1,2 @@
+[functions.nodemere-mcp]
+verify_jwt = false

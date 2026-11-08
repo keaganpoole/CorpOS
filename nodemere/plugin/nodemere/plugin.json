@@ -1,0 +1,20 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "nodemere",
+  "version": "0.1.0",
+  "description": "Manage People and appointments in the signed-in Nodemere business through its authenticated API.",
+  "author": { "name": "Nodemere" },
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "Nodemere",
+        "shortDescription": "Manage People and bookings",
+        "longDescription": "Read, create, update, and delete People and appointments in the Nodemere business you authorize.",
+        "developerName": "Nodemere",
+        "category": "Productivity",
+        "capabilities": ["Interactive"],
+        "defaultPrompt": "Show me the Nodemere workspace connected to this chat."
+      }
+    }
+  }
+}

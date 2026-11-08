@@ -7,6 +7,7 @@ import { useNavigate, useLocation, useParams, Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import googleIcon from '../assets/google.png'; // Import the local Google icon
 import { LEGAL_ACCEPTANCE_VERSION } from '../legal/legalDocuments';
+import { PENDING_OAUTH_AUTHORIZATION } from './OAuthConsentPage';
 
 const API_BASE_URL = (import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:8000' : '')).replace(/\/$/, '');
 const FRONTEND_PUBLIC_URL = import.meta.env.VITE_FRONTEND_PUBLIC_URL || window.location.origin;
@@ -94,6 +95,12 @@ const AuthPage = () => {
                 }
             }
             if (cancelled) return;
+            const pendingAuthorization = sessionStorage.getItem(PENDING_OAUTH_AUTHORIZATION);
+            if (pendingAuthorization && !isInvitation) {
+                sessionStorage.removeItem(PENDING_OAUTH_AUTHORIZATION);
+                navigate(`/oauth/consent?authorization_id=${encodeURIComponent(pendingAuthorization)}`, { replace: true });
+                return;
+            }
             if (isInvitation) {
                 const currentWorkforce = await refreshWorkforce();
                 if (!currentWorkforce) {
@@ -231,7 +238,7 @@ const AuthPage = () => {
             const { data, error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
                 options: {
-                    redirectTo: FRONTEND_PUBLIC_URL + (invitationId ? `/invite/${invitationId}` : (isSignUp ? '/auth' : '/onboarding')),
+                    redirectTo: FRONTEND_PUBLIC_URL + (invitationId ? `/invite/${invitationId}` : (isSignUp || sessionStorage.getItem(PENDING_OAUTH_AUTHORIZATION) ? '/auth' : '/onboarding')),
                 },
             });
             if (error) throw error;
