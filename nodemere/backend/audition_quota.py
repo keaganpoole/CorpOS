@@ -1,5 +1,6 @@
 """Monthly Audition creation quota, separate from hired receptionist limits."""
 from datetime import datetime, timezone
+from uuid import uuid4
 
 from fastapi import HTTPException
 
@@ -26,7 +27,7 @@ def require_creation_slot(db, owner_id, plan):
 
 def quota_error(snapshot):
     return HTTPException(402, {"code": "audition_creation_limit_reached",
-                               "message": "You've reached your monthly receptionist creation limit. Upgrade your plan to create more.",
+                               "message": "You've reached your monthly Audition creation limit. Upgrade your plan to generate or save more receptionists.",
                                **snapshot})
 
 
@@ -35,6 +36,35 @@ def reserve_creation(db, owner_id, business_id, candidate_id, plan):
         result = db.rpc("nodemere_reserve_audition_creation", {
             "target_owner": str(owner_id), "target_business": business_id,
             "candidate_id": candidate_id,
+        }).execute()
+        if result.data == -1:
+            raise HTTPException(409, "This audition creation is already being processed.")
+    except Exception as exc:
+        if isinstance(exc, HTTPException):
+            raise
+        if "audition_creation_limit_reached" in str(exc):
+            raise quota_error(quota_snapshot(db, owner_id, plan)) from None
+        raise
+
+
+def reserve_generation(db, owner_id, business_id, plan):
+    generation_id = str(uuid4())
+    reserve_creation(db, owner_id, business_id, f"generation:{generation_id}", plan)
+    return generation_id
+
+
+def finish_generation(db, owner_id, business_id, generation_id, completed):
+    db.rpc("nodemere_finish_audition_creation", {
+        "target_owner": str(owner_id), "target_business": business_id,
+        "candidate_id": f"generation:{generation_id}", "completed": completed,
+    }).execute()
+
+
+def claim_generation(db, owner_id, business_id, generation_id, candidate_id, plan):
+    try:
+        result = db.rpc("nodemere_claim_audition_generation", {
+            "target_owner": str(owner_id), "target_business": business_id,
+            "generation_id": generation_id, "candidate_id": candidate_id,
         }).execute()
         if result.data == -1:
             raise HTTPException(409, "This audition creation is already being processed.")

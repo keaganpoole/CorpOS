@@ -7421,8 +7421,8 @@ async def check_document_upload_status_tool(request: Request):
     )
 
 
-from .voice_design import VoiceDesignRequest, VoiceSaveRequest, design_voice, save_voice
-from .audition_quota import quota_snapshot, require_creation_slot, reserve_creation, finish_creation
+from .voice_design import VoiceDesignRequest, VoiceSaveRequest, design_voice, save_voice, verify_ticket
+from .audition_quota import quota_snapshot, reserve_creation, finish_creation, reserve_generation, finish_generation
 from .portrait_generation import PortraitGenerationRequest, generate_portraits
 from .receptionist_catalog import private_created_catalog, hire_created_receptionist, created_receptionist_lifecycle, normalize_created_receptionist
 
@@ -7438,15 +7438,35 @@ def studio_creation_quota(current_user: dict = Depends(get_current_user)):
 def studio_design_voice(payload: VoiceDesignRequest, current_user: dict = Depends(get_current_user)):
     owner_id = business_owner_id(current_user)
     context = require_plan_access(owner_id, 'receptionists')
-    require_creation_slot(supabase_admin.raw, owner_id, context['plan'])
-    return design_voice(payload, api_key=elevenlabs_api_key, owner_id=owner_id)
+    business = load_business_by_user_id(owner_id)
+    if not business:
+        raise HTTPException(404, 'Business not found')
+    generation_id = reserve_generation(supabase_admin.raw, owner_id, business['id'], context['plan'])
+    try:
+        result = design_voice(payload, api_key=elevenlabs_api_key, owner_id=owner_id, generation_id=generation_id)
+        finish_generation(supabase_admin.raw, owner_id, business['id'], generation_id, True)
+        return result
+    except Exception:
+        finish_generation(supabase_admin.raw, owner_id, business['id'], generation_id, False)
+        raise
 
 
 @app.post('/api/sonar/studio/portraits', tags=['Nodemere Studio'])
 def studio_generate_portraits(payload: PortraitGenerationRequest, current_user: dict = Depends(get_current_user)):
     owner_id = business_owner_id(current_user)
-    context = require_plan_access(owner_id, 'receptionists')
-    require_creation_slot(supabase_admin.raw, owner_id, context['plan'])
+    require_plan_access(owner_id, 'receptionists')
+    candidate = verify_ticket(payload.generation_ticket, owner_id, elevenlabs_api_key)
+    generation_id = candidate.get('generation_id')
+    if not generation_id:
+        raise HTTPException(403, 'This audition is unavailable. Generate a new voice set.')
+    business = load_business_by_user_id(owner_id)
+    if not business:
+        raise HTTPException(404, 'Business not found')
+    usage = (supabase_admin.raw.table('audition_creation_usage').select('state')
+             .eq('user_id', str(owner_id)).eq('business_id', business['id'])
+             .eq('design_candidate_id', f'generation:{generation_id}').limit(1).execute().data or [])
+    if not usage or usage[0].get('state') != 'completed':
+        raise HTTPException(403, 'This audition is unavailable. Generate a new voice set.')
     return generate_portraits(payload, db=supabase, api_key=openai_api_key, owner_id=owner_id)
 
 

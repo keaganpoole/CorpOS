@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 class PortraitGenerationRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    generation_ticket: str = Field(min_length=20, max_length=10000)
     gender: Optional[str] = Field(default=None, max_length=30)
     age: Optional[str] = Field(default=None, max_length=30)
     voice_traits: list[str] = Field(default_factory=list, max_length=8)

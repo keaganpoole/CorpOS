@@ -12,7 +12,7 @@ from fastapi import HTTPException
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from .portrait_generation import upload_portrait
-from .audition_quota import reserve_creation, finish_creation
+from .audition_quota import reserve_creation, finish_creation, claim_generation
 
 
 class VoiceDesignRequest(BaseModel):
@@ -48,10 +48,11 @@ class VoiceSaveRequest(BaseModel):
     preview_audio: Optional[str] = Field(default=None, max_length=12_000_000)
 
 
-def candidate_ticket(candidate_id, description, owner_id, secret, now=None):
+def candidate_ticket(candidate_id, description, owner_id, secret, now=None, generation_id=None):
     body = base64.urlsafe_b64encode(json.dumps({
         "id": candidate_id, "description": description, "owner": str(owner_id),
         "expires": int(now if now is not None else time.time()) + 3600,
+        **({"generation_id": generation_id} if generation_id else {}),
     }, separators=(",", ":")).encode()).decode()
     signature = hmac.new(secret.encode(), ("nodemere-voice-design:" + body).encode(), hashlib.sha256).hexdigest()
     return body + "." + signature
@@ -108,7 +109,7 @@ def provider_post(path, payload, api_key, params=None):
         raise HTTPException(502, "The voice provider returned an unreadable response.") from None
 
 
-def design_voice(payload, *, api_key, owner_id):
+def design_voice(payload, *, api_key, owner_id, generation_id=None):
     body = payload.model_dump(exclude_none=True)
     if payload.gender:
         body["gender"] = payload.gender.lower()
@@ -121,7 +122,7 @@ def design_voice(payload, *, api_key, owner_id):
     return {"text": result.get("text", payload.text), "previews": [{
         "generated_voice_id": p["generated_voice_id"], "audio_base_64": p["audio_base_64"],
         "media_type": p.get("media_type", "audio/mpeg"), "duration_secs": p.get("duration_secs", 0),
-        "ticket": candidate_ticket(p["generated_voice_id"], payload.voice_description, owner_id, api_key),
+        "ticket": candidate_ticket(p["generated_voice_id"], payload.voice_description, owner_id, api_key, generation_id=generation_id),
     } for p in previews]}
 
 
@@ -161,7 +162,10 @@ def save_voice(payload, *, db, api_key, owner_id, business_id, plan="free"):
         return _saved_catalog_result(row)
     if row and row.get("status") != "draft":
         raise HTTPException(409, "This voice save is still being confirmed. Contact support before saving it again.")
-    reserve_creation(db, owner_id, business_id, candidate["id"], plan)
+    if candidate.get("generation_id"):
+        claim_generation(db, owner_id, business_id, candidate["generation_id"], candidate["id"], plan)
+    else:
+        reserve_creation(db, owner_id, business_id, candidate["id"], plan)
     try:
         if row:
             reserved = (db.table("created_receptionists").update({"status": "generating"})

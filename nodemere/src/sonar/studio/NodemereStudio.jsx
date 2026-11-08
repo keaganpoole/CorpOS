@@ -280,6 +280,7 @@ export default function NodemereStudio({ onReturn, onDirtyChange, onSaved, onOpe
   },[stage,intro,mode]);
   const markDirty=(key,value)=>{dirty.current[key]=value;onDirtyChange(dirty.current.design||dirty.current.clone);};
   const touch=()=>{markDirty(mode,true);if(mode==='design')setSaved(null);};
+  const showPlanLimit=detail=>window.dispatchEvent(new CustomEvent('nodemere:plan-limit',{detail:{...detail,resource:'receptionists'}}));
   const changeSetting=(key,value)=>{touch();setSettings(s=>({...s,[key]:value}));};
   const description=manual??composeDescription(values,'');
   useEffect(()=>{
@@ -348,7 +349,7 @@ export default function NodemereStudio({ onReturn, onDirtyChange, onSaved, onOpe
       const result=await api.designVoice(payload);
       if(!result?.previews?.length)throw new Error('No auditions were returned. Please try again.');
       if(mounted.current){setPreviews(result.previews);setGeneration({description,text:result.text,values:{...values,toneWeights:{...(values.toneWeights||{})}}});setSelected(null);setStage(AUDITION_STAGE);}
-    }catch(err){if(mounted.current){if(err.detail?.code==='audition_creation_limit_reached'){setCreationQuota(err.detail);setStage(0);setIdentityReady(false);}else setError(err.message||'The audition could not be generated. Try again.');}}
+    }catch(err){if(mounted.current){if(err.detail?.code==='audition_creation_limit_reached'){setCreationQuota(err.detail);showPlanLimit(err.detail);}else setError(err.message||'The audition could not be generated. Try again.');}}
     finally{if(mounted.current)setBusy(false);}
   };
   const continueToPortraits=async()=>{
@@ -363,10 +364,10 @@ export default function NodemereStudio({ onReturn, onDirtyChange, onSaved, onOpe
     try {
       const voiceValues=generation?.values||values;
       const traits=[...accentSelections(voiceValues).map(accentName), ...describeToneWeights(voiceValues.toneWeights||{}).split(', ').filter(Boolean)].filter(Boolean).slice(0,8);
-      const result=await api.generateReceptionistPortraits({gender:voiceValues.gender||null, age:voiceValues.age||null, voice_traits:traits, voice_description:generation?.description||description});
+      const result=await api.generateReceptionistPortraits({generation_ticket:selected.ticket,gender:voiceValues.gender||null, age:voiceValues.age||null, voice_traits:traits, voice_description:generation?.description||description});
       if(!result?.images?.length)throw new Error('No portrait options were returned. Please try again.');
       if(mounted.current){setPortraitOptions(result.images.slice(0,2));setSelectedPortrait(null);setStage(PORTRAIT_STAGE);}
-    } catch(err) { if(mounted.current){if(err.detail?.code==='audition_creation_limit_reached'){setCreationQuota(err.detail);setStage(0);setIdentityReady(false);}else setError(err.message||'The portrait studio could not finish these options.');} }
+    } catch(err) { if(mounted.current){if(err.detail?.code==='audition_creation_limit_reached'){setCreationQuota(err.detail);showPlanLimit(err.detail);}else setError(err.message||'The portrait studio could not finish these options.');} }
     finally { if(mounted.current)setPortraitBusy(false); }
   };
   const continueToPreview=()=>{
@@ -383,13 +384,13 @@ export default function NodemereStudio({ onReturn, onDirtyChange, onSaved, onOpe
       const result=await api.saveDesignedVoice({ticket:selected.ticket,voice_name:name.trim(),traits,gender:voiceValues.gender,age:voiceValues.age,portrait_image:selectedPortrait.data_url,preview_audio:selected.audio_base_64});
       if(mounted.current){setSaved(result);markDirty('design',false);setStage(COMPLETE_STAGE);}
       await Promise.resolve(onSaved?.()).catch(()=>{});
-    }catch(err){if(mounted.current){if(err.detail?.code==='audition_creation_limit_reached'){setCreationQuota(err.detail);setStage(0);setIdentityReady(false);}else setError(err.message||'Your voice could not be saved.');}}
+    }catch(err){if(mounted.current){if(err.detail?.code==='audition_creation_limit_reached'){setCreationQuota(err.detail);showPlanLimit(err.detail);}else setError(err.message||'Your voice could not be saved.');}}
     finally{if(mounted.current)setSaving(false);}
   };
   const beginClone=async()=>{
     touch();setBusy(true);setError('');
     try{const result=await api.createStudioCloneSession();const token=new URL(result.clone_url,window.location.origin).pathname.split('/').pop();if(!token)throw new Error('No clone session was returned.');setCloneToken(token);}
-    catch(err){setError(err.message);}finally{setBusy(false);}
+    catch(err){if(err.detail?.code==='audition_creation_limit_reached'){setCreationQuota(err.detail);showPlanLimit(err.detail);}else setError(err.message);}finally{setBusy(false);}
   };
   const useCloneLink=()=>{
     try{const url=new URL(cloneLink,window.location.origin);if(url.origin!==window.location.origin||!/^\/clone\/[A-Za-z0-9_-]+\/?$/.test(url.pathname))throw new Error();touch();setCloneToken(url.pathname.split('/').filter(Boolean).pop());setError('');}
@@ -452,7 +453,7 @@ export default function NodemereStudio({ onReturn, onDirtyChange, onSaved, onOpe
            {stage===0&&!creationQuota?.capped?<nav className="ns-identity-slides" aria-label="Identity steps"><button type="button" className={!identityReady?'is-active':''} onClick={()=>setIdentityReady(false)}>Name</button><button type="button" className={identityReady?'is-active':''} disabled={!name.trim()} onClick={()=>setIdentityReady(true)}>Gender</button></nav>:null}
            <span className="ns-eyebrow">{stage===0?'IDENTITY':CHARACTERISTICS[stage].label} / VOICE DIRECTION</span>
            <h1 ref={focusHeading} tabIndex={-1}>{stage===0&&identityReady?'Choose a\ngender.':CHARACTERISTICS[stage].title}</h1><p>{guidedHint}</p>
-           {stage===0&&!identityReady?(creationQuota===undefined?<div className="ns-age-name ns-creation-limit" role="status"><p>Checking your monthly allowance…</p></div>:creationQuota?.capped?<div className="ns-age-name ns-creation-limit" role="status"><span>MONTHLY CREATION LIMIT</span><p>You’ve used all {creationQuota.limit} receptionist creations for this month. Your allowance resets next month.</p><a className="ns-primary" href="/pricing">Upgrade plan <ArrowRight size={14}/></a></div>:<label className="ns-age-name"><span>Name</span><div className="ns-identity-name-shell"><input aria-label="Name your receptionist" placeholder="Name your receptionist" value={name} disabled={busy||saving} onChange={e=>{touch();setName(e.target.value);}}/><button type="button" aria-label="Continue to gender" disabled={!name.trim()||busy||saving} onClick={()=>setIdentityReady(true)}><ArrowRight size={17}/></button></div></label>):null}
+           {stage===0&&!identityReady?(creationQuota===undefined?<div className="ns-age-name ns-creation-limit" role="status"><p>Checking your monthly allowance…</p></div>:creationQuota?.capped?<div className="ns-age-name ns-creation-limit" role="status"><span>MONTHLY CREATION LIMIT</span><p>You’ve used all {creationQuota.limit} monthly Audition creations. Your allowance resets next month.</p><a className="ns-primary" href="/pricing">Upgrade plan <ArrowRight size={14}/></a></div>:<label className="ns-age-name"><span>Name</span><div className="ns-identity-name-shell"><input aria-label="Name your receptionist" placeholder="Name your receptionist" value={name} disabled={busy||saving} onChange={e=>{touch();setName(e.target.value);}}/><button type="button" aria-label="Continue to gender" disabled={!name.trim()||busy||saving} onClick={()=>setIdentityReady(true)}><ArrowRight size={17}/></button></div></label>):null}
           {stage===2?<AccentDna values={values} previewOption={previewOption}/>:null}
            {stage===0&&!identityReady?null:CHARACTERISTICS[stage].control==='blend'?<div className="ns-blend">{CHARACTERISTICS[stage].options.map((option,i)=>{
             const weight=values.toneWeights?.[option]??50;
@@ -529,7 +530,7 @@ export default function NodemereStudio({ onReturn, onDirtyChange, onSaved, onOpe
       </div>:null}
       {complete?<div className="ns-complete"><span className="ns-eyebrow"><Check size={14}/> ADDED TO YOUR COLLECTION</span><h1 ref={focusHeading} tabIndex={-1}>Hello,<br/><span>{name}.</span></h1><p>Your receptionist and portrait are saved in your private collection.<br/>Open the collection and choose Hire when you're ready to add them to your team.</p><button className="ns-primary" onClick={()=>onOpenCatalog?.(saved?.created_receptionist_id)}>View your collection<ArrowRight size={16}/></button><button className="ns-text-button" onClick={onReturn}>Return to Team</button>{error?<p role="alert" className="ns-error">{error}</p>:null}</div>:null}
     </>:null}
-    <div hidden={mode!=='clone'}>{cloneToken?<Suspense fallback={<CubePreloader/>}><Clone embedded active={mode==='clone'} sessionToken={cloneToken} skipSplash onDirty={()=>markDirty('clone',true)} onComplete={()=>markDirty('clone',false)} onFinish={onReturn}/></Suspense>:mode==='clone'?<div className="ns-clone-entry"><span className="ns-eyebrow">YOUR VOICE. A NEW POSSIBILITY.</span><h1 ref={focusHeading} tabIndex={-1}>Already one<br/><span>of a kind.</span></h1><p>Bring your own voice into Audition. Review your consent, record or upload a sample, then shape your receptionist.</p>{creationQuota?.capped?<div className="ns-age-name ns-creation-limit" role="status"><span>MONTHLY CREATION LIMIT</span><p>You’ve used all {creationQuota.limit} receptionist creations for this month. Your allowance resets next month.</p><a className="ns-primary" href="/pricing">Upgrade plan <ArrowRight size={14}/></a></div>:<button className="ns-primary" disabled={busy||creationQuota===undefined} onClick={beginClone}>{busy?'Preparing your session…':'Begin voice cloning'}<ArrowRight size={16}/></button>}<details className="ns-script"><summary>Continue an existing clone session <ChevronDown size={14}/></summary><label>Clone session link<input value={cloneLink} placeholder="Paste your Nodemere clone link" onChange={e=>{touch();setCloneLink(e.target.value);}}/></label><button className="ns-text-button" onClick={useCloneLink}>Continue session <ArrowRight size={13}/></button></details>{error?<p className="ns-error" role="alert">{error}</p>:null}</div>:null}</div>
+    <div hidden={mode!=='clone'}>{cloneToken?<Suspense fallback={<CubePreloader/>}><Clone embedded active={mode==='clone'} sessionToken={cloneToken} skipSplash onDirty={()=>markDirty('clone',true)} onComplete={()=>markDirty('clone',false)} onFinish={onReturn}/></Suspense>:mode==='clone'?<div className="ns-clone-entry"><span className="ns-eyebrow">YOUR VOICE. A NEW POSSIBILITY.</span><h1 ref={focusHeading} tabIndex={-1}>Already one<br/><span>of a kind.</span></h1><p>Bring your own voice into Audition. Review your consent, record or upload a sample, then shape your receptionist.</p>{creationQuota?.capped?<div className="ns-age-name ns-creation-limit" role="status"><span>MONTHLY CREATION LIMIT</span><p>You’ve used all {creationQuota.limit} monthly Audition creations. Your allowance resets next month.</p><a className="ns-primary" href="/pricing">Upgrade plan <ArrowRight size={14}/></a></div>:<button className="ns-primary" disabled={busy||creationQuota===undefined} onClick={beginClone}>{busy?'Preparing your session…':'Begin voice cloning'}<ArrowRight size={16}/></button>}<details className="ns-script"><summary>Continue an existing clone session <ChevronDown size={14}/></summary><label>Clone session link<input value={cloneLink} placeholder="Paste your Nodemere clone link" onChange={e=>{touch();setCloneLink(e.target.value);}}/></label><button className="ns-text-button" onClick={useCloneLink}>Continue session <ArrowRight size={13}/></button></details>{error?<p className="ns-error" role="alert">{error}</p>:null}</div>:null}</div>
     </div>
   </section>;
 }

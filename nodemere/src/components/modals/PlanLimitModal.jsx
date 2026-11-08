@@ -11,7 +11,9 @@ const PlanLimitModal = ({ detail, onClose }) => {
   const [openingPortal, setOpeningPortal] = useState(false);
   const [portalError, setPortalError] = useState('');
   const isSubscriptionIssue = ['subscription_inactive', 'billing_customer_invalid', 'overage_limit_reached', 'billing_context_missing'].includes(detail?.code);
-  const title = detail?.code === 'minute_limit_reached'
+  const title = detail?.code === 'audition_creation_limit_reached'
+    ? 'Audition limit reached'
+    : detail?.code === 'minute_limit_reached'
     ? 'Call minutes used'
     : detail?.code === 'overage_limit_reached'
       ? 'Billing limit reached'
