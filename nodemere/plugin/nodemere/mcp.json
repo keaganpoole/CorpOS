@@ -8,7 +8,11 @@
         "com.openai": {
           "auth": {
             "type": "oauth",
-            "client": { "mode": "dcr" }
+            "client": { "mode": "dcr" },
+            "authorizationUrl": "https://grpgmhhtmfiwukncucaq.supabase.co/auth/v1/oauth/authorize",
+            "tokenUrl": "https://grpgmhhtmfiwukncucaq.supabase.co/auth/v1/oauth/token",
+            "registrationUrl": "https://grpgmhhtmfiwukncucaq.supabase.co/auth/v1/oauth/clients/register",
+            "baseScopes": ["email"]
           }
         }
       }

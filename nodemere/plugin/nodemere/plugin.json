@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "nodemere",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Manage People and appointments in the signed-in Nodemere business through its authenticated API.",
   "author": { "name": "Keagan Poole", "email": "keaganpoole2@gmail.com" },
   "extensions": {
