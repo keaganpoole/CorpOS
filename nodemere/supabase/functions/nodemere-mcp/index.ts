@@ -7,11 +7,13 @@ const json = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSO
 const RESOURCE_METADATA = 'https://grpgmhhtmfiwukncucaq.supabase.co/functions/v1/nodemere-mcp/oauth-protected-resource'
 
 function registerTool(server: McpServer, request: Request, name: string, config: Record<string, unknown>, run: (args: any) => Promise<any>) {
+  const securitySchemes = [{ type: 'oauth2', scopes: ['email'] }]
   server.registerTool(name, {
     ...config,
+    securitySchemes,
     _meta: {
       ...(config._meta as Record<string, unknown> | undefined),
-      securitySchemes: [{ type: 'oauth2', scopes: ['email'] }],
+      securitySchemes,
     },
   } as any, async (args: any) => {
     const authorization = request.headers.get('authorization')
@@ -158,8 +160,28 @@ Deno.serve(async (request) => {
       })
       return server
     })
+    const rpc = request.method === 'POST' ? await request.clone().json().catch(() => null) : null
     const response = await handler.fetch(request)
     const headers = new Headers(response.headers)
     for (const [name, value] of Object.entries(corsHeaders)) headers.set(name, value)
+    if (rpc?.method === 'tools/list' && response.body) {
+      const body = await response.text()
+      const enriched = body.replace(/^data: (.+)$/gm, (line, payload: string) => {
+        try {
+          const message = JSON.parse(payload)
+          const tools = message?.result?.tools
+          if (Array.isArray(tools)) {
+            message.result.tools = tools.map((tool: Record<string, any>) => ({
+              ...tool,
+              securitySchemes: tool.securitySchemes ?? tool._meta?.securitySchemes ?? [],
+            }))
+            return `data: ${JSON.stringify(message)}`
+          }
+        } catch { /* Preserve non-JSON SSE data unchanged. */ }
+        return line
+      })
+      headers.delete('content-length')
+      return new Response(enriched, { status: response.status, statusText: response.statusText, headers })
+    }
     return new Response(response.body, { status: response.status, statusText: response.statusText, headers })
 })
