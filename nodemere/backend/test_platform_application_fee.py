@@ -78,7 +78,9 @@ class CustomerPaymentFeeFlowTests(unittest.IsolatedAsyncioTestCase):
              patch.object(main.stripe.PaymentIntent, "create", return_value=intent) as create_intent, \
              patch.object(main.stripe.checkout.Session, "create", return_value=session) as create_session, \
              patch.object(main.stripe.InvoiceItem, "create") as create_item, \
-             patch.object(main.stripe.Invoice, "create", return_value={"id": "in_1"}) as create_invoice:
+             patch.object(main.stripe.Invoice, "create", return_value={"id": "in_1"}) as create_invoice, \
+             patch.object(main.stripe.Invoice, "modify", return_value={"id": "in_1"}) as modify_invoice, \
+             patch.object(main.stripe.Invoice, "retrieve", return_value={"id": "in_1"}):
             details = {"amount": 11500, "tax_amount": 1000, "tip_amount": 500}
             await main._create_payment_for_user(main.PaymentCreateRequest(**details), "user_1")
             await main._send_payment_link_for_user(main.PaymentLinkCreateRequest(**details), "user_1")
@@ -90,7 +92,9 @@ class CustomerPaymentFeeFlowTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(create_session.call_args.kwargs["line_items"][0]["price_data"]["unit_amount"], 11500)
         self.assertEqual(create_session.call_args.kwargs["payment_intent_data"]["application_fee_amount"], 300)
         self.assertEqual(create_item.call_args.kwargs["amount"], 11500)
-        self.assertEqual(create_invoice.call_args.kwargs["application_fee_amount"], 300)
+        self.assertEqual(create_item.call_args.kwargs["invoice"], "in_1")
+        self.assertEqual(create_invoice.call_args.kwargs["pending_invoice_items_behavior"], "exclude")
+        self.assertEqual(modify_invoice.call_args.kwargs["application_fee_amount"], 300)
 
 
 if __name__ == "__main__":

@@ -17,7 +17,7 @@ from dataclasses import replace
 import hmac
 from html import escape as escape_html
 from types import SimpleNamespace
-from uuid import UUID, uuid4
+from uuid import UUID, uuid4, uuid5, NAMESPACE_URL
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from datetime import date, datetime, timezone, timedelta
 from typing import List, Optional, Literal
@@ -3324,14 +3324,16 @@ class InvoiceCreateRequest(BaseModel):
     customer_email: Optional[str] = None
     customer_phone: Optional[str] = None
     due_days: Optional[int] = 7
+    operation_id: Optional[str] = Field(default=None, min_length=1, max_length=200)
 
 class InvoiceSendRequest(BaseModel):
     invoice_id: str
 
 class RefundPaymentRequest(BaseModel):
     payment_id: str
-    amount: Optional[int] = None
+    amount: Optional[int] = Field(default=None, gt=0)
     refund_reason: Optional[str] = None
+    operation_id: Optional[str] = Field(default=None, min_length=1, max_length=200)
 
 class CancelSubscriptionRequest(BaseModel):
     subscription_id: Optional[str] = None
@@ -4269,6 +4271,31 @@ def emit_payment_trigger(trigger_key: str, payload: dict):
         logging.debug('main.emit_payment_trigger.event_3543')
     schedule_backend_scenario_execution(trigger_key, payload)
     return trigger_payload
+
+async def emit_verified_payment_received(payload: dict, payment_intent_id: str):
+    if not payment_intent_id:
+        raise HTTPException(502, "Paid Checkout session is missing its payment reference")
+    business_id = resolve_scenario_event_business_id(payload)
+    if business_id is None:
+        raise HTTPException(502, "Payment workspace could not be resolved")
+    event_key = f"payment_received:{business_id}:{payment_intent_id}"
+    event_id = str(uuid5(NAMESPACE_URL, event_key))
+    try:
+        supabase.table("scenario_events").insert({
+            "id": event_id, "business_id": business_id, "trigger_key": "payment_received",
+            "payload": payload, "created_at": datetime.now(timezone.utc).isoformat(),
+        }).execute()
+    except Exception:
+        if not supabase.table("scenario_events").select("id").eq("id", event_id).limit(1).execute().data:
+            raise
+    # Await durable execution claims before acknowledging Stripe. A retry can
+    # finish dispatching scenarios not reached on the first delivery.
+    if not scenario_engine:
+        raise HTTPException(503, "Payment automation is unavailable")
+    result = await scenario_engine.handle_event("payment_received", payload, event_key=event_key)
+    if any(not run.get("result", {}).get("success") for run in result.get("runs", [])):
+        raise HTTPException(502, "Payment automation could not be started")
+
 
 def emit_scenario_trigger(trigger_key: str, payload: Optional[dict] = None, created_at: Optional[datetime] = None):
     normalized_trigger_key = (trigger_key or "").strip()
@@ -7105,33 +7132,74 @@ def upsert_payment_from_stripe(
     receipt_url: Optional[str] = None,
     error_message: Optional[str] = None,
 ):
-    query = None
-    if payment_intent_id:
-        query = supabase.table("payments").select("*").eq("stripe_payment_intent_id", payment_intent_id).limit(1)
-    elif session_id:
-        query = supabase.table("payments").select("*").eq("stripe_session_id", session_id).limit(1)
-    else:
-        return None
-
-    existing = query.execute()
-    if not existing.data:
+    # Checkout rows initially have only a session ID. Bind the eventual intent
+    # to that same row rather than searching exclusively by the new intent ID.
+    row = None
+    for field, value in (("stripe_session_id", session_id), ("stripe_payment_intent_id", payment_intent_id)):
+        if value:
+            rows = supabase.table("payments").select("*").eq(field, value).limit(1).execute().data or []
+            if rows:
+                row = rows[0]
+                break
+    if not row:
         return None
 
     update_data = {}
+    if payment_intent_id:
+        update_data["stripe_payment_intent_id"] = payment_intent_id
     if status is not None:
-        update_data["status"] = normalize_payment_record_status(status)
+        next_status = normalize_payment_record_status(status)
+        if int(row.get("refunded_amount") or 0) > 0:
+            next_status = "refunded" if int(row["refunded_amount"]) >= int(row.get("amount") or 0) else "partial_refund"
+        elif row.get("status") == "succeeded" and next_status in {"pending", "failed"}:
+            next_status = "succeeded"
+        update_data["status"] = next_status
     if receipt_url is not None:
         update_data["receipt_url"] = receipt_url
     if error_message is not None:
         update_data["error_message"] = error_message
     if not update_data:
-        return existing.data[0]
+        return row
+    # Refund reconciliation can race a delayed success webhook. Compare the
+    # observed total before writing a status derived from that observation.
+    # Receipt/error fields are encrypted by the persistence adapter. Keep them
+    # separate so the status comparison remains a single conditional DB write.
+    details = {key: update_data.pop(key) for key in ("receipt_url", "error_message") if key in update_data}
+    query = supabase.table("payments").update(update_data).eq("id", row["id"])
+    query = query.is_("refunded_amount", "null") if row.get("refunded_amount") is None else query.eq("refunded_amount", row["refunded_amount"])
+    updated = query.execute() if update_data else None
+    if details:
+        updated = supabase.table("payments").update(details).eq("id", row["id"]).execute()
+    if updated and updated.data:
+        return updated.data[0]
+    refreshed = supabase.table("payments").select("*").eq("id", row["id"]).limit(1).execute().data or []
+    return refreshed[0] if refreshed else row
 
-    if payment_intent_id:
-        updated = supabase.table("payments").update(update_data).eq("stripe_payment_intent_id", payment_intent_id).execute()
-    else:
-        updated = supabase.table("payments").update(update_data).eq("stripe_session_id", session_id).execute()
-    return updated.data[0] if updated.data else existing.data[0]
+
+def reconcile_payment_refunds(payment_intent_id: str, user_id: str, stripe_options: dict, allow_decrease: bool = False):
+    """Use Stripe's cumulative charge total; webhook amounts describe one refund."""
+    intent = stripe.PaymentIntent.retrieve(payment_intent_id, expand=["latest_charge"], **stripe_options)
+    charge = intent.get("latest_charge") or {}
+    if isinstance(charge, str):
+        charge = stripe.Charge.retrieve(charge, **stripe_options)
+    if not charge:
+        return None
+    refunded = int(charge.get("amount_refunded") or 0)
+    amount = int(charge.get("amount") or intent.get("amount") or 0)
+    values = {
+        "refunded_amount": refunded,
+        "status": ("refunded" if refunded >= amount else "partial_refund") if refunded else "succeeded",
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    # An older webhook's reconciliation must not overwrite a newer refund total.
+    query = supabase.table("payments").update(values).eq("stripe_payment_intent_id", payment_intent_id).eq("user_id", user_id)
+    if not allow_decrease:
+        query = query.or_(f"refunded_amount.is.null,refunded_amount.lte.{refunded}")
+    response = query.execute()
+    if response.data:
+        return response.data[0]
+    rows = supabase.table("payments").select("*").eq("stripe_payment_intent_id", payment_intent_id).eq("user_id", user_id).limit(1).execute().data or []
+    return rows[0] if rows else None
 
 # --------------------------------------------------------------------------
 # API Endpoints
@@ -12557,24 +12625,23 @@ async def create_sonar_bug_report(
 
 @app.get("/api/sonar/people/search", tags=["Sonar People"])
 async def search_sonar_people(q: str, limit: int = 25, current_user: dict = Depends(get_current_user)):
-    rows = await list_sonar_people(limit=200, current_user=current_user)
     query_text = (q or "").strip().lower()
-    if not query_text:
-        return rows[:limit]
+    limit = max(1, min(limit, 100))
     matches = []
-    for row in rows:
-        searchable = " ".join(
-            str(value) for value in [
-                row.get("first_name"),
-                row.get("last_name"),
-                row.get("phone"),
-                row.get("email"),
-                row.get("notes"),
-            ] if value
-        ).lower()
-        if query_text in searchable:
-            matches.append(row)
-    return matches[:max(1, min(limit, 100))]
+    offset = 0
+    while True:
+        rows = await list_sonar_people(limit=500, offset=offset, current_user=current_user)
+        for row in rows:
+            searchable = " ".join(str(row.get(key) or "") for key in (
+                "first_name", "last_name", "phone", "email", "notes"
+            )).lower()
+            if not query_text or query_text in searchable:
+                matches.append(row)
+                if len(matches) >= limit:
+                    return matches
+        if len(rows) < 500:
+            return matches
+        offset += len(rows)
 
 @app.get("/api/sonar/people/{person_id}", tags=["Sonar People"])
 async def get_sonar_person(person_id: str, current_user: dict = Depends(get_current_user)):
@@ -12771,12 +12838,38 @@ STAFF_PROFILE_FIELDS = {
     "avatar", "is_active", "working_hours", "knowledge", "acknowledgements",
 }
 
+
+def write_staff_profile(operation: str, values: dict, *, staff_id=None, business_id):
+    try:
+        if operation == "insert":
+            return supabase.table("staff").insert(values).execute()
+        query = supabase.table("staff").update(values).eq("id", str(staff_id)).eq("business_id", business_id)
+        return query.execute()
+    except Exception as exc:
+        # Existing databases may still enforce the legacy manager label. Some
+        # legacy rows already contain transfer_contact, so even unrelated edits
+        # fail the CHECK constraint until that value is normalized on write.
+        if (
+            getattr(exc, "code", None) != "23514"
+            or "staff_staff_type_check" not in str(exc)
+            or values.get("staff_type") not in (None, "transfer_contact")
+        ):
+            raise
+        compatible_values = {**values, "staff_type": "authorized_representative"}
+        if operation == "insert":
+            return supabase.table("staff").insert(compatible_values).execute()
+        return (
+            supabase.table("staff").update(compatible_values)
+            .eq("id", str(staff_id)).eq("business_id", business_id).execute()
+        )
+
+
 @app.post("/api/sonar/staff", tags=["Sonar Staff"])
 async def create_sonar_staff(payload: dict, current_user: dict = Depends(get_current_user)):
     business = require_business_for_user(business_owner_id(current_user))
     values = {key: value for key, value in payload.items() if key in STAFF_PROFILE_FIELDS}
     values["business_id"] = business["id"]
-    response = supabase.table("staff").insert(values).execute()
+    response = write_staff_profile("insert", values, business_id=business["id"])
     created = response.data[0] if response.data else values
     queue_business_knowledge_refresh(business, reason="staff created")
     return created
@@ -12785,7 +12878,7 @@ async def create_sonar_staff(payload: dict, current_user: dict = Depends(get_cur
 async def update_sonar_staff(staff_id: UUID, payload: dict, current_user: dict = Depends(get_current_user)):
     business = require_business_for_user(business_owner_id(current_user))
     values = {key: value for key, value in payload.items() if key in STAFF_PROFILE_FIELDS}
-    response = supabase.table("staff").update(values).eq("id", str(staff_id)).eq("business_id", business["id"]).execute()
+    response = write_staff_profile("update", values, staff_id=staff_id, business_id=business["id"])
     if not response.data:
         raise HTTPException(status_code=404, detail="Staff member not found")
     queue_business_knowledge_refresh(business, reason="staff updated")
@@ -12847,13 +12940,15 @@ async def delete_sonar_service(service_id: UUID, current_user: dict = Depends(ge
     return {"ok": True}
 
 @app.get("/api/sonar/appointments", tags=["Sonar Appointments"])
-def list_sonar_appointments(limit: int = 100, current_user: dict = Depends(get_current_user)):
+def list_sonar_appointments(limit: int = 100, current_user: dict = Depends(get_current_user), offset: int = 0):
     business = load_business_by_user_id(business_owner_id(current_user))
     if not business:
         return []
     query = supabase.table("appointments").select("id,date,time,duration,status,source,notes,person_id,service_id,staff_id,business_id,receptionist_id,created_at,updated_at")
     query = query.eq("business_id", business["id"])
-    response = query.order("date").order("time").limit(max(1, min(limit, 500))).execute()
+    page_size = max(1, min(limit, 500))
+    offset = max(0, offset)
+    response = query.order("date").order("time").order("id").range(offset, offset + page_size - 1).execute()
     return response.data or []
 
 @app.get("/api/sonar/payments", tags=["Sonar Payments"])
@@ -13132,12 +13227,17 @@ async def delete_sonar_appointment(appointment_id: str, current_user: dict = Dep
 
 @app.get("/api/sonar/appointments/stats", tags=["Sonar Appointments"])
 async def get_sonar_appointment_stats(current_user: dict = Depends(get_current_user)):
-    appointments = await list_sonar_appointments(limit=1000, current_user=current_user)
     counts = defaultdict(int)
-    for row in appointments:
-        counts[str(row.get("status") or "unknown").lower()] += 1
+    total = 0
+    while True:
+        appointments = list_sonar_appointments(limit=500, offset=total, current_user=current_user)
+        for row in appointments:
+            counts[str(row.get("status") or "unknown").lower()] += 1
+        total += len(appointments)
+        if len(appointments) < 500:
+            break
     return {
-        "total": len(appointments),
+        "total": total,
         "by_status": dict(counts),
     }
 
@@ -14795,27 +14895,39 @@ async def _create_invoice_for_user(request: InvoiceCreateRequest, user_id: str):
         )
         invoice_metadata.update(customer_payment_fee_metadata(request.amount, request.tax_amount, request.tip_amount))
 
+        operation_id = request.operation_id or str(uuid4())
+        operation_key = hashlib.sha256(f"{user_id}:{operation_id}".encode()).hexdigest()
+        application_fee_amount = calculate_platform_application_fee(fee_base_cents)
+        invoice = stripe.Invoice.create(
+            **stripe_request_options,
+            idempotency_key=f"invoice:{operation_key}",
+            customer=customer.get("id"),
+            collection_method="send_invoice",
+            days_until_due=max(int(request.due_days or 7), 1),
+            auto_advance=False,
+            pending_invoice_items_behavior="exclude",
+            description=description or None,
+            metadata=invoice_metadata,
+        )
+        # Attach only this operation's item to its draft. A failed attempt must
+        # never leave pending items to be swept into a later invoice.
         stripe.InvoiceItem.create(
             **stripe_request_options,
+            idempotency_key=f"invoice-item:{operation_key}",
+            invoice=invoice.get("id"),
             customer=customer.get("id"),
             amount=request.amount,
             currency=request.currency,
             description=description or "Invoice",
             metadata=invoice_metadata,
         )
-
-        application_fee_amount = calculate_platform_application_fee(fee_base_cents)
-        invoice = stripe.Invoice.create(
-            **stripe_request_options,
-            customer=customer.get("id"),
-            collection_method="send_invoice",
-            days_until_due=max(int(request.due_days or 7), 1),
-            auto_advance=False,
-            pending_invoice_items_behavior="include",
-            description=description or None,
-            metadata=invoice_metadata,
-            **({"application_fee_amount": application_fee_amount} if application_fee_amount else {}),
-        )
+        if application_fee_amount:
+            stripe.Invoice.modify(
+                invoice.get("id"), **stripe_request_options,
+                application_fee_amount=application_fee_amount,
+                idempotency_key=f"invoice-fee:{operation_key}",
+            )
+        invoice = stripe.Invoice.retrieve(invoice.get("id"), **stripe_request_options)
         payload = serialize_stripe_invoice(invoice)
         payload["customer_id"] = customer.get("id")
         return payload
@@ -14894,13 +15006,18 @@ async def _refund_payment_for_user(request: RefundPaymentRequest, user_id: str):
         if not payment_record:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Payment not found")
         payment_intent_id = payment_record.get("stripe_payment_intent_id") or request.payment_id
-        refunded_amount = int(request.amount or payment_record.get("amount") or 0)
+        already_refunded = int(payment_record.get("refunded_amount") or 0)
+        amount = int(payment_record.get("amount") or 0)
+        refunded_amount = request.amount if request.amount is not None else amount - already_refunded
+        if refunded_amount <= 0 or already_refunded + refunded_amount > amount:
+            raise HTTPException(status_code=400, detail="Refund exceeds the remaining payment amount")
+        cumulative_refund = already_refunded + refunded_amount
         update_payment_record(
             "id",
             payment_record.get("id"),
             {
-                "status": "refunded",
-                "refunded_amount": refunded_amount,
+                "status": "refunded" if cumulative_refund == amount else "partial_refund",
+                "refunded_amount": cumulative_refund,
                 "updated_at": datetime.now(timezone.utc).isoformat(),
             },
             user_id=user_id,
@@ -14937,10 +15054,16 @@ async def _refund_payment_for_user(request: RefundPaymentRequest, user_id: str):
             if existing.data:
                 payment_record = existing.data[0]
 
-    payment_intent_id = (
-        (payment_record or {}).get("stripe_payment_intent_id")
-        or request.payment_id
-    )
+    payment_intent_id = (payment_record or {}).get("stripe_payment_intent_id")
+    if not payment_intent_id and (payment_record or {}).get("stripe_session_id"):
+        # Repair links created before Checkout webhooks persisted intent IDs.
+        session = stripe.checkout.Session.retrieve(payment_record["stripe_session_id"], **stripe_request_options)
+        intent = session.get("payment_intent")
+        payment_intent_id = intent.get("id") if isinstance(intent, dict) else intent
+        if payment_intent_id:
+            payment_record = upsert_payment_from_stripe(session_id=session.get("id"), payment_intent_id=payment_intent_id)
+    if not payment_intent_id and str(request.payment_id).startswith("pi_"):
+        payment_intent_id = request.payment_id
     if not payment_intent_id:
         raise HTTPException(status_code=404, detail="Payment not found")
 
@@ -14957,6 +15080,7 @@ async def _refund_payment_for_user(request: RefundPaymentRequest, user_id: str):
         refund = _stripe_object_to_dict(
             stripe.Refund.create(
                 **stripe_request_options,
+                idempotency_key="refund:" + hashlib.sha256(f"{user_id}:{request.operation_id or uuid4()}".encode()).hexdigest(),
                 payment_intent=payment_intent_id,
                 **({"refund_application_fee": True} if has_application_fee else {}),
                 **({"amount": request.amount} if request.amount else {}),
@@ -14968,9 +15092,6 @@ async def _refund_payment_for_user(request: RefundPaymentRequest, user_id: str):
         logging.error('main._refund_payment_for_user.event_11162')
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail='The request could not be completed') from exc
 
-    refunded_amount = int(refund.get("amount") or 0)
-    current_amount = int((payment_record or {}).get("amount") or 0)
-    next_status = "partial_refund" if current_amount and refunded_amount < current_amount else "refunded"
     customer_id = refund.get("customer")
     if not customer_id and payment_intent_id:
         try:
@@ -14979,16 +15100,7 @@ async def _refund_payment_for_user(request: RefundPaymentRequest, user_id: str):
             ).get("customer")
         except Exception:
             customer_id = None
-    updated_payment = update_payment_record(
-        "stripe_payment_intent_id",
-        payment_intent_id,
-        {
-            "status": next_status,
-            "refunded_amount": refunded_amount,
-            "updated_at": datetime.now(timezone.utc).isoformat(),
-        },
-        user_id=user_id,
-    ) or payment_record or {}
+    updated_payment = reconcile_payment_refunds(payment_intent_id, user_id, stripe_request_options) or payment_record or {}
 
     result = {
         **serialize_stripe_refund(refund),
@@ -15201,6 +15313,7 @@ scenario_engine = ScenarioEngine(
         "send_email": scenario_send_email_callback,
         "emit_scenario_trigger": emit_scenario_trigger,
         "emit_appointment_change_triggers": emit_appointment_change_triggers,
+        "validate_appointment_schedule": validate_appointment_schedule,
     },
     base_url=os.environ.get("SCENARIO_ENGINE_BASE_URL", "http://127.0.0.1:8000"),
     plan_access_checker=enforce_call_minutes,
@@ -15315,6 +15428,7 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
             payment_status = session.get("payment_status")
             payment_record = upsert_payment_from_stripe(
                 session_id=session.get("id"),
+                payment_intent_id=(session.get("payment_intent") or {}).get("id") if isinstance(session.get("payment_intent"), dict) else session.get("payment_intent"),
                 status="succeeded" if payment_status == "paid" else payment_status or "succeeded",
             )
             logging.info('main.stripe_webhook.event_11492')
@@ -15323,7 +15437,7 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
                 user_id = resolve_scenario_user_id_from_stripe_event(event, metadata)
                 logging.info('main.stripe_webhook.event_11496')
                 if user_id:
-                    emit_payment_trigger("payment_received", {
+                    await emit_verified_payment_received({
                         "checkout_session": session,
                         "payment": payment_record,
                         "payment_id": (payment_record or {}).get("id"),
@@ -15334,7 +15448,7 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
                         "status": payment_status,
                         "user_id": user_id,
                         "person_id": metadata.get("person_id"),
-                    })
+                    }, (session.get("payment_intent") or {}).get("id") if isinstance(session.get("payment_intent"), dict) else session.get("payment_intent"))
             return {"status": "success"}
 
         if is_connected_account_event:
@@ -15600,8 +15714,21 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
         metadata = payment_intent.get("metadata") or {}
         user_id = resolve_scenario_user_id_from_stripe_event(event, metadata)
         logging.info('main.stripe_webhook.event_11775')
+        if not updated_payment and user_id and is_connected_account_event:
+            # Intent events may precede Checkout completion. Resolve the saved
+            # session so automation receives the same local payment in either order.
+            sessions = stripe.checkout.Session.list(
+                payment_intent=payment_intent.get("id"), limit=1,
+                **_get_connected_stripe_request_options(user_id),
+            )
+            for session in sessions.get("data") or []:
+                updated_payment = upsert_payment_from_stripe(
+                    session_id=session.get("id"), payment_intent_id=payment_intent.get("id"), status="succeeded",
+                )
+                if updated_payment:
+                    break
         if user_id:
-            emit_payment_trigger("payment_received", {
+            await emit_verified_payment_received({
                 "payment_intent": payment_intent,
                 "payment": updated_payment,
                 "payment_id": (updated_payment or {}).get("id"),
@@ -15611,7 +15738,7 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
                 "status": payment_intent.get("status"),
                 "user_id": user_id,
                 "person_id": metadata.get("person_id"),
-            })
+            }, payment_intent.get("id"))
     elif event_type == 'payment_intent.payment_failed':
         payment_intent = event['data']['object']
         last_error = payment_intent.get("last_payment_error", {})
@@ -15635,23 +15762,15 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
                 "user_id": user_id,
                 "person_id": metadata.get("person_id"),
             })
-    elif event_type == 'refund.created':
+    elif event_type in {'refund.created', 'refund.updated', 'refund.failed', 'charge.refunded'}:
         refund = event['data']['object']
         metadata = refund.get("metadata") or {}
         user_id = resolve_scenario_user_id_from_stripe_event(event, metadata)
         payment_intent_id = refund.get("payment_intent")
         customer_id = refund.get("customer")
         payment_record = None
-        if payment_intent_id:
-            payment_record = update_payment_record(
-                "stripe_payment_intent_id",
-                payment_intent_id,
-                {
-                    "status": "refunded",
-                    "refunded_amount": refund.get("amount"),
-                    "updated_at": datetime.now(timezone.utc).isoformat(),
-                },
-            )
+        if payment_intent_id and user_id:
+            payment_record = reconcile_payment_refunds(payment_intent_id, user_id, _get_connected_stripe_request_options(user_id), allow_decrease=event_type == 'refund.failed')
             if not customer_id and user_id:
                 try:
                     customer_id = _stripe_object_to_dict(
@@ -15659,7 +15778,7 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
                     ).get("customer")
                 except Exception:
                     customer_id = None
-        if user_id:
+        if user_id and event_type == 'refund.created' and refund.get("status") not in {"failed", "canceled"}:
             emit_payment_trigger("refund_issued", {
                 "refund": refund,
                 "payment": payment_record,
@@ -16146,6 +16265,37 @@ async def confirm_account_reset_email(payload: AccountResetEmailConfirmRequest):
     return {"reset": True, "billing_preserved": True, "message": "Your account was reset. Sign in to start onboarding again."}
 
 
+def cancel_nodemere_subscription_for_deletion(user_id: str, profile: dict) -> bool:
+    """Cancel this owner's platform subscription, never a Connect customer's plan."""
+    subscription_id = profile.get("stripe_subscription_id")
+    if not subscription_id:
+        if str(profile.get("subscription_status") or "").lower() in {"active", "trialing", "past_due", "unpaid", "failed"}:
+            raise ValueError("Active subscription has no billing reference")
+        return False
+    if is_payment_test_mode():
+        if not str(subscription_id).startswith("sim_sub_"):
+            raise ValueError("Cannot cancel a real subscription in simulation mode")
+    else:
+        options = {"api_key": _stripe_platform_api_key()}
+        subscription = stripe.Subscription.retrieve(subscription_id, **options)
+        customer_id = subscription.get("customer")
+        if isinstance(customer_id, dict):
+            customer_id = customer_id.get("id")
+        if not profile.get("stripe_customer_id") or customer_id != profile["stripe_customer_id"]:
+            raise ValueError("Subscription customer does not match account")
+        if subscription.get("status") not in {"canceled", "incomplete_expired"}:
+            subscription = stripe.Subscription.cancel(subscription_id, **options)
+            if subscription.get("status") != "canceled":
+                raise ValueError("Subscription was not canceled")
+    response = supabase_admin.table("users").update({
+        "plan": "free", "subscription_status": "canceled", "billing_period": None,
+    }).eq("id", user_id).execute()
+    if not response.data:
+        raise ValueError("Canceled billing state could not be saved")
+    sync_business_plan_entitlement(user_id, "free", reset_usage=False)
+    return True
+
+
 @app.post("/users/me/account/delete", tags=["Users"])
 async def request_account_deletion(payload: AccountDeletionRequest, current_user: dict = Depends(get_current_user)):
     """Submit the user-facing SaaS account deletion request.
@@ -16179,34 +16329,12 @@ async def request_account_deletion(payload: AccountDeletionRequest, current_user
 
     profile_response = (
         supabase_admin.table("users")
-        .select("subscription_status,account_status")
+        .select("subscription_status,account_status,stripe_subscription_id,stripe_customer_id")
         .eq("id", user_id)
         .limit(1)
         .execute()
     )
     profile = (profile_response.data or [None])[0]
-    status_value = str((profile or {}).get("subscription_status") or "").lower()
-    if status_value in {"active", "trialing", "past_due", "unpaid", "failed"}:
-        try:
-            await _cancel_subscription_for_user(CancelSubscriptionRequest(), user_id)
-        except HTTPException as exc:
-            logging.warning('main.request_account_deletion.billing_cancel_failed.event_12390')
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail="We could not cancel your subscription, so your account was not scheduled for deletion. Please retry.",
-            ) from exc
-        except Exception as exc:
-            logging.warning('main.request_account_deletion.billing_cancel_failed.event_12391')
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail="We could not cancel your subscription, so your account was not scheduled for deletion. Please retry.",
-            ) from exc
-        supabase_admin.table("users").update({
-            "plan": "free",
-            "subscription_status": "canceled",
-            "billing_period": None,
-        }).eq("id", user_id).execute()
-        subscription_canceled = True
     if str((profile or {}).get("account_status") or "").lower() in {"pending_deletion", "closed"}:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="A deletion request is already pending for this account")
 
@@ -16232,11 +16360,18 @@ async def request_account_deletion(payload: AccountDeletionRequest, current_user
         .limit(1)
         .execute()
     ).data or []
-    if pending_request:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="A deletion request is already pending for this account")
+    usage_snapshot = get_usage_snapshot(user_id)
+    try:
+        subscription_canceled = cancel_nodemere_subscription_for_deletion(user_id, profile or {})
+    except Exception as exc:
+        logging.warning('main.request_account_deletion.billing_cancel_failed')
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="We could not cancel your subscription, so your account was not scheduled for deletion. Please retry.",
+        ) from exc
 
     now = datetime.now(timezone.utc).isoformat()
-    request_response = supabase_admin.table("account_data_requests").insert({
+    request_response = SimpleNamespace(data=pending_request) if pending_request else supabase_admin.table("account_data_requests").insert({
         "user_id": user_id,
         "request_type": "deletion",
         "details": json.dumps({

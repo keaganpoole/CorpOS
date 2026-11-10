@@ -933,6 +933,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
   const edgeDragRef = useRef(null);
   const scenarioRunStateRef = useRef(null);
   const builderRunPollRef = useRef({ cancelled: false, executionId: null });
+  const paymentOperationsRef = useRef(new Map());
 
   const dragRef = useRef({ id: null, moved: false, startX: 0, startY: 0, nodeX: 0, nodeY: 0, scale: 1 });
   const panRef = useRef(null);
@@ -1067,8 +1068,24 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
     }
     const headers = new Headers(options.headers || {});
     headers.set('Authorization', `Bearer ${session.access_token}`);
+    const { paymentNodeId, ...fetchOptions } = options;
+    let operationKey;
+    if (['/api/sonar/create-invoice', '/api/sonar/refund-payment'].includes(path) && paymentNodeId && options.body) {
+      operationKey = `${session.user?.id}:${path}:${paymentNodeId}:${options.body}`;
+      if (!paymentOperationsRef.current.has(operationKey)) {
+        paymentOperationsRef.current.set(operationKey, crypto.randomUUID());
+      }
+      fetchOptions.body = JSON.stringify({ ...JSON.parse(options.body), operation_id: paymentOperationsRef.current.get(operationKey) });
+    }
     try {
-      return await fetch(`${API_BASE_URL}${path}`, { ...options, headers, signal: options.signal });
+      const response = await fetch(`${API_BASE_URL}${path}`, { ...fetchOptions, headers, signal: options.signal });
+      if (response.ok && operationKey) {
+        // Headers may arrive before a lost/truncated response body. Retain the
+        // retry key until a complete invoice response has actually arrived.
+        const result = await response.clone().json();
+        if (result.id || result.invoice_id || result.refund_id) paymentOperationsRef.current.delete(operationKey);
+      }
+      return response;
     } catch (error) {
       if (error?.name === 'AbortError' || error?.message?.includes('signal is aborted')) {
         throw error;
@@ -3885,6 +3902,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
         console.debug("Scenarios.jsx:event_4153");
         const resp = await authorizedApiFetch('/api/sonar/create-invoice', {
           method: 'POST',
+          paymentNodeId: nodeId,
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             amount: amountCents,
@@ -3913,6 +3931,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
         console.debug("Scenarios.jsx:event_4179");
         const resp = await authorizedApiFetch('/api/sonar/refund-payment', {
           method: 'POST',
+          paymentNodeId: nodeId,
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             payment_id: getValue('payment_id') || null,
@@ -4263,7 +4282,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
             due_days: resolveVariableRefs(resolveTableVariableRefs(config.due_days, resultsMap), resultsMap) || config.due_days || 7,
           };
           console.debug("Scenarios.jsx:event_4518");
-          const resp = await authorizedApiFetch('/api/sonar/create-invoice', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+          const resp = await authorizedApiFetch('/api/sonar/create-invoice', { method: 'POST', paymentNodeId: node.id, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
           const result = await resp.json();
           if (resp.ok && !result.error && !result.detail) {
             setNodes(prev => prev.map(n => n.id === node.id ? { ...n, outputData: result } : n));
@@ -4305,7 +4324,7 @@ export default function ScenariosPage({ onToolbarMetaChange = null, hideInitialI
             refund_reason: resolveVariableRefs(resolveTableVariableRefs(config.refund_reason, resultsMap), resultsMap) || config.refund_reason || '',
           };
           console.debug("Scenarios.jsx:event_4560");
-          const resp = await authorizedApiFetch('/api/sonar/refund-payment', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+          const resp = await authorizedApiFetch('/api/sonar/refund-payment', { method: 'POST', paymentNodeId: node.id, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
           const result = await resp.json();
           if (resp.ok && !result.error && !result.detail) {
             setNodes(prev => prev.map(n => n.id === node.id ? { ...n, outputData: result } : n));

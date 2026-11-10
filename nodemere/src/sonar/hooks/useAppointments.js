@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { getCurrentBusinessId } from '../lib/customFields';
 import { computeEndTime, normalizeOptionValue, titleCase } from '../lib/appointmentSchema';
 import { api } from '../lib/api';
+import { readAllPages } from '../lib/pagination';
 
 const getReceptionistBannerUrl = (bannerId) => (
   bannerId ? `https://grpgmhhtmfiwukncucaq.supabase.co/storage/v1/object/public/banners/${bannerId}.png` : null
@@ -192,7 +193,8 @@ export function useAppointments() {
     if (!background) setLoading(true);
     if (!background) setError(null);
     try {
-      const appointmentRows = await api.getAppointmentsForCRM(500);
+      const appointmentRows = await readAllPages(api.getAppointmentsForCRM, () => abortRef.current);
+      if (abortRef.current) return;
       if (!abortRef.current && Array.isArray(appointmentRows)) {
         const loaded = appointmentRows.map((row) => clientKeysRef.current.has(String(row.id))
           ? { ...row, _clientKey: clientKeysRef.current.get(String(row.id)) }
@@ -214,7 +216,7 @@ export function useAppointments() {
       }
 
       const [peopleResult, servicesResult, agentsResult] = await Promise.allSettled([
-        api.getPeopleForCRM(500),
+        readAllPages(api.getPeopleForCRM, () => abortRef.current),
         api.getServices(),
         api.getAgents(),
       ]);
