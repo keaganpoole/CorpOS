@@ -5,6 +5,6 @@
 
 # Private test records
 
-- For synthetic People records or account-specific People custom fields, read `skills/nodemere-test-records/SKILL.md` and use `python -m backend.test_workspace_cli request`.
+- For private test data in People, appointments, staff, services, receptionists, business information, knowledge base, or schedules, read `skills/nodemere-test-records/SKILL.md` and use `python -m backend.test_workspace_cli request`.
 - The persistent local connection targets only `keaganpoole2@outlook.com`, workspace 21. Verify `/workspace` before writes; reuse the stored connection.
-- The private API uses loopback port 8767 and is not mounted in the customer backend. People CRUD reuses the existing Nodemere handlers. No XLead or connected-app setup is needed.
+- The private API uses loopback port 8767 and is not mounted in the customer backend. Record operations reuse the existing Nodemere handlers and scoped data boundaries. No XLead or connected-app setup is needed.

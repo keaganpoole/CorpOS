@@ -7,7 +7,7 @@ from dataclasses import replace
 from enum import Enum
 import hashlib
 import hmac
-from datetime import date
+from datetime import date, time as clock_time
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -156,6 +156,78 @@ def build_app(binding, api):
     async def fields():
         return api.supabase.table('people_schema').select('*').eq('is_active', True).order('position').execute().data
 
+    @app.get('/appointments')
+    async def appointments(limit: int = 100, offset: int = 0):
+        if not 1 <= limit <= 500 or offset < 0:
+            raise HTTPException(422, 'Use limit 1–500 and a nonnegative offset')
+        return api.supabase.table('appointments').select('*').order('date').order('time').order('id').range(offset, offset + limit - 1).execute().data
+
+    @app.get('/appointments/{appointment_id}')
+    async def appointment(appointment_id: str):
+        if not api.uuid_or_none(appointment_id):
+            raise HTTPException(400, 'Invalid appointment ID')
+        rows = api.supabase.table('appointments').select('*').eq('id', appointment_id).limit(1).execute().data
+        if not rows:
+            raise HTTPException(404, 'Appointment not found')
+        return rows[0]
+
+    @app.get('/appointment-fields')
+    async def appointment_fields():
+        return api.supabase.table('appointments_schema').select('*').eq('is_active', True).execute().data
+
+    def appointment_payload(payload):
+        allowed = {'date', 'appointment_date', 'time', 'appointment_time', 'duration',
+                   'appointment_duration', 'status', 'person_id', 'service_id', 'staff_id',
+                   'receptionist_id', 'hired_receptionist_id', 'notes', 'source', 'custom_fields'}
+        if set(payload) - allowed:
+            raise HTTPException(422, 'Unknown appointment fields')
+        for key in ('date', 'appointment_date', 'time', 'appointment_time'):
+            if key in payload:
+                try:
+                    value = payload[key]
+                    if not isinstance(value, str):
+                        raise ValueError()
+                    if key in {'date', 'appointment_date'}:
+                        if date.fromisoformat(value).isoformat() != value:
+                            raise ValueError()
+                    elif clock_time.fromisoformat(value).tzinfo is not None:
+                        raise ValueError()
+                except ValueError:
+                    raise HTTPException(422, 'Use date YYYY-MM-DD and local time HH:MM') from None
+        if 'status' in payload and payload['status'] not in api.APPOINTMENT_ALLOWED_STATUSES:
+            raise HTTPException(422, 'Invalid appointment status')
+        for key in ('duration', 'appointment_duration'):
+            if key in payload and (isinstance(payload[key], bool) or not isinstance(payload[key], int) or not 1 <= payload[key] <= 1440):
+                raise HTTPException(422, 'Duration must be an integer from 1 to 1440 minutes')
+        if 'custom_fields' in payload:
+            if not isinstance(payload['custom_fields'], dict):
+                raise HTTPException(422, 'custom_fields must be an object')
+            definitions = api.supabase.table('appointments_schema').select('*').eq('is_active', True).execute().data
+            validate_custom_values({'custom_fields': payload['custom_fields']}, definitions)
+
+    @app.post('/appointments', status_code=201)
+    async def create_appointment(payload: dict):
+        appointment_payload(payload)
+        if not payload.get('date', payload.get('appointment_date')) or not payload.get('time', payload.get('appointment_time')):
+            raise HTTPException(422, 'Appointment date and time are required')
+        row = await api.create_sonar_appointment(payload, current_user=user)
+        if not row.get('id'):
+            raise HTTPException(503, 'Appointment save could not be confirmed; read back before retrying')
+        return row
+
+    @app.put('/appointments/{appointment_id}')
+    async def update_appointment(appointment_id: str, payload: dict):
+        appointment_payload(payload)
+        return await api.update_sonar_appointment(appointment_id, payload, current_user=user)
+
+    @app.delete('/appointments/{appointment_id}')
+    async def delete_appointment(appointment_id: str):
+        result = await api.delete_sonar_appointment(appointment_id, current_user=user)
+        remaining = api.supabase.table('appointments').select('id').eq('id', appointment_id).limit(1).execute().data
+        if remaining:
+            raise HTTPException(409, 'Appointment was not deleted')
+        return result
+
     @app.post('/fields', status_code=201)
     async def create_field(payload: CustomField):
         rows = await fields()
@@ -184,4 +256,6 @@ def build_app(binding, api):
         api.supabase.table('people_schema').delete().eq('field_key', field_key).execute()
         return {'ok': True, 'field_key': field_key}
 
+    from .test_workspace_core import register
+    register(app, api, user, binding)
     return app
