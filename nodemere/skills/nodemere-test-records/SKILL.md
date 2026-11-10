@@ -4,7 +4,7 @@ description: Manage synthetic Nodemere People, appointments, staff, services, re
 ---
 
 Use the private local API from `C:\Users\Keagan\.openclaw\workspace\nodemere`.
-It is already authorized for `keaganpoole2@outlook.com`, workspace 21 (Outlook Salon).
+It is already authorized for `keaganpoole2@outlook.com`, workspace 21 (Willow & Finch Hair Studio).
 Credentials are DPAPI encrypted outside the repository. Do not request a password,
 print the credential, rerun authorization, use a connected app, or use database
 credentials for record operations. Normal requests automatically start the local
@@ -122,3 +122,13 @@ local receipt before writing, and restore them in a finally block after verifica
 Staff and service deletion use the existing handlers and respect linked-data rules.
 The optional scenarios, conversations/call-history, and People-document areas were
 explicitly excluded from the requested scope.
+
+## Larger record batches and the salon dataset
+
+`POST /batch/people` and `POST /batch/appointments` accept `{"records":[{"payload":{...}},{"record_id":"existing ID","payload":{...}}]}` with 1–25 items. Omit record_id for creation. Results contain index, status, and saved record or an error for each item; a 200 outer response does not mean every item succeeded. Persist every confirmed ID, inspect all item statuses, and reconcile unconfirmed creates before retrying. Batches preserve per-record tenant and reference checks. Use normal individual requests for workflows that need background scenario execution; the salon dataset has no active automations.
+
+The account was rebuilt into Willow & Finch Hair Studio, a fictional Portland salon established in 2012. The seven agreed People custom fields are Preferred Name, Birthday, Hair Goals, Product Sensitivities, Usual Services, Visit Frequency, and Loyalty Tier. Every field has an account-specific description. Staff manager Elena Martin is the sole escalation contact. Her manager label uses the legacy authorized_representative value on the current live schema; the private API maps transfer_contact after a rejected legacy constraint write, and the UI recognizes it as Manager.
+
+The encrypted pre-rebuild snapshot and progress ledger are in `%LOCALAPPDATA%\Nodemere\test-workspace\salon-rebuild`. Do not rerun the rebuild scripts for ordinary record requests. They replace the account's scoped data and require an explicit overhaul request. Generated display emails were requested for reporting, not outreach; never infer consent from them. No calls, texts, emails, payments, or real transfers are part of data verification.
+
+The salon knowledge content is defined in `scripts/salon_knowledge.py`. `scripts/verify-salon-knowledge.py` checks the account's seven business-specific live-branch documents and their indexes. Keep checks scoped to business 21; do not remove or alter other businesses' provider documents or shared agent settings.

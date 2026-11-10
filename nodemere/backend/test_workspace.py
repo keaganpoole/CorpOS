@@ -4,6 +4,7 @@ Run through `python -m backend.test_workspace_cli serve`. Credentials and bindin
 live outside the checkout, encrypted with Windows DPAPI, with no automatic expiry.
 """
 from dataclasses import replace
+import asyncio
 from enum import Enum
 import hashlib
 import hmac
@@ -99,7 +100,8 @@ def build_app(binding, api):
                 body = await request.json()
                 if not isinstance(body, dict):
                     raise HTTPException(422, 'An object payload is required')
-                validate_references(db, tenant, body)
+                if request.url.path not in {'/batch/people', '/batch/appointments'}:
+                    validate_references(db, tenant, body)
                 if any(key in body for key in ('id', 'user_id', 'business_id', 'created_by',
                                                'owner_id', 'encryption_record_id', 'security_revision')):
                     raise HTTPException(422, 'Ownership and system fields cannot be supplied')
@@ -228,6 +230,53 @@ def build_app(binding, api):
             raise HTTPException(409, 'Appointment was not deleted')
         return result
 
+    async def batch(payload, creator, updater):
+        records = payload.get('records')
+        if set(payload) != {'records'} or not isinstance(records, list) or not 1 <= len(records) <= 25:
+            raise HTTPException(422, 'Supply 1–25 records')
+        for item in records:
+            if not isinstance(item, dict) or set(item) - {'record_id', 'payload'} or not isinstance(item.get('payload'), dict):
+                raise HTTPException(422, 'Each record requires payload and optional record_id')
+        semaphore = asyncio.Semaphore(8)
+        async def one(index, item):
+            async with semaphore:
+                async def perform():
+                    validate_references(db, current_tenant.get(), item['payload'])
+                    if any(key in item['payload'] for key in ('id', 'user_id', 'business_id', 'created_by',
+                                                               'owner_id', 'encryption_record_id', 'security_revision')):
+                        raise HTTPException(422, 'Ownership and system fields cannot be supplied')
+                    if item.get('record_id') is not None:
+                        return await updater(str(item['record_id']), item['payload'])
+                    return await creator(item['payload'])
+                try:
+                    result = await asyncio.to_thread(lambda: asyncio.run(perform()))
+                    return {'index': index, 'status': 200 if item.get('record_id') is not None else 201, 'record': result}
+                except HTTPException as exc:
+                    return {'index': index, 'status': exc.status_code, 'detail': exc.detail}
+                except Exception:
+                    return {'index': index, 'status': 503, 'detail': 'Unconfirmed operation; reconcile before retrying'}
+        return {'results': await asyncio.gather(*(one(index, item) for index, item in enumerate(records)))}
+
+    @app.post('/batch/people')
+    async def people_batch(payload: dict): return await batch(payload, create, update)
+
+    @app.post('/batch/appointments')
+    async def appointments_batch(payload: dict):
+        records=payload.get('records')
+        if (set(payload)=={'records'} and isinstance(records,list) and 1<=len(records)<=25
+                and all(isinstance(row,dict) and set(row)=={'payload'} and isinstance(row['payload'],dict)
+                        and 'date' in row['payload'] and 'time' in row['payload'] for row in records)):
+            # Aliases stay on the normal handler path; this import path accepts
+            # canonical fields and no updates. Every record is checked before
+            # the protected atomic insert. There are no scenario side effects.
+            canonical={'date','time','duration','status','person_id','service_id','staff_id',
+                       'receptionist_id','notes','source','custom_fields'}
+            if all(set(row['payload'])<=canonical for row in records):
+                for row in records: appointment_payload(row['payload'])
+                from .test_workspace_import import import_appointments
+                return await asyncio.to_thread(import_appointments,api,[row['payload'] for row in records])
+        return await batch(payload, create_appointment, update_appointment)
+
     @app.post('/fields', status_code=201)
     async def create_field(payload: CustomField):
         rows = await fields()
@@ -258,4 +307,6 @@ def build_app(binding, api):
 
     from .test_workspace_core import register
     register(app, api, user, binding)
+    from .test_workspace_cleanup import register as register_cleanup
+    register_cleanup(app,api)
     return app

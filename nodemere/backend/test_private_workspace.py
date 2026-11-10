@@ -4,14 +4,22 @@ import unittest
 from unittest.mock import MagicMock, AsyncMock, patch
 from types import SimpleNamespace
 from fastapi.testclient import TestClient
+from postgrest.exceptions import APIError
 
 from fastapi import HTTPException
 from .authorization import Tenant
 from .test_workspace import authorize, validate_custom_values, build_app
 from .test_workspace_core import allowed, schedule
+from .test_workspace_import import ensure_no_overlaps
 
 
 class PrivateWorkspaceTests(unittest.TestCase):
+    def test_import_detects_client_and_staff_conflicts_across_rows(self):
+        original={'date':'2026-11-10','time':'10:00','duration':60,'staff_id':'staff-a','person_id':1}
+        for conflicting in ({**original,'time':'10:30','person_id':2},
+                            {**original,'time':'10:30','staff_id':'staff-b'}):
+            with self.assertRaises(HTTPException): ensure_no_overlaps([conflicting],[original])
+        ensure_no_overlaps([{**original,'time':'11:00'}],[original])
     def test_core_allowlist_rejects_privileged_settings(self):
         for payload in ({'billing_plan': 'Ultra'}, {'forwarding_config': {}}, {'user_id': 'other'}):
             with self.assertRaises(HTTPException): allowed(payload, {'name', 'website'})
@@ -84,6 +92,35 @@ class PrivateWorkspaceTests(unittest.TestCase):
                                 {'date': '2026-13-40', 'time': '10:00'}, {'date': '2026-11-16', 'time': '25:00'}):
                     self.assertIn(client.post('/appointments', json=payload).status_code, {403, 422})
         api.create_sonar_appointment.assert_not_called()
+
+    def test_people_batch_reports_partial_success_without_replaying(self):
+        async def writer(payload, current_user):
+            if payload['first_name'] == 'Reject': raise HTTPException(409, 'Conflict')
+            return {'id': 123, **payload}
+        database = MagicMock()
+        database.table.return_value.select.return_value.eq.return_value.order.return_value.execute.return_value.data = []
+        api = SimpleNamespace(supabase_admin=SimpleNamespace(raw=self.db), supabase=database,
+                              create_sonar_person=AsyncMock(side_effect=writer))
+        with patch('backend.test_workspace.authorize', return_value=Tenant('owner', 21, 'owner', service=True)):
+            with TestClient(build_app(self.binding, api)) as client:
+                result = client.post('/batch/people', json={'records':[{'payload':{'first_name':'Avery'}},
+                                                                     {'payload':{'first_name':'Reject'}}]})
+                self.assertEqual(result.status_code, 200)
+                self.assertEqual([row['status'] for row in result.json()['results']], [201,409])
+                self.assertEqual(api.create_sonar_person.await_count, 2)
+
+    def test_legacy_manager_staff_label_is_mapped_after_constraint_rejection(self):
+        identifier = 'f13bf878-e76f-4ba7-92d4-90d45f0163d6'
+        writer = AsyncMock(side_effect=[APIError({'code':'23514','message':'violates staff_staff_type_check'}),
+                                       {'id':identifier,'staff_type':'authorized_representative'}])
+        api = SimpleNamespace(supabase_admin=SimpleNamespace(raw=self.db), update_sonar_staff=writer,
+                              STAFF_PROFILE_FIELDS={'staff_type'})
+        with patch('backend.test_workspace.authorize', return_value=Tenant('owner',21,'owner',service=True)):
+            with TestClient(build_app(self.binding,api)) as client:
+                response = client.put('/staff/' + identifier,json={'staff_type':'transfer_contact'})
+                self.assertEqual(response.status_code,200)
+        self.assertEqual(writer.await_count,2)
+        self.assertEqual(writer.await_args_list[1].args[1]['staff_type'],'authorized_representative')
 
 
 if __name__ == '__main__': unittest.main()

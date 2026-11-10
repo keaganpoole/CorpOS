@@ -2,6 +2,7 @@
 from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from fastapi import HTTPException
+from postgrest.exceptions import APIError
 
 BUSINESS_FIELDS = {'name', 'phone', 'email', 'avatar', 'address', 'city', 'state', 'zip',
                    'website', 'industry', 'about_us', 'policies', 'faq', 'business_hours', 'business_timezone'}
@@ -118,6 +119,17 @@ def register(app, api, user, binding):
         if 'working_hours' in payload: schedule(payload['working_hours'])
         if 'escalation_hours' in payload: schedule(payload['escalation_hours'])
 
+    async def staff_write(handler, payload, *args):
+        try:
+            return await handler(*args, payload, current_user=user)
+        except APIError as exc:
+            # Older deployments use the legacy label that the current UI still
+            # recognizes. The failed check-constraint write is rolled back.
+            if (getattr(exc, 'code', None) == '23514' and 'staff_staff_type_check' in str(exc)
+                    and payload.get('staff_type') == 'transfer_contact'):
+                return await handler(*args, {**payload, 'staff_type': 'authorized_representative'}, current_user=user)
+            raise
+
     @app.post('/staff', status_code=201)
     async def create_staff(payload: dict):
         staff_payload(payload)
@@ -127,14 +139,14 @@ def register(app, api, user, binding):
         # database plaintext {} defaults violates the live encryption guard.
         defaults = {'first_name': None, 'last_name': None, 'email': None, 'phone': None,
                     'knowledge': None, 'working_hours': {}, 'acknowledgements': {}}
-        row = await api.create_sonar_staff({**defaults, **payload}, current_user=user)
+        row = await staff_write(api.create_sonar_staff, {**defaults, **payload})
         if not row.get('id'): raise HTTPException(503, 'Staff save could not be confirmed')
         return row
 
     @app.put('/staff/{staff_id}')
     async def update_staff(staff_id: UUID, payload: dict):
         staff_payload(payload)
-        return await api.update_sonar_staff(staff_id, payload, current_user=user)
+        return await staff_write(api.update_sonar_staff, payload, staff_id)
 
     @app.delete('/staff/{staff_id}')
     async def delete_staff(staff_id: UUID): return await api.delete_sonar_staff(staff_id, current_user=user)
