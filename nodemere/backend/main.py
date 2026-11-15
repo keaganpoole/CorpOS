@@ -10135,6 +10135,35 @@ async def legacy_server_tool(
         total_count = result.count
         if total_count is None:
             raise HTTPException(status_code=502, detail="Appointment count unavailable")
+
+        person_ids = sorted({
+            int(row["person_id"])
+            for row in appointments
+            if int_or_none(row.get("person_id")) is not None
+        })
+        people_by_id = {}
+        if person_ids:
+            people = (
+                supabase.table("people")
+                .select("id,first_name,last_name")
+                .eq("business_id", business_id)
+                .in_("id", person_ids)
+                .execute()
+                .data or []
+            )
+            people_by_id = {
+                int(person["id"]): {
+                    "id": int(person["id"]),
+                    "first_name": person.get("first_name"),
+                    "last_name": person.get("last_name"),
+                    "name": " ".join(filter(None, [person.get("first_name"), person.get("last_name")])).strip() or None,
+                }
+                for person in people
+            }
+        for appointment in appointments:
+            person_id_value = int_or_none(appointment.get("person_id"))
+            appointment["person"] = people_by_id.get(person_id_value)
+
         logging.info(
             "intercom.appointments.lookup tool=%s business_id=%s date=%s date_from=%s date_to=%s status=%s "
             "created_from=%s created_to=%s include_cancelled=%s has_person_filter=%s has_appointment_filter=%s limit=%s offset=%s sort_by=%s sort_order=%s total_count=%s result_count=%s",
