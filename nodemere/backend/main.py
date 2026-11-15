@@ -10056,20 +10056,59 @@ async def legacy_server_tool(
 
         appointment_id = uuid_or_none(first_present(payload, "appointment_id", "id"))
         status_value = str(first_present(payload, "status", "appointment_status") or "").strip().lower()
-        date_value = normalize_appointment_date_value(first_present(payload, "date", "appointment_date"), fallback=None)
-        date_from = normalize_appointment_date_value(first_present(payload, "date_from", "start_date"), fallback=None)
-        date_to = normalize_appointment_date_value(first_present(payload, "date_to", "end_date"), fallback=None)
+        status_values = [value.strip().lower() for value in status_value.split(",") if value.strip()]
+        if any(value not in APPOINTMENT_ALLOWED_STATUSES for value in status_values):
+            raise HTTPException(status_code=400, detail="Invalid appointment status")
+
+        def optional_appointment_date(*keys):
+            raw = first_present(payload, *keys)
+            if raw is None or raw == "":
+                return None
+            normalized = normalize_appointment_date_value(raw, fallback="invalid")
+            if normalized == "invalid":
+                raise HTTPException(status_code=400, detail="Invalid appointment date")
+            return normalized
+
+        date_value = optional_appointment_date("date", "appointment_date")
+        date_from = optional_appointment_date("date_from", "start_date")
+        date_to = optional_appointment_date("date_to", "end_date")
+        created_from = optional_appointment_date("created_from")
+        created_to = optional_appointment_date("created_to")
+        if date_from and date_to and date_from > date_to:
+            raise HTTPException(status_code=400, detail="date_from must be on or before date_to")
+        if created_from and created_to and created_from > created_to:
+            raise HTTPException(status_code=400, detail="created_from must be on or before created_to")
         include_cancelled = str(first_present(payload, "include_cancelled") or "").strip().lower() in {"true", "1", "yes"}
         limit_value = int_or_none(first_present(payload, "limit"))
-        limit_value = max(1, min(limit_value or 10, 50))
+        limit_value = max(1, min(limit_value or 25, 100))
+        offset = max(0, int_or_none(first_present(payload, "offset")) or 0)
+        sort_by = str(first_present(payload, "sort_by") or "date").strip().lower()
+        sort_order = str(first_present(payload, "sort_order") or "asc").strip().lower()
+        if sort_by not in {"date", "created_at", "updated_at"} or sort_order not in {"asc", "desc"}:
+            raise HTTPException(status_code=400, detail="Invalid appointment sort")
 
-        query = supabase.table("appointments").select("*").eq("business_id", business_id)
+        query = supabase.table("appointments").select("*", count="exact").eq("business_id", business_id)
         if appointment_id:
             query = query.eq("id", appointment_id)
         if person_id:
             query = query.eq("person_id", person_id)
-        if status_value:
-            query = query.eq("status", normalize_appointment_status(status_value))
+        for key in ("service_id", "staff_id"):
+            raw_id = first_present(payload, key)
+            if raw_id:
+                record_id = uuid_or_none(raw_id)
+                if not record_id:
+                    raise HTTPException(status_code=400, detail=f"Invalid {key}")
+                query = query.eq(key, record_id)
+        receptionist_id = int_or_none(first_present(payload, "receptionist_id"))
+        if receptionist_id:
+            query = query.eq("receptionist_id", receptionist_id)
+        source = str(first_present(payload, "source") or "").strip()
+        if source:
+            query = query.eq("source", source)
+        if len(status_values) == 1:
+            query = query.eq("status", status_values[0])
+        elif status_values:
+            query = query.in_("status", status_values)
         elif not include_cancelled:
             query = query.neq("status", "cancelled")
         if date_value:
@@ -10078,14 +10117,54 @@ async def legacy_server_tool(
             query = query.gte("date", date_from)
         if date_to:
             query = query.lte("date", date_to)
+        business_timezone = get_business_timezone(business)
+        if created_from:
+            start = datetime.combine(date.fromisoformat(created_from), datetime.min.time(), tzinfo=business_timezone)
+            query = query.gte("created_at", start.astimezone(timezone.utc).isoformat())
+        if created_to:
+            end = datetime.combine(date.fromisoformat(created_to) + timedelta(days=1), datetime.min.time(), tzinfo=business_timezone)
+            query = query.lt("created_at", end.astimezone(timezone.utc).isoformat())
 
-        appointments = query.order("date").order("time").limit(limit_value).execute().data or []
+        descending = sort_order == "desc"
+        if sort_by == "date":
+            query = query.order("date", desc=descending).order("time", desc=descending)
+        else:
+            query = query.order(sort_by, desc=descending)
+        result = query.order("id", desc=descending).range(offset, offset + limit_value - 1).execute()
+        appointments = result.data or []
+        total_count = result.count
+        if total_count is None:
+            raise HTTPException(status_code=502, detail="Appointment count unavailable")
+        logging.info(
+            "intercom.appointments.lookup tool=%s business_id=%s date=%s date_from=%s date_to=%s status=%s "
+            "created_from=%s created_to=%s include_cancelled=%s has_person_filter=%s has_appointment_filter=%s limit=%s offset=%s sort_by=%s sort_order=%s total_count=%s result_count=%s",
+            normalized_tool,
+            business_id,
+            date_value,
+            date_from,
+            date_to,
+            ",".join(status_values) or "any",
+            created_from,
+            created_to,
+            include_cancelled,
+            bool(person_id),
+            bool(appointment_id),
+            limit_value,
+            offset,
+            sort_by,
+            sort_order,
+            total_count,
+            len(appointments),
+        )
         return {
             "ok": True,
             "appointments": appointments,
             "appointment": appointments[0] if appointments else None,
             "found": bool(appointments),
-            "count": len(appointments),
+            "count": total_count,
+            "returned_count": len(appointments),
+            "has_more": offset + len(appointments) < total_count,
+            "offset": offset,
             "person": matched_people[0] if matched_people else None,
             "people_matches": matched_people,
         }
