@@ -9280,6 +9280,17 @@ async def legacy_server_tool(
         return {"ok": True, "report": remove_secrets(report)}
 
     if normalized_tool in {"dispatch-call", "start-outbound-call", "call-customer", "outbound-call"}:
+        def dispatch_failure(code: str, message: str, next_step: str, **details):
+            return {
+                "ok": False,
+                "success": False,
+                "call_dispatched": False,
+                "error_code": code,
+                "error": message,
+                "next_step": next_step,
+                **details,
+            }
+
         ensure_no_unresolved_templates(
             payload.get("person_id"),
             payload.get("appointment_id"),
@@ -9287,7 +9298,18 @@ async def legacy_server_tool(
             payload.get("mission"),
             payload.get("main_content"),
         )
-        enforce_call_minutes(user_id, business, direction="outbound")
+        try:
+            enforce_call_minutes(user_id, business, direction="outbound")
+        except HTTPException as exc:
+            detail = exc.detail if isinstance(exc.detail, dict) else {}
+            code = str(detail.get("code") or "outbound_call_unavailable")
+            message = str(detail.get("message") or "The outbound call could not be started.")
+            next_step = {
+                "feature_not_in_plan": "Upgrade the business plan to Pro or Ultra to enable outbound calling.",
+                "minute_limit_reached": "Review the call-minute limit or enable overage in billing settings.",
+                "billing_context_missing": "Complete business and billing setup, then try again.",
+            }.get(code, "Check the account's outbound calling setup, then try again.")
+            return dispatch_failure(code, message, next_step, status_code=exc.status_code)
 
         person = None
         person_id = first_present(payload, "person_id", "customer_id")
@@ -9330,25 +9352,16 @@ async def legacy_server_tool(
                 .eq("business_id", business["id"])
             )
 
-        requested_receptionist_id = first_present(payload, "receptionist_id", "hired_receptionist_id") or (appointment or {}).get("receptionist_id")
-        selected_receptionist = load_receptionist_by_id(requested_receptionist_id) if requested_receptionist_id else None
-        if selected_receptionist and int_or_none(selected_receptionist.get("business_id")) != int_or_none(business.get("id")):
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Receptionist not found")
-        if selected_receptionist and not receptionist_direction_allows("outbound", selected_receptionist.get("direction")):
-            return {
-                "ok": False,
-                "success": False,
-                "call_dispatched": False,
-                "error": "The selected receptionist is not enabled for outbound calls. Set a hired receptionist direction to outbound or all, then try again.",
-            }
-        receptionist = selected_receptionist or find_outbound_receptionist_for_business(business.get("id"), user_id)
+        # Outbound dispatch always uses a business receptionist enabled for outbound
+        # calling. Appointment assignments are for appointment ownership and do not
+        # determine which receptionist places an outbound call.
+        receptionist = find_outbound_receptionist_for_business(business.get("id"), user_id)
         if not receptionist:
-            return {
-                "ok": False,
-                "success": False,
-                "call_dispatched": False,
-                "error": "No hired receptionist is set to outbound or all. Set a receptionist direction to outbound or all before dispatching an outbound call.",
-            }
+            return dispatch_failure(
+                "no_outbound_receptionist",
+                "No business receptionist is enabled to place outbound calls.",
+                "In Teams, set a hired receptionist's direction to outbound or all, then try again.",
+            )
 
         mission = str(first_present(payload, "mission", "main_content", "instructions") or "").strip()
         if not mission:
@@ -9367,9 +9380,10 @@ async def legacy_server_tool(
                 or (appointment or {}).get("phone")
             )
         if not to_phone:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="A phone number is required. Provide to_phone/phone or choose a person record with a phone number.",
+            return dispatch_failure(
+                "customer_phone_missing",
+                "The customer record does not have a usable phone number.",
+                "Add or confirm the customer's phone number, then retry the call.",
             )
         intercom_claims = getattr(request.state, "internal_claims", None) or {}
         customer_context = {
@@ -9403,16 +9417,29 @@ async def legacy_server_tool(
         }
         result = await scenario_engine.action_executor._call_customer(node, call_context)
         if not result.get("success"):
-            return {
-                "ok": False,
-                "success": False,
-                "call_dispatched": False,
-                "error": result.get("error") or "The call could not be started.",
-                "provider_status": result.get("provider_status"),
-                "provider_response": result.get("provider_response"),
-                "to_phone": to_phone,
-                "person_id": str((person or {}).get("id") or person_id or ""),
-            }
+            raw_error = str(result.get("error") or "The call could not be started.")
+            normalized_error = raw_error.lower()
+            if "do not call" in normalized_error:
+                code, next_step = "customer_call_consent_disabled", "Review the customer's Do Not Call setting; do not place another call unless consent is corrected."
+            elif "no phone number" in normalized_error:
+                code, next_step = "customer_phone_missing", "Add or confirm the customer's phone number, then retry the call."
+            elif "not configured" in normalized_error or "no outbound business phone" in normalized_error:
+                code, next_step = "outbound_setup_incomplete", "Configure the outbound agent and business caller ID in calling settings."
+            elif "provider could not start" in normalized_error:
+                code, next_step = "calling_provider_rejected", "Check the provider response and outbound number configuration before retrying."
+            elif result.get("dispatch_unknown"):
+                code, next_step = "dispatch_status_unknown", "Check dispatch status before retrying to avoid placing a duplicate call."
+            else:
+                code, next_step = "outbound_call_failed", "Review the call setup and error details, then retry if the issue is resolved."
+            return dispatch_failure(
+                code,
+                raw_error,
+                next_step,
+                provider_status=result.get("provider_status"),
+                provider_response=result.get("provider_response"),
+                to_phone=to_phone,
+                person_id=str((person or {}).get("id") or person_id or ""),
+            )
         record_intercom_write_action(request, normalized_tool, result)
         return result.get("data") or result
 
