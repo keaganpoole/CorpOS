@@ -14,7 +14,7 @@ from .permissions import require_permission
 
 router=APIRouter()
 COLUMNS={
- 'people':set('id created_at first_name last_name phone email street_address city state zip_code preferred_contact_method preferred_language best_time_to_contact consent_sms consent_call do_not_call do_not_text status source lead_source_detail tags updated_at last_inbound_call_at last_outbound_call_at last_call_status last_intent last_outcome missed_call_count last_inbound_sms_at last_outbound_sms_at last_sms_status last_inbound_email_at last_outbound_email_at last_email_status callback_needed callback_due_at handoff_required assigned_staff call_route payment_status balance_due invoice_id notes special_instructions user_id business_id stripe_customer_id stripe_payment_method_id custom_fields'.split()),
+ 'people':set('id created_at first_name last_name phone email street_address city state zip_code preferred_contact_method preferred_language best_time_to_contact consent_sms do_not_call do_not_text status source lead_source_detail tags updated_at last_inbound_call_at last_outbound_call_at last_call_status last_intent last_outcome missed_call_count last_inbound_sms_at last_outbound_sms_at last_sms_status last_inbound_email_at last_outbound_email_at last_email_status callback_needed callback_due_at handoff_required assigned_staff call_route payment_status balance_due invoice_id notes special_instructions user_id business_id stripe_customer_id stripe_payment_method_id custom_fields'.split()),
  'appointments':set('id date time duration status notes scenario_id created_at user_id person_id service_id business_id custom_fields source updated_at receptionist_id staff_id'.split()),
 }
 

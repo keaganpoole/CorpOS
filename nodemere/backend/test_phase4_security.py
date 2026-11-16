@@ -388,7 +388,7 @@ class AdditionalBoundaryTests(unittest.TestCase):
         from backend.scenario_engine import ScenarioActionExecutor
         db=Database(); action=ScenarioActionExecutor(ScopedClient(db),{},'http://offline.example.test')
         context={'business':db.rows['businesses'][0],'business_id':1,'user_id':OWNER,
-            'person':{'phone':'+15555550123','consent_call':True,'consent_call_source':'synthetic','consent_call_scope':'synthetic','consent_call_recorded_at':'2026-09-03'},'_scenario':{'id':APPT}}
+            'person':{'phone':'+15555550123','consent_call_source':'synthetic','consent_call_scope':'synthetic','consent_call_recorded_at':'2026-09-03'},'_scenario':{'id':APPT}}
         response=SimpleNamespace(ok=True,json=lambda:{'conversation_id':'conv-new','callSid':'CA-synthetic'})
         with tenant_scope(Tenant(OWNER,1,OWNER,service=True)),patch.dict(os.environ,{'ELEVENLABS_API_KEY':'offline','ELEVENLABS_AGENT_ID_OUTBOUND':'synthetic'}),patch.object(action,'_find_elevenlabs_phone_number_id_for_business',return_value='owned-line'),patch.object(action,'_infer_required_agent_fields',return_value=[]),patch.object(action,'_build_downstream_data',return_value={}),patch.object(action,'_add_person_custom_dynamic_variables'),patch.object(action,'_build_agent_collection_state',return_value={}),patch('backend.scenario_engine.requests.post',return_value=response) as post:
             result=asyncio.run(action._call_customer({'id':'node','actionConfig':{}},context))

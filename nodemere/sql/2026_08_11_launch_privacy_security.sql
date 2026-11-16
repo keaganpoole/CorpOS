@@ -21,9 +21,6 @@ where p.business_id is null
 
 create index if not exists idx_people_user_id on public.people (user_id);
 create index if not exists idx_people_business_id on public.people (business_id);
-create index if not exists idx_people_call_consent_evidence
-  on public.people (user_id, consent_call, do_not_call, consent_call_recorded_at desc);
-
 alter table public.people enable row level security;
 drop policy if exists "users can read own people" on public.people;
 create policy "users can read own people" on public.people

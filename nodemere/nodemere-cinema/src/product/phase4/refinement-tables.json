@@ -71,11 +71,6 @@
         "type": "boolean"
       },
       {
-        "key": "consent_call",
-        "label": "Consent Call",
-        "type": "boolean"
-      },
-      {
         "key": "do_not_call",
         "label": "Do Not Call",
         "type": "boolean"

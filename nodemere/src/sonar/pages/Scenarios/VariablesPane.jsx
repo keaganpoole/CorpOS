@@ -465,7 +465,6 @@ const TABLE_DEFS = [
       { key: 'preferred_language', label: 'Preferred Language', type: 'text' },
       { key: 'best_time_to_contact', label: 'Best Time to Contact', type: 'text' },
       { key: 'consent_sms', label: 'Consent SMS', type: 'boolean' },
-      { key: 'consent_call', label: 'Consent Call', type: 'boolean' },
       { key: 'do_not_call', label: 'Do Not Call', type: 'boolean' },
       { key: 'do_not_text', label: 'Do Not Text', type: 'boolean' },
       { key: 'source', label: 'Source', type: 'text' },

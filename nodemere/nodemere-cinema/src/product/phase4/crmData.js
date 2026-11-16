@@ -11,7 +11,6 @@ export const DEFAULT_FIELD_CONFIG = {
   preferred_language: { name: 'Preferred Language', icon: 'globe' },
   best_time_to_contact: { name: 'Best Time To Contact', icon: 'clock' },
   consent_sms: { name: 'Consent SMS', icon: 'shield' },
-  consent_call: { name: 'Consent Call', icon: 'shield' },
   do_not_call: { name: 'Do Not Call', icon: 'shield', locked: true, hidden: false },
   do_not_text: { name: 'Do Not Text', icon: 'shield' },
   source: {

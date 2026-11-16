@@ -150,7 +150,6 @@ export const LEAD_FIELDS = [
   { key: 'consent_sms_source', label: 'SMS Consent Source', type: 'text', required: false, table: false, section: 'consent', editable: true },
   { key: 'consent_sms_recorded_at', label: 'SMS Consent Timestamp', type: 'timestamp', required: false, table: false, section: 'consent', editable: true },
   { key: 'consent_sms_scope', label: 'SMS Consent Scope', type: 'text', required: false, table: false, section: 'consent', editable: true },
-  { key: 'consent_call', label: 'Documented AI Call Consent', type: 'boolean', required: false, table: false, section: 'consent', editable: true },
   { key: 'consent_call_source', label: 'AI Call Consent Source', type: 'text', required: false, table: false, section: 'consent', editable: true },
   { key: 'consent_call_recorded_at', label: 'AI Call Consent Timestamp', type: 'timestamp', required: false, table: false, section: 'consent', editable: true },
   { key: 'consent_call_scope', label: 'AI Call Consent Scope', type: 'text', required: false, table: false, section: 'consent', editable: true },

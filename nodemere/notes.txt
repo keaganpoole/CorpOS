@@ -92,7 +92,6 @@ create table public.people (
   preferred_language text null,
   best_time_to_contact text null,
   consent_sms boolean null default false,
-  consent_call boolean null default false,
   do_not_call boolean null default false,
   do_not_text boolean null default false,
   status text null,

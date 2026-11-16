@@ -41,7 +41,6 @@ CORE_FIELDS = {
     "tags": ("Tags", "multi_select"),
     "do_not_call": ("Do Not Call", "boolean"),
     "do_not_text": ("Do Not Text", "boolean"),
-    "consent_call": ("Documented AI Call Consent", "boolean"),
     "consent_call_source": ("AI Call Consent Source", "text"),
     "consent_call_recorded_at": ("AI Call Consent Timestamp", "timestamp"),
     "consent_call_scope": ("AI Call Consent Scope", "text"),

@@ -76,7 +76,7 @@ with client(values) as connection:
         else:
             person = request('POST', '/people', {'first_name': first, 'last_name': last, 'email': email,
                 'city': 'Portland', 'state': 'ME', 'notes': 'Synthetic test record — private agent verification.',
-                'consent_sms': False, 'consent_call': False, 'do_not_call': True, 'do_not_text': True}, 201)
+                'consent_sms': False, 'do_not_call': True, 'do_not_text': True}, 201)
         if person['id'] not in receipt['records']:
             receipt['records'].append(person['id'])
             save()

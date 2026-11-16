@@ -64,7 +64,7 @@ class Database:
             'businesses': [{'id': 1, 'user_id': OWNER, 'industry': 'Beauty & Wellness'}],
             'drop_ins': [{'id': DROP, 'business_id': 1, 'name': 'Thank You', 'purpose': 'thank them', 'prompt': 'Thank the customer.', 'available_on_status': 'completed', 'is_active': True, 'sort_order': 0, 'deleted_at': None}],
             'appointments': [{'id': APPT, 'business_id': 1, 'user_id': OWNER, 'status': 'completed', 'person_id': 7, 'receptionist_id': 9, 'date': '2026-09-06', 'time': '13:00'}],
-            'people': [{'id': 7, 'business_id': 1, 'phone': '+15555550123', 'consent_call': True, 'consent_call_source': 'synthetic', 'consent_call_recorded_at': '2026-09-01', 'consent_call_scope': 'test'}],
+            'people': [{'id': 7, 'business_id': 1, 'phone': '+15555550123', 'consent_call_source': 'synthetic', 'consent_call_recorded_at': '2026-09-01', 'consent_call_scope': 'test'}],
             'hired_receptionists': [
                 {'id': 9, 'business_id': 1, 'first_name': 'Assigned', 'elevenlabs_voice_id': 'assigned-voice', 'is_active': True, 'direction': 'inbound'},
                 {'id': 10, 'business_id': 1, 'first_name': 'Outbound', 'elevenlabs_voice_id': 'outbound-voice', 'is_active': True, 'direction': 'outbound'},
