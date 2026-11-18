@@ -3,9 +3,9 @@ import { Check, Copy, Info, Link2, MousePointer2, Share2, UserRound, Wallet } fr
 import { auth, partnerApi } from './api'
 import { Brand, Button, displayDate, ErrorMessage, Modal, money, Pager, Select, Status, StatusFilter, usePartnerData } from './ui'
 
-function EarningsCard({ label, value, hint, description }) {
+function CardInfo({ label, description }) {
   const tooltipId = useId()
-  const card = useRef(null)
+  const info = useRef(null)
   const [help, setHelp] = useState(null)
   const isOpen = help !== null
 
@@ -15,7 +15,7 @@ function EarningsCard({ label, value, hint, description }) {
       if (event.key === 'Escape') setHelp(null)
     }
     function closeOutside(event) {
-      if (!card.current.contains(event.target)) setHelp(null)
+      if (!info.current?.contains(event.target)) setHelp(null)
     }
     document.addEventListener('keydown', closeOnEscape)
     document.addEventListener('pointerdown', closeOutside)
@@ -25,27 +25,35 @@ function EarningsCard({ label, value, hint, description }) {
     }
   }, [isOpen])
 
-  return <div ref={card} onPointerLeave={() => setHelp(current => current === 'hover' ? null : current)}>
-    <dt>
-      {label}
-      <button type="button" className="partner-earnings-info" aria-label={`About ${label}`}
-        aria-describedby={tooltipId} aria-expanded={isOpen}
-        onPointerEnter={event => { if (event.pointerType === 'mouse') setHelp(current => current ?? 'hover') }}
-        onFocus={event => { if (event.currentTarget.matches(':focus-visible')) setHelp('focus') }}
-        onBlur={() => setHelp(null)}
-        onClick={() => setHelp(current => current === 'pinned' ? null : 'pinned')}>
-        <Info size={14} aria-hidden="true" />
-      </button>
-      <span className="partner-earnings-tooltip" id={tooltipId} role="tooltip" hidden={!isOpen}>{description}</span>
-    </dt>
+  return <span ref={info} className="partner-card-info" onPointerLeave={() => setHelp(current => current === 'hover' ? null : current)}>
+    <button type="button" className="partner-card-info-button" aria-label={`About ${label}`}
+      aria-describedby={tooltipId} aria-expanded={isOpen}
+      onPointerEnter={event => { if (event.pointerType === 'mouse') setHelp(current => current ?? 'hover') }}
+      onFocus={event => { if (event.currentTarget.matches(':focus-visible')) setHelp('focus') }}
+      onBlur={() => setHelp(null)}
+      onClick={() => setHelp(current => current === 'pinned' ? null : 'pinned')}>
+      <Info size={14} aria-hidden="true" />
+    </button>
+    <span className="partner-card-tooltip" id={tooltipId} role="tooltip" hidden={!isOpen}>{description}</span>
+  </span>
+}
+
+function EarningsCard({ label, value, hint, description }) {
+  return <div>
+    <dt className="partner-card-heading"><span className="partner-card-label"><span>{label}</span><CardInfo label={label} description={description} /></span></dt>
     <dd>{value}{hint && <small>{hint}</small>}</dd>
   </div>
 }
 
 export function Totals({ cards }) {
   return <section className="partner-stats" aria-label="Summary">
-    {cards.map(({ title, value, detail, icon: Icon }) => <article className="partner-card partner-stat" key={title}>
-      <div><span>{title}</span>{Icon && <Icon size={16} strokeWidth={1.7} aria-hidden />}</div>
+    {cards.map(({ title, value, detail, icon: Icon, description }) => <article className="partner-card partner-stat" key={title}>
+      <div className="partner-card-heading">
+        {description
+          ? <span className="partner-card-label"><span>{title}</span><CardInfo label={title} description={description} /></span>
+          : <span>{title}</span>}
+        {Icon && <Icon size={16} strokeWidth={1.7} aria-hidden />}
+      </div>
       <strong>{value}</strong>
       {detail && <small>{detail}</small>}
     </article>)}
@@ -236,10 +244,14 @@ export default function Dashboard({ user, home, signOut }) {
   const earned = totals && totals.ready + totals.owed + totals.paid
   const conversion = analytics?.lifetime_visitors ? totals.registrations / analytics.lifetime_visitors : 0
   const cards = [
-    { title: 'Link clicks', value: count(analytics?.lifetime_clicks), detail: analytics && `${count(analytics.lifetime_visitors)} unique visitors`, icon: MousePointer2 },
-    { title: 'Registrations', value: count(totals?.registrations), detail: totals && `${(conversion * 100).toFixed(1)}% visitor conversion`, icon: UserRound },
-    { title: 'Qualified referrals', value: count(totals?.qualified), detail: 'Lifetime', icon: Link2 },
-    { title: 'Total earned', value: totals ? money(earned) : '—', detail: totals && `${money(totals.paid)} paid`, icon: Wallet },
+    { title: 'Link clicks', value: count(analytics?.lifetime_clicks), detail: analytics && `${count(analytics.lifetime_visitors)} unique visitors`, icon: MousePointer2,
+      description: 'Recorded visits to your referral link, including repeat visitors.' },
+    { title: 'Registrations', value: count(totals?.registrations), detail: totals && `${(conversion * 100).toFixed(1)}% visitor conversion`, icon: UserRound,
+      description: 'Businesses that signed up through your referral link.' },
+    { title: 'Qualified referrals', value: count(totals?.qualified), detail: 'Lifetime', icon: Link2,
+      description: 'Referrals that reached 30 paid days within the 180-day referral window.' },
+    { title: 'Total earned', value: totals ? money(earned) : '—', detail: totals && `${money(totals.paid)} paid`, icon: Wallet,
+      description: 'Total rewards for qualified referrals, including rewards awaiting payout and those already paid.' },
   ]
 
   return <>

@@ -94,7 +94,7 @@
 .partner-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
 .partner-stat { padding: 14px; }
 .partner-stat > div { display: flex; align-items: center; justify-content: space-between; gap: 5px; color: #b2b2bc; font-size: 12px; font-weight: 550; }
-.partner-stat svg { flex: none; color: var(--color-light-gray); }
+.partner-stat > div > svg { flex: 0 1 16px; min-width: 0; color: var(--color-light-gray); }
 .partner-stat strong { display: block; font-size: clamp(25px, 3vw, 35px); line-height: 1.2; font-weight: 650; letter-spacing: -.05em; margin-top: 5px; overflow-wrap: anywhere; }
 .partner-stat small { display: block; font-size: 11px; color: var(--partner-muted); margin-top: 4px; }
 .partner-panel { padding: 16px; }
@@ -132,14 +132,18 @@
 .partner-status-paid { border-color: #244338; color: #95dbc0; background: #66d9ad0a; }
 .partner-status-rejected { border-color: var(--color-status-dnc); color: var(--color-status-dnc); }
 .partner-earnings { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 16px; }
-.partner-earnings > div { position: relative; min-width: 0; padding: 8px; background: #171719; border: 1px solid #26262a; border-radius: 8px; }
+.partner-earnings > div { min-width: 0; padding: 8px; background: #171719; border: 1px solid #26262a; border-radius: 8px; }
 .partner-earnings dt, .partner-earnings small { font-size: 11px; color: var(--partner-muted); }
-.partner-earnings dt { display: flex; align-items: center; justify-content: space-between; gap: 2px; line-height: 1.2; }
-.partner-earnings-info { display: grid; place-items: center; flex: none; width: 24px; height: 24px; border-radius: 50%; }
-.partner-earnings-info:hover, .partner-earnings-info[aria-expanded="true"] { color: var(--color-light-gray); background: #ffffff13; }
-.partner-earnings-tooltip { position: absolute; z-index: 4; top: calc(100% - 3px); left: 50%; transform: translateX(-50%); width: min(220px, calc(100vw - 64px)); padding: 8px 10px; border: 1px solid #3f3f46; border-radius: 8px; background: #171719; color: var(--color-light-gray); font-size: 12px; line-height: 1.45; }
-.partner-earnings > div:first-child .partner-earnings-tooltip { left: 0; transform: none; }
-.partner-earnings > div:last-child .partner-earnings-tooltip { right: 0; left: auto; transform: none; }
+.partner-card-heading { position: relative; }
+.partner-card-label { display: inline-flex; align-items: center; min-width: 0; gap: 2px; line-height: 1.2; }
+.partner-stat .partner-card-label { flex-shrink: 0; max-width: 100%; }
+.partner-card-label > span:first-child { overflow-wrap: anywhere; }
+.partner-card-info { display: grid; place-items: center; align-self: stretch; flex: none; }
+.partner-card-info-button { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; }
+.partner-card-info-button:hover, .partner-card-info-button[aria-expanded="true"] { color: var(--color-light-gray); background: #ffffff13; }
+.partner-card-tooltip { position: absolute; z-index: 4; top: calc(100% - 1px); left: 50%; transform: translateX(-50%); width: min(220px, calc(100vw - 64px)); padding: 8px 10px; border: 1px solid #3f3f46; border-radius: 8px; background: #171719; color: var(--color-light-gray); font-size: 12px; line-height: 1.45; }
+.partner-stats > :first-child .partner-card-tooltip, .partner-earnings > :first-child .partner-card-tooltip { left: 0; transform: none; }
+.partner-stats > :last-child .partner-card-tooltip, .partner-earnings > :last-child .partner-card-tooltip { right: 0; left: auto; transform: none; }
 .partner-earnings dd { font-size: 18px; font-weight: 650; letter-spacing: -.04em; overflow-wrap: anywhere; }
 .partner-earnings dd small { display: block; font-weight: 400; letter-spacing: normal; }
 .partner-payment-list li, .partner-directory li { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--partner-border); overflow-wrap: anywhere; font-size: 13px; }
@@ -211,6 +215,8 @@
   .partner-link-row .partner-button { flex: 1; }
   .partner-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
   .partner-stat { padding: 9px 10px; border-radius: 12px; }
+  .partner-stats > :nth-child(odd) .partner-card-tooltip { left: 0; transform: none; }
+  .partner-stats > :nth-child(even) .partner-card-tooltip { right: 0; left: auto; transform: none; }
   .partner-chart { height: 90px; gap: 1px; }
   .partner-chart-dates span { order: 1; flex-basis: 100%; text-align: left; }
   .partner-table, .partner-table tbody { display: block; }
