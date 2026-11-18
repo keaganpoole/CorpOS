@@ -13,6 +13,7 @@ import requests
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import RedirectResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from postgrest.exceptions import APIError
 from pydantic import BaseModel, EmailStr, Field, SecretStr
 from supabase_auth.errors import AuthApiError
 
@@ -27,7 +28,7 @@ REFERRAL_FIELDS = (
     "customer_id,referral_id,partner_id,business_id,clicked_at,registered_at,business_registered_at,"
     "expires_at,paid_seconds,paid_at,qualified_at,paid_on,status,amount_cents"
 )
-PARTNER_FIELDS = "id,full_name,email,code,email_updates,payout_contact,created_at"
+PARTNER_FIELDS = "id,full_name,email,code,short_code,email_updates,payout_contact,created_at"
 STATUSES = {"registered", "qualifying", "held", "ready", "owed", "paid", "expired", "rejected"}
 MAIL_COPY = {
     "registered": ("A business registered through your link", "A business you referred has registered for Nodemere."),
@@ -155,10 +156,15 @@ class Partners:
         if not rows:
             submitted_name = (user.get("user_metadata") or {}).get("full_name")
             name = (submitted_name.strip()[:120] if isinstance(submitted_name, str) else "") or email[:120]
-            self.db.table("partner_accounts").upsert(
-                {"id": user_id, "email": email, "full_name": name},
-                on_conflict="id", ignore_duplicates=True,
-            ).execute()
+            try:
+                self.db.table("partner_accounts").upsert(
+                    {"id": user_id, "email": email, "full_name": name},
+                    on_conflict="id", ignore_duplicates=True,
+                ).execute()
+            except APIError as exc:
+                if exc.code == "P9000":
+                    raise HTTPException(503, "No referral codes are currently available.") from None
+                raise
             rows = self.db.table("partner_accounts").select(PARTNER_FIELDS).eq("id", user_id).execute().data
         account = rows[0]
         if account["email"] != email:
@@ -167,7 +173,7 @@ class Partners:
         account["is_admin"] = bool(
             self.db.table("partner_admins").select("partner_id").eq("partner_id", user_id).execute().data
         )
-        account["referral_url"] = f"{self.referral_origin}/r/{account['code']}"
+        account["referral_url"] = f"{self.referral_origin}/r/{account['short_code']}"
         return account
 
     def dashboard_rows(self, *, partner_id, state, page, paid_only=False, admin=False):
@@ -323,7 +329,7 @@ class Partners:
         @router.get("/r/{code}", include_in_schema=False)
         def click(code: str, request: Request):
             response = RedirectResponse("/", status_code=302, headers={"Cache-Control": "private, no-store"})
-            if not self.enabled or not re.fullmatch(r"[a-f0-9]{12}", code):
+            if not self.enabled or not re.fullmatch(r"(?:[1-9][0-9]{3}|[a-f0-9]{12})", code):
                 return response
             if (request.headers.get("sec-purpose") or request.headers.get("purpose")) or request.headers.get("sec-fetch-mode") not in {None, "navigate"}:
                 return response
