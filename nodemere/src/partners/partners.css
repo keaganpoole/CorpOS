@@ -9,7 +9,7 @@
   color-scheme: dark;
 }
 
-#partner-root :focus-visible { outline: 2px solid #c4b5fd; outline-offset: 3px; }
+#partner-root :focus-visible { outline: 2px solid var(--color-light-gray); outline-offset: 3px; }
 #partner-root p, #partner-root h1, #partner-root h2, #partner-root h3 { margin: 0; }
 #partner-root a { color: inherit; text-decoration: none; }
 .partner-header {
@@ -74,7 +74,7 @@
 .partner-auth-form .partner-button { margin-top: 4px; }
 .partner-auth-links { display: flex; gap: 13px; flex-wrap: wrap; margin-top: 13px; }
 .partner-dashboard { display: grid; gap: 14px; width: min(calc(100% - 44px), 1120px); margin: 0 auto; padding: 21px 0 34px; }
-.partner-share { display: grid; grid-template-columns: 1.12fr 1fr; align-items: center; gap: 18px; padding: 24px; background: linear-gradient(118deg, #17121a, var(--partner-surface) 66%); }
+.partner-share { display: grid; grid-template-columns: 1.12fr 1fr; align-items: center; gap: 18px; padding: 24px; }
 .partner-share h1 { font-size: clamp(24px, 3.2vw, 42px); letter-spacing: -.055em; font-weight: 650; line-height: 1.09; max-width: 20ch; text-wrap: balance; }
 #partner-root .partner-share p { margin-top: 9px; font-size: 13px; color: var(--partner-muted); max-width: 43ch; }
 .partner-share-controls { min-width: 0; }
@@ -94,7 +94,7 @@
 .partner-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
 .partner-stat { padding: 14px; }
 .partner-stat > div { display: flex; align-items: center; justify-content: space-between; gap: 5px; color: #b2b2bc; font-size: 12px; font-weight: 550; }
-.partner-stat svg { flex: none; color: #a99abb; }
+.partner-stat svg { flex: none; color: var(--color-light-gray); }
 .partner-stat strong { display: block; font-size: clamp(25px, 3vw, 35px); line-height: 1.2; font-weight: 650; letter-spacing: -.05em; margin-top: 5px; overflow-wrap: anywhere; }
 .partner-stat small { display: block; font-size: 11px; color: var(--partner-muted); margin-top: 4px; }
 .partner-panel { padding: 16px; }
@@ -108,12 +108,12 @@
 .partner-chart { height: 112px; display: flex; gap: 3px; padding-top: 5px; border-bottom: 1px solid var(--partner-border); background: repeating-linear-gradient(to top, transparent 0 calc(25% - 1px), #242426 calc(25% - 1px) 25%); }
 .partner-chart button { flex: 1 1 0; min-width: 0; height: 100%; display: flex; justify-content: center; align-items: end; gap: 1px; position: relative; }
 .partner-chart button:hover, .partner-chart button.active, .partner-chart button:focus-visible { background: #ffffff13; }
-.partner-chart button span { width: 42%; max-width: 16px; background: #a78bfa; border-radius: 3px 3px 0 0; }
-.partner-chart button span + span { background: #f084c7; }
+.partner-chart button span { width: 42%; max-width: 16px; background: var(--color-brand-purple); border-radius: 3px 3px 0 0; }
+.partner-chart button span + span { background: var(--color-brand-pink); }
 .partner-chart-meta { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; font-size: 12px; margin-bottom: 9px; color: #d2d2d7; }
 .partner-chart-meta div { display: flex; gap: 12px; }
-.partner-chart-meta i { display: inline-block; width: 7px; height: 7px; border-radius: 2px; background: #a78bfa; vertical-align: 1px; }
-.partner-chart-meta span + span i { background: #f084c7; }
+.partner-chart-meta i { display: inline-block; width: 7px; height: 7px; border-radius: 2px; background: var(--color-brand-purple); vertical-align: 1px; }
+.partner-chart-meta span + span i { background: var(--color-brand-pink); }
 .partner-chart-meta small { color: var(--partner-muted); font-size: 11px; }
 .partner-chart-dates { margin: 7px 0 0; }
 .partner-chart-dates > span { font-size: 11px; text-align: center; }
@@ -128,9 +128,9 @@
 .partner-cell-label { display: none; }
 .partner-status { display: inline-flex; align-items: center; width: fit-content; border: 1px solid #37373c; border-radius: 6px; padding: 3px 7px; font-size: 11px; line-height: 1.25; font-weight: 600; color: #cccbd2; background: #ffffff07; }
 .partner-status-qualifying, .partner-status-held { border-color: #473b24; color: #e7c88a; background: #e7c88a0b; }
-.partner-status-ready, .partner-status-owed { border-color: #483960; color: #d4bbff; background: #a78bfa0d; }
+.partner-status-ready, .partner-status-owed { border-color: var(--color-brand-purple); color: var(--color-light-gray); }
 .partner-status-paid { border-color: #244338; color: #95dbc0; background: #66d9ad0a; }
-.partner-status-rejected { border-color: #533238; color: #f0abb5; background: #f0abb509; }
+.partner-status-rejected { border-color: var(--color-status-dnc); color: var(--color-status-dnc); }
 .partner-earnings { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-bottom: 16px; }
 .partner-earnings > div { min-width: 0; padding: 8px; background: #171719; border: 1px solid #26262a; border-radius: 8px; }
 .partner-earnings dt { font-size: 11px; color: var(--partner-muted); }
@@ -141,7 +141,7 @@
 .partner-pager { display: flex; justify-content: flex-end; align-items: center; gap: 8px; color: var(--partner-muted); font-size: 12px; margin-top: 10px; }
 .partner-pager .partner-button { width: 38px; padding: 0; }
 .partner-profile { position: relative; }
-.partner-profile summary { display: grid; place-items: center; list-style: none; min-width: 39px; min-height: 39px; border-radius: 50%; border: 1px solid #3b3541; background: #1d1822; cursor: pointer; color: #e5d5f3; font-size: 12px; font-weight: 650; }
+.partner-profile summary { display: grid; place-items: center; list-style: none; min-width: 39px; min-height: 39px; border-radius: 50%; border: 1px solid #303033; background: #1c1c1c; cursor: pointer; color: var(--color-light-gray); font-size: 12px; font-weight: 650; }
 .partner-profile summary::-webkit-details-marker { display: none; }
 .partner-profile-menu { z-index: 2; position: absolute; right: 0; top: calc(100% + 6px); width: max-content; display: grid; gap: 2px; padding: 5px; color: #d4d4d8; border: 1px solid #303033; border-radius: 12px; background: #101010; box-shadow: 0 14px 36px #000a; }
 .partner-profile-menu :is(button, a) { display: flex; align-items: center; min-height: 38px; text-align: left; padding: 4px 10px; border-radius: 8px; font-size: 13px; }
@@ -170,7 +170,7 @@
 .partner-review-dates dt { font-size: 11px; color: var(--partner-muted); }
 .partner-review-details summary { cursor: pointer; font-weight: 600; }
 .partner-review-details li { margin-top: 6px; overflow-wrap: anywhere; }
-#partner-root .partner-error { color: #fda4af; font-size: 13px; overflow-wrap: anywhere; }
+#partner-root .partner-error { color: var(--color-status-dnc); font-size: 13px; overflow-wrap: anywhere; }
 
 @media (max-width: 760px) {
   .partner-share { grid-template-columns: 1fr; gap: 10px; }
