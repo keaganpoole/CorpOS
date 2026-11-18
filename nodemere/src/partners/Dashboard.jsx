@@ -231,8 +231,9 @@ export default function Dashboard({ user, home, signOut }) {
       <section className="partner-card partner-panel">
         <div className="partner-panel-head"><h2>Earnings</h2></div>
         <dl className="partner-earnings">
-          {[['Pending', 'pending'], ['Ready for approval', 'ready'], ['Owed', 'owed'], ['Paid', 'paid']].map(([label, key]) =>
-            <div key={key}><dt>{label}</dt><dd>{totals ? money(totals[key]) : '—'}</dd></div>)}
+          <div><dt>Pending</dt><dd>{totals ? money(totals.pending_total ?? totals.pending + totals.ready + totals.owed) : '—'}</dd></div>
+          <div><dt>Paid</dt><dd>{totals ? money(totals.paid) : '—'}</dd></div>
+          <div><dt>Ended early</dt><dd>{count(totals?.ended_early)}<small>Before 30 paid days</small></dd></div>
         </dl>
         <h3>Payment history</h3>
         {payments.loading && <p role="status" className="partner-empty">Loading payments…</p>}

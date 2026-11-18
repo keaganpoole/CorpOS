@@ -131,10 +131,11 @@
 .partner-status-ready, .partner-status-owed { border-color: var(--color-brand-purple); color: var(--color-light-gray); }
 .partner-status-paid { border-color: #244338; color: #95dbc0; background: #66d9ad0a; }
 .partner-status-rejected { border-color: var(--color-status-dnc); color: var(--color-status-dnc); }
-.partner-earnings { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-bottom: 16px; }
+.partner-earnings { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 16px; }
 .partner-earnings > div { min-width: 0; padding: 8px; background: #171719; border: 1px solid #26262a; border-radius: 8px; }
-.partner-earnings dt { font-size: 11px; color: var(--partner-muted); }
+.partner-earnings dt, .partner-earnings small { font-size: 11px; color: var(--partner-muted); }
 .partner-earnings dd { font-size: 18px; font-weight: 650; letter-spacing: -.04em; overflow-wrap: anywhere; }
+.partner-earnings dd small { display: block; font-weight: 400; letter-spacing: normal; }
 .partner-payment-list li, .partner-directory li { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--partner-border); overflow-wrap: anywhere; font-size: 13px; }
 .partner-payment-list span { color: var(--partner-muted); font-size: 12px; }
 .partner-directory .partner-button { flex: none; }
@@ -212,7 +213,6 @@
   .partner-table tbody tr td { padding: 0; border: 0; }
   .partner-table tbody tr td:first-child { grid-column: 1 / -1; }
   .partner-cell-label { color: var(--partner-muted); display: block; font-size: 10px; margin-bottom: 2px; }
-  .partner-earnings { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .partner-modal-inner { padding: 14px; }
 }
 
