@@ -1,7 +1,46 @@
-import React, { useEffect, useRef, useState } from 'react'
-import { Check, Copy, Link2, MousePointer2, Share2, UserRound, Wallet } from 'lucide-react'
+import React, { useEffect, useId, useRef, useState } from 'react'
+import { Check, Copy, Info, Link2, MousePointer2, Share2, UserRound, Wallet } from 'lucide-react'
 import { auth, partnerApi } from './api'
 import { Brand, Button, displayDate, ErrorMessage, Modal, money, Pager, Select, Status, StatusFilter, usePartnerData } from './ui'
+
+function EarningsCard({ label, value, hint, description }) {
+  const tooltipId = useId()
+  const card = useRef(null)
+  const [help, setHelp] = useState(null)
+  const isOpen = help !== null
+
+  useEffect(() => {
+    if (!isOpen) return
+    function closeOnEscape(event) {
+      if (event.key === 'Escape') setHelp(null)
+    }
+    function closeOutside(event) {
+      if (!card.current.contains(event.target)) setHelp(null)
+    }
+    document.addEventListener('keydown', closeOnEscape)
+    document.addEventListener('pointerdown', closeOutside)
+    return () => {
+      document.removeEventListener('keydown', closeOnEscape)
+      document.removeEventListener('pointerdown', closeOutside)
+    }
+  }, [isOpen])
+
+  return <div ref={card} onPointerLeave={() => setHelp(current => current === 'hover' ? null : current)}>
+    <dt>
+      {label}
+      <button type="button" className="partner-earnings-info" aria-label={`About ${label}`}
+        aria-describedby={tooltipId} aria-expanded={isOpen}
+        onPointerEnter={event => { if (event.pointerType === 'mouse') setHelp(current => current ?? 'hover') }}
+        onFocus={event => { if (event.currentTarget.matches(':focus-visible')) setHelp('focus') }}
+        onBlur={() => setHelp(null)}
+        onClick={() => setHelp(current => current === 'pinned' ? null : 'pinned')}>
+        <Info size={14} aria-hidden="true" />
+      </button>
+      <span className="partner-earnings-tooltip" id={tooltipId} role="tooltip" hidden={!isOpen}>{description}</span>
+    </dt>
+    <dd>{value}{hint && <small>{hint}</small>}</dd>
+  </div>
+}
 
 export function Totals({ cards }) {
   return <section className="partner-stats" aria-label="Summary">
@@ -231,9 +270,12 @@ export default function Dashboard({ user, home, signOut }) {
       <section className="partner-card partner-panel">
         <div className="partner-panel-head"><h2>Earnings</h2></div>
         <dl className="partner-earnings">
-          <div><dt>Pending</dt><dd>{totals ? money(totals.pending_total ?? totals.pending + totals.ready + totals.owed) : '—'}</dd></div>
-          <div><dt>Paid</dt><dd>{totals ? money(totals.paid) : '—'}</dd></div>
-          <div><dt>Ended early</dt><dd>{count(totals?.ended_early)}<small>Before 30 paid days</small></dd></div>
+          <EarningsCard label="Pending" value={totals ? money(totals.pending_total ?? totals.pending + totals.ready + totals.owed) : '—'}
+            description="Potential rewards for referrals still qualifying and rewards waiting to be paid." />
+          <EarningsCard label="Paid" value={totals ? money(totals.paid) : '—'}
+            description="Rewards Nodemere has already paid out." />
+          <EarningsCard label="Ended early" value={count(totals?.ended_early)} hint="Before 30 paid days"
+            description="Number of referrals whose subscriptions ended before they reached 30 paid days." />
         </dl>
         <h3>Payment history</h3>
         {payments.loading && <p role="status" className="partner-empty">Loading payments…</p>}
