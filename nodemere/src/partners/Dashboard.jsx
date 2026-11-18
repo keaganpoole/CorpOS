@@ -32,7 +32,7 @@ function CardInfo({ label, description }) {
       onFocus={event => { if (event.currentTarget.matches(':focus-visible')) setHelp('focus') }}
       onBlur={() => setHelp(null)}
       onClick={() => setHelp(current => current === 'pinned' ? null : 'pinned')}>
-      <Info size={14} aria-hidden="true" />
+      <Info size={11} aria-hidden="true" />
     </button>
     <span className="partner-card-tooltip" id={tooltipId} role="tooltip" hidden={!isOpen}>{description}</span>
   </span>
