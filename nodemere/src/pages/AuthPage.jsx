@@ -176,7 +176,9 @@ const AuthPage = () => {
                     setIsLoading(false);
                     return;
                 }
-                await axios.post(`${API_BASE_URL}/users`, {
+                const signupUrl = !invitationId && document.cookie.split('; ').includes('nodemere_referral_present=1')
+                    ? '/api/partner-attribution/signup' : `${API_BASE_URL}/users`;
+                await axios.post(signupUrl, {
                     email: invitation?.email || formData.email,
                     password: formData.password,
                     terms_accepted: true,

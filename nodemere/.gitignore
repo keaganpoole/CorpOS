@@ -2,6 +2,7 @@
 /node_modules
 /venv
 /dist
+/partners/dist/
 
 # Python cache
 __pycache__/

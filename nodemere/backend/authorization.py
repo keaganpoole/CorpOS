@@ -9,6 +9,8 @@ from contextvars import ContextVar
 from dataclasses import dataclass
 from fastapi import HTTPException
 
+PARTNER_ROLE = "nodemere_partner"
+
 
 @dataclass(frozen=True)
 class Tenant:

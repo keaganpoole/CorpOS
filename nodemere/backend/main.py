@@ -121,6 +121,8 @@ from .config import (
     microsoft_graph_base_url,
     frontend_base_url,
     verification_base_url,
+    url as customer_auth_url,
+    public_key as customer_auth_public_key,
 )
 
  
@@ -174,6 +176,7 @@ from .intercom_knowledge import (
     schedule_business_knowledge_sync,
 )
 from .visitor_intelligence import build_visitor_intelligence_router, build_visitor_router, record_verified_billing_event
+from .partners import Partners
 from .nest_events import MILESTONE_KEYS, claim_call_milestones, claim_nest_milestone, claim_payment_milestones, get_nest_history, record_call_nest_event, record_nest_event
 from .people_import import (
     CORE_FIELDS, IMPORT_MARKER, MAX_IMPORT_BYTES, MAX_IMPORT_ROWS,
@@ -201,6 +204,11 @@ from .record_reads import router as record_read_router
 app.include_router(record_read_router)
 app.include_router(build_visitor_router(supabase_admin, get_current_user))
 app.include_router(build_visitor_intelligence_router(supabase_admin, get_current_user))
+partners = Partners(supabase_admin, auth_url=customer_auth_url, auth_key=customer_auth_public_key,
+                    new_auth_client=new_auth_client,
+                    stripe_key=STRIPE_LIVE_SECRET_KEY, resend_key=resend_api_key, resend_sender=resend_from_email)
+app.include_router(partners.router(get_current_user))
+partner_worker = None
 NODEMERE_LEGAL_ACCEPTANCE_KEY = "nodemere_legal_acceptance_v2026_10_28"
 NODEMERE_LEGAL_ACCEPTANCE_VERSION = "2026-10-28"
 # scheduler = AsyncIOScheduler()
@@ -2236,11 +2244,14 @@ async def startup_scenario_engine():
     global BUSINESS_KNOWLEDGE_STARTUP_TASK
     global BUSINESS_KNOWLEDGE_WATCH_TASK
     global scenario_engine
+    global partner_worker
     from .audit import enforced
     from .envelope import writes_enabled, keyring
     enforced()  # Invalid production mode is a startup failure, not a silent bypass.
     if writes_enabled(): keyring()
     if os.getenv('NODEMERE_RECOVERY_MODE', '').lower() in {'1','true','yes','on'}: return
+    if partners.enabled:
+        partner_worker = asyncio.create_task(partners.run())
     if elevenlabs_api_key and (elevenlabs_agent_id_inbound or elevenlabs_agent_id_intercom or elevenlabs_agent_id_outbound):
         try:
             BUSINESS_KNOWLEDGE_STARTUP_TASK = asyncio.create_task(delayed_startup_business_knowledge_sync())
@@ -2261,6 +2272,10 @@ async def shutdown_scenario_engine():
     global scenario_engine
     global BUSINESS_KNOWLEDGE_STARTUP_TASK
     global BUSINESS_KNOWLEDGE_WATCH_TASK
+    global partner_worker
+    if partner_worker:
+        partner_worker.cancel()
+        partner_worker = None
     if BUSINESS_KNOWLEDGE_STARTUP_TASK and not BUSINESS_KNOWLEDGE_STARTUP_TASK.done():
         BUSINESS_KNOWLEDGE_STARTUP_TASK.cancel()
     BUSINESS_KNOWLEDGE_STARTUP_TASK = None
@@ -3495,6 +3510,8 @@ origins = configured_origins or [
     "https://nodemere.io",
     "https://www.nodemere.io",
 ]
+if partners.enabled and partners.origin not in origins:
+    origins.append(partners.origin)
 
 app.add_middleware(
     CORSMiddleware,
@@ -3524,6 +3541,12 @@ async def add_security_headers(request: Request, call_next):
 
 def is_public_api_route(request: Request) -> bool:
     path = request.url.path
+    # Partner routes verify the dedicated Supabase Auth role. Attribution capture
+    # verifies main Auth itself, before the new customer has a membership.
+    if path.startswith("/api/partners/") or path in {
+        "/api/partner-attribution/capture", "/api/partner-attribution/signup"
+    }:
+        return True
     # Tracking validates consent/capabilities itself; identity additionally
     # verifies Supabase Auth before membership or onboarding exists.
     if request.method == "POST" and path in {
@@ -16029,6 +16052,8 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
 
 
 @app.post("/users", response_model=UserResponse, status_code=status.HTTP_201_CREATED, tags=["Users"])
+@app.post("/api/partner-attribution/signup", response_model=UserResponse,
+          status_code=status.HTTP_201_CREATED, include_in_schema=False)
 async def create_user(auth_data: AuthSignUpRequest, request: Request):
     try:
         if not auth_data.terms_accepted or auth_data.legal_version != NODEMERE_LEGAL_ACCEPTANCE_VERSION:
@@ -16086,6 +16111,8 @@ async def create_user(auth_data: AuthSignUpRequest, request: Request):
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Supabase signup failed")
         
         user_id = auth_response.user.id
+        if not auth_data.invitation_id:
+            await asyncio.to_thread(partners.capture, request, user_id)
         user_metadata = getattr(auth_response.user, "user_metadata", {}) or {}
         profile_data = {
             "id": str(user_id),
@@ -16111,7 +16138,7 @@ async def create_user(auth_data: AuthSignUpRequest, request: Request):
         # signup failure. The authenticated profile bootstrap path repairs a
         # missing row after the user confirms the email.
         try:
-            db_response = supabase_admin.table('users').upsert(profile_data, on_conflict='id').select().execute()
+            db_response = supabase_admin.table('users').upsert(profile_data, on_conflict='id').execute()
             return db_response.data[0] if db_response.data else profile_data
         except Exception:
             logging.exception('main.create_user.profile_persistence_failed')

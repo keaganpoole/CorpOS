@@ -8,7 +8,7 @@ from jose import JWTError, jwt
 from pydantic import BaseModel # type: ignore
 from supabase_auth.errors import AuthApiError, AuthInvalidJwtError
 from .config import ALGORITHM, SECRET_KEY, supabase_admin, supabase_auth
-from .authorization import current_identity
+from .authorization import PARTNER_ROLE, current_identity
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 http_bearer = HTTPBearer()
@@ -47,6 +47,8 @@ async def _get_current_user(token, allow_pending_deletion=False):
             return identity
         user_info = supabase_auth.auth.get_user(token.credentials)
         if user_info and user_info.user:
+            if getattr(user_info.user, "role", None) == PARTNER_ROLE:
+                raise HTTPException(403, "Use your business account to access Nodemere.")
             stage = "profile"
             profile = supabase_admin.table("users").select("account_status").eq("id", str(user_info.user.id)).limit(1).execute()
             if not profile.data:
@@ -110,10 +112,14 @@ async def get_current_user_for_workforce_session(token = Depends(http_bearer)):
         )
         if not isinstance(claims, dict):
             raise AuthInvalidJwtError("Missing verified claims")
+        if claims.get("role") == PARTNER_ROLE:
+            raise HTTPException(403, "Use your business account to access Nodemere.")
         user = _build_authenticated_user(claims)
         user.nodemere_aal = "aal2" if claims.get("aal") == "aal2" else "aal1"
         user.nodemere_mfa_enrolled = False
         return user
+    except HTTPException:
+        raise
     except AuthInvalidJwtError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
                             detail="Invalid or expired authentication token.") from None

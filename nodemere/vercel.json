@@ -3,6 +3,14 @@
   "outputDirectory": "dist",
   "rewrites": [
     {
+      "source": "/r/:code",
+      "destination": "https://nodemere-backend.onrender.com/r/:code"
+    },
+    {
+      "source": "/api/partner-attribution/:path",
+      "destination": "https://nodemere-backend.onrender.com/api/partner-attribution/:path"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

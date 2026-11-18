@@ -13,6 +13,10 @@ export default defineConfig({
     watch: { ignored: ['**/.studio-tools/**'] },
     port: 5173,
     proxy: {
+      '/r/': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+      },
       '/api': {
         target: 'http://127.0.0.1:8000',
         changeOrigin: true,

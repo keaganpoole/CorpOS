@@ -70,6 +70,14 @@ export const AuthProvider = ({ children }) => {
         else { setWorkforce(null); setWorkforceContext(null); }
     }, [session?.access_token, refreshWorkforce]);
     useEffect(() => {
+        if (session?.access_token && document.cookie.split('; ').includes('nodemere_referral_present=1')) {
+            fetch('/api/partner-attribution/capture', {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${session.access_token}` },
+            }).catch(() => {});
+        }
+    }, [session?.access_token]);
+    useEffect(() => {
         if (!session?.user) return undefined;
         const timer = setInterval(refreshWorkforce, 60000);
         window.addEventListener('focus', refreshWorkforce);

@@ -50,6 +50,22 @@ class AuthFailureClassificationTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("SECRET_CANARY", " ".join(captured.output))
         self.assertIn("profile", " ".join(captured.output))
 
+    async def test_partner_auth_role_is_denied_on_customer_boundaries(self):
+        token = SimpleNamespace(credentials="signed-partner-fixture")
+        user = SimpleNamespace(id="partner-fixture", role=dependencies.PARTNER_ROLE)
+        with (
+            patch.object(dependencies.supabase_auth.auth, "get_user", return_value=SimpleNamespace(user=user)),
+            patch.object(dependencies.supabase_auth.auth, "get_claims", return_value={
+                "claims": {"sub": user.id, "role": user.role},
+            }),
+            patch.object(dependencies, "supabase_admin") as database,
+        ):
+            for authenticate in (dependencies.get_current_user, dependencies.get_current_user_for_workforce_session):
+                with self.assertRaises(HTTPException) as denied:
+                    await authenticate(token)
+                self.assertEqual(denied.exception.status_code, 403)
+            database.table.assert_not_called()
+
     async def test_http_boundary_preserves_503_and_never_authorizes(self):
         from fastapi.testclient import TestClient
         from .test_phase1_security import main
