@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { ArrowRight, CircleDollarSign, Link2, Mail, UserRoundPlus } from 'lucide-react'
 import { auth, partnerApi, partnerSignup } from './api'
 import { Brand, Button, ErrorMessage, Modal, usePartnerData } from './ui'
-import DashboardLoadingScreen from '../components/DashboardLoadingScreen'
+import CirclePreloader from '../sonar/components/CirclePreloader'
 import Dashboard from './Dashboard'
 import Admin from './Admin'
 import '../index.css'
@@ -137,7 +137,7 @@ function AuthForm({ view, navigate, email, setEmail, session, linkError }) {
 function SignedIn({ signOut }) {
   const [revision, setRevision] = useState(0)
   const account = usePartnerData(signal => partnerApi('/account', { signal }), [revision])
-  if (account.loading) return <DashboardLoadingScreen isLoading />
+  if (account.loading) return <main className="partner-loading-screen"><CirclePreloader size={22} /></main>
   if (account.error) return <main className="partner-auth">
     <h1>Partner dashboard unavailable</h1><ErrorMessage>{account.error}</ErrorMessage>
     <div className="partner-actions"><Button primary onClick={() => setRevision(r => r + 1)}>Try again</Button><Button onClick={signOut}>Log out</Button></div>
@@ -180,7 +180,7 @@ function App() {
     navigate('login')
   }
 
-  if (loading) return <DashboardLoadingScreen isLoading />
+  if (loading) return <main className="partner-loading-screen"><CirclePreloader size={22} /></main>
   if (session && view !== 'recover') return <SignedIn key={session.user.id} signOut={signOut} />
   if (Object.hasOwn(views, view)) {
     return <AuthForm key={view} {...{ view, navigate, email, setEmail, session, linkError }} />

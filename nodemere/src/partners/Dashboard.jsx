@@ -1,6 +1,6 @@
 import React, { useEffect, useId, useRef, useState } from 'react'
 import { Check, Copy, Info, Link2, MousePointer2, Share2, UserRound, Wallet } from 'lucide-react'
-import DashboardLoadingScreen from '../components/DashboardLoadingScreen'
+import CirclePreloader from '../sonar/components/CirclePreloader'
 import { auth, partnerApi } from './api'
 import { Brand, Button, displayDate, ErrorMessage, Modal, money, Pager, Select, Status, StatusFilter, usePartnerData } from './ui'
 
@@ -286,7 +286,7 @@ export default function Dashboard({ user, home, signOut }) {
       description: 'Total rewards for qualified referrals, including rewards awaiting payout and those already paid.' },
   ]
 
-  if (overview.loading && !totals && !hasLoadedOverview.current) return <DashboardLoadingScreen isLoading />
+  if (overview.loading && !totals && !hasLoadedOverview.current) return <main className="partner-loading-screen"><CirclePreloader size={22} /></main>
 
   return <>
     <header className="partner-header"><Brand home={home} /><Profile user={account} signOut={signOut} settings={() => setSettings(true)} home={home} /></header>
