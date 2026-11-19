@@ -47,6 +47,7 @@ class PartnerSignup(BaseModel):
     full_name: str = Field(min_length=1, max_length=120)
     email: EmailStr
     password: SecretStr
+    phone: str = Field(min_length=7, max_length=32)
 
 
 class RewardAction(BaseModel):
@@ -96,7 +97,7 @@ class Partners:
                 "password": password,
                 "email_confirm": False,
                 "role": PARTNER_ROLE,
-                "user_metadata": {"full_name": name},
+                "user_metadata": {"full_name": name, "phone": data.phone.strip()},
             })
         except AuthApiError as exc:
             if exc.code in {"email_exists", "user_already_exists"}:

@@ -14,10 +14,10 @@ export async function partnerApi(path, options = {}) {
   return send(path, options, data.session.access_token)
 }
 
-export function partnerSignup({ fullName, email, password }) {
+export function partnerSignup({ fullName, email, password, phone }) {
   return send('/signup', {
     method: 'POST',
-    body: JSON.stringify({ full_name: fullName, email, password }),
+    body: JSON.stringify({ full_name: fullName, email, password, phone }),
   })
 }
 

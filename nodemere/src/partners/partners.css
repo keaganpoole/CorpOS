@@ -81,6 +81,11 @@
 .partner-share h1 { font-size: clamp(22px, 2.6vw, 32px); letter-spacing: -.04em; font-weight: 600; line-height: 1.16; max-width: 22ch; text-wrap: balance; }
 #partner-root .partner-share p { margin-top: 9px; font-size: 13px; color: var(--partner-muted); max-width: 43ch; }
 .partner-share-controls { min-width: 0; }
+.partner-payout-prompt { display: grid; gap: 8px; align-content: center; justify-items: start; }
+.partner-payout-prompt strong { font-size: 14px; font-weight: 600; }
+.partner-payout-options { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.partner-payout-option { min-height: 72px; border: 1px solid #303033; border-radius: 12px; background: #161618; font-size: 15px; font-weight: 500; color: #f5f5f7; }
+.partner-payout-option.selected { border-color: var(--color-brand-purple); background: #8b5cf61a; }
 .partner-share-controls label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 6px; }
 .partner-link-row { display: flex; flex-wrap: wrap; gap: 6px; }
 .partner-link-row input, .partner-directory-search input {

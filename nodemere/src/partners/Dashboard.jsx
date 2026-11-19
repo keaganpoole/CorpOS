@@ -86,10 +86,33 @@ export function ReferralList({ rows, admin, inspect }) {
   </table>
 }
 
-function ShareCard({ link }) {
+function ShareCard({ link, account, onAccountUpdate }) {
   const [feedback, setFeedback] = useState('')
   const [error, setError] = useState('')
   const field = useRef(null)
+  const [setup, setSetup] = useState(false)
+  const [method, setMethod] = useState('')
+  const [handle, setHandle] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [setupError, setSetupError] = useState('')
+  async function savePayout(event) {
+    event.preventDefault()
+    const prefix = method === 'Cash App' ? '$' : '@'
+    const username = handle.trim().replace(/^[$@]/, '')
+    const valid = method === 'Cash App' ? /^[a-z0-9]+$/i : /^[a-z0-9_-]+$/i
+    if (!method || !valid.test(username)) { setSetupError('Enter a valid payout handle.'); return }
+    setSaving(true)
+    setSetupError('')
+    try {
+      const updated = await partnerApi('/account', { method: 'PATCH', body: JSON.stringify({
+        full_name: account.full_name, email_updates: account.email_updates,
+        payout_contact: method + ': ' + prefix + username,
+      }) })
+      onAccountUpdate(updated)
+      setSetup(false)
+    } catch (reason) { setSetupError(reason.message) }
+    finally { setSaving(false) }
+  }
   async function act(share) {
     setFeedback('')
     setError('')
@@ -110,7 +133,15 @@ function ShareCard({ link }) {
       <h1>Earn <span className="brand-gradient-text">$100</span> for every business you refer.</h1>
       <p>Share your link. Earn $100 when a referred business completes 30 paid days within 180 days.</p>
     </div>
-    <div className="partner-share-controls">
+    {!account.payout_contact ? <div className="partner-share-controls partner-payout-prompt">
+      <strong>Referral link</strong><p>Choose a payout method to unlock your referral link.</p>
+      <Button primary onClick={() => setSetup(true)}>Set up payouts</Button>
+      {setup && <Modal title="Choose a payout method" onClose={() => setSetup(false)}><form className="modal-form partner-settings" onSubmit={savePayout}>
+        <div className="partner-payout-options">{['Cash App', 'Venmo'].map(option => <button key={option} type="button" className={method === option ? 'partner-payout-option selected' : 'partner-payout-option'} onClick={() => { setMethod(option); setHandle(''); setSetupError('') }}>{option}</button>)}</div>
+        {method && <label>{method === 'Cash App' ? 'Cash App cashtag' : 'Venmo username'}<input autoFocus value={handle} onChange={e => setHandle(e.target.value)} placeholder={method === 'Cash App' ? '$username' : '@username'} required /></label>}
+        <ErrorMessage>{setupError}</ErrorMessage><Button primary type="submit" disabled={!method || saving}>{saving ? 'Saving…' : 'Save payout method'}</Button>
+      </form></Modal>}
+    </div> : <div className="partner-share-controls">
       <label htmlFor="referral-link">Your referral link</label>
       <div className="partner-link-row">
         <input ref={field} id="referral-link" value={link} readOnly onFocus={e => e.target.select()} />
@@ -118,7 +149,7 @@ function ShareCard({ link }) {
         {typeof navigator.share === 'function' && <Button onClick={() => act(true)}><Share2 size={15} /> Share</Button>}
       </div>
       <span className="sr-only" role="status">{feedback}</span><ErrorMessage>{error}</ErrorMessage>
-    </div>
+    </div>}
   </section>
 }
 
@@ -291,7 +322,7 @@ export default function Dashboard({ user, home, signOut }) {
   return <>
     <header className="partner-header"><Brand home={home} /><Profile user={account} signOut={signOut} settings={() => setSettings(true)} home={home} /></header>
     <main className="partner-dashboard">
-      <ShareCard link={account.referral_url} />
+      <ShareCard link={account.referral_url} account={account} onAccountUpdate={setAccount} />
       <Totals cards={cards} />
       <section className="partner-card partner-panel">
         <div className="partner-panel-head">

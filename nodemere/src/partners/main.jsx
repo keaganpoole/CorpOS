@@ -63,6 +63,7 @@ function How({ icon: Icon, title, children }) {
 function AuthForm({ view, navigate, email, setEmail, session, linkError }) {
   const [name, setName] = useState('')
   const [password, setPassword] = useState('')
+  const [phone, setPhone] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
@@ -81,7 +82,7 @@ function AuthForm({ view, navigate, email, setEmail, session, linkError }) {
       const address = email.trim()
       if (view === 'join') {
         if (!name.trim()) throw new Error('Enter your full name.')
-        await partnerSignup({ email: address, password, fullName: name.trim() })
+        await partnerSignup({ email: address, password, fullName: name.trim(), phone: phone.trim() })
         result = {}
       } else if (view === 'login') {
         result = await auth.signInWithPassword({ email: address, password })
@@ -119,6 +120,7 @@ function AuthForm({ view, navigate, email, setEmail, session, linkError }) {
       <ErrorMessage>{error || linkError || (invalidRecovery ? 'This reset link has expired. Request a new link.' : '')}</ErrorMessage>
       {!auth ? <p className="partner-error" role="alert">Partner sign-in is temporarily unavailable.</p> : !invalidRecovery && <form onSubmit={handleSubmit} className="partner-auth-form">
         {view === 'join' && <label>Full name<input value={name} onChange={e => setName(e.target.value)} required maxLength={120} autoComplete="name" /></label>}
+        {view === 'join' && <label>Phone number<input type="tel" value={phone} onChange={e => setPhone(e.target.value)} required maxLength={32} autoComplete="tel" /></label>}
         {!hideEmail && <label>Email address<input type="email" value={email} onChange={e => setEmail(e.target.value)} required autoComplete="email" /></label>}
         {!hidePassword && <label>Password<input type="password" value={password} onChange={e => setPassword(e.target.value)} required minLength={view === 'login' ? undefined : 8} autoComplete={view === 'login' ? 'current-password' : 'new-password'} /></label>}
         <Button primary type="submit" disabled={busy}>{busy ? 'Please wait…' : submit}</Button>
