@@ -131,7 +131,7 @@ export default function Admin({ home, signOut }) {
         {directory.data && <>
           {directory.data.rows.length ? <ul className="partner-directory">{directory.data.rows.map(item => <li key={item.id}>
             <div><strong>{item.full_name}</strong><small>{item.email} · Joined {displayDate(item.created_at)}</small>
-              {item.payout_contact && <small>Payout contact · {item.payout_contact}</small>}
+              {item.payout_contact && <small>Payout details · {item.payout_contact}</small>}
               {item.suppressed_clicks > 0 && <small>{item.suppressed_clicks} rate-limited clicks in the last 24 hours</small>}</div>
             <Button onClick={() => { setPartner(item); setPage(0); document.querySelector('.partner-admin-title').scrollIntoView() }}>View referrals</Button>
           </li>)}</ul> : <p className="partner-empty">No partners found.</p>}

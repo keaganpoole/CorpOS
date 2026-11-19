@@ -41,6 +41,8 @@
 }
 .partner-secondary { border-color: #303033; background-color: #131314; color: #eeeef0; }
 .partner-secondary:hover { border-color: #515156; background-color: #1c1c1e; }
+.partner-button.partner-copy-link { box-shadow: 0 4px 12px rgba(139, 92, 246, .06); }
+.partner-button.partner-copy-link:hover { box-shadow: 0 5px 14px rgba(255, 255, 255, .07); }
 .partner-button:disabled { opacity: .4; cursor: not-allowed; }
 .partner-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 9px; }
 .partner-text-button { min-height: 38px; display: inline-flex; align-items: center; color: var(--partner-muted); font-size: 13px; font-weight: 550; text-align: left; }
@@ -102,6 +104,8 @@
 .partner-panel-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
 .partner-panel-head h2 { font-size: 16px; font-weight: 600; letter-spacing: -.025em; }
 .partner-panel h3 { font-size: 13px; font-weight: 600; }
+.partner-stat strong.partner-earned-amount { color: var(--color-status-interest); }
+.partner-settings .partner-select select { width: 100%; }
 .partner-select { min-width: 0; position: relative; display: inline-flex; }
 .partner-select select { appearance: none; min-height: 32px; max-width: 100%; padding: 4px 24px 4px 9px; background: #161618; border: 1px solid #2b2b2e; border-radius: 8px; color: #dddde3; font-size: 13px; font-weight: 400; }
 .partner-select svg { pointer-events: none; position: absolute; right: 8px; top: 50%; width: 12px; height: 12px; transform: translateY(-50%); color: var(--partner-muted); }

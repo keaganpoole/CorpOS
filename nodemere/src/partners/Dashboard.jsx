@@ -1,5 +1,6 @@
 import React, { useEffect, useId, useRef, useState } from 'react'
 import { Check, Copy, Info, Link2, MousePointer2, Share2, UserRound, Wallet } from 'lucide-react'
+import DashboardLoadingScreen from '../components/DashboardLoadingScreen'
 import { auth, partnerApi } from './api'
 import { Brand, Button, displayDate, ErrorMessage, Modal, money, Pager, Select, Status, StatusFilter, usePartnerData } from './ui'
 
@@ -47,14 +48,14 @@ function EarningsCard({ label, value, hint, description }) {
 
 export function Totals({ cards }) {
   return <section className="partner-stats" aria-label="Summary">
-    {cards.map(({ title, value, detail, icon: Icon, description }) => <article className="partner-card partner-stat" key={title}>
+    {cards.map(({ title, value, detail, icon: Icon, description, highlightAmount }) => <article className="partner-card partner-stat" key={title}>
       <div className="partner-card-heading">
         {description
           ? <span className="partner-card-label"><span>{title}</span><CardInfo label={title} description={description} /></span>
           : <span>{title}</span>}
         {Icon && <Icon size={16} strokeWidth={1.7} aria-hidden />}
       </div>
-      <strong>{value}</strong>
+      <strong className={highlightAmount ? 'partner-earned-amount' : undefined}>{value}</strong>
       {detail && <small>{detail}</small>}
     </article>)}
   </section>
@@ -113,7 +114,7 @@ function ShareCard({ link }) {
       <label htmlFor="referral-link">Your referral link</label>
       <div className="partner-link-row">
         <input ref={field} id="referral-link" value={link} readOnly onFocus={e => e.target.select()} />
-        <Button primary onClick={() => act(false)}>{feedback ? <Check size={15} /> : <Copy size={15} />} {feedback ? 'Copied' : 'Copy link'}</Button>
+        <Button primary className="partner-copy-link" onClick={() => act(false)}>{feedback ? <Check size={15} /> : <Copy size={15} />} {feedback ? 'Copied' : 'Copy link'}</Button>
         {typeof navigator.share === 'function' && <Button onClick={() => act(true)}><Share2 size={15} /> Share</Button>}
       </div>
       <span className="sr-only" role="status">{feedback}</span><ErrorMessage>{error}</ErrorMessage>
@@ -152,17 +153,32 @@ function Chart({ analytics, days }) {
 function AccountSettings({ user, close, update }) {
   const [name, setName] = useState(user.full_name)
   const [updates, setUpdates] = useState(user.email_updates)
-  const [contact, setContact] = useState(user.payout_contact)
+  const existingHandle = /^(Cash App): (\$[a-z0-9]+)$|^(Venmo): (@[a-z0-9_-]+)$/i.exec(user.payout_contact || '')
+  const legacyContact = existingHandle ? '' : user.payout_contact
+  const [method, setMethod] = useState(existingHandle ? (existingHandle[1] ? 'Cash App' : 'Venmo') : (legacyContact ? 'existing' : ''))
+  const [handle, setHandle] = useState(existingHandle?.[2] ?? existingHandle?.[4] ?? '')
+  const usesHandle = method === 'Cash App' || method === 'Venmo'
+  const prefix = method === 'Cash App' ? '$' : '@'
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [info, setInfo] = useState('')
   async function save(e) {
     e.preventDefault()
+    const input = handle.trim()
+    const username = input.startsWith(prefix) ? input.slice(1) : input
+    const validHandle = method === 'Cash App' ? /^[a-z0-9]+$/i : /^[a-z0-9_-]+$/i
+    if (usesHandle && !validHandle.test(username)) {
+      setError(method === 'Cash App' ? 'Enter your Cash App cashtag.' : 'Enter your Venmo username.')
+      return
+    }
+    let payoutContact = ''
+    if (usesHandle) payoutContact = method + ': ' + prefix + username
+    if (method === 'existing') payoutContact = legacyContact
     setBusy(true)
     setError('')
     try {
       update(await partnerApi('/account', { method: 'PATCH', body: JSON.stringify({
-        full_name: name, email_updates: updates, payout_contact: contact,
+        full_name: name, email_updates: updates, payout_contact: payoutContact,
       }) }))
       close()
     } catch (reason) {
@@ -193,8 +209,20 @@ function AccountSettings({ user, close, update }) {
       <div className="partner-account-email"><div><span>Email address</span><strong>{user.email}</strong></div><span className="partner-status partner-status-paid">Verified</span></div>
       <button type="button" className="partner-text-button" onClick={resetPassword} disabled={busy}>Change password by email</button>
       <label className="partner-check"><input type="checkbox" checked={updates} onChange={e => setUpdates(e.target.checked)} /><span>Registration and subscription emails</span></label>
-      <label>Payout coordination <small>Optional</small><textarea value={contact} onChange={e => setContact(e.target.value)} maxLength={300} rows={2} placeholder="Preferred contact for manual payouts" /></label>
-      <small>Enter a contact preference only. Keep banking details private.</small>
+      <label>Payout method
+        <Select label="Payout method" value={method} onChange={e => { setMethod(e.target.value); setHandle(''); setError('') }}>
+          <option value="">No payout method selected</option>
+          {legacyContact && <option value="existing">Keep existing payout details</option>}
+          <option value="Cash App">Cash App</option>
+          <option value="Venmo">Venmo</option>
+        </Select>
+      </label>
+      {method === 'existing' && <small>Current payout details · {legacyContact}</small>}
+      {usesHandle && <label>{method === 'Cash App' ? 'Cash App cashtag' : 'Venmo username'}
+        <input value={handle} onChange={e => setHandle(e.target.value)} placeholder={prefix + 'username'}
+          autoCapitalize="none" autoCorrect="off" spellCheck={false} maxLength={64} required />
+      </label>}
+      {usesHandle && <small>Double-check your handle. Nodemere uses it to send your payout manually.</small>}
       <ErrorMessage>{error}</ErrorMessage>{info && <p role="status">{info}</p>}
       <Button primary type="submit" disabled={busy}>Save changes</Button>
     </form>
@@ -239,6 +267,10 @@ export default function Dashboard({ user, home, signOut }) {
   const referrals = usePartnerData(signal => partnerApi(`/referrals?state=${state}&page=${page}`, { signal }), [state, page, revision])
   const payments = usePartnerData(signal => partnerApi(`/payments?page=${paymentPage}`, { signal }), [paymentPage, revision])
   const totals = overview.data?.totals
+  const hasLoadedOverview = useRef(false)
+  useEffect(() => {
+    if (overview.data) hasLoadedOverview.current = true
+  }, [overview.data])
   const analytics = overview.data?.analytics
   const count = value => value?.toLocaleString() ?? '—'
   const earned = totals && totals.ready + totals.owed + totals.paid
@@ -250,9 +282,11 @@ export default function Dashboard({ user, home, signOut }) {
       description: 'Businesses that signed up through your referral link.' },
     { title: 'Qualified referrals', value: count(totals?.qualified), detail: 'Lifetime', icon: Link2,
       description: 'Referrals that reached 30 paid days within the 180-day referral window.' },
-    { title: 'Total earned', value: totals ? money(earned) : '—', detail: totals && `${money(totals.paid)} paid`, icon: Wallet,
+    { title: 'Total earned', value: totals ? money(earned) : '—', detail: totals && `${money(totals.paid)} paid`, icon: Wallet, highlightAmount: Boolean(totals),
       description: 'Total rewards for qualified referrals, including rewards awaiting payout and those already paid.' },
   ]
+
+  if (overview.loading && !totals && !hasLoadedOverview.current) return <DashboardLoadingScreen isLoading />
 
   return <>
     <header className="partner-header"><Brand home={home} /><Profile user={account} signOut={signOut} settings={() => setSettings(true)} home={home} /></header>
