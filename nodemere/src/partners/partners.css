@@ -85,7 +85,7 @@
 .partner-payout-prompt strong { font-size: 14px; font-weight: 600; }
 .partner-payout-options { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .partner-payout-option { min-height: 72px; border: 1px solid #303033; border-radius: 12px; background: #161618; font-size: 15px; font-weight: 500; color: #f5f5f7; }
-.partner-payout-option.selected { border-color: var(--color-brand-purple); background: #8b5cf61a; }
+.partner-payout-option.selected { border-color: #85858f; background: #ffffff12; }
 .partner-share-controls label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 6px; }
 .partner-link-row { display: flex; flex-wrap: wrap; gap: 6px; }
 .partner-link-row input, .partner-directory-search input {
