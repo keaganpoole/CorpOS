@@ -72,7 +72,7 @@
 #partner-root .partner-auth p { color: var(--partner-muted); font-size: 13px; margin-top: 8px; }
 .partner-auth-form { display: grid; gap: 12px; margin-top: 22px; }
 .partner-auth-form label, .partner-settings label, .partner-review label { display: grid; gap: 5px; font-size: 13px; font-weight: 550; }
-.partner-auth-form input { height: 42px; width: 100%; padding: 0 15px; border: 1px solid #3f3f46; border-radius: 999px; background: #1c1c1c; font-size: 16px; color: white; transition: border-color .18s ease; }
+.partner-auth-form input { height: 42px; width: 100%; padding: 0 15px; border: 1px solid #3f3f46; border-radius: 999px; background: #1c1c1c; font-size: 14px; font-weight: 400; color: white; transition: border-color .18s ease; }
 .partner-auth-form input:focus { border-color: #d4d4d8; outline: none; }
 .partner-auth-form .partner-button { margin-top: 4px; }
 .partner-auth-links { display: flex; gap: 13px; flex-wrap: wrap; margin-top: 13px; }
