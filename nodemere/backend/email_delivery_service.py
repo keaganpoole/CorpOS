@@ -17,7 +17,7 @@ import requests
 
 
 RESEND_SEND_URL = "https://api.resend.com/emails"
-EMAIL_KIND = Literal["verification", "document_upload", "workforce_invitation", "account_reset"]
+EMAIL_KIND = Literal["verification", "document_upload", "workforce_invitation", "account_reset", "payment"]
 
 
 class EmailDeliveryError(Exception):
@@ -73,6 +73,10 @@ def _email_copy(kind: EMAIL_KIND, business_name: str) -> tuple[str, str, str, st
     if kind == "account_reset":
         return ("Confirm your Nodemere account reset", "Reset account",
                 "Use this link to permanently clear your Nodemere workspace and return to onboarding. Your login and billing information will stay unchanged.", "Account reset requested")
+    if kind == "payment":
+        return (f"Payment link from {business_name}", "Open secure checkout",
+                f"Use this link to review and pay the amount you confirmed with {business_name}.",
+                "Payment requested")
     if kind == "verification":
         return (
             f"Verify your identity with {business_name}",
@@ -177,6 +181,7 @@ def send_secure_link_email(
     business_name: str,
     secure_link: str,
     configuration: SystemResendConfiguration,
+    idempotency_key: str | None = None,
 ) -> dict:
     """Send one secure-link email through Resend.
 
@@ -205,6 +210,7 @@ def send_secure_link_email(
         RESEND_SEND_URL,
         headers={
             "Authorization": f"Bearer {configuration.api_key}",
+            **({"Idempotency-Key": idempotency_key} if idempotency_key else {}),
             "Content-Type": "application/json",
         },
         json={

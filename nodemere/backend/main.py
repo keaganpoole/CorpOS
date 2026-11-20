@@ -9124,6 +9124,30 @@ def record_intercom_write_action(request: Request, tool_name: str, result: dict)
     )
 
 
+from .outbound_payments import PaymentLookup, PaymentSend, handle_payment
+
+
+def outbound_customer_payment(request, payload):
+    from . import main as payment_backend
+    try:
+        return handle_payment(payment_backend, request.state.internal_claims or {}, payload)
+    except HTTPException:
+        raise
+    except Exception:
+        logging.error("Outbound payment provider or storage unavailable")
+        raise HTTPException(503, "Payment result could not be verified.") from None
+
+
+@app.post("/api/tools/get-payments", dependencies=[Depends(require_internal_tool_authorization)])
+def outbound_get_payments(request: Request, payload: PaymentLookup):
+    return outbound_customer_payment(request, payload)
+
+
+@app.post("/api/tools/send-payment-link", dependencies=[Depends(require_internal_tool_authorization)])
+def outbound_send_payment_link(request: Request, payload: PaymentSend):
+    return outbound_customer_payment(request, payload)
+
+
 @app.api_route("/api/tools/{tool_name}", methods=["GET", "POST"], tags=["Server Tools"])
 async def legacy_server_tool(
     tool_name: str,
@@ -14838,6 +14862,44 @@ async def create_payment_profile(
     return await _send_payment_link_for_user(request, business_owner_id(current_user))
 
 
+def create_customer_checkout(amount, currency, payment_metadata, application_fee_amount,
+                             payment_mode_base_url, stripe_request_options, *, return_url=None, **customer_options):
+    payment_intent_data = {
+        "metadata": payment_metadata,
+    }
+    if application_fee_amount:
+        payment_intent_data["application_fee_amount"] = application_fee_amount
+
+    return stripe.checkout.Session.create(
+        **stripe_request_options,
+        mode="payment",
+        **customer_options,
+        line_items=[{
+            "price_data": {
+                "currency": currency,
+                "product_data": {
+                    "name": "Business payment",
+                    "description": "Business payment",
+                },
+                "unit_amount": amount,
+            },
+            "quantity": 1,
+        }],
+        payment_intent_data=payment_intent_data,
+        success_url=return_url or f"{payment_mode_base_url}/dashboard?payment=success&session_id={{CHECKOUT_SESSION_ID}}",
+        cancel_url=return_url or f"{payment_mode_base_url}/dashboard?payment=cancelled",
+        metadata=payment_metadata,
+    )
+
+
+@app.get("/payments/checkout-return", response_class=HTMLResponse)
+def outbound_checkout_return():
+    return ("<!doctype html><html lang='en'><meta charset='utf-8'>"
+            "<meta name='viewport' content='width=device-width, initial-scale=1'>"
+            "<title>Checkout closed</title><main><h1>Checkout closed</h1>"
+            "<p>You can close this page. Contact the business if you need to confirm your payment status.</p></main></html>")
+
+
 async def _send_payment_link_for_user(request: PaymentLinkCreateRequest, user_id: str):
     require_payment_access(user_id)
     fee_base_cents = customer_payment_fee_base(request.amount, request.tax_amount, request.tip_amount)
@@ -14918,33 +14980,9 @@ async def _send_payment_link_for_user(request: PaymentLinkCreateRequest, user_id
     payment_metadata = build_scenario_customer_metadata(user_id=user_id, person_id=request.person_id)
     payment_metadata.update(customer_payment_fee_metadata(request.amount, request.tax_amount, request.tip_amount))
     try:
-
-        payment_intent_data = {
-            "metadata": payment_metadata,
-        }
-        application_fee_amount = calculate_platform_application_fee(fee_base_cents)
-        if application_fee_amount:
-            payment_intent_data["application_fee_amount"] = application_fee_amount
-
-        checkout_session = stripe.checkout.Session.create(
-            **stripe_request_options,
-            mode="payment",
-            customer=customer.get("id"),
-            line_items=[{
-                "price_data": {
-                    "currency": request.currency,
-                    "product_data": {
-                        "name": "Business payment",
-                        **({"description": description} if description else {}),
-                    },
-                    "unit_amount": request.amount,
-                },
-                        "quantity": 1,
-            }],
-            payment_intent_data=payment_intent_data,
-            success_url=f"{payment_mode_base_url}/dashboard?payment=success&session_id={{CHECKOUT_SESSION_ID}}",
-            cancel_url=f"{payment_mode_base_url}/dashboard?payment=cancelled",
-            metadata=payment_metadata,
+        checkout_session = create_customer_checkout(
+            request.amount, request.currency, payment_metadata, calculate_platform_application_fee(fee_base_cents),
+            payment_mode_base_url, stripe_request_options, customer=customer.get("id"),
         )
 
         payment_row = build_payment_row(

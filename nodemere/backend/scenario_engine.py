@@ -1,6 +1,7 @@
 import json
 import logging
 from .authorization import (scenario_tenant, validate_references, tenant_scope, current_tenant)
+from .outbound_payments import outbound_payment_claims
 from .security import issue_internal_context
 from .permissions import require_permission
 from .privacy import event_metadata, workflow_snapshot
@@ -2042,7 +2043,12 @@ class ScenarioActionExecutor:
             if downstream_data:
                 scenario_context_payload["downstream_data"] = downstream_data
             elevenlabs_dynamic_variables = dict(scenario_context)
-            elevenlabs_dynamic_variables["secret__nodemere_context"] = issue_internal_context(internal_tool_secret, business)
+            payment_claims = {}
+            if not is_scenario_origin:
+                original_person = (context.get("_intercom_outbound") or {}).get("person") or customer_record
+                payment_claims = outbound_payment_claims(original_person, to_number, context.get("appointment"))
+            elevenlabs_dynamic_variables["secret__nodemere_context"] = issue_internal_context(
+                internal_tool_secret, business, claims=payment_claims)
             elevenlabs_dynamic_variables["scenario_context"] = json.dumps(
                 scenario_context_payload,
                 default=str,
