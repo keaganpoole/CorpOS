@@ -15,7 +15,7 @@ This is the operating checklist for Nodemere LLC's general U.S. business launch.
 - Set `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_JWT_SECRET`, `NODEMERE_INTERNAL_TOOL_SECRET`, `ELEVENLABS_WEBHOOK_SECRET`, `STRIPE_WEBHOOK_SECRET`, `TWILIO_AUTH_TOKEN`, `TWILIO_VOICE_WEBHOOK_URL`, `FRONTEND_BASE_URL`, and `CORS_ORIGINS` in production. Do not use an anon key as the backend database key.
 - Configure each ElevenLabs server tool with `x-nodemere-internal-secret`; confirm the provider permits the dynamic first-message override used for the AI/recording notice.
 - Configure Twilio's voice and caller-ID callbacks to the exact HTTPS URLs in the corresponding environment variables. Confirm signature validation succeeds on a test call.
-- Configure Stripe Connect for direct charges on the customer's connected account. Do not add `application_fee_amount` until a fee rate and customer disclosure are approved.
+- Configure Stripe Connect for direct charges on the customer's connected account. The payment code supports `application_fee_amount`; verify the approved `STRIPE_APPLICATION_FEE_PERCENT` value and customer disclosure before enabling payments for a business.
 - Make `www.nodemere.ai` the canonical domain and redirect the other approved domain to it. Set the same production URL in Supabase OAuth redirect settings and all provider callback settings.
 
 ## Communication controls
@@ -52,7 +52,7 @@ Apply the shortest period consistent with the business purpose, a customer contr
 
 - Keep the current public Terms, Privacy Policy, Acceptable Use Policy, AI/Recording Notice, DPA, Cookie Notice, and Subprocessor Notice published from the production domain.
 - Keep a versioned acceptance record for every account. Re-prompt users for a material legal change before continued dashboard use.
-- For Stripe Connect direct charges, the connected business is merchant of record and handles fulfillment, refunds, chargebacks, taxes, and payment disputes. Nodemere does not take a transaction fee at launch.
+- For Stripe Connect direct charges, the connected business is merchant of record and handles fulfillment, refunds, chargebacks, taxes, and payment disputes. Nodemere's configured application fee is transferred to the platform Stripe account when the connected-account payment succeeds; verify the fee rate and transfer in Stripe before launch.
 - Do not collect payment-card information in prompts, notes, documents, call recordings, or CRM fields. Use Stripe-hosted payment collection only.
 
 ## Review cadence

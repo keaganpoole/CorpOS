@@ -42,6 +42,7 @@ class OutboundPayments(unittest.TestCase):
         self.api.load_person_by_id_for_user.return_value = self.person
         self.api.load_business_by_id.return_value = {"name": "Example Salon"}
         self.api.is_payment_test_mode.return_value = False
+        self.api.is_real_stripe_test_mode.return_value = False
         self.options = dict(api_key="sk_test_fixture", stripe_account="acct_fixture")
         self.api._get_connected_stripe_request_options.return_value = self.options
         self.api._system_resend_configuration.return_value = SystemResendConfiguration("billing@example.com", "fixture")
@@ -122,7 +123,59 @@ class OutboundPayments(unittest.TestCase):
         self.assert_blocked(409, self.lookup)
         self.api.require_payment_access.side_effect = HTTPException(403, "Plan")
         self.assert_blocked(403, self.lookup)
-        self.api._get_connected_stripe_request_options.assert_not_called()
+        self.api._get_connected_stripe_request_options.assert_called_once_with("owner")
+
+    def test_explicit_stripe_test_mode_allows_sandbox_only(self):
+        self.api.is_payment_test_mode.return_value = True
+        self.api.is_real_stripe_test_mode.return_value = True
+        self.assertEqual(self.lookup()["quote"]["amount_cents"], 4500)
+        self.assertEqual(self.send(), {"status": "sent"})
+        self.assertEqual(self.checkout.call_args.kwargs["payment_intent_data"]["application_fee_amount"], 135)
+
+        self.api._get_connected_stripe_request_options.return_value = {
+            "api_key": "sk_live_fixture", "stripe_account": "acct_live_fixture"}
+        self.assert_blocked(409, self.lookup)
+        self.checkout.assert_called_once()
+
+    def test_real_stripe_test_flag_cannot_select_live_platform_key(self):
+        with patch.object(main, "STRIPE_REAL_TEST_MODE", True), \
+             patch.object(main, "is_payment_test_mode", return_value=True), \
+             patch.object(main, "STRIPE_TEST_SECRET_KEY", "sk_test_fixture"):
+            self.assertEqual(main._stripe_platform_api_key(False), "sk_test_fixture")
+            with self.assertRaises(HTTPException) as ctx:
+                main._stripe_platform_api_key(True)
+        self.assertEqual(ctx.exception.status_code, 409)
+
+    def test_stripe_oauth_is_real_only_for_explicit_test_mode(self):
+        with patch.object(main, "is_payment_test_mode", return_value=True), \
+             patch.object(main, "is_real_stripe_test_mode", return_value=False), \
+             patch.object(main.stripe.OAuth, "token") as oauth_token:
+            with self.assertRaises(HTTPException) as ctx:
+                main._exchange_stripe_code("fixture-code")
+            self.assertEqual(ctx.exception.status_code, 409)
+            oauth_token.assert_not_called()
+
+        with patch.object(main, "is_payment_test_mode", return_value=True), \
+             patch.object(main, "is_real_stripe_test_mode", return_value=True), \
+             patch.object(main, "_stripe_connect_client_id", return_value="ca_test_fixture"), \
+             patch.object(main, "_stripe_platform_api_key", return_value="sk_test_fixture"), \
+             patch.object(main.stripe.OAuth, "token", return_value={"stripe_user_id": "acct_test_fixture", "livemode": False}) as oauth_token:
+            self.assertEqual(main._exchange_stripe_code("fixture-code")["stripe_user_id"], "acct_test_fixture")
+        self.assertEqual(oauth_token.call_args.kwargs["api_key"], "sk_test_fixture")
+
+    def test_connected_account_options_reject_live_account_in_test_mode(self):
+        integration = {"status": "connected", "credentials": {"stripe_user_id": "acct_test_fixture", "livemode": False}}
+        with patch.object(main, "_fetch_integration_row", return_value=integration), \
+             patch.object(main, "is_real_stripe_test_mode", return_value=True), \
+             patch.object(main, "_stripe_platform_api_key", return_value="sk_test_fixture"):
+            self.assertEqual(main._get_connected_stripe_request_options("owner"),
+                             {"api_key": "sk_test_fixture", "stripe_account": "acct_test_fixture"})
+        integration["credentials"]["livemode"] = True
+        with patch.object(main, "_fetch_integration_row", return_value=integration), \
+             patch.object(main, "is_real_stripe_test_mode", return_value=True):
+            with self.assertRaises(HTTPException) as ctx:
+                main._get_connected_stripe_request_options("owner")
+        self.assertEqual(ctx.exception.status_code, 409)
 
     def test_quote_requires_positive_exact_cents_and_no_existing_invoice(self):
         for value in (0, -1, "NaN", "45.005", "", "1e100"):

@@ -2786,6 +2786,11 @@ def _upsert_integration_row(user_id: str, provider: str, updates: dict) -> dict:
 
 def _stripe_platform_api_key(livemode: Optional[bool] = None) -> str:
     is_payment_test_mode()
+    if is_real_stripe_test_mode() and livemode is True:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Live Stripe accounts are unavailable while real Stripe test mode is enabled.",
+        )
     use_live_key = (not (PAYMENT_TEST_MODE or is_real_stripe_test_mode())) if livemode is None else livemode
     api_key = STRIPE_LIVE_SECRET_KEY if use_live_key else STRIPE_TEST_SECRET_KEY
     if not api_key:
@@ -2803,7 +2808,7 @@ def _stripe_object_to_dict(value) -> dict:
 
 
 def _exchange_stripe_code(code: str) -> dict:
-    if is_payment_test_mode():
+    if is_payment_test_mode() and not is_real_stripe_test_mode():
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Stripe account authorization is simulated while payment test mode is enabled.")
     if not _stripe_connect_client_id():
         raise HTTPException(
@@ -2835,6 +2840,11 @@ def _get_connected_stripe_request_options(user_id: str) -> dict:
             status_code=status.HTTP_409_CONFLICT,
             detail="Stripe is not connected. Connect Stripe in Integrations before running payment actions.",
         )
+    if is_real_stripe_test_mode() and livemode:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A test-mode Stripe account is required while real Stripe test mode is enabled.",
+        )
     return {
         "api_key": _stripe_platform_api_key(bool(livemode)),
         "stripe_account": stripe_user_id,
@@ -2842,7 +2852,7 @@ def _get_connected_stripe_request_options(user_id: str) -> dict:
 
 
 def _deauthorize_stripe_integration(integration: Optional[dict]) -> None:
-    if is_payment_test_mode():
+    if is_payment_test_mode() and not is_real_stripe_test_mode():
         return
     credentials = (integration or {}).get("credentials") or {}
     stripe_user_id = credentials.get("stripe_user_id")
@@ -16763,7 +16773,7 @@ async def list_user_integrations(current_user: dict = Depends(get_current_user))
             or []
         )
         by_provider = {row.get("provider"): row for row in rows if row.get("provider")}
-        if is_payment_test_mode():
+        if is_payment_test_mode() and not is_real_stripe_test_mode():
             simulated_stripe = _default_user_integration("stripe", current_user_id)
             simulated_stripe.update({
                 "status": "connected",
@@ -16865,7 +16875,7 @@ async def authorize_user_integration(
         }
         authorization_url = requests.Request("GET", OUTLOOK_AUTH_URL, params=params).prepare().url
     elif provider == "stripe":
-        if is_payment_test_mode():
+        if is_payment_test_mode() and not is_real_stripe_test_mode():
             _upsert_integration_row(
                 business_owner_id(current_user),
                 provider,
@@ -17170,6 +17180,11 @@ async def stripe_integration_callback(
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Stripe did not return a connected account ID.")
 
         livemode = bool(token_data.get("livemode"))
+        if is_real_stripe_test_mode() and livemode:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Stripe returned a live account while test mode is required.",
+            )
         account = _stripe_object_to_dict(
             stripe.Account.retrieve(
                 stripe_user_id,

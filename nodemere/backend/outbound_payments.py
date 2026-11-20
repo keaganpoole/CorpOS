@@ -176,9 +176,15 @@ def handle_payment(api, claims, payload):
             or email.casefold() != str(payload.customer_email).casefold()
             or digest(phone + "|" + email.casefold()) != claims["payment_contact"]):
         raise HTTPException(403, "Customer details could not be verified.")
-    if api.is_payment_test_mode():
-        raise HTTPException(409, "Checkout is unavailable in local simulation mode.")
     options = api._get_connected_stripe_request_options(owner)
+    if api.is_payment_test_mode():
+        is_explicit_stripe_test = (
+            api.is_real_stripe_test_mode()
+            and isinstance(options.get("api_key"), str)
+            and options["api_key"].startswith(("sk_test_", "rk_test_"))
+        )
+        if not is_explicit_stripe_test:
+            raise HTTPException(409, "Checkout is unavailable in local simulation mode.")
     account = options["stripe_account"]
     mode = "test" if "_test_" in options["api_key"] else "live"
     def records():
