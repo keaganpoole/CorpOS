@@ -129,8 +129,10 @@ def verify_caller_turns(payload):
         if not isinstance(entry, dict):
             continue
         if isinstance(payload, PaymentSend):
-            if entry.get("role") == "tool" and any(isinstance(result, dict) and result.get("tool_name") == "get_payments"
-                                                    for result in entry.get("tool_results") or []):
+            # Resolved webhook bodies can put tool results on an agent turn.
+            results = (entry.get("tool_results") or []) if entry.get("role") in {"agent", "tool"} else []
+            result_names = {result.get("tool_name") for result in results if isinstance(result, dict)}
+            if "get_payments" in result_names:
                 lookup_completed, quote_spoken, customer_replied = True, False, False
             if entry.get("role") == "agent":
                 if lookup_completed and entry.get("message"):
@@ -139,9 +141,8 @@ def verify_caller_turns(payload):
                     if isinstance(request, dict) and request.get("tool_name") == "send_payment_link":
                         params = request.get("params_as_json")
                         previous_quote = params.get("quote_id") if isinstance(params, dict) else None
-            if entry.get("role") == "tool" and previous_quote in (None, payload.quote_id):
-                send_attempted |= any(isinstance(result, dict) and result.get("tool_name") == "send_payment_link"
-                                      for result in entry.get("tool_results") or [])
+            if "send_payment_link" in result_names and previous_quote in (None, payload.quote_id):
+                send_attempted = True
         if entry.get("role") != "user" or not isinstance(entry.get("message"), str):
             continue
         if quote_spoken and entry["message"].strip():

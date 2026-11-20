@@ -398,3 +398,13 @@ class OutboundPayments(unittest.TestCase):
         for incomplete in (entries[:1], entries[:2], entries[:3]):
             self.assert_blocked(409, self.send, conversation_history=json.dumps({"entries": incomplete}))
         self.checkout.assert_not_called()
+
+    def test_resolved_elevenlabs_webhook_uses_agent_role_for_tool_results(self):
+        entries = json.loads(self.agreed_history())["entries"]
+        entries[1]["role"] = "agent"
+        def as_wire_body():
+            return json.dumps({"x-elevenlabs-history": True, "entries": entries})
+        self.assertEqual(self.send(conversation_history=as_wire_body()), {"status": "sent"})
+        entries.append({"role": "agent", "tool_results": [{"tool_name": "send_payment_link", "result_value": "timeout"}]})
+        self.assert_blocked(409, self.send, conversation_history=as_wire_body())
+        self.mail.assert_called_once()
