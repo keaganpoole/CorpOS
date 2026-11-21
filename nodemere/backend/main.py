@@ -15710,7 +15710,12 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
         if not secret:
             continue
         try:
-            candidate = stripe.Webhook.construct_event(payload=raw_body, sig_header=stripe_signature, secret=secret)
+            verified_event = stripe.Webhook.construct_event(payload=raw_body, sig_header=stripe_signature, secret=secret)
+            candidate = (
+                verified_event.to_dict()
+                if callable(getattr(verified_event, "to_dict", None))
+                else dict(verified_event)
+            )
         except ValueError:
             logging.warning('main.stripe_webhook.event_11473')
             raise HTTPException(status_code=400, detail="Invalid payload")

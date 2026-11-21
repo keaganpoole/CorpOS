@@ -42,3 +42,23 @@ class StripeWebhookSignatureTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(HTTPException) as wrong_signature:
                 await self._deliver("whsec_other")
             self.assertEqual(wrong_signature.exception.status_code, 400)
+
+    async def test_stripe_sdk_event_objects_are_normalized_before_scope_checks(self):
+        class StripeEventObject:
+            def to_dict(self):
+                return {
+                    "id": "evt_test",
+                    "object": "event",
+                    "type": "unhandled.test",
+                    "account": "acct_test",
+                    "data": {"object": {}},
+                }
+
+        request = SimpleNamespace(body=AsyncMock(return_value=b"{}"))
+        with patch.object(main, "stripe_connect_test_webhook_secret", "whsec_connect_test"), \
+             patch.object(main.stripe.Webhook, "construct_event", return_value=StripeEventObject()), \
+             patch.object(main.asyncio, "to_thread", new_callable=AsyncMock):
+            self.assertEqual(
+                await main.stripe_webhook(request, stripe_signature="test-signature"),
+                {"status": "success"},
+            )
