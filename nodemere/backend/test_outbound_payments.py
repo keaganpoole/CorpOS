@@ -405,6 +405,60 @@ class OutboundPayments(unittest.TestCase):
         self.checkout.assert_called_once()
         self.assertEqual(client.get("/payments/checkout-return").status_code, 200)
 
+    def test_outbound_payment_test_harness_requires_test_mode_and_uses_same_handler(self):
+        from types import SimpleNamespace
+        person = {**self.person, "id": 12, "business_id": 21}
+        self.enter_patch(main, "load_person_by_id_for_user", return_value=person)
+        self.enter_patch(main, "is_real_stripe_test_mode", return_value=True)
+        self.enter_patch(main, "is_payment_test_mode", return_value=True)
+        self.enter_patch(main, "_get_connected_stripe_request_options", return_value=self.options)
+        admin_query = MagicMock()
+        admin_query.limit.return_value.execute.return_value.data = [{"stripe_session_id": "cs_test_fixture"}]
+        admin_table = MagicMock()
+        admin_table.select.return_value.eq.return_value.eq.return_value.eq.return_value = admin_query
+        self.enter_patch(main.supabase_admin, "table", return_value=admin_table)
+        self.enter_patch(main.stripe.checkout.Session, "retrieve", return_value={
+            "url": "https://checkout.stripe.com/test_fixture", "status": "open"})
+        calls = []
+
+        def handle(_backend, claims, payload):
+            calls.append((claims.copy(), payload))
+            if isinstance(payload, payments.PaymentSend):
+                return {"status": "sent"}
+            if isinstance(payload, payments.PaymentLookup):
+                return {"quote": {"quote_id": "quote-test", "amount_cents": 4500,
+                                  "currency": "usd", "purpose": "Cut", "source": "service:7"}, "payments": []}
+            raise AssertionError("Unexpected payment payload")
+
+        self.enter_patch(main, "handle_payment", side_effect=handle)
+        payload = main.OutboundPaymentTestRequest(person_id="12", service_name="Cut",
+                                                   confirmed_email=self.person["email"])
+        result = main.run_outbound_payment_sandbox_test(payload, SimpleNamespace(id="owner"))
+
+        self.assertEqual(result, {
+            "status": "sent", "amount_cents": 4500, "currency": "usd",
+            "application_fee_cents": 135, "mode": "test", "phone_call_placed": False,
+            "checkout_url": "https://checkout.stripe.com/test_fixture"})
+        self.assertEqual(len(calls), 2)
+        lookup_claims, lookup_payload = calls[0]
+        send_claims, send_payload = calls[1]
+        self.assertEqual(lookup_claims["payment_person"], "12")
+        self.assertEqual(send_claims["payment_call"], lookup_claims["payment_call"])
+        self.assertEqual(send_payload.confirmed_amount_cents, 4500)
+        self.assertTrue(send_payload.confirmed)
+        self.assertEqual(send_payload.quote_id, "quote-test")
+        self.assertIn("Yes, I agree", send_payload.conversation_history.get_secret_value())
+
+    def test_outbound_payment_test_harness_rejects_non_stripe_test_mode(self):
+        from types import SimpleNamespace
+        payload = main.OutboundPaymentTestRequest(person_id="12", service_name="Cut",
+                                                   confirmed_email=self.person["email"])
+        self.enter_patch(main, "is_real_stripe_test_mode", return_value=False)
+        with patch.object(main, "handle_payment") as handler, self.assertRaises(HTTPException) as ctx:
+            main.run_outbound_payment_sandbox_test(payload, SimpleNamespace(id="owner"))
+        self.assertEqual(ctx.exception.status_code, 409)
+        handler.assert_not_called()
+
     def test_generated_checkout_webhook_updates_the_reserved_payment(self):
         from backend.test_prelaunch_fixes import handlers
         self.send()

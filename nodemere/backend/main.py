@@ -9153,7 +9153,7 @@ def record_intercom_write_action(request: Request, tool_name: str, result: dict)
     )
 
 
-from .outbound_payments import PaymentLookup, PaymentSend, handle_payment
+from .outbound_payments import PaymentLookup, PaymentSend, handle_payment, outbound_payment_claims
 
 
 def outbound_customer_payment(request, payload):
@@ -9175,6 +9175,93 @@ def outbound_get_payments(request: Request, payload: PaymentLookup):
 @app.post("/api/tools/send-payment-link", dependencies=[Depends(require_internal_tool_authorization)])
 def outbound_send_payment_link(request: Request, payload: PaymentSend):
     return outbound_customer_payment(request, payload)
+
+
+class OutboundPaymentTestRequest(BaseModel):
+    person_id: str = Field(min_length=1, max_length=64)
+    service_name: str = Field(min_length=1, max_length=160)
+    confirmed_email: EmailStr
+
+
+@app.post("/api/sonar/payments/outbound-test", tags=["Sonar Payments"])
+def run_outbound_payment_sandbox_test(
+    payload: OutboundPaymentTestRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """Exercise the outbound payment handler in Stripe sandbox without placing a phone call."""
+    if not is_real_stripe_test_mode() or not is_payment_test_mode():
+        raise HTTPException(status_code=409, detail="Outbound payment harness is available only in explicit Stripe test mode.")
+
+    user_id = business_owner_id(current_user)
+    person = load_person_by_id_for_user(user_id, payload.person_id) or {}
+    email = str(person.get("email") or "").strip()
+    business_id = person.get("business_id")
+    if (not person.get("id") or not business_id or not person.get("phone")
+            or email.casefold() != str(payload.confirmed_email).casefold()):
+        raise HTTPException(status_code=409, detail="The selected test customer could not be verified.")
+
+    options = _get_connected_stripe_request_options(user_id)
+    api_key = options.get("api_key")
+    if not isinstance(api_key, str) or not api_key.startswith(("sk_test_", "rk_test_")):
+        raise HTTPException(status_code=409, detail="A Stripe sandbox key is required for this test.")
+
+    claims = outbound_payment_claims(person, person.get("phone"))
+    if not claims:
+        raise HTTPException(status_code=409, detail="The selected test customer has no verified payment contact.")
+    claims.update({"sub": user_id, "business_id": str(business_id)})
+
+    lookup_history = json.dumps({"entries": [{"role": "user", "message": f"My email is {email}"}]})
+    lookup_payload = PaymentLookup(
+        customer_email=email,
+        service_name=payload.service_name,
+        conversation_history=lookup_history,
+    )
+    test_request = SimpleNamespace(state=SimpleNamespace(internal_claims=claims))
+    lookup = outbound_customer_payment(test_request, lookup_payload)
+    quote = lookup.get("quote") if isinstance(lookup, dict) else None
+    if not quote or not quote.get("quote_id") or not quote.get("amount_cents"):
+        raise HTTPException(status_code=409, detail="No current fixed-price quote is available for this test.")
+
+    amount_cents = int(quote["amount_cents"])
+    amount = f"{amount_cents / 100:.2f}"
+    send_history = json.dumps({"entries": [
+        {"role": "user", "message": f"My email is {email}"},
+        {"role": "tool", "tool_results": [{"tool_name": "get_payments", "result_value": json.dumps(lookup)}]},
+        {"role": "agent", "message": f"The {quote.get('purpose', 'payment')} quote is ${amount} to {email}. Should I send it?"},
+        {"role": "user", "message": "Yes, I agree to send that amount to that email."},
+    ]})
+    sent = outbound_customer_payment(test_request, PaymentSend(
+        customer_email=email,
+        service_name=payload.service_name,
+        conversation_history=send_history,
+        confirmed_amount_cents=amount_cents,
+        confirmed=True,
+        quote_id=quote["quote_id"],
+    ))
+    account = options["stripe_account"]
+    payment_key = str(uuid5(NAMESPACE_URL, "|".join([
+        str(user_id), str(business_id), str(person["id"]), str(account), "test",
+        str(quote["source"]), "outstanding",
+    ])))
+    payment_rows = (supabase_admin.table("payments").select("stripe_session_id")
+                    .eq("id", payment_key).eq("business_id", business_id)
+                    .eq("user_id", user_id).limit(1).execute().data or [])
+    session_id = payment_rows[0].get("stripe_session_id") if payment_rows else None
+    if not session_id:
+        raise HTTPException(status_code=503, detail="Sandbox Checkout was not recorded.")
+    session = stripe.checkout.Session.retrieve(session_id, **options)
+    checkout_url = session.get("url")
+    if not checkout_url or session.get("status") != "open":
+        raise HTTPException(status_code=409, detail="Sandbox Checkout is not open.")
+    return {
+        "status": sent.get("status"),
+        "amount_cents": amount_cents,
+        "currency": quote.get("currency", "usd"),
+        "application_fee_cents": calculate_platform_application_fee(amount_cents),
+        "mode": "test",
+        "phone_call_placed": False,
+        "checkout_url": checkout_url,
+    }
 
 
 @app.api_route("/api/tools/{tool_name}", methods=["GET", "POST"], tags=["Server Tools"])
