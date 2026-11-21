@@ -2823,7 +2823,14 @@ def _exchange_stripe_code(code: str) -> dict:
         )
         return _stripe_object_to_dict(token)
     except Exception as exc:
-        logging.error('main._exchange_stripe_code.event_2264')
+        # Keep OAuth diagnostics useful without logging the one-time code,
+        # response body, or any credentials.
+        logging.error(
+            'main._exchange_stripe_code.event_2264 error_type=%s stripe_code=%s http_status=%s',
+            type(exc).__name__,
+            getattr(exc, 'code', None),
+            getattr(exc, 'http_status', None),
+        )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Stripe account authorization failed.",
