@@ -180,6 +180,19 @@ class OutboundPayments(unittest.TestCase):
 
         self.assertEqual(token, {"stripe_user_id": "acct_test_fixture", "livemode": False})
 
+    def test_stripe_oauth_callback_access_logs_are_suppressed(self):
+        record = main.logging.LogRecord(
+            "uvicorn.access",
+            main.logging.INFO,
+            __file__,
+            1,
+            '%s - "%s %s HTTP/%s" %d',
+            ("127.0.0.1", "GET", "/users/me/integrations/stripe/callback?code=one-time&state=private", "1.1", 302),
+            None,
+        )
+
+        self.assertFalse(main.UvicornAccessFilter().filter(record))
+
     def test_connected_account_options_reject_live_account_in_test_mode(self):
         integration = {"status": "connected", "credentials": {"stripe_user_id": "acct_test_fixture", "livemode": False}}
         with patch.object(main, "_fetch_integration_row", return_value=integration), \

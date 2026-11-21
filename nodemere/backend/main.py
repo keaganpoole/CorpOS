@@ -39,6 +39,7 @@ SUPPRESSED_ACCESS_LOG_PATHS = {
     "/api/cron",
     "/api/reactions",
     "/businesses/me/forwarding",
+    "/users/me/integrations/stripe/callback",
 }
 APPOINTMENT_ALLOWED_STATUSES = {"pending", "confirmed", "cancelled", "completed", "missed"}
 
