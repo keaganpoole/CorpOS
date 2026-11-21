@@ -2804,6 +2804,8 @@ def _stripe_platform_api_key(livemode: Optional[bool] = None) -> str:
 def _stripe_object_to_dict(value) -> dict:
     if hasattr(value, "to_dict_recursive"):
         return value.to_dict_recursive()
+    if hasattr(value, "to_dict"):
+        return value.to_dict()
     return dict(value or {})
 
 

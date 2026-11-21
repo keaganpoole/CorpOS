@@ -163,6 +163,23 @@ class OutboundPayments(unittest.TestCase):
             self.assertEqual(main._exchange_stripe_code("fixture-code")["stripe_user_id"], "acct_test_fixture")
         self.assertEqual(oauth_token.call_args.kwargs["api_key"], "sk_test_fixture")
 
+    def test_stripe_object_conversion_uses_sdk_to_dict(self):
+        class StripeTokenFixture:
+            def to_dict(self):
+                return {"stripe_user_id": "acct_test_fixture", "livemode": False}
+
+            def __iter__(self):
+                raise TypeError("StripeObject is not iterable; call .to_dict()")
+
+        with patch.object(main, "is_payment_test_mode", return_value=True), \
+             patch.object(main, "is_real_stripe_test_mode", return_value=True), \
+             patch.object(main, "_stripe_connect_client_id", return_value="ca_test_fixture"), \
+             patch.object(main, "_stripe_platform_api_key", return_value="sk_test_fixture"), \
+             patch.object(main.stripe.OAuth, "token", return_value=StripeTokenFixture()):
+            token = main._exchange_stripe_code("fixture-code")
+
+        self.assertEqual(token, {"stripe_user_id": "acct_test_fixture", "livemode": False})
+
     def test_connected_account_options_reject_live_account_in_test_mode(self):
         integration = {"status": "connected", "credentials": {"stripe_user_id": "acct_test_fixture", "livemode": False}}
         with patch.object(main, "_fetch_integration_row", return_value=integration), \
