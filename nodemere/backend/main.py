@@ -2825,11 +2825,20 @@ def _exchange_stripe_code(code: str) -> dict:
     except Exception as exc:
         # Keep OAuth diagnostics useful without logging the one-time code,
         # response body, or any credentials.
+        error_frame = exc.__traceback__
+        while error_frame and error_frame.tb_next:
+            error_frame = error_frame.tb_next
+        error_site = (
+            f"{os.path.basename(error_frame.tb_frame.f_code.co_filename)}:"
+            f"{error_frame.tb_lineno}:{error_frame.tb_frame.f_code.co_name}"
+            if error_frame else "unknown"
+        )
         logging.error(
-            'main._exchange_stripe_code.event_2264 error_type=%s stripe_code=%s http_status=%s',
+            'main._exchange_stripe_code.event_2264 error_type=%s stripe_code=%s http_status=%s error_site=%s',
             type(exc).__name__,
             getattr(exc, 'code', None),
             getattr(exc, 'http_status', None),
+            error_site,
         )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
