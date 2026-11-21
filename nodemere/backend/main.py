@@ -85,6 +85,7 @@ from .config import (
     supabase_auth,
     stripe_webhook_secret,
     stripe_connect_webhook_secret,
+    stripe_connect_test_webhook_secret,
     SECRET_KEY,
     ALGORITHM,
     TEST_MODE,
@@ -15695,7 +15696,7 @@ async def update_payment(request: PaymentUpdateRequest, current_user: dict = Dep
 
 @app.post("/stripe-webhook", tags=["Billing"])
 async def stripe_webhook(request: Request, stripe_signature: str = Header(None)):
-    if not stripe_webhook_secret and not stripe_connect_webhook_secret:
+    if not stripe_webhook_secret and not stripe_connect_webhook_secret and not stripe_connect_test_webhook_secret:
         logging.error('main.stripe_webhook.event_11531')
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Stripe webhook authentication is not configured.")
     raw_body = await request.body()
@@ -15704,6 +15705,7 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
     for secret, expects_connected_account in (
         (stripe_webhook_secret, False),
         (stripe_connect_webhook_secret, True),
+        (stripe_connect_test_webhook_secret, True),
     ):
         if not secret:
             continue

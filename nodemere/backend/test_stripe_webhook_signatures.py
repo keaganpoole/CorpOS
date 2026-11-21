@@ -25,13 +25,16 @@ class StripeWebhookSignatureTests(unittest.IsolatedAsyncioTestCase):
     async def test_platform_and_connect_secrets_accept_matching_scopes(self):
         with patch.object(main, "stripe_webhook_secret", "whsec_platform"), \
              patch.object(main, "stripe_connect_webhook_secret", "whsec_connect"), \
+             patch.object(main, "stripe_connect_test_webhook_secret", "whsec_connect_test"), \
              patch.object(main.asyncio, "to_thread", new_callable=AsyncMock):
             self.assertEqual((await self._deliver("whsec_platform"))["status"], "success")
             self.assertEqual((await self._deliver("whsec_connect", "acct_123"))["status"], "success")
+            self.assertEqual((await self._deliver("whsec_connect_test", "acct_test"))["status"], "success")
 
     async def test_signature_cannot_be_used_for_wrong_account_scope(self):
         with patch.object(main, "stripe_webhook_secret", "whsec_platform"), \
              patch.object(main, "stripe_connect_webhook_secret", "whsec_connect"), \
+             patch.object(main, "stripe_connect_test_webhook_secret", "whsec_connect_test"), \
              patch.object(main.asyncio, "to_thread", new_callable=AsyncMock):
             with self.assertRaises(HTTPException) as wrong_scope:
                 await self._deliver("whsec_platform", "acct_123")
